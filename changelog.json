@@ -1,4 +1,11 @@
 {
+  "2.8.2": [
+      "🐞 **Bug Fix (Data Transfer):** Fixed data transfer failure between tabs (e.g., MR Tracking to MR Payment) caused by Skeleton Loader timing.",
+      "🐞 **Bug Fix (Background Execution):** Fixed automation stopping/timing out when the browser window is minimized.",
+      "🐞 **Bug Fix (Autocomplete):** Resolved issue where the dropdown list would re-open immediately after selecting an item.",
+      "🛠 **Improvement (MR Tracking):** Updated logic to skip records 'Pending since 1 day' (in addition to 0 days) to avoid premature processing.",
+      "🛠 **Improvement (macOS Headless):** Fixed EGL/GPU driver errors in headless mode by disabling GPU hardware acceleration."
+    ],
   "2.8.1": [
       "✨ **New Browser Support:** Added full support for **Microsoft Edge**! You can now launch Edge directly from the dashboard and use it for all automations alongside Chrome and Firefox.",
       "🚀 **Performance (Headless Mode):** Reports like 'MR Tracking' now run in the background (Headless Browser). You can continue working on other tasks while the bot processes data invisibly.",

@@ -8,17 +8,13 @@ import threading
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from .base_tab import BaseAutomationTab
 
 class SADUpdateStatusTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
         super().__init__(parent, app_instance, automation_key="sad_update_status")
         self.config_file = self.app.get_data_path("sad_update_inputs.json")
-        
-        # Flags
-        self.is_running = False
-        self.stop_requested = False
         
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1) 
@@ -31,7 +27,7 @@ class SADUpdateStatusTab(BaseAutomationTab):
         self.load_inputs()
 
     def _create_widgets(self):
-        # Frame
+        # --- Top Frame: Inputs & Actions ---
         main_frame = ctk.CTkFrame(self.main_scroll)
         main_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         main_frame.grid_columnconfigure(1, weight=1)
@@ -40,55 +36,53 @@ class SADUpdateStatusTab(BaseAutomationTab):
         ctk.CTkLabel(main_frame, text="Sarkar Aapke Dwar - Update Status / Disposal", 
                      font=ctk.CTkFont(size=16, weight="bold")).grid(row=0, column=0, columnspan=3, pady=10, sticky="w", padx=10)
 
-        # --- NEW NOTE ADDED HERE (Row 1) ---
+        # Note
         ctk.CTkLabel(main_frame, text="Note: Download Excel filtered Applicant report from ASAD portal and directly upload it here.", 
                      text_color="gray", font=("Arial", 12, "italic")).grid(row=1, column=0, columnspan=3, sticky="w", padx=15, pady=(0, 10))
 
-        # 1. File Selection (Row 2)
+        # 1. File Selection
         ctk.CTkLabel(main_frame, text="Upload File (Excel/CSV):").grid(row=2, column=0, sticky="w", padx=10, pady=5)
         self.csv_entry = ctk.CTkEntry(main_frame, placeholder_text="Select .xlsx or .csv file")
         self.csv_entry.grid(row=2, column=1, sticky="ew", padx=5, pady=5)
         ctk.CTkButton(main_frame, text="Browse", width=80, command=self.browse_file).grid(row=2, column=2, padx=10, pady=5)
 
-        # 2. Action Selection (Row 3)
+        # 2. Action Selection
         ctk.CTkLabel(main_frame, text="Select Action:").grid(row=3, column=0, sticky="w", padx=10, pady=5)
         self.action_combobox = ctk.CTkComboBox(main_frame, values=["Dispose", "Reject", "In Progress", "Pending"])
         self.action_combobox.set("Dispose") 
         self.action_combobox.grid(row=3, column=1, sticky="ew", padx=5, pady=5)
 
-        # 3. Block Code Prefix (Row 4)
+        # 3. Block Code Prefix
         ctk.CTkLabel(main_frame, text="Block Code to Remove:").grid(row=4, column=0, sticky="w", padx=10, pady=5)
         self.prefix_entry = ctk.CTkEntry(main_frame, placeholder_text="e.g. 3/28/ (Leave empty if not needed)")
         self.prefix_entry.grid(row=4, column=1, sticky="ew", padx=5, pady=5)
         ctk.CTkLabel(main_frame, text="(Prefix will be removed)", 
                      text_color="gray", font=("Arial", 10)).grid(row=4, column=2, sticky="w", padx=5)
 
-        # 4. Control Buttons (Row 5)
-        btn_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        btn_frame.grid(row=5, column=0, columnspan=3, pady=15, sticky="ew")
+        # 4. Control Buttons (Standardized & Centered)
+        btn_container = ctk.CTkFrame(main_frame, fg_color="transparent")
+        btn_container.grid(row=5, column=0, columnspan=3, pady=20, sticky="ew")
         
-        self.start_btn = ctk.CTkButton(btn_frame, text="Start Process", command=self.start_process, 
-                                       fg_color="#28a745", hover_color="#218838", width=100)
-        self.start_btn.pack(side="left", padx=5)
+        # Using BaseAutomationTab's button creator
+        action_frame = self._create_action_buttons(btn_container)
+        action_frame.pack(anchor="center")
 
-        self.stop_btn = ctk.CTkButton(btn_frame, text="Stop", command=self.stop_process, 
-                                      fg_color="#dc3545", hover_color="#c82333", width=80, state="disabled")
-        self.stop_btn.pack(side="left", padx=5)
-
-        self.reset_btn = ctk.CTkButton(btn_frame, text="Reset", command=self.reset_ui, 
-                                       fg_color="#6c757d", hover_color="#5a6268", width=80)
-        self.reset_btn.pack(side="left", padx=5)
-
-        self.copy_log_btn = ctk.CTkButton(btn_frame, text="Copy Log", command=self.copy_logs, 
-                                          fg_color="#17a2b8", hover_color="#138496", width=80)
-        self.copy_log_btn.pack(side="left", padx=5)
-
-        # 5. Logs
+        # --- Bottom Frame: Logs & Status ---
         log_frame = ctk.CTkFrame(self.main_scroll)
         log_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         log_frame.grid_columnconfigure(0, weight=1)
         
-        ctk.CTkLabel(log_frame, text="Process Logs").grid(row=0, column=0, sticky="w", padx=5, pady=2)
+        # Log Header (Label Left, Copy Button Right)
+        log_header = ctk.CTkFrame(log_frame, fg_color="transparent")
+        log_header.grid(row=0, column=0, sticky="ew", padx=5, pady=(5, 0))
+        
+        ctk.CTkLabel(log_header, text="Process Logs", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=5)
+        
+        # Copy Log Button (Fixed: Now in the correct place)
+        self.copy_log_btn = ctk.CTkButton(log_header, text="Copy Logs", width=100, command=self.copy_logs)
+        self.copy_log_btn.pack(side="right", padx=5)
+
+        # Log Textbox
         self.log_display = ctk.CTkTextbox(log_frame, height=200, state="disabled")
         self.log_display.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
 
@@ -112,10 +106,22 @@ class SADUpdateStatusTab(BaseAutomationTab):
             messagebox.showerror("Error", f"Failed to copy: {e}")
 
     def reset_ui(self):
+        # Standard reset logic
         self.csv_entry.delete(0, tkinter.END)
         self.prefix_entry.delete(0, tkinter.END)
         self.app.clear_log(self.log_display)
         self.log("UI Reset.")
+
+    def set_ui_state(self, running: bool):
+        # Base class method toggles Start/Stop buttons
+        self.set_common_ui_state(running)
+        
+        # Local widgets toggle
+        state = "disabled" if running else "normal"
+        self.csv_entry.configure(state=state)
+        self.action_combobox.configure(state=state)
+        self.prefix_entry.configure(state=state)
+        self.copy_log_btn.configure(state=state) # Toggle copy button too
 
     def save_inputs(self, inputs):
         try:
@@ -128,7 +134,7 @@ class SADUpdateStatusTab(BaseAutomationTab):
                 with open(self.config_file, 'r') as f:
                     data = json.load(f)
                     self.csv_entry.insert(0, data.get('csv_file', ''))
-                    self.prefix_entry.insert(0, data.get('block_prefix', '3/28/')) # Default suggested
+                    self.prefix_entry.insert(0, data.get('block_prefix', '3/28/'))
         except: pass
 
     # --- File Reading Helper ---
@@ -165,7 +171,8 @@ class SADUpdateStatusTab(BaseAutomationTab):
         except Exception as e:
             return [], f"File Read Error: {str(e)}"
 
-    def start_process(self):
+    # --- Standard Start Method Override ---
+    def start_automation(self):
         file_path = self.csv_entry.get().strip()
         action_text = self.action_combobox.get().strip()
         prefix_val = self.prefix_entry.get().strip()
@@ -179,20 +186,24 @@ class SADUpdateStatusTab(BaseAutomationTab):
 
         self.save_inputs({'csv_file': file_path, 'block_prefix': prefix_val})
         
-        self.is_running = True
-        self.stop_requested = False
-        self.start_btn.configure(state="disabled", text="Running...")
-        self.stop_btn.configure(state="normal")
+        inputs = {
+            'file_path': file_path, 
+            'action_val': action_val, 
+            'action_text': action_text, 
+            'prefix_val': prefix_val
+        }
         
-        threading.Thread(target=self.run_logic, args=(file_path, action_val, action_text, prefix_val), daemon=True).start()
+        self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
-    def stop_process(self):
-        if self.is_running:
-            self.stop_requested = True
-            self.log("Stopping requested... finishing current step.")
-            self.stop_btn.configure(state="disabled")
+    def run_automation_logic(self, inputs):
+        file_path = inputs['file_path']
+        action_val = inputs['action_val']
+        action_text = inputs['action_text']
+        prefix_val = inputs['prefix_val']
 
-    def run_logic(self, file_path, action_val, action_text, prefix_val):
+        self.app.after(0, self.set_ui_state, True)
+        self.app.clear_log(self.log_display)
+        
         try:
             driver = self.app.get_driver()
             if not driver: return
@@ -201,7 +212,6 @@ class SADUpdateStatusTab(BaseAutomationTab):
             rows, error_msg = self.read_file_data(file_path)
             if error_msg:
                 self.log(error_msg)
-                self.finish_run()
                 return
 
             total = len(rows)
@@ -212,7 +222,7 @@ class SADUpdateStatusTab(BaseAutomationTab):
             processed_success = 0
             
             for idx, row in enumerate(rows):
-                if self.stop_requested:
+                if self.app.stop_events[self.automation_key].is_set():
                     self.log("!!! Process Stopped by User !!!")
                     break
 
@@ -229,16 +239,14 @@ class SADUpdateStatusTab(BaseAutomationTab):
                     raw_acc = str(raw_acc).strip()
                     search_term = raw_acc
 
-                    # --- DYNAMIC PREFIX REMOVAL ---
                     if prefix_val:
-                        # Case insensitive check if needed, but standardizing on exact match usually better
                         if search_term.startswith(prefix_val):
                             search_term = search_term[len(prefix_val):]
                         elif prefix_val in search_term:
-                            # Fallback: Agar prefix shuru me nahi par beech me hai (kam chance hai)
                             search_term = search_term.replace(prefix_val, "", 1)
                     
                     self.log(f"[{idx+1}/{total}] Processing: {raw_acc} -> Search: {search_term}")
+                    self.app.after(0, self.app.set_status, f"Processing {idx+1}/{total}: {search_term}")
 
                     # 1. Search Page
                     driver.get("https://sarkaraapkedwar.jharkhand.gov.in/#/application/search")
@@ -305,14 +313,12 @@ class SADUpdateStatusTab(BaseAutomationTab):
                             
                             # --- Handle SUCCESS Popup (SweetAlert) ---
                             try:
-                                # Find 'OK' button in SweetAlert
                                 swal_ok = WebDriverWait(driver, 5).until(
                                     EC.element_to_be_clickable((By.CSS_SELECTOR, "button.swal2-confirm"))
                                 )
                                 swal_ok.click()
                                 self.log("--> Success (Popup Closed)")
                                 
-                                # Wait for popup to vanish
                                 WebDriverWait(driver, 3).until(
                                     EC.invisibility_of_element_located((By.CSS_SELECTOR, "div.swal2-container"))
                                 )
@@ -329,18 +335,13 @@ class SADUpdateStatusTab(BaseAutomationTab):
                 except Exception as e:
                     self.log(f"Error on row {idx+1}: {str(e)}")
 
-            self.log("Automation Batch Ended.")
-            if not self.stop_requested:
-                messagebox.showinfo("Completed", f"Process Finished.\nSuccess: {processed_success}/{total}")
+            if not self.app.stop_events[self.automation_key].is_set():
+                self.log("Automation Batch Ended.")
+                self.app.after(0, lambda: messagebox.showinfo("Completed", f"Process Finished.\nSuccess: {processed_success}/{total}"))
 
         except Exception as e:
             self.log(f"Critical Error: {e}")
-            messagebox.showerror("Error", str(e))
+            self.app.after(0, lambda: messagebox.showerror("Error", str(e)))
         finally:
-            self.finish_run()
-
-    def finish_run(self):
-        self.is_running = False
-        self.stop_requested = False
-        self.app.after(0, lambda: self.start_btn.configure(state="normal", text="Start Process"))
-        self.app.after(0, lambda: self.stop_btn.configure(state="disabled"))
+            self.app.after(0, self.set_ui_state, False)
+            self.app.after(0, self.app.set_status, "Ready")

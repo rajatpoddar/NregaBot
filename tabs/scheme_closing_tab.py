@@ -98,19 +98,31 @@ class SchemeClosingTab(BaseAutomationTab):
         self.cert_no_entry = ctk.CTkEntry(input_frame, placeholder_text="e.g., 54 (will auto-increment for each work code)")
         self.cert_no_entry.grid(row=5, column=1, padx=15, pady=5, sticky="ew")
 
-        # Row 6: Completion Date
+        # --- Row 6: Completion Date AND Checkbox Combined ---
         ctk.CTkLabel(input_frame, text="Completion Date:").grid(row=6, column=0, padx=15, pady=(5, 15), sticky="w")
-        self.completion_date_entry = DateEntry(input_frame)
-        self.completion_date_entry.grid(row=6, column=1, padx=15, pady=(5, 15), sticky="w")
+        
+        # Sub-frame to hold Date and Checkbox in one line
+        date_check_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
+        date_check_frame.grid(row=6, column=1, sticky="ew", padx=15, pady=(5, 15))
+        
+        self.completion_date_entry = DateEntry(date_check_frame)
+        self.completion_date_entry.pack(side="left")
+        
+        self.skip_confirm_checkbox = ctk.CTkCheckBox(
+            date_check_frame, 
+            text="Skip final confirmation", 
+            variable=self.skip_confirmation_var, 
+            onvalue=True, 
+            offvalue=False
+        )
+        self.skip_confirm_checkbox.pack(side="left", padx=(20, 0))
+        # ----------------------------------------------------
 
-        # Action Buttons
+        # Action Buttons (Row 1 of Main Container)
         action_frame = self._create_action_buttons(main_container)
         action_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
-        
-        self.skip_confirm_checkbox = ctk.CTkCheckBox(action_frame, text="Skip final confirmation for each scheme", variable=self.skip_confirmation_var, onvalue=True, offvalue=False)
-        self.skip_confirm_checkbox.pack(side="right", padx=15)
 
-        # Data Notebook
+        # Data Notebook (Row 2 of Main Container - Moved Up)
         notebook = ctk.CTkTabview(main_container)
         notebook.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
         
@@ -118,21 +130,20 @@ class SchemeClosingTab(BaseAutomationTab):
         results_tab = notebook.add("Results")
         self._create_log_and_status_area(notebook)
         
+        # ... (Rest of the logic remains same below) ...
+        
         work_codes_tab.grid_columnconfigure(0, weight=1)
         work_codes_tab.grid_rowconfigure(1, weight=1)
 
         wc_header_frame = ctk.CTkFrame(work_codes_tab, fg_color="transparent")
         wc_header_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(5,0))
         
-        # --- Botton "Clear" ---
         clear_wc_button = ctk.CTkButton(wc_header_frame, text="Clear", width=80, command=lambda: self.work_codes_textbox.delete("1.0", "end"))
         clear_wc_button.pack(side="right", padx=5)
 
-        # --- Botton "Extract" (MODIFIED) ---
         extract_button = ctk.CTkButton(wc_header_frame, text="Extract from Text", width=120,
                                        command=self._extract_work_codes_local)
         extract_button.pack(side='right', padx=(0, 5))
-        # ---
         
         self.work_codes_textbox = ctk.CTkTextbox(work_codes_tab, height=150)
         self.work_codes_textbox.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)

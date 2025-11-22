@@ -16,8 +16,11 @@ class AutocompleteEntry(ctk.CTkEntry):
         self._suggestion_labels = []
         self._suggestion_frames = []
         
-        # --- NEW: Debounce Timer variable ---
+        # --- Debounce Timer variable ---
         self._typing_timer = None
+        
+        # --- NEW: Flag to prevent re-opening after selection ---
+        self._is_selecting = False 
 
         self.bind("<KeyRelease>", self._on_key_release)
         self.bind("<FocusOut>", self._on_focus_out)
@@ -26,13 +29,17 @@ class AutocompleteEntry(ctk.CTkEntry):
         self.bind("<Return>", self._on_enter)
 
     def _on_key_release(self, event):
+        # --- FIX: Agar abhi selection kiya hai, to search mat karo ---
+        if self._is_selecting:
+            return
+
         # Navigation keys ko ignore karein
         if event.keysym in ("Up", "Down", "Return", "Enter", "Tab", "Escape"):
             return
         if event.keysym in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R"):
             return
 
-        # --- NEW: Debouncing Logic ---
+        # Debouncing Logic
         # Agar purana timer chal raha hai toh use cancel karein
         if self._typing_timer:
             self.after_cancel(self._typing_timer)
@@ -130,15 +137,22 @@ class AutocompleteEntry(ctk.CTkEntry):
         self._active_suggestion_index = -1
 
     def _select_suggestion(self, value):
+        # Timer cancel karein
         if self._typing_timer: self.after_cancel(self._typing_timer)
+        
+        # --- FIX: Flag set karein taaki KeyRelease event ignore ho jaye ---
+        self._is_selecting = True
         
         self.delete(0, "end")
         self.insert(0, value)
         self._hide_suggestions()
         self.focus()
-        # Optional: Trigger manual event if needed elsewhere
-        # self.event_generate("<KeyRelease>") 
-        self.event_generate("<KeyRelease>")
+        
+        # Trigger manual event (Validation triggers ke liye)
+        self.event_generate("<KeyRelease>") 
+        
+        # --- FIX: Flag reset karein ---
+        self._is_selecting = False
 
     def _on_focus_out(self, event):
         # Thoda delay dein taki click register ho sake (agar user list par click kare)

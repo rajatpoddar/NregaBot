@@ -3,6 +3,7 @@ import tkinter
 from tkinter import messagebox, filedialog
 import customtkinter as ctk
 import threading, time, subprocess, os, webbrowser, sys, requests, json, uuid, logging, socket, shutil
+import re
 from urllib.parse import urlencode
 from PIL import Image
 from packaging.version import parse as parse_version
@@ -138,68 +139,169 @@ class MarqueeLabel(ctk.CTkFrame):
     def __init__(self, parent, text, speed=1, **kwargs):
         super().__init__(parent, fg_color="transparent", **kwargs)
         self.speed = speed
-        self.text = text
+        self.raw_text = text
         self.safe_bg = ("white", "#1D1E1E")
         
-        # Height increased to 30 (taaki text kate nahi)
         self.canvas = tkinter.Canvas(
             self, 
             bg=self._apply_appearance_mode(self.safe_bg), 
             bd=0, 
             highlightthickness=0, 
-            height=30 
+            height=30,
+            cursor="arrow" 
         )
         self.canvas.pack(fill="both", expand=True)
         
-        mode = ctk.get_appearance_mode()
-        initial_color = "gray90" if mode == "Dark" else "gray40"
-        
-        # Y-axis 15 (Middle of 30) set kiya hai
-        self.text_id = self.canvas.create_text(10, 15, text=text, anchor="w", fill=initial_color, font=("Segoe UI", 13))
-        
+        self.items = []  # List to store text segments
+        self.total_width = 0
         self.canvas_width = 1
-        self.text_width = 1
         
         self.bind("<Configure>", self._on_resize)
+        self.update_text(text) # Initial render
         self._animate()
 
     def _on_resize(self, event):
         self.canvas_width = event.width
         self.update_colors()
-        self._update_text_width()
-
-    def _update_text_width(self):
-        bbox = self.canvas.bbox(self.text_id)
-        if bbox:
-            self.text_width = bbox[2] - bbox[0]
 
     def update_colors(self):
         mode = ctk.get_appearance_mode()
-        text_color = "gray90" if mode == "Dark" else "gray40"
         bg_color = self._apply_appearance_mode(self.safe_bg)
         self.canvas.configure(bg=bg_color)
-        self.canvas.itemconfig(self.text_id, fill=text_color)
+        
+        # Update text colors based on mode (Links stay blue)
+        default_color = "gray90" if mode == "Dark" else "gray40"
+        for item in self.items:
+            if not item.get('is_link'):
+                self.canvas.itemconfig(item['id'], fill=default_color)
+
+    def _parse_html(self, text):
+        """Parses simple HTML tags: <b>, <i>, <a href="...">."""
+        # Regex to split text by tags
+        # Captures: <b>...</b>, <i>...</i>, <a href="...">...</a>
+        pattern = re.compile(r'(<a\s+href="([^"]+)">(.+?)</a>|<b>(.+?)</b>|<i>(.+?)</i>)')
+        
+        parts = []
+        last_pos = 0
+        
+        for match in pattern.finditer(text):
+            # Add text before the tag
+            if match.start() > last_pos:
+                parts.append({'text': text[last_pos:match.start()], 'type': 'normal'})
+            
+            full_match = match.group(0)
+            
+            if full_match.startswith('<a'):
+                url = match.group(2)
+                content = match.group(3)
+                parts.append({'text': content, 'type': 'link', 'url': url})
+            elif full_match.startswith('<b>'):
+                content = match.group(4)
+                parts.append({'text': content, 'type': 'bold'})
+            elif full_match.startswith('<i>'):
+                content = match.group(5)
+                parts.append({'text': content, 'type': 'italic'})
+                
+            last_pos = match.end()
+            
+        # Add remaining text
+        if last_pos < len(text):
+            parts.append({'text': text[last_pos:], 'type': 'normal'})
+            
+        return parts if parts else [{'text': text, 'type': 'normal'}]
+
+    def update_text(self, new_text):
+        self.raw_text = new_text
+        self.canvas.delete("all")
+        self.items = []
+        self.total_width = 0
+        
+        mode = ctk.get_appearance_mode()
+        default_color = "gray90" if mode == "Dark" else "gray40"
+        link_color = "#3B82F6" # Blue
+        
+        # Fonts
+        base_font_family = "Segoe UI" if os.name == "nt" else "Arial"
+        # Emojis ke liye Segoe UI Emoji Windows par fallback karta hai automatically usually
+        
+        parsed_segments = self._parse_html(new_text)
+        
+        current_x = 10 # Start padding
+        y_pos = 15
+        
+        for seg in parsed_segments:
+            text_content = seg['text']
+            font_spec = (base_font_family, 13)
+            fill_color = default_color
+            is_link = False
+            
+            if seg['type'] == 'bold':
+                font_spec = (base_font_family, 13, "bold")
+            elif seg['type'] == 'italic':
+                font_spec = (base_font_family, 13, "italic")
+            elif seg['type'] == 'link':
+                font_spec = (base_font_family, 13, "underline")
+                fill_color = link_color
+                is_link = True
+            
+            text_id = self.canvas.create_text(
+                current_x, y_pos, 
+                text=text_content, 
+                anchor="w", 
+                fill=fill_color, 
+                font=font_spec
+            )
+            
+            bbox = self.canvas.bbox(text_id)
+            width = bbox[2] - bbox[0] if bbox else 0
+            
+            item_data = {
+                'id': text_id,
+                'width': width,
+                'is_link': is_link,
+                'url': seg.get('url')
+            }
+            self.items.append(item_data)
+            
+            if is_link:
+                self.canvas.tag_bind(text_id, "<Button-1>", lambda e, url=seg['url']: webbrowser.open(url))
+                self.canvas.tag_bind(text_id, "<Enter>", lambda e: self.canvas.configure(cursor="hand2"))
+                self.canvas.tag_bind(text_id, "<Leave>", lambda e: self.canvas.configure(cursor="arrow"))
+            
+            current_x += width
+            
+        self.total_width = current_x
 
     def _animate(self):
-        # Width update karte raho taaki glitch na ho
-        self._update_text_width() 
-        
-        # Move logic
-        self.canvas.move(self.text_id, -self.speed, 0)
-        coords = self.canvas.coords(self.text_id)
-        
-        # Agar text left side se poora nikal gaya, toh wapas right side le aao
-        # (x_position + text_width < 0) matlab gayab ho gaya
-        if coords[0] + self.text_width < 0:
-            self.canvas.coords(self.text_id, self.canvas_width + 50, 15)
+        if not self.items:
+            self.after(100, self._animate)
+            return
 
-        # Loop continues (approx 50 FPS for smoothness)
-        self.after(20, self._animate)
+        # Check if first item has gone off screen completely
+        first_item = self.items[0]
+        first_coords = self.canvas.coords(first_item['id'])
         
-    def update_text(self, new_text):
-        self.text = new_text
-        self.canvas.itemconfig(self.text_id, text=new_text)
-        self._update_text_width()
+        # Calculate shift needed if text is fully off-screen left
+        # We use the last item to determine where the text ends
+        last_item = self.items[-1]
+        last_coords = self.canvas.coords(last_item['id'])
+        
+        # If the ENTIRE text block has moved past the left edge
+        # (Checking the last item's X position + its width)
+        if last_coords[0] + last_item['width'] < 0:
+            # Reset all items to start from the right side
+            offset = self.canvas_width + 20
+            current_x_reset = offset
+            
+            for item in self.items:
+                self.canvas.coords(item['id'], current_x_reset, 15)
+                current_x_reset += item['width']
+        else:
+            # Move everything left
+            for item in self.items:
+                self.canvas.move(item['id'], -self.speed, 0)
+
+        self.after(20, self._animate)
 
 class ToastNotification(ctk.CTkToplevel):
     def __init__(self, parent, message, kind="success", duration=3000):
@@ -876,7 +978,19 @@ class NregaBotApp(ctk.CTk):
             self.play_sound("error")
             messagebox.showerror("Error", "Google Chrome not found."); return
         try:
-            cmd = [b_path, f"--remote-debugging-port={port}", f"--user-data-dir={p_dir}", config.MAIN_WEBSITE_URL, "https://bookmark.nregabot.com/"]
+            # --- UPDATE: Added flags to keep browser active when minimized ---
+            cmd = [
+                b_path, 
+                f"--remote-debugging-port={port}", 
+                f"--user-data-dir={p_dir}",
+                "--disable-backgrounding-occluded-windows", # New Flag
+                "--disable-renderer-backgrounding",       # New Flag
+                "--disable-background-timer-throttling",  # New Flag
+                config.MAIN_WEBSITE_URL, 
+                "https://bookmark.nregabot.com/"
+            ]
+            # ---------------------------------------------------------------
+            
             flags = 0x00000008 if config.OS_SYSTEM == "Windows" else 0
             subprocess.Popen(cmd, creationflags=flags, start_new_session=(config.OS_SYSTEM != "Windows"))
             self.play_sound("success")
@@ -894,7 +1008,19 @@ class NregaBotApp(ctk.CTk):
             self.play_sound("error")
             messagebox.showerror("Error", "Microsoft Edge not found."); return
         try:
-            cmd = [b_path, f"--remote-debugging-port={port}", f"--user-data-dir={p_dir}", config.MAIN_WEBSITE_URL, "https://bookmark.nregabot.com/"]
+            # --- UPDATE: Added flags to keep browser active when minimized ---
+            cmd = [
+                b_path, 
+                f"--remote-debugging-port={port}", 
+                f"--user-data-dir={p_dir}",
+                "--disable-backgrounding-occluded-windows", # New Flag
+                "--disable-renderer-backgrounding",       # New Flag
+                "--disable-background-timer-throttling",  # New Flag
+                config.MAIN_WEBSITE_URL, 
+                "https://bookmark.nregabot.com/"
+            ]
+            # ---------------------------------------------------------------
+
             flags = 0x00000008 if config.OS_SYSTEM == "Windows" else 0
             subprocess.Popen(cmd, creationflags=flags, start_new_session=(config.OS_SYSTEM != "Windows"))
             self.play_sound("success")
@@ -1137,7 +1263,7 @@ class NregaBotApp(ctk.CTk):
                 url = f"{config.LICENSE_SERVER_URL}/api/app-config"
                 # UPDATE: Timeout ko 5 se badhakar 20 kar diya gaya hai
                 # Taaki agar database slow ho to bhi request fail na ho.
-                resp = requests.get(url, timeout=5)
+                resp = requests.get(url, timeout=20)
                 
                 if resp.status_code == 200:
                     data = resp.json()
@@ -1495,54 +1621,126 @@ class NregaBotApp(ctk.CTk):
         if self.license_info.get('key'): webbrowser.open_new_tab(f"{config.LICENSE_SERVER_URL}/authenticate-from-app/{self.license_info['key']}?next=files")
         else: self.play_sound("error"); messagebox.showerror("Error", "License key not found.")
 
+    # --- FIXED: Added wait loop to ensure Tab is loaded before sending data ---
+
     def switch_to_if_edit_with_data(self, data):
         self.show_frame("IF Editor")
-        if self.tab_instances.get("IF Editor"):
-            self.tab_instances["IF Editor"].load_data_from_wc_gen(data)
-            self.play_sound("success"); messagebox.showinfo("Data Transferred", f"{len(data)} items transferred.")
+        
+        def _wait_for_tab():
+            if "IF Editor" in self.tab_instances:
+                self.tab_instances["IF Editor"].load_data_from_wc_gen(data)
+                self.play_sound("success")
+                messagebox.showinfo("Data Transferred", f"{len(data)} items transferred.")
+            else:
+                self.after(100, _wait_for_tab) # Retry after 100ms
+        
+        _wait_for_tab()
     
     def run_work_allocation_from_demand(self, panchayat_name: str, work_key: str):
         self.show_frame("Allocation")
-        alloc = self.tab_instances.get("Allocation")
-        if alloc:
-            self.after(200, alloc.run_automation_from_demand, panchayat_name, work_key)
-            self.play_sound("success"); messagebox.showinfo("Handoff", "Starting Work Allocation...")
+        
+        def _wait_for_tab():
+            if "Allocation" in self.tab_instances:
+                alloc = self.tab_instances["Allocation"]
+                # Thoda extra delay allocation tab ke liye taaki UI settle ho jaye
+                self.after(200, lambda: alloc.run_automation_from_demand(panchayat_name, work_key))
+                self.play_sound("success")
+                messagebox.showinfo("Handoff", "Starting Work Allocation...")
+            else:
+                self.after(100, _wait_for_tab)
+                
+        _wait_for_tab()
 
     def switch_to_msr_tab_with_data(self, workcodes: str, panchayat_name: str):
         self.show_frame("MR Payment")
-        if self.tab_instances.get("MR Payment"):
-            self.tab_instances["MR Payment"].load_data_from_mr_tracking(workcodes, panchayat_name)
-            self.play_sound("success"); messagebox.showinfo("Data Transferred", "Data sent to MR Payment.")
+        
+        def _wait_for_tab():
+            if "MR Payment" in self.tab_instances:
+                self.tab_instances["MR Payment"].load_data_from_mr_tracking(workcodes, panchayat_name)
+                self.play_sound("success")
+                messagebox.showinfo("Data Transferred", "Data sent to MR Payment.")
+            else:
+                self.after(100, _wait_for_tab)
+        
+        _wait_for_tab()
 
     def switch_to_emb_entry_with_data(self, workcodes: str, panchayat_name: str):
         self.show_frame("eMB Entry")
-        if self.tab_instances.get("eMB Entry"):
-            self.tab_instances["eMB Entry"].load_data_from_mr_tracking(workcodes, panchayat_name)
-            self.play_sound("success"); messagebox.showinfo("Data Transferred", "Data sent to eMB Entry.")
+        
+        def _wait_for_tab():
+            if "eMB Entry" in self.tab_instances:
+                self.tab_instances["eMB Entry"].load_data_from_mr_tracking(workcodes, panchayat_name)
+                self.play_sound("success")
+                messagebox.showinfo("Data Transferred", "Data sent to eMB Entry.")
+            else:
+                self.after(100, _wait_for_tab)
+                
+        _wait_for_tab()
 
     def switch_to_mr_fill_with_data(self, workcodes: str, panchayat_name: str):
         self.show_frame("MR Fill")
-        if self.tab_instances.get("MR Fill"):
-            self.tab_instances["MR Fill"].load_data_from_dashboard(workcodes, panchayat_name)
-            self.play_sound("success"); messagebox.showinfo("Data Transferred", "Data sent to MR Fill.")
+        
+        def _wait_for_tab():
+            if "MR Fill" in self.tab_instances:
+                self.tab_instances["MR Fill"].load_data_from_dashboard(workcodes, panchayat_name)
+                self.play_sound("success")
+                messagebox.showinfo("Data Transferred", "Data sent to MR Fill.")
+            else:
+                self.after(100, _wait_for_tab)
+        
+        _wait_for_tab()
 
     def switch_to_mr_tracking_for_abps(self):
         self.show_frame("MR Tracking")
-        if self.tab_instances.get("MR Tracking"):
-            self.tab_instances["MR Tracking"].set_for_abps_check()
-            self.play_sound("success"); messagebox.showinfo("Action Required", "Fill details to check ABPS Labour")
+        
+        def _wait_for_tab():
+            if "MR Tracking" in self.tab_instances:
+                self.tab_instances["MR Tracking"].set_for_abps_check()
+                self.play_sound("success")
+                messagebox.showinfo("Action Required", "Fill details to check ABPS Labour")
+            else:
+                self.after(100, _wait_for_tab)
+        
+        _wait_for_tab()
 
     def switch_to_duplicate_mr_with_data(self, workcodes: str, panchayat_name: str):
         self.show_frame("Duplicate MR Print")
-        if self.tab_instances.get("Duplicate MR Print"):
-            self.tab_instances["Duplicate MR Print"].load_data_from_report(workcodes, panchayat_name)
-            self.play_sound("success"); messagebox.showinfo("Data Transferred", "Data sent to Duplicate MR.")
+        
+        def _wait_for_tab():
+            if "Duplicate MR Print" in self.tab_instances:
+                self.tab_instances["Duplicate MR Print"].load_data_from_report(workcodes, panchayat_name)
+                self.play_sound("success")
+                messagebox.showinfo("Data Transferred", "Data sent to Duplicate MR.")
+            else:
+                self.after(100, _wait_for_tab)
+        
+        _wait_for_tab()
 
     def switch_to_zero_mr_tab_with_data(self, data_list: list):
         self.show_frame("Zero Mr")
-        if self.tab_instances.get("Zero Mr"):
-            self.tab_instances["Zero Mr"].load_data_from_mr_tracking(data_list)
-            self.play_sound("success"); messagebox.showinfo("Data Transferred", "Data sent to Zero MR.")
+        
+        def _wait_for_tab():
+            if "Zero Mr" in self.tab_instances:
+                self.tab_instances["Zero Mr"].load_data_from_mr_tracking(data_list)
+                self.play_sound("success")
+                messagebox.showinfo("Data Transferred", "Data sent to Zero MR.")
+            else:
+                self.after(100, _wait_for_tab)
+        
+        _wait_for_tab()
+
+    def send_wagelist_data_and_switch_tab(self, start, end):
+        self.show_frame("Send Wagelist")
+        
+        def _wait_for_tab():
+            if "Send Wagelist" in self.tab_instances:
+                # Populate data once tab is ready
+                self.tab_instances["Send Wagelist"].populate_wagelist_data(start, end)
+            else:
+                # Keep checking every 100ms
+                self.after(100, _wait_for_tab)
+        
+        _wait_for_tab()
     
     def _create_footer(self):
         footer = ctk.CTkFrame(self, height=40, corner_radius=0)
@@ -1596,7 +1794,14 @@ class NregaBotApp(ctk.CTk):
 
     def validate_on_server(self, key, is_startup_check=False):
         try:
-            resp = requests.post(f"{config.LICENSE_SERVER_URL}/api/validate", json={"key": key, "machine_id": self.machine_id}, timeout=10)
+            # --- NEW: Sending app_version ---
+            payload = {
+                "key": key, 
+                "machine_id": self.machine_id,
+                "app_version": config.APP_VERSION 
+            }
+            resp = requests.post(f"{config.LICENSE_SERVER_URL}/api/validate", json=payload, timeout=10)
+            
             self.after(0, self.set_server_status, True)
             data = resp.json()
             if resp.status_code == 200 and data.get("status") == "valid":
@@ -1621,22 +1826,136 @@ class NregaBotApp(ctk.CTk):
     def show_activation_window(self):
         win = ctk.CTkToplevel(self); win.title("Activate Product")
         win.update_idletasks()
+        
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        w, h = min(450, sw-40), min(420, sh-40)
+        
+        # --- FIX: Increased Height from 420 to 700 to fit QR Code ---
+        w, h = min(450, sw-40), min(580, sh-40) 
+        
         win.geometry(f'{w}x{h}+{(sw//2)-(w//2)}+{(sh//2)-(h//2)}')
         win.resizable(False, False); win.transient(self); win.grab_set()
-        main = ctk.CTkFrame(win, fg_color="transparent"); main.pack(expand=True, fill="both", padx=20, pady=20)
+        
+        # --- FIX: Changed 'main' to ScrollableFrame so content never cuts off ---
+        # Agar screen chhota ho, to scrollbar aa jayega
+        main = ctk.CTkScrollableFrame(win, fg_color="transparent")
+        main.pack(expand=True, fill="both", padx=20, pady=20)
+        
         ctk.CTkLabel(main, text="Product Activation", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(0, 10))
+        
         activated = tkinter.BooleanVar(value=False)
+        
         def on_trial():
             win.withdraw()
             if self.show_trial_registration_window(): activated.set(True); win.destroy()
             else: win.deiconify()
+
+        # --- Helper to show Deactivation UI inside the modal ---
+        def show_slots_full_ui(data):
+            # Clear current content
+            for widget in main.winfo_children(): widget.pack_forget()
+            
+            # Title
+            ctk.CTkLabel(main, text="All Device Slots Full", font=ctk.CTkFont(size=18, weight="bold"), text_color="#E53E3E").pack(pady=(0, 5))
+            ctk.CTkLabel(main, text="Deactivate an old device to use this one.", font=ctk.CTkFont(size=12)).pack(pady=(0, 10))
+            
+            # Device List Container
+            device_frame = ctk.CTkFrame(main, fg_color="transparent")
+            device_frame.pack(fill="x", pady=5)
+            
+            temp_key = data.get('license_key')
+            devices = data.get('devices', [])
+            
+            for dev in devices:
+                row = ctk.CTkFrame(device_frame, fg_color=("gray90", "gray30"))
+                row.pack(fill="x", pady=3, padx=5)
+                
+                # Device Name/ID
+                info_frame = ctk.CTkFrame(row, fg_color="transparent")
+                info_frame.pack(side="left", padx=10, pady=5)
+                ctk.CTkLabel(info_frame, text=dev['name'], font=ctk.CTkFont(weight="bold")).pack(anchor="w")
+                if dev['name'] != dev['id']:
+                    ctk.CTkLabel(info_frame, text=dev['id'], font=ctk.CTkFont(size=10), text_color="gray60").pack(anchor="w")
+                
+                # Status Check Logic
+                if dev.get('is_pending'):
+                    status_lbl = ctk.CTkLabel(row, text="Pending Approval ⏳", text_color=("orange", "#FFA500"), font=ctk.CTkFont(size=12, weight="bold"))
+                    status_lbl.pack(side="right", padx=15)
+                else:
+                    def request_remove(mid=dev['id'], btn_ref=None):
+                        if not messagebox.askyesno("Confirm", f"Request removal of {mid}?", parent=win): return
+                        if btn_ref: btn_ref.configure(state="disabled", text="Sending...")
+                        
+                        def _req_thread():
+                            try:
+                                headers = {'Authorization': f'Bearer {temp_key}'}
+                                resp = requests.post(
+                                    f"{config.LICENSE_SERVER_URL}/api/request-deactivation",
+                                    json={'machine_id': mid}, headers=headers, timeout=10
+                                )
+                                res = resp.json()
+                                if resp.status_code == 200 and res.get("status") == "success":
+                                    self.after(0, lambda: messagebox.showinfo("Success", "Request Sent! Admin will review it.", parent=win))
+                                    self.after(0, win.destroy) 
+                                else:
+                                    self.after(0, lambda: messagebox.showerror("Error", res.get("reason", "Failed"), parent=win))
+                                    if btn_ref: self.after(0, lambda: btn_ref.configure(state="normal", text="Request Removal"))
+                            except Exception as e:
+                                self.after(0, lambda: messagebox.showerror("Error", str(e), parent=win))
+                                if btn_ref: self.after(0, lambda: btn_ref.configure(state="normal", text="Request Removal"))
+
+                        threading.Thread(target=_req_thread, daemon=True).start()
+
+                    btn = ctk.CTkButton(row, text="Request Removal", width=110, height=28, fg_color="#C53030", hover_color="#9B2C2C")
+                    btn.configure(command=lambda m=dev['id'], b=btn: request_remove(m, b))
+                    btn.pack(side="right", padx=10)
+
+            # --- Footer Section (Support & QR) ---
+            footer_frame = ctk.CTkFrame(main, fg_color="transparent")
+            footer_frame.pack(fill="x", pady=(20, 0))
+
+            ctk.CTkLabel(footer_frame, text="Please contact:", font=ctk.CTkFont(size=12, weight="bold")).pack()
+            
+            email_label = ctk.CTkLabel(footer_frame, text="nregabot@gmail.com", text_color=("#3B82F6", "#60A5FA"), cursor="hand2")
+            email_label.pack()
+            email_label.bind("<Button-1>", lambda e: webbrowser.open("mailto:nregabot@gmail.com"))
+
+            ctk.CTkLabel(footer_frame, text="- OR -", text_color="gray60", font=ctk.CTkFont(size=10)).pack(pady=5)
+
+            wa_link = ctk.CTkLabel(footer_frame, text="Join WhatsApp Community", text_color="#25D366", font=ctk.CTkFont(weight="bold"), cursor="hand2")
+            wa_link.pack()
+            wa_link.bind("<Button-1>", lambda e: webbrowser.open("https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn"))
+
+            # QR Code Image
+            try:
+                qr_path = resource_path(os.path.join("assets", "whatsapp_qr.png"))
+                if os.path.exists(qr_path):
+                    pil_img = Image.open(qr_path)
+                    qr_image = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(160, 160))
+                    
+                    qr_label = ctk.CTkLabel(footer_frame, text="", image=qr_image)
+                    qr_label.pack(pady=(10, 0))
+                    qr_label.image = qr_image # Keep reference
+                else:
+                    print("QR Image file not found at:", qr_path)
+            except Exception as e:
+                print(f"QR Load Error: {e}")
+
+            ctk.CTkButton(main, text="Back to Login", command=lambda: [win.destroy(), self.show_activation_window()], fg_color="gray", width=150).pack(pady=20)
+
+        # --- TEMP: TESTING LINE (Ise check karne ke baad hata dena) ---
+        # show_slots_full_ui({
+        #     "license_key": "TEST-KEY",
+        #     "devices": [{"id": "mac:12:34", "name": "Test Device", "is_pending": False}]
+        # })
+        # return 
+        # --------------------------------------------------------------
+
         def on_unified_activate():
             input_val = entry.get().strip()
             if not input_val: self.play_sound("error"); messagebox.showwarning("Input Required", "Please enter a key or email", parent=win); return
             activate_btn.configure(state="disabled", text="Activating...")
-            if "@" in input_val and "." in input_val:
+            
+            if "@" in input_val and "." in input_val: # Email
                 try:
                     resp = requests.post(f"{config.LICENSE_SERVER_URL}/api/login-for-activation", json={"email": input_val, "machine_id": self.machine_id}, timeout=15)
                     data = resp.json()
@@ -1644,14 +1963,27 @@ class NregaBotApp(ctk.CTk):
                         save_config('last_used_email', input_val); self.license_info = data
                         with open(get_data_path('license.dat'), 'w') as f: json.dump(self.license_info, f)
                         self.play_sound("success"); messagebox.showinfo("Success", "Activated!", parent=win); activated.set(True); win.destroy()
-                    else: self.play_sound("error"); messagebox.showerror("Failed", data.get("reason", "Error"), parent=win)
-                except Exception as e: self.play_sound("error"); messagebox.showerror("Error", str(e), parent=win)
+                    
+                    # --- NEW: Slots Full Handler ---
+                    elif resp.status_code == 403 and data.get("status") == "slots_full":
+                        self.play_sound("error")
+                        show_slots_full_ui(data)
+                    # -------------------------------
+
+                    else: 
+                        self.play_sound("error")
+                        if data.get("action") == "redirect":
+                            if messagebox.askyesno("Action Required", data.get("reason") + "\n\nOpen website?"): webbrowser.open(data.get("url"))
+                        else: messagebox.showerror("Failed", data.get("reason", "Error"), parent=win)
+                except Exception as e: 
+                    self.play_sound("error"); messagebox.showerror("Error", str(e), parent=win)
                 finally: 
                     if activate_btn.winfo_exists(): activate_btn.configure(state="normal", text="Login & Activate")
-            else:
+            else: # Key
                 if self.validate_on_server(input_val): activated.set(True); win.destroy()
                 else: 
                     if activate_btn.winfo_exists(): activate_btn.configure(state="normal", text="Login & Activate")
+
         ctk.CTkButton(main, text="Start 30-Day Free Trial", command=on_trial).pack(pady=(20, 5), ipady=4, fill='x', padx=10)
         ctk.CTkLabel(main, text="— OR —").pack(pady=10)
         entry = ctk.CTkEntry(main, width=300, placeholder_text="Enter License Key or Email"); entry.pack(pady=5, padx=10, fill='x')
@@ -1659,6 +1991,7 @@ class NregaBotApp(ctk.CTk):
         activate_btn = ctk.CTkButton(main, text="Login & Activate", command=on_unified_activate); activate_btn.pack(pady=10, ipady=4, fill='x', padx=10)
         buy_link = ctk.CTkLabel(main, text="Purchase a License Key", text_color=("blue", "cyan"), cursor="hand2"); buy_link.pack(pady=(15,0))
         buy_link.bind("<Button-1>", lambda e: webbrowser.open_new_tab(f"{config.LICENSE_SERVER_URL}/buy"))
+        
         self.wait_window(win); return activated.get()
 
     def show_trial_registration_window(self):
@@ -1866,9 +2199,17 @@ if __name__ == '__main__':
         def listen():
             s.listen(1)
             while True:
-                c, a = s.accept(); d = c.recv(1024)
-                if d == b'focus': app.after(0, app.bring_to_front)
-                c.close()
+                try:
+                    # Socket listening inside try-block
+                    c, a = s.accept()
+                    d = c.recv(1024)
+                    if d == b'focus': 
+                        app.after(0, app.bring_to_front)
+                    c.close()
+                except (OSError, ValueError):
+                    # Jab app band hota hai to socket close ho jata hai
+                    # Ye error expected hai, loop break kar do
+                    break
         threading.Thread(target=listen, daemon=True).start()
         app.mainloop()
     except Exception as e:

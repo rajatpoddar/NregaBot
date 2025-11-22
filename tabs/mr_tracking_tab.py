@@ -1,4 +1,5 @@
 # tabs/mr_tracking_tab.py
+from asyncio import subprocess
 import json
 import tkinter
 from tkinter import ttk, messagebox, filedialog
@@ -312,17 +313,34 @@ class MrTrackingTab(BaseAutomationTab):
         try:
             chrome_options = ChromeOptions()
             
-            # --- YEH LINE HEADLESS MODE ENABLE KARTI HAI ---
-            chrome_options.add_argument("--headless")
-            # --- END HEADLESS ---
+            # --- HEADLESS MODE ---
+            chrome_options.add_argument("--headless=new") # Updated syntax for better compatibility
+            # ---------------------
 
-            # Headless browser ko ek size dena zaroori hai
+            # --- FIX FOR EGL / GPU ERRORS on MAC ---
+            chrome_options.add_argument("--disable-gpu")  # GPU Hardware acceleration band karein
+            chrome_options.add_argument("--disable-software-rasterizer")
+            # ---------------------------------------
+
+            # --- CONSOLE LOG CLEANUP ---
+            chrome_options.add_argument("--log-level=3")  # Sirf fatal errors dikhaye, warnings chhupaye
+            chrome_options.add_argument("--silent")
+            # ---------------------------
+
+            # Standard Headless Flags
             chrome_options.add_argument("--window-size=1920,1080") 
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"]) # "Chrome is being controlled" banner hatane ke liye
+            chrome_options.add_argument("--disable-dev-shm-usage") # Memory issues ke liye
+            chrome_options.add_argument("--no-sandbox")
+            
+            # "Chrome is being controlled" banner hatane ke liye
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"]) 
             
             # webdriver-manager ka istemaal karke driver manage karein
             service = ChromeService(ChromeDriverManager().install())
+            
+            # Service logs ko bhi suppress karein
+            service.creation_flags = subprocess.CREATE_NO_WINDOW if config.OS_SYSTEM == "Windows" else 0
+            
             driver = webdriver.Chrome(service=service, options=chrome_options)
             
             self.app.log_message(self.log_display, "Headless browser safaltapoorvak shuru ho gaya.", "info")
@@ -331,7 +349,7 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Headless browser shuru karne mein BADI GADBAD: {e}", "error")
             messagebox.showerror("Browser Error", f"Naya Headless Chrome browser shuru nahi ho saka.\n\nError: {e}\n\nKya Chrome installed hai?")
             return None
-
+        
     # --- Badlaav: `start_automation` ab naya driver banayega ---
     def start_automation(self):
         self.run_mr_payment_button.pack_forget() # Hide button on new run
@@ -526,10 +544,12 @@ class MrTrackingTab(BaseAutomationTab):
                     if not is_pending_filling:
                         continue 
 
-                    # NAYA CHECK: Agar pending hai, toh check karo ki '0 days' wala hai ya nahi
-                    if muster_status == "Pending for filling of Muster since 0 days of closure of MR":
-                        self.app.log_message(self.log_display, f"Skipping MR {muster_roll_no} (0 days pending).", "info")
+                    # NAYA CHECK: Agar pending hai, toh check karo ki '0 days' ya '1 days' wala hai ya nahi
+                    # MODIFIED: Ab ye 0 aur 1 dono din wale records ko skip karega
+                    if "since 0 days" in muster_status or "since 1 days" in muster_status or "since 1 Day" in muster_status:
+                        self.app.log_message(self.log_display, f"Skipping MR {muster_roll_no} (0/1 days pending).", "info")
                         continue # Is row ko skip kar do
+                    
                     
                 elif inputs['zero_mr_filter']:
                     # Store data including the panchayat name from the row

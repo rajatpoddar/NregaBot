@@ -4,9 +4,11 @@
   "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.8.2-macOS.dmg",
   "changelog": {
     "2.8.2": [
-      "🐞 **Bug Fix (SAD Update Status):** Resolved an issue where the 'Fetch Status' button was unresponsive in the 'SAD Update Status' tab.",
-      "🐞 **Bug Fix (Edge Launch):** Fixed a problem where launching Microsoft Edge from the dashboard occasionally failed due to incorrect path handling.",
-      "🐞 **Bug Fix (Headless Reporting):** Addressed a rare crash that occurred when running reports in headless mode under specific system configurations."
+      "🐞 **Bug Fix (Data Transfer):** Fixed data transfer failure between tabs (e.g., MR Tracking to MR Payment) caused by Skeleton Loader timing.",
+      "🐞 **Bug Fix (Background Execution):** Fixed automation stopping/timing out when the browser window is minimized.",
+      "🐞 **Bug Fix (Autocomplete):** Resolved issue where the dropdown list would re-open immediately after selecting an item.",
+      "🛠 **Improvement (MR Tracking):** Updated logic to skip records 'Pending since 1 day' (in addition to 0 days) to avoid premature processing.",
+      "🛠 **Improvement (macOS Headless):** Fixed EGL/GPU driver errors in headless mode by disabling GPU hardware acceleration."
     ]
   }
 }
