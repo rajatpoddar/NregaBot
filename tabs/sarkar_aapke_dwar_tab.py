@@ -50,25 +50,25 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.backlog_switch.pack(side="right", padx=10)
         # --------------------------------
 
-        # --- MODE 1: CSV Bulk Upload (Optional) ---
+        # --- MODE 1: Bulk Upload (Excel/CSV) ---
         bulk_frame = ctk.CTkFrame(controls_frame, fg_color=("gray90", "gray20"))
         bulk_frame.grid(row=1, column=0, columnspan=3, sticky="ew", padx=10, pady=10)
         bulk_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(bulk_frame, text="Mode 1: Bulk Entry (via CSV)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=3, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(bulk_frame, text="Mode 1: Bulk Entry (via Excel or CSV)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=3, sticky="w", padx=10, pady=5)
         
-        self.csv_path_entry = ctk.CTkEntry(bulk_frame, placeholder_text="Select CSV file with Applicant Details...")
-        self.csv_path_entry.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        self.file_path_entry = ctk.CTkEntry(bulk_frame, placeholder_text="Select .xlsx or .csv file with Applicant Details...")
+        self.file_path_entry.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
         
         btn_frame = ctk.CTkFrame(bulk_frame, fg_color="transparent")
         btn_frame.grid(row=1, column=2, padx=5)
         
-        ctk.CTkButton(btn_frame, text="Browse", width=80, command=self.browse_csv).pack(side="left", padx=2)
-        ctk.CTkButton(btn_frame, text="Get Demo CSV", width=100, fg_color="green", command=self.generate_demo_csv).pack(side="left", padx=2)
-        ctk.CTkButton(btn_frame, text="Clear", width=60, fg_color="#C53030", hover_color="#9B2C2C", command=self.clear_csv_selection).pack(side="left", padx=2)
+        ctk.CTkButton(btn_frame, text="Browse", width=80, command=self.browse_file).pack(side="left", padx=2)
+        ctk.CTkButton(btn_frame, text="Get Template", width=100, fg_color="green", command=self.generate_demo_template).pack(side="left", padx=2)
+        ctk.CTkButton(btn_frame, text="Clear", width=60, fg_color="#C53030", hover_color="#9B2C2C", command=self.clear_file_selection).pack(side="left", padx=2)
         
-        note_text = ("ℹ️ Monitor Mode: Leave CSV empty & click Start. Bot will auto-fill Scheme details when you open a new form.\n"
-                     "ℹ️ Bulk Mode: Select CSV to auto-fill applicants. Columns: Name, Father Name, Age, Mobile, Village, Address.")
+        note_text = ("ℹ️ Monitor Mode: Leave File empty & click Start. Bot will auto-fill Scheme details when you open a new form.\n"
+                     "ℹ️ Bulk Mode: Select Excel/CSV to auto-fill applicants. Columns: Name, Father Name, Age, Mobile, Village, Address.")
         
         ctk.CTkLabel(bulk_frame, text=note_text, text_color="gray60", 
                      font=ctk.CTkFont(size=11), justify="left", anchor="w").grid(row=2, column=0, columnspan=3, sticky="w", padx=10, pady=(5, 5))
@@ -78,7 +78,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         settings_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 10))
         settings_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(settings_frame, text="Common Settings (Applied to CSV & Manual Mode)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(settings_frame, text="Common Settings (Applied to Bulk & Manual Mode)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=5)
 
         # 1. Applicant Remarks
         ctk.CTkLabel(settings_frame, text="Applicant Remarks:").grid(row=1, column=0, sticky="w", padx=10, pady=2)
@@ -130,8 +130,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
 
     def _on_mode_switch(self):
         """Optional: Logic when switch is toggled (e.g., change label color)."""
-        mode = "Backlog" if self.backlog_mode_var.get() else "Normal"
-        # You could add UI feedback here if desired, but the switch itself is visual enough.
         pass
 
     def set_ui_state(self, running: bool):
@@ -141,16 +139,22 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.scheme_type_combobox.configure(state=state)
         self.service_combobox.configure(state=state)
         self.scheme_remarks_entry.configure(state=state)
-        self.csv_path_entry.configure(state=state)
+        self.file_path_entry.configure(state=state)
         self.backlog_switch.configure(state=state) # Disable switch while running
 
-    def browse_csv(self):
-        file_path = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
+    def browse_file(self):
+        file_path = filedialog.askopenfilename(
+            filetypes=[
+                ("Excel/CSV Files", "*.csv *.xlsx"), 
+                ("Excel Files", "*.xlsx"), 
+                ("CSV Files", "*.csv")
+            ]
+        )
         if file_path:
-            self.csv_path_entry.delete(0, tkinter.END)
-            self.csv_path_entry.insert(0, file_path)
+            self.file_path_entry.delete(0, tkinter.END)
+            self.file_path_entry.insert(0, file_path)
 
-    def generate_demo_csv(self):
+    def generate_demo_template(self):
         headers = [
             "Applicant Name", "Father/Husband Name", "Age", "Mobile No", 
             "Is WhatsApp (Y/N)", "Village", "Address"
@@ -161,8 +165,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         file_path = filedialog.asksaveasfilename(
             defaultextension=".csv", 
             filetypes=[("CSV Files", "*.csv")],
-            initialfile="SAD_Bulk_Simple_Demo.csv",
-            title="Save Demo CSV"
+            initialfile="SAD_Bulk_Template.csv",
+            title="Save Demo Template"
         )
         if file_path:
             try:
@@ -170,30 +174,95 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                     writer = csv.writer(f)
                     writer.writerow(headers)
                     writer.writerow(demo_data)
-                messagebox.showinfo("Success", "Demo CSV saved! Please fill applicant details only.")
+                messagebox.showinfo("Success", "Template saved! You can save this as Excel (.xlsx) later if you prefer.")
             except Exception as e:
                 messagebox.showerror("Error", f"Could not save file: {e}")
 
     def start_automation(self):
         inputs = {
-            'csv_file': self.csv_path_entry.get().strip(),
+            'file_path': self.file_path_entry.get().strip(),
             'app_remarks': self.app_remarks_entry.get().strip(),
             'scheme_type': self.scheme_type_combobox.get().strip(),
             'service': self.service_combobox.get().strip(),
             'scheme_remarks': self.scheme_remarks_entry.get().strip(),
-            'is_backlog': self.backlog_mode_var.get() # Capture the switch state
+            'is_backlog': self.backlog_mode_var.get()
         }
 
         if not inputs['scheme_type'] or not inputs['service']:
             messagebox.showwarning("Input Error", "Please select 'Scheme Type' and 'Service' from the dropdowns.")
             return
 
-        if inputs['csv_file'] and not os.path.exists(inputs['csv_file']):
-            messagebox.showerror("File Error", "Selected CSV File does not exist.")
+        if inputs['file_path'] and not os.path.exists(inputs['file_path']):
+            messagebox.showerror("File Error", "Selected file does not exist.")
             return
 
         self.save_inputs(inputs)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
+
+    def _read_file_data(self, file_path):
+        """Reads data from CSV (robust encoding) or Excel."""
+        data = []
+        
+        # 1. EXCEL HANDLING (.xlsx)
+        if file_path.lower().endswith(".xlsx"):
+            try:
+                import openpyxl
+            except ImportError:
+                raise Exception("Missing Library: Please run 'pip install openpyxl' to read Excel files.")
+            
+            try:
+                wb = openpyxl.load_workbook(file_path, data_only=True)
+                sheet = wb.active
+                rows = list(sheet.iter_rows(values_only=True))
+                
+                if not rows: return []
+
+                headers = [str(h).strip() for h in rows[0] if h]
+                
+                for row in rows[1:]:
+                    # Check if row is not completely empty
+                    if not any(row): continue
+                    
+                    row_dict = {}
+                    for i, header in enumerate(headers):
+                        val = row[i] if i < len(row) else ""
+                        row_dict[header] = str(val).strip() if val is not None else ""
+                    data.append(row_dict)
+                return data
+
+            except Exception as e:
+                raise Exception(f"Excel Read Error: {e}")
+
+        # 2. CSV HANDLING (.csv)
+        else:
+            # Try multiple encodings for Windows compatibility
+            encodings_to_try = ['utf-8-sig', 'cp1252', 'latin-1']
+            
+            for enc in encodings_to_try:
+                try:
+                    with open(file_path, 'r', encoding=enc) as f:
+                        # Try to detect delimiter if it's not comma (common in some regions)
+                        sample = f.read(1024)
+                        f.seek(0)
+                        sniffer = csv.Sniffer()
+                        try:
+                            dialect = sniffer.sniff(sample)
+                        except:
+                            dialect = None # Fallback to default comma
+                        
+                        if dialect:
+                            reader = csv.DictReader(f, dialect=dialect)
+                        else:
+                            reader = csv.DictReader(f)
+                        
+                        data = list(reader)
+                        return data # If successful, return immediately
+                except UnicodeDecodeError:
+                    continue # Try next encoding
+                except Exception as e:
+                    raise Exception(f"CSV Error ({enc}): {e}")
+            
+            raise Exception("Failed to read CSV. Try saving it as UTF-8 or standard CSV.")
 
     def run_automation_logic(self, inputs):
         self.app.after(0, self.set_ui_state, True)
@@ -208,9 +277,9 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
 
             mode_str = "BACKLOG Entry" if inputs['is_backlog'] else "NORMAL Entry"
             
-            if inputs['csv_file']:
-                self.app.log_message(self.log_display, f"Starting BULK Mode ({mode_str}) via CSV...")
-                self.app.log_message(self.log_display, f"Common Service: {inputs['service']}")
+            if inputs['file_path']:
+                self.app.log_message(self.log_display, f"Starting BULK Mode ({mode_str})...")
+                self.app.log_message(self.log_display, f"Reading file: {os.path.basename(inputs['file_path'])}")
                 self._run_bulk_mode(driver, wait, inputs)
             else:
                 self.app.log_message(self.log_display, f"Starting MONITOR Mode ({mode_str})...")
@@ -223,17 +292,17 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Stopped")
 
     def _run_bulk_mode(self, driver, wait, inputs):
-        data = []
         try:
-            with open(inputs['csv_file'], 'r', encoding='utf-8-sig') as f:
-                reader = csv.DictReader(f)
-                data = list(reader)
+            data = self._read_file_data(inputs['file_path'])
         except Exception as e:
-            self.app.log_message(self.log_display, f"Error reading CSV: {e}", "error")
+            self.app.log_message(self.log_display, str(e), "error")
             return
 
         total = len(data)
-        
+        if total == 0:
+            self.app.log_message(self.log_display, "No data found in file.", "error")
+            return
+
         # --- URL LOGIC ---
         url_fragment = "application/createBackLog" if inputs['is_backlog'] else "application/create"
         target_url = f"https://sarkaraapkedwar.jharkhand.gov.in/#/{url_fragment}"
@@ -279,6 +348,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         village_input.send_keys(Keys.ENTER)
                     except NoSuchElementException:
                         try:
+                            # Fallback selector
                             village_input = driver.find_element(By.CSS_SELECTOR, ".css-13cymwt-control input")
                             village_input.send_keys(village)
                             time.sleep(1)
@@ -457,12 +527,12 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         except: pass
 
     def reset_ui(self):
-        self.csv_path_entry.delete(0, tkinter.END)
+        self.file_path_entry.delete(0, tkinter.END)
         self.app_remarks_entry.delete(0, tkinter.END)
         self.scheme_type_combobox.set("Service Focus Area")
         self.service_combobox.set("")
         self.scheme_remarks_entry.delete(0, tkinter.END)
-        self.backlog_switch.deselect() # Reset switch to Normal
+        self.backlog_switch.deselect()
         self.app.clear_log(self.log_display)
         self.app.after(0, self.app.set_status, "Ready")
 
@@ -476,7 +546,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r') as f:
                     data = json.load(f)
-                    self.csv_path_entry.insert(0, data.get('csv_file', ''))
+                    self.file_path_entry.insert(0, data.get('file_path', ''))
                     self.app_remarks_entry.insert(0, data.get('app_remarks', ''))
                     self.scheme_type_combobox.set(data.get('scheme_type', 'Service Focus Area'))
                     self.service_combobox.set(data.get('service', ''))
@@ -489,5 +559,5 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         self.backlog_switch.deselect()
         except Exception as e: print(f"Error loading SAD inputs: {e}")
 
-    def clear_csv_selection(self):
-        self.csv_path_entry.delete(0, tkinter.END)
+    def clear_file_selection(self):
+        self.file_path_entry.delete(0, tkinter.END)

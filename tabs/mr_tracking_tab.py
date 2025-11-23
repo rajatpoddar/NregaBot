@@ -1,5 +1,5 @@
 # tabs/mr_tracking_tab.py
-from asyncio import subprocess
+import subprocess
 import json
 import tkinter
 from tkinter import ttk, messagebox, filedialog
