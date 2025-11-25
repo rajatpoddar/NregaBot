@@ -335,7 +335,7 @@ class SADUpdateStatusTab(BaseAutomationTab):
                     try:
                         # --- FAST SKIP LOGIC ---
                         # Wait ONLY 2 seconds for dropdown. If not found, assume already disposed.
-                        short_wait = WebDriverWait(driver, 0.5)
+                        short_wait = WebDriverWait(driver, 2.0)
                         select_elem = short_wait.until(EC.presence_of_element_located((By.TAG_NAME, "select")))
                         
                         # Dropdown found -> Select value

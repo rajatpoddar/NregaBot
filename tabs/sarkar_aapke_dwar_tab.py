@@ -1,9 +1,9 @@
 # tabs/sarkar_aapke_dwar_tab.py
 import tkinter
-from tkinter import messagebox, filedialog
+from tkinter import messagebox, filedialog, ttk
 import customtkinter as ctk
 import json
-import os, time, csv
+import os, time, csv, re, sys, subprocess
 from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -17,8 +17,9 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         super().__init__(parent, app_instance, automation_key="sad_auto")
         self.config_file = self.app.get_data_path("sad_inputs.json")
         
-        # Variable for Backlog Toggle
         self.backlog_mode_var = ctk.BooleanVar(value=False)
+        self.success_count = 0
+        self.fail_count = 0
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
@@ -38,7 +39,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
 
         ctk.CTkLabel(header_frame, text="Sarkar Aapke Dwar Automation", font=ctk.CTkFont(size=16, weight="bold")).pack(side="left", padx=10)
         
-        # --- NEW: Backlog Mode Switch ---
         self.backlog_switch = ctk.CTkSwitch(
             header_frame, 
             text="Backlog Entry Mode", 
@@ -48,7 +48,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             command=self._on_mode_switch
         )
         self.backlog_switch.pack(side="right", padx=10)
-        # --------------------------------
 
         # --- MODE 1: Bulk Upload (Excel/CSV) ---
         bulk_frame = ctk.CTkFrame(controls_frame, fg_color=("gray90", "gray20"))
@@ -67,18 +66,18 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         ctk.CTkButton(btn_frame, text="Get Template", width=100, fg_color="green", command=self.generate_demo_template).pack(side="left", padx=2)
         ctk.CTkButton(btn_frame, text="Clear", width=60, fg_color="#C53030", hover_color="#9B2C2C", command=self.clear_file_selection).pack(side="left", padx=2)
         
-        note_text = ("ℹ️ Monitor Mode: Leave File empty & click Start. Bot will auto-fill Scheme details when you open a new form.\n"
-                     "ℹ️ Bulk Mode: Select Excel/CSV to auto-fill applicants. Columns: Name, Father Name, Age, Mobile, Village, Address.")
+        note_text = ("ℹ️ Monitor Mode: Leave File empty. Bot auto-fills Scheme details when you open a new form.\n"
+                     "ℹ️ Bulk Mode: Select Excel/CSV. Bot fills Applicant + Scheme details and Extracts Ack No.")
         
         ctk.CTkLabel(bulk_frame, text=note_text, text_color="gray60", 
                      font=ctk.CTkFont(size=11), justify="left", anchor="w").grid(row=2, column=0, columnspan=3, sticky="w", padx=10, pady=(5, 5))
 
-        # --- Settings (Applied to ALL Modes) ---
+        # --- Settings ---
         settings_frame = ctk.CTkFrame(controls_frame)
         settings_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 10))
         settings_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(settings_frame, text="Common Settings (Applied to Bulk & Manual Mode)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(settings_frame, text="Common Settings", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=5)
 
         # 1. Applicant Remarks
         ctk.CTkLabel(settings_frame, text="Applicant Remarks:").grid(row=1, column=0, sticky="w", padx=10, pady=2)
@@ -107,7 +106,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             "वृद्धा पेंशन (Old Age Pension)",
             "विधवा पेंशन (Widow Pension)",
             "विकलांग पेंशन (Disability Pension)",
-            "झारखंड राज्य सेवा देने की गारंटी अधिनियम 2011 से जुड़ी अन्य सेवाएं (Other Services under Jharkhand Right to Guarantee of Services Act 2011)",
+            "झारखंड राज्य सेवा देने की गारंटी अधिनियम 2011 से जुड़ी अन्य सेवाएं",
             "अन्य लोक कल्याणकारी योजनाएँ (Other Welfare Schemes)"
         ]
         self.service_combobox = ctk.CTkComboBox(settings_frame, values=service_options, width=300)
@@ -118,19 +117,99 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.scheme_remarks_entry = ctk.CTkEntry(settings_frame, placeholder_text="Enter Scheme Remarks")
         self.scheme_remarks_entry.grid(row=4, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
-        # Action Buttons (Wrapper handles centering)
+        # Action Buttons
         action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        # Using pack with expand/center from the wrapper logic in base_tab
         action_frame.grid(row=3, column=0, columnspan=3, sticky="ew", pady=15)
 
-        # --- Logs & Status Area ---
-        data_notebook = ctk.CTkTabview(self)
-        data_notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
-        self._create_log_and_status_area(parent_notebook=data_notebook)
+        # --- Results & Logs Notebook ---
+        self.tab_view = ctk.CTkTabview(self)
+        self.tab_view.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.tab_view.add("Results")
+        self.tab_view.add("Logs")
+
+        # --- TAB 1: Results (Treeview) with Export ---
+        res_tab = self.tab_view.tab("Results")
+        res_tab.grid_columnconfigure(0, weight=1)
+        res_tab.grid_rowconfigure(1, weight=1)
+
+        # Export Controls
+        export_frame = ctk.CTkFrame(res_tab, fg_color="transparent")
+        export_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        
+        self.export_button = ctk.CTkButton(export_frame, text="Export Result", width=100, command=self.export_report)
+        self.export_button.pack(side="left", padx=(0, 5))
+        
+        self.export_format_menu = ctk.CTkOptionMenu(export_frame, width=120, values=["PDF (.pdf)", "CSV (.csv)"], command=self._on_format_change)
+        self.export_format_menu.pack(side="left", padx=5)
+        
+        self.export_filter_menu = ctk.CTkOptionMenu(export_frame, width=120, values=["Export All", "Success Only", "Failed Only"])
+        self.export_filter_menu.pack(side="left", padx=5)
+
+        # Treeview
+        cols = ("Time", "Applicant Name", "Scheme Remarks", "Status", "Ack Number")
+        self.results_tree = ttk.Treeview(res_tab, columns=cols, show='headings')
+        
+        self.results_tree.heading("Time", text="Time")
+        self.results_tree.heading("Applicant Name", text="Applicant Name")
+        self.results_tree.heading("Scheme Remarks", text="Scheme Remarks") # Updated Column
+        self.results_tree.heading("Status", text="Status")
+        self.results_tree.heading("Ack Number", text="Ack Number") # Updated Column
+
+        self.results_tree.column("Time", width=80, anchor="center")
+        self.results_tree.column("Applicant Name", width=150, anchor="w")
+        self.results_tree.column("Scheme Remarks", width=150, anchor="w")
+        self.results_tree.column("Status", width=80, anchor="center")
+        self.results_tree.column("Ack Number", width=200, anchor="w")
+
+        self.results_tree.grid(row=1, column=0, sticky="nsew")
+        
+        vsb = ctk.CTkScrollbar(res_tab, orientation="vertical", command=self.results_tree.yview)
+        vsb.grid(row=1, column=1, sticky="ns")
+        self.results_tree.configure(yscrollcommand=vsb.set)
+
+        self.style_treeview(self.results_tree)
+        self.results_tree.tag_configure('Success', foreground='green')
+        self.results_tree.tag_configure('Failed', foreground='red')
+        self.results_tree.tag_configure('Info', foreground='#2B6CB0')
+
+        # Summary Label
+        self.summary_label = ctk.CTkLabel(res_tab, text="Success: 0 | Failed: 0", font=ctk.CTkFont(weight="bold"))
+        self.summary_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
+
+        # --- TAB 2: Logs ---
+        log_tab = self.tab_view.tab("Logs")
+        log_tab.grid_columnconfigure(0, weight=1)
+        log_tab.grid_rowconfigure(0, weight=1)
+        
+        self.log_display = ctk.CTkTextbox(log_tab, state="disabled", font=("Consolas", 12))
+        self.log_display.grid(row=0, column=0, sticky="nsew")
+
+        # Status Bar
+        status_frame = ctk.CTkFrame(self, height=30, fg_color="transparent")
+        status_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 5))
+        
+        self.progress_bar = ctk.CTkProgressBar(status_frame, height=8)
+        self.progress_bar.set(0)
+        self.progress_bar.pack(fill="x", expand=True)
 
     def _on_mode_switch(self):
-        """Optional: Logic when switch is toggled (e.g., change label color)."""
         pass
+
+    def _on_format_change(self, selected_format):
+        if "CSV" in selected_format: self.export_filter_menu.configure(state="disabled")
+        else: self.export_filter_menu.configure(state="normal")
+
+    def _log_result(self, name, scheme_rem, status, ack_no):
+        """Adds a row to the Result Treeview."""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        tag = 'Success' if status == 'Success' else ('Failed' if status == 'Failed' else 'Info')
+        
+        self.results_tree.insert("", "0", values=(timestamp, name, scheme_rem, status, ack_no), tags=(tag,))
+        
+        if status == "Success": self.success_count += 1
+        elif status == "Failed": self.fail_count += 1
+            
+        self.summary_label.configure(text=f"Success: {self.success_count} | Failed: {self.fail_count}")
 
     def set_ui_state(self, running: bool):
         self.set_common_ui_state(running)
@@ -140,41 +219,25 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.service_combobox.configure(state=state)
         self.scheme_remarks_entry.configure(state=state)
         self.file_path_entry.configure(state=state)
-        self.backlog_switch.configure(state=state) # Disable switch while running
+        self.backlog_switch.configure(state=state)
+        self.export_button.configure(state=state)
+        
+        if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     def browse_file(self):
-        file_path = filedialog.askopenfilename(
-            filetypes=[
-                ("Excel/CSV Files", "*.csv *.xlsx"), 
-                ("Excel Files", "*.xlsx"), 
-                ("CSV Files", "*.csv")
-            ]
-        )
+        file_path = filedialog.askopenfilename(filetypes=[("Excel/CSV Files", "*.csv *.xlsx"), ("Excel Files", "*.xlsx")])
         if file_path:
             self.file_path_entry.delete(0, tkinter.END)
             self.file_path_entry.insert(0, file_path)
 
     def generate_demo_template(self):
-        headers = [
-            "Applicant Name", "Father/Husband Name", "Age", "Mobile No", 
-            "Is WhatsApp (Y/N)", "Village", "Address"
-        ]
-        demo_data = [
-            "Ramesh Kumar", "Suresh Kumar", "45", "9876543210", "Y", "Ratu", "House No 12, Main Road"
-        ]
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=".csv", 
-            filetypes=[("CSV Files", "*.csv")],
-            initialfile="SAD_Bulk_Template.csv",
-            title="Save Demo Template"
-        )
+        headers = ["Applicant Name", "Father/Husband Name", "Age", "Mobile No", "Is WhatsApp (Y/N)", "Village", "Address"]
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV Files", "*.csv")], initialfile="SAD_Bulk_Template.csv")
         if file_path:
             try:
                 with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
-                    writer = csv.writer(f)
-                    writer.writerow(headers)
-                    writer.writerow(demo_data)
-                messagebox.showinfo("Success", "Template saved! You can save this as Excel (.xlsx) later if you prefer.")
+                    csv.writer(f).writerow(headers)
+                messagebox.showinfo("Success", "Template saved!")
             except Exception as e:
                 messagebox.showerror("Error", f"Could not save file: {e}")
 
@@ -189,7 +252,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         }
 
         if not inputs['scheme_type'] or not inputs['service']:
-            messagebox.showwarning("Input Error", "Please select 'Scheme Type' and 'Service' from the dropdowns.")
+            messagebox.showwarning("Input Error", "Please select 'Scheme Type' and 'Service'.")
             return
 
         if inputs['file_path'] and not os.path.exists(inputs['file_path']):
@@ -197,89 +260,57 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             return
 
         self.save_inputs(inputs)
+        self.success_count = 0
+        self.fail_count = 0
+        self.summary_label.configure(text="Success: 0 | Failed: 0")
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
+            
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def _read_file_data(self, file_path):
-        """Reads data from CSV (robust encoding) or Excel."""
+        """Reads data from CSV (robust) or Excel."""
         data = []
-        
-        # 1. EXCEL HANDLING (.xlsx)
         if file_path.lower().endswith(".xlsx"):
             try:
                 import openpyxl
-            except ImportError:
-                raise Exception("Missing Library: Please run 'pip install openpyxl' to read Excel files.")
-            
-            try:
                 wb = openpyxl.load_workbook(file_path, data_only=True)
                 sheet = wb.active
                 rows = list(sheet.iter_rows(values_only=True))
-                
                 if not rows: return []
-
                 headers = [str(h).strip() for h in rows[0] if h]
-                
                 for row in rows[1:]:
-                    # Check if row is not completely empty
                     if not any(row): continue
-                    
                     row_dict = {}
                     for i, header in enumerate(headers):
                         val = row[i] if i < len(row) else ""
                         row_dict[header] = str(val).strip() if val is not None else ""
                     data.append(row_dict)
                 return data
-
-            except Exception as e:
-                raise Exception(f"Excel Read Error: {e}")
-
-        # 2. CSV HANDLING (.csv)
+            except ImportError: raise Exception("Install openpyxl to read Excel.")
+            except Exception as e: raise Exception(f"Excel Error: {e}")
         else:
-            # Try multiple encodings for Windows compatibility
-            encodings_to_try = ['utf-8-sig', 'cp1252', 'latin-1']
-            
-            for enc in encodings_to_try:
+            for enc in ['utf-8-sig', 'cp1252', 'latin-1']:
                 try:
                     with open(file_path, 'r', encoding=enc) as f:
-                        # Try to detect delimiter if it's not comma (common in some regions)
-                        sample = f.read(1024)
-                        f.seek(0)
-                        sniffer = csv.Sniffer()
-                        try:
-                            dialect = sniffer.sniff(sample)
-                        except:
-                            dialect = None # Fallback to default comma
-                        
-                        if dialect:
-                            reader = csv.DictReader(f, dialect=dialect)
-                        else:
-                            reader = csv.DictReader(f)
-                        
-                        data = list(reader)
-                        return data # If successful, return immediately
-                except UnicodeDecodeError:
-                    continue # Try next encoding
-                except Exception as e:
-                    raise Exception(f"CSV Error ({enc}): {e}")
-            
-            raise Exception("Failed to read CSV. Try saving it as UTF-8 or standard CSV.")
+                        return list(csv.DictReader(f))
+                except: continue
+            raise Exception("Failed to read CSV.")
 
     def run_automation_logic(self, inputs):
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
+        self.tab_view.set("Results")
         
         try:
             driver = self.app.get_driver()
-            if not driver:
-                self.app.after(0, self.set_ui_state, False)
-                return
+            if not driver: return
             wait = WebDriverWait(driver, 10)
 
-            mode_str = "BACKLOG Entry" if inputs['is_backlog'] else "NORMAL Entry"
+            mode_str = "Backlog" if inputs['is_backlog'] else "Normal"
             
             if inputs['file_path']:
                 self.app.log_message(self.log_display, f"Starting BULK Mode ({mode_str})...")
-                self.app.log_message(self.log_display, f"Reading file: {os.path.basename(inputs['file_path'])}")
                 self._run_bulk_mode(driver, wait, inputs)
             else:
                 self.app.log_message(self.log_display, f"Starting MONITOR Mode ({mode_str})...")
@@ -289,7 +320,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Critical Error: {e}", "error")
         finally:
             self.app.after(0, self.set_ui_state, False)
-            self.app.after(0, self.app.set_status, "Automation Stopped")
+            self.app.after(0, self.app.set_status, "Ready")
+            self.app.after(0, self.progress_bar.set, 0)
 
     def _run_bulk_mode(self, driver, wait, inputs):
         try:
@@ -299,33 +331,28 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             return
 
         total = len(data)
-        if total == 0:
-            self.app.log_message(self.log_display, "No data found in file.", "error")
-            return
-
-        # --- URL LOGIC ---
         url_fragment = "application/createBackLog" if inputs['is_backlog'] else "application/create"
         target_url = f"https://sarkaraapkedwar.jharkhand.gov.in/#/{url_fragment}"
         
-        self.app.log_message(self.log_display, f"Loaded {total} records. Target: {url_fragment}")
+        self.app.log_message(self.log_display, f"Loaded {total} records.")
 
         for i, row in enumerate(data):
             if self.app.stop_events[self.automation_key].is_set(): break
             
             applicant_name = row.get("Applicant Name", "").strip()
-            self.app.log_message(self.log_display, f"Processing ({i+1}/{total}): {applicant_name}")
-            self.app.after(0, self.update_status, f"Processing {applicant_name}...", (i+1)/total)
-
+            status_msg = f"Processing {i+1}/{total}: {applicant_name}"
+            
+            self.app.after(0, self.app.set_status, status_msg)
+            self.app.after(0, self.progress_bar.set, (i+1)/total)
+            
             try:
-                # --- Check and Navigate to correct URL ---
                 if url_fragment not in driver.current_url:
                     driver.get(target_url)
                     time.sleep(2)
 
-                # Wait for form to be ready
                 wait.until(EC.presence_of_element_located((By.NAME, "applicantName")))
 
-                # --- 1. Fill Applicant Details ---
+                # 1. Fill Applicant
                 self._safe_send_keys(driver, "applicantName", applicant_name)
                 self._safe_send_keys(driver, "fatherHusbandName", row.get("Father/Husband Name", ""))
                 self._safe_send_keys(driver, "age", row.get("Age", ""))
@@ -343,187 +370,158 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                 if village:
                     try:
                         village_input = driver.find_element(By.ID, "react-select-2-input")
-                        village_input.send_keys(village)
-                        time.sleep(1)
+                        village_input.send_keys(village); time.sleep(1)
                         village_input.send_keys(Keys.ENTER)
-                    except NoSuchElementException:
-                        try:
-                            # Fallback selector
-                            village_input = driver.find_element(By.CSS_SELECTOR, ".css-13cymwt-control input")
-                            village_input.send_keys(village)
-                            time.sleep(1)
-                            village_input.send_keys(Keys.ENTER)
-                        except: pass
+                    except: pass
 
                 self._safe_send_keys(driver, "address", row.get("Address", ""))
-                
-                # --- 2. Fill Remarks ---
                 self._safe_send_keys(driver, "remarks", inputs['app_remarks'])
 
-                # --- 3. Fill Scheme Details ---
+                # 2. Fill Scheme
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 
                 try:
                     Select(driver.find_element(By.NAME, "schemeId")).select_by_visible_text(inputs['scheme_type'])
                     time.sleep(1) 
-                except NoSuchElementException:
-                    self.app.log_message(self.log_display, f"Error: Scheme Type '{inputs['scheme_type']}' not found.", "error")
+                except:
+                    self._log_result(applicant_name, inputs['scheme_remarks'], "Failed", "Scheme Type Error")
                     continue
 
                 try:
                     svc_select = Select(wait.until(EC.presence_of_element_located((By.NAME, "schemeService"))))
-                    try:
-                        svc_select.select_by_visible_text(inputs['service'])
+                    try: svc_select.select_by_visible_text(inputs['service'])
                     except:
                         found = False
                         for opt in svc_select.options:
                             if inputs['service'].lower() in opt.text.lower():
-                                svc_select.select_by_visible_text(opt.text)
-                                found = True
-                                break
+                                svc_select.select_by_visible_text(opt.text); found = True; break
                         if not found:
-                            self.app.log_message(self.log_display, f"Error: Service '{inputs['service']}' not found.", "error")
-                except Exception as e:
-                    self.app.log_message(self.log_display, f"Error selecting Service: {e}", "error")
+                            self._log_result(applicant_name, inputs['scheme_remarks'], "Failed", "Service Error")
+                            continue
+                except: pass
 
                 self._safe_send_keys(driver, "schemeRemarks", inputs['scheme_remarks'])
 
-                # --- 4. Submit ---
+                # 3. Submit & Extract Ack No
                 try:
                     driver.find_element(By.XPATH, "//button[contains(., 'Add Service')]").click()
                     time.sleep(1)
                     wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Create Application')]"))).click()
-                    time.sleep(2) # Success Wait
                     
-                    # Reset
+                    # --- EXTRACT ACKNOWLEDGEMENT ---
+                    ack_number = "N/A"
+                    try:
+                        # Wait for popup (SweetAlert)
+                        WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.CLASS_NAME, "swal2-popup")))
+                        
+                        # Get text
+                        popup_text = ""
+                        try: popup_text = driver.find_element(By.CLASS_NAME, "swal2-content").text
+                        except: 
+                            try: popup_text = driver.find_element(By.CLASS_NAME, "swal2-html-container").text
+                            except: pass
+                        
+                        # Regex Extract: 3/28/1913/3608040
+                        match = re.search(r'Acknowledgement No is\s*:\s*([\d/]+)', popup_text)
+                        if match:
+                            ack_number = match.group(1)
+                        
+                        # Close popup
+                        try: driver.find_element(By.CSS_SELECTOR, "button.swal2-confirm").click()
+                        except: pass
+                        
+                    except Exception as e:
+                        self.app.log_message(self.log_display, f"Popup Error: {e}", "warning")
+
+                    # Reset form for next entry
                     try:
                         driver.find_element(By.XPATH, "//button[contains(., 'Reset')]").click()
                         time.sleep(1)
-                    except:
-                        driver.refresh()
-                        time.sleep(2)
+                    except: driver.refresh(); time.sleep(2)
 
-                    self.app.log_message(self.log_display, f"Success: {applicant_name}", "success")
+                    self._log_result(applicant_name, inputs['scheme_remarks'], "Success", ack_number)
                 except Exception as e:
-                    self.app.log_message(self.log_display, f"Error clicking submit: {e}", "error")
+                    self._log_result(applicant_name, inputs['scheme_remarks'], "Failed", f"Submit Error: {e}")
 
             except Exception as e:
-                self.app.log_message(self.log_display, f"Failed {applicant_name}: {e}", "error")
-                driver.refresh()
-                time.sleep(3)
+                self._log_result(applicant_name, inputs['scheme_remarks'], "Failed", str(e))
+                driver.refresh(); time.sleep(3)
 
     def _run_monitor_mode(self, driver, wait, inputs):
-        self.app.log_message(self.log_display, "Monitor Mode Active: Navigate to 'Create Application' or 'Backlog Entry'.")
+        self.app.log_message(self.log_display, "Monitor Mode Active. Waiting for form...")
         last_log_time = 0
 
         while not self.app.stop_events[self.automation_key].is_set():
             try:
-                # 1. Check URL (Supports BOTH Normal and Backlog pages automatically)
                 curr_url = driver.current_url
                 if "application/create" not in curr_url and "application/createBackLog" not in curr_url:
-                    # Log status occasionally so user knows it's waiting
                     if time.time() - last_log_time > 8:
-                        self.app.log_message(self.log_display, "Waiting... Please open an Entry page.")
+                        self.app.after(0, self.app.set_status, "Waiting for Entry Page...")
                         last_log_time = time.time()
-                    time.sleep(2)
-                    continue
+                    time.sleep(2); continue
 
-                # 2. Check if Scheme is already added (Prevent double entry)
                 try:
-                    # Check if table has rows (meaning service is already added)
-                    tbody = driver.find_element(By.CSS_SELECTOR, "table tbody")
-                    rows = tbody.find_elements(By.TAG_NAME, "tr")
-                    # If rows exist and it's not a "No data" row, skip filling
+                    rows = driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
                     if len(rows) > 0 and "No data" not in rows[0].text:
-                        time.sleep(2)
-                        continue
-                except NoSuchElementException: 
-                    pass # Table might not exist yet, proceed to fill
+                        time.sleep(2); continue
+                except: pass
 
-                # 3. Check Scheme Dropdown & Fill
                 try:
                     scheme_dd = driver.find_element(By.NAME, "schemeId")
                     select_obj = Select(scheme_dd)
-                    
-                    # Robust Check: Check by Value ("-1") OR Text ("Select...")
-                    selected_val = select_obj.first_selected_option.get_attribute("value")
-                    selected_text = select_obj.first_selected_option.text.strip()
+                    val = select_obj.first_selected_option.get_attribute("value")
 
-                    # If default is selected, start filling
-                    if selected_val == "-1" or "Select Scheme" in selected_text:
-                        
-                        self.app.log_message(self.log_display, "New blank form detected. Auto-filling details...")
-                        
-                        # Fill Applicant Remarks
-                        if inputs['app_remarks']: 
-                            self._safe_send_keys(driver, "remarks", inputs['app_remarks'])
-                        
-                        # Select Scheme Type
+                    if val == "-1" or "Select" in select_obj.first_selected_option.text:
+                        app_name = "Unknown"
                         try:
-                            select_obj.select_by_visible_text(inputs['scheme_type'])
-                        except NoSuchElementException:
-                            self.app.log_message(self.log_display, f"Scheme Type '{inputs['scheme_type']}' not found.", "warning")
-                            time.sleep(2); continue
-
-                        time.sleep(1) # Wait for services to load
+                            app_name = driver.find_element(By.NAME, "applicantName").get_attribute("value")
+                            if not app_name: app_name = "New Applicant"
+                        except: pass
                         
-                        # Select Service
+                        self.app.after(0, self.app.set_status, "Auto-filling Form...")
+                        
+                        if inputs['app_remarks']: self._safe_send_keys(driver, "remarks", inputs['app_remarks'])
+                        
+                        try: select_obj.select_by_visible_text(inputs['scheme_type'])
+                        except: time.sleep(2); continue
+
+                        time.sleep(1)
                         svc_select = Select(driver.find_element(By.NAME, "schemeService"))
                         
-                        # Retry loop for Service Dropdown population
                         for _ in range(10):
                             if len(svc_select.options) > 1: break
                             time.sleep(0.5)
                         
                         try:
-                            # Try exact match first, then partial match
-                            try:
-                                svc_select.select_by_visible_text(inputs['service'])
+                            try: svc_select.select_by_visible_text(inputs['service'])
                             except:
-                                found = False
                                 for opt in svc_select.options:
                                     if inputs['service'].lower() in opt.text.lower():
-                                        svc_select.select_by_visible_text(opt.text)
-                                        found = True
-                                        break
-                                if not found:
-                                    self.app.log_message(self.log_display, f"Service '{inputs['service']}' not found in list.", "warning")
-                        except Exception as e:
-                            self.app.log_message(self.log_display, f"Error selecting service: {e}", "error")
+                                        svc_select.select_by_visible_text(opt.text); break
+                        except: pass
                         
-                        # Fill Scheme Remarks
-                        if inputs['scheme_remarks']: 
-                            self._safe_send_keys(driver, "schemeRemarks", inputs['scheme_remarks'])
+                        if inputs['scheme_remarks']: self._safe_send_keys(driver, "schemeRemarks", inputs['scheme_remarks'])
                         
-                        # Click Add Service
                         try:
-                            add_btn = driver.find_element(By.XPATH, "//button[contains(., 'Add Service')]")
-                            add_btn.click()
-                            self.app.log_message(self.log_display, "✅ Details Filled & Service Added.")
-                        except NoSuchElementException:
-                            self.app.log_message(self.log_display, "Add Service button not found.", "error")
+                            driver.find_element(By.XPATH, "//button[contains(., 'Add Service')]").click()
+                            # Monitor mode just fills service, it doesn't submit final app, 
+                            # so we don't get Ack No. here.
+                            self._log_result(app_name, inputs['scheme_remarks'], "Success", "Service Added")
+                        except: pass
                         
-                        # Wait to avoid repeating immediately
                         time.sleep(3)
-                    else:
-                        # Form is already filled/selected, just wait
-                        time.sleep(1)
+                    else: time.sleep(1)
 
-                except StaleElementReferenceException:
-                    time.sleep(1) # Page refreshed/changed
-                except NoSuchElementException:
-                    time.sleep(1) # Element not ready
+                except StaleElementReferenceException: time.sleep(1)
+                except NoSuchElementException: time.sleep(1)
 
-            except Exception as e:
-                # Suppress minor errors in monitor loop
-                time.sleep(1)
+            except Exception: time.sleep(1)
 
     def _safe_send_keys(self, driver, element_name, value):
         if not value: return
         try:
             elem = driver.find_element(By.NAME, element_name)
-            elem.clear()
-            elem.send_keys(value)
+            elem.clear(); elem.send_keys(value)
         except: pass
 
     def reset_ui(self):
@@ -534,12 +532,13 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.scheme_remarks_entry.delete(0, tkinter.END)
         self.backlog_switch.deselect()
         self.app.clear_log(self.log_display)
+        for item in self.results_tree.get_children(): self.results_tree.delete(item)
         self.app.after(0, self.app.set_status, "Ready")
 
     def save_inputs(self, inputs):
         try:
             with open(self.config_file, 'w') as f: json.dump(inputs, f, indent=4)
-        except Exception as e: print(f"Error saving SAD inputs: {e}")
+        except: pass
 
     def load_inputs(self):
         try:
@@ -551,13 +550,74 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                     self.scheme_type_combobox.set(data.get('scheme_type', 'Service Focus Area'))
                     self.service_combobox.set(data.get('service', ''))
                     self.scheme_remarks_entry.insert(0, data.get('scheme_remarks', ''))
-                    
-                    # Load Switch State
-                    if data.get('is_backlog', False):
-                        self.backlog_switch.select()
-                    else:
-                        self.backlog_switch.deselect()
-        except Exception as e: print(f"Error loading SAD inputs: {e}")
+                    if data.get('is_backlog', False): self.backlog_switch.select()
+                    else: self.backlog_switch.deselect()
+        except: pass
 
     def clear_file_selection(self):
         self.file_path_entry.delete(0, tkinter.END)
+
+    # --- Export Logic ---
+    def export_report(self):
+        export_format = self.export_format_menu.get()
+        if "CSV" in export_format:
+            self.export_treeview_to_csv(self.results_tree, "sad_entry_results.csv")
+            return
+            
+        data, file_path = self._get_filtered_data_and_filepath(export_format)
+        if not data: return
+
+        # Map data for PDF: [Time, Name, Scheme Remarks, Status, Ack No]
+        # We'll rearrange or use as is. The tree has: Time, Name, SchemeRem, Status, Ack
+        # That order is fine.
+        report_data = [[row[0], row[1], row[2], row[3], row[4]] for row in data]
+        report_headers = ["Time", "Applicant Name", "Scheme Remarks", "Status", "Ack Number"]
+        col_widths = [40, 100, 100, 40, 80]
+
+        if "PDF" in export_format:
+            self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
+
+    def _get_filtered_data_and_filepath(self, export_format):
+        if not self.results_tree.get_children():
+            messagebox.showinfo("No Data", "No results to export.")
+            return None, None
+        
+        filter_option = self.export_filter_menu.get()
+        data_to_export = []
+        for item_id in self.results_tree.get_children():
+            row_values = self.results_tree.item(item_id)['values']
+            status = row_values[3].upper() # Status is column 3 (0-based)
+            
+            if filter_option == "Export All":
+                data_to_export.append(row_values)
+            elif filter_option == "Success Only" and "SUCCESS" in status:
+                data_to_export.append(row_values)
+            elif filter_option == "Failed Only" and "SUCCESS" not in status:
+                data_to_export.append(row_values)
+                
+        if not data_to_export:
+            messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'.")
+            return None, None
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        details = {"PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}
+        if export_format not in details: return None, None
+        
+        filename = f"SAD_Report_{timestamp}{details[export_format]['ext']}"
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=details[export_format]['ext'],
+            filetypes=details[export_format]['types'],
+            initialdir=self.app.get_user_downloads_path(),
+            initialfile=filename,
+            title="Save Report"
+        )
+        return (data_to_export, file_path) if file_path else (None, None)
+
+    def _handle_pdf_export(self, data, headers, col_widths, file_path):
+        title = f"Sarkar Aapke Dwar Report"
+        report_date = datetime.now().strftime('%d %b %Y')
+        success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
+        
+        if success and messagebox.askyesno("Success", f"PDF Report saved to:\n{file_path}\n\nDo you want to open it?"):
+            if sys.platform == "win32": os.startfile(file_path)
+            else: subprocess.call(['open', file_path])
