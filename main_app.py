@@ -2183,35 +2183,53 @@ def initialize_webdriver_manager():
         FirefoxService(GeckoDriverManager().install())
     except: pass
 
-if __name__ == '__main__':
+# --- NEW FUNCTION FOR LOADER ---
+def run_application():
+    """
+    Ye function loader.py call karega jab naya update ready hoga.
+    """
     logging.basicConfig(level=logging.INFO)
+    
+    # Socket Logic for Single Instance
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try: s.bind(("127.0.0.1", 60123))
+    try: 
+        s.bind(("127.0.0.1", 60123))
     except:
-        try: s.connect(("127.0.0.1", 60123)); s.sendall(b'focus')
+        try: 
+            s.connect(("127.0.0.1", 60123))
+            s.sendall(b'focus')
+            s.close()
         except: pass
         sys.exit(0)
     
+    # Webdriver Manager Background Thread
     threading.Thread(target=initialize_webdriver_manager, daemon=True).start()
     
     try:
         app = NregaBotApp()
+        
+        # Socket Listener Thread
         def listen():
             s.listen(1)
             while True:
                 try:
-                    # Socket listening inside try-block
                     c, a = s.accept()
                     d = c.recv(1024)
                     if d == b'focus': 
                         app.after(0, app.bring_to_front)
                     c.close()
                 except (OSError, ValueError):
-                    # Jab app band hota hai to socket close ho jata hai
-                    # Ye error expected hai, loop break kar do
                     break
         threading.Thread(target=listen, daemon=True).start()
+        
+        # Start App
         app.mainloop()
+        
     except Exception as e:
         messagebox.showerror("Fatal Error", str(e))
-    finally: s.close()
+    finally: 
+        s.close()
+
+# Ye block tabhi chalega jab aap testing ke liye directly main_app.py run karenge
+if __name__ == '__main__':
+    run_application()

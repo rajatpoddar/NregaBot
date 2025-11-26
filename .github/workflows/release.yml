@@ -4,11 +4,11 @@ name: Create Application Release
 on:
   push:
     branches:
-      - main   # runs automatically on every push to main
-  workflow_dispatch: {} # still allows manual trigger if needed
+      - main
+  workflow_dispatch: {}
 
 jobs:
-  # Extract version & changelog
+  # --- 1. Get Release Info ---
   get-release-info:
     name: Get Release Information
     runs-on: ubuntu-latest
@@ -38,8 +38,7 @@ jobs:
           echo "$CHANGELOG_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-
-  # --- Build Job for Windows ---
+  # --- 2. Build for Windows (Loader + Core Zip) ---
   build-windows:
       name: Build for Windows
       needs: get-release-info
@@ -60,38 +59,35 @@ jobs:
           run: echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" > .env
           shell: bash
   
-        # ✅ Install Inno Setup
         - name: Install Inno Setup
-          run: |
-            choco install innosetup --yes
+          run: choco install innosetup --yes
           shell: powershell
   
-        # ✅ Run build script with version env
+        # ✅ Run build script (Updated to build Loader)
         - name: Run Windows build script
           run: |
             set APP_VERSION=${{ needs.get-release-info.outputs.version }}
             build_windows.bat
           shell: cmd
   
-        - name: Debug - List dist/installer
-          run: dir dist\installer
-          shell: cmd
-  
-        - name: Create Portable ZIP archive
+        # ✅ NEW: Create Core Update Zip (For Smart Updates)
+        # Hum sirf un files ko zip kar rahe hain jo dynamic code hain (Loader chhodkar)
+        - name: Create Core Update Zip
           run: |
             $version = "${{ needs.get-release-info.outputs.version }}"
-            Compress-Archive -Path dist/'NREGA Bot.exe' -DestinationPath dist/NREGABot-v$version-Windows-Portable.zip
-  
-        - name: Upload Windows artifacts
+            Compress-Archive -Path main_app.py, utils.py, config.py, version.json, location_data.py, tabs -DestinationPath dist/core_v$version.zip
+          shell: powershell
+
+        - name: Upload Windows Artifacts
           uses: actions/upload-artifact@v4
           with:
             name: windows-builds
             path: |
               dist/installer/*.exe
-              dist/NREGABot-v${{ needs.get-release-info.outputs.version }}-Windows-Portable.zip
-            retention-days: 1 # <-- AUTOMATIC CLEANUP: Artifacts 1 din baad delete ho jayenge
+              dist/core_v${{ needs.get-release-info.outputs.version }}.zip
+            retention-days: 1
 
-  # --- Build Job for Linux ---
+  # --- 3. Build for Linux (Loader - Optional but updated) ---
   build-linux:
     name: Build for Linux (Portable)
     needs: get-release-info
@@ -114,7 +110,8 @@ jobs:
       - name: Create .env file
         run: echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" > .env
 
-      - name: Build with PyInstaller
+      # ✅ Updated PyInstaller Command for Loader Architecture (Linux)
+      - name: Build Loader with PyInstaller
         run: |
           pyinstaller --noconfirm --windowed --onefile --name "NREGA Bot" \
           --icon="assets/app_icon.icns" \
@@ -125,8 +122,20 @@ jobs:
           --add-data=".env:." \
           --add-data="jobcard.jpeg:." \
           --add-data="tabs:tabs" \
+          --collect-all customtkinter \
           --collect-data fpdf \
-          main_app.py
+          --hidden-import=selenium \
+          --hidden-import=webdriver_manager \
+          --hidden-import=pandas \
+          --hidden-import=PIL \
+          --hidden-import=requests \
+          --hidden-import=fpdf \
+          --hidden-import=babel.numbers \
+          --hidden-import=tkcalendar \
+          --hidden-import=getmac \
+          --hidden-import=packaging \
+          --hidden-import=main_app \
+          loader.py
 
       - name: Create portable archive
         run: |
@@ -139,12 +148,12 @@ jobs:
         with:
           name: linux-build
           path: dist/NREGABot-v${{ needs.get-release-info.outputs.version }}-Linux.tar.gz
-          retention-days: 1 # <-- AUTOMATIC CLEANUP: Artifacts 1 din baad delete ho jayenge
+          retention-days: 1
 
-  # --- Publish Release ---
+  # --- 4. Publish Release ---
   publish-release:
     name: Publish GitHub Release
-    needs: [get-release-info, build-windows, build-linux] # <-- macOS removed form needs
+    needs: [get-release-info, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write

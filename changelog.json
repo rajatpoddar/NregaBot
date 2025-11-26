@@ -1,4 +1,17 @@
 {
+  "2.8.3": [
+      "🛠 **Improvement (MR Fill):** Added auto-fill for 'Work Start Date'. If empty, it now copies the date from 'Date From' field before saving.",
+      "🐞 **Bug Fix (Workcode Extractor):** Removed duplicate filtering. Now extracts all occurrences of work codes, even if they appear multiple times.",
+      "✨ **New Feature (Work Allocation):** Added 'From Date' filter. Users can now select a specific date to delete allocations, instead of deleting everything.",
+      "📅 **UI Update (Global):** Introduced a new, modern **Calendar Popup** across all automations (Muster Roll, Demand, Scheme Closing). Features colored indicators for Sundays and Mondays.",
+      "🛡️ **Stability (Global):** Added 'Friendly Error Handling'. If the browser is closed manually during automation, the app now stops gracefully with a clear message instead of showing code errors.",
+      "🚀 **New Feature (Smart Updates):** Introduced a new Loader Architecture! Future updates will be instant and very small in size (KB instead of MB).",
+      "✨ **Sarkar Aapke Dwar (Update):** Added support for 'Applicant Remarks' and 'Scheme Remarks' columns in CSV/Excel Bulk Upload.",
+      "🛠 **UX Improvement (SAD):** Remarks fields in UI now auto-disable when a file is selected. Added helper note for manual entry.",
+      "📝 **Template Update:** Updated 'Get Template' to include new remarks columns.",
+      "⚡ **Performance:** App launch time improved significantly.",
+      "🛠 **Architecture:** Unified update mechanism for both Windows and macOS to support background updates."
+    ],
   "2.8.2": [
       "🐞 **Bug Fix (Data Transfer):** Fixed data transfer failure between tabs (e.g., MR Tracking to MR Payment) caused by Skeleton Loader timing.",
       "🐞 **Bug Fix (Background Execution):** Fixed automation stopping/timing out when the browser window is minimized.",
