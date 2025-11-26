@@ -4,15 +4,167 @@ import tkinter
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import os, sys, platform, re
+import calendar
+from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont 
+
+# Import Selenium Exceptions for Error Handling
+from selenium.common.exceptions import NoSuchWindowException, WebDriverException
 
 from utils import resource_path
 
+# --- REUSABLE DATE PICKER CLASS ---
+class DatePickerPopup(ctk.CTkToplevel):
+    """
+    A reusable modal popup for selecting a date.
+    Features:
+    - Centered on the main application window.
+    - Highlights Today (Blue), Mondays (Greenish), and Sundays (Reddish).
+    """
+    def __init__(self, parent, on_date_select):
+        super().__init__(parent)
+        self.on_date_select = on_date_select
+        self.title("Select Date")
+        
+        # Dimensions
+        width, height = 300, 360
+        
+        # Calculate Center Position relative to Parent
+        try:
+            parent.update_idletasks()
+            x = parent.winfo_rootx() + (parent.winfo_width() // 2) - (width // 2)
+            y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (height // 2)
+        except:
+            # Fallback if parent coords aren't ready
+            x, y = 100, 100
+        
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        self.resizable(False, False)
+        self.attributes("-topmost", True)
+        self.transient(parent) # Keeps it on top of the parent window
+        
+        self.current_year = datetime.now().year
+        self.current_month = datetime.now().month
+        
+        # --- Header Section (Month/Year & Navigation) ---
+        self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.header_frame.pack(fill="x", padx=10, pady=(10, 5))
+        
+        ctk.CTkButton(self.header_frame, text="<", width=30, command=self.prev_month, 
+                      fg_color="transparent", border_width=1, text_color=("black", "white")).pack(side="left")
+        
+        self.lbl_month_year = ctk.CTkLabel(self.header_frame, text="", font=("Arial", 16, "bold"))
+        self.lbl_month_year.pack(side="left", expand=True)
+        
+        ctk.CTkButton(self.header_frame, text=">", width=30, command=self.next_month, 
+                      fg_color="transparent", border_width=1, text_color=("black", "white")).pack(side="right")
+        
+        # --- Calendar Grid Section ---
+        self.cal_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.cal_frame.pack(expand=True, fill="both", padx=10, pady=5)
+        
+        self.draw_calendar()
+        self.focus_force() 
+
+    def draw_calendar(self):
+        """Renders the grid of days for the current month."""
+        for widget in self.cal_frame.winfo_children():
+            widget.destroy()
+            
+        # Update Header
+        month_name = calendar.month_name[self.current_month]
+        self.lbl_month_year.configure(text=f"{month_name} {self.current_year}")
+        
+        # Weekday Headers
+        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        for i, day in enumerate(days):
+            t_color = "red" if i == 6 else ("gray30", "gray70")
+            ctk.CTkLabel(self.cal_frame, text=day, font=("Arial", 12, "bold"), text_color=t_color).grid(row=0, column=i, padx=2, pady=5)
+            
+        # Days Grid
+        cal = calendar.monthcalendar(self.current_year, self.current_month)
+        for r, week in enumerate(cal):
+            for c, day in enumerate(week):
+                if day != 0:
+                    # Color Logic
+                    btn_fg_color = "transparent"
+                    hover_color = ("gray80", "gray30")
+                    text_color = ("black", "white")
+
+                    if c == 0: # Monday (Greenish)
+                        btn_fg_color = ("#E8F5E9", "#1B5E20") 
+                    elif c == 6: # Sunday (Reddish)
+                        btn_fg_color = ("#FFEBEE", "#8B0000")
+                        text_color = ("#C62828", "#FFCCCC")
+
+                    # Highlight Today (Blue)
+                    now = datetime.now()
+                    if day == now.day and self.current_month == now.month and self.current_year == now.year:
+                        btn_fg_color = ("#2196F3", "#1976D2")
+                        text_color = "white"
+                        hover_color = ("#1E88E5", "#1565C0")
+
+                    btn = ctk.CTkButton(
+                        self.cal_frame, text=str(day), width=35, height=35,
+                        fg_color=btn_fg_color, 
+                        hover_color=hover_color,
+                        text_color=text_color,
+                        command=lambda d=day: self.select_date(d)
+                    )
+                    btn.grid(row=r+1, column=c, padx=2, pady=2)
+
+    def prev_month(self):
+        self.current_month -= 1
+        if self.current_month == 0:
+            self.current_month = 12
+            self.current_year -= 1
+        self.draw_calendar()
+
+    def next_month(self):
+        self.current_month += 1
+        if self.current_month == 13:
+            self.current_month = 1
+            self.current_year += 1
+        self.draw_calendar()
+
+    def select_date(self, day):
+        # Return date in DD/MM/YYYY format
+        selected_date = f"{day:02d}/{self.current_month:02d}/{self.current_year}"
+        self.on_date_select(selected_date)
+        self.destroy()
 class BaseAutomationTab(ctk.CTkFrame):
     def __init__(self, parent, app_instance, automation_key):
         super().__init__(parent, fg_color="transparent")
         self.app = app_instance
         self.automation_key = automation_key
+        
+    # --- ADD THIS HELPER METHOD ---
+    def open_date_picker(self, callback):
+        """
+        Opens the reusable DatePickerPopup.
+        :param callback: A function that accepts a string (the selected date).
+        """
+        DatePickerPopup(self, callback)
+
+    # --- ADD THIS ERROR HANDLER ---
+    def handle_error(self, e):
+        """
+        Centralized error handler.
+        Detects manual browser closure and shows user-friendly messages.
+        """
+        error_msg = str(e).lower()
+        
+        if "no such window" in error_msg or "target window already closed" in error_msg or "web view not found" in error_msg:
+            self.app.log_message(self.log_display, "Automation Stopped: Browser tab/window was closed.", "error")
+            messagebox.showwarning("Browser Closed", "Automation stopped because the browser window was closed.")
+        
+        elif "invalid session id" in error_msg:
+            self.app.log_message(self.log_display, "Error: Browser session lost.", "error")
+            messagebox.showwarning("Connection Lost", "Browser session was lost. Please restart the browser.")
+            
+        else:
+            self.app.log_message(self.log_display, f"Error: {e}", "error")
+            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
 
     def _get_wkhtml_path(self):
         """Gets the correct path to the wkhtmltoimage executable based on the OS."""
@@ -232,68 +384,19 @@ class BaseAutomationTab(ctk.CTkFrame):
     # MODIFIED: _create_action_buttons (Centralized & Modern UI)
     # -------------------------------------------------------------------------
     def _create_action_buttons(self, parent_frame):
-        """
-        Creates Start, Stop, and Reset buttons.
-        USES A WRAPPER FRAME TO FORCE CENTERING IN ALL TABS.
-        """
-        # 1. Outer Wrapper (The frame that child tabs will pack/grid)
-        # This frame will take whatever space the child tab gives it (e.g. fill='x')
+        """Creates Start, Stop, and Reset buttons."""
         outer_wrapper = ctk.CTkFrame(parent_frame, fg_color="transparent")
-        
-        # 2. Inner Container (Holds the actual buttons)
-        # We pack this centered inside the outer wrapper.
         inner_container = ctk.CTkFrame(outer_wrapper, fg_color="transparent")
         inner_container.pack(expand=True, anchor="center")
         
-        # 3. Add Buttons to the Inner Container
-        
-        # ▶ Start Button (Green, Compact)
-        self.start_button = ctk.CTkButton(
-            inner_container, 
-            text="▶ Start", 
-            command=self.start_automation, 
-            width=110, 
-            height=32,
-            corner_radius=8,
-            fg_color="#2E8B57",  # Sea Green
-            hover_color="#1F5E39",
-            font=ctk.CTkFont(size=13, weight="bold")
-        )
+        self.start_button = ctk.CTkButton(inner_container, text="▶ Start", command=self.start_automation, width=110, height=32, corner_radius=8, fg_color="#2E8B57", hover_color="#1F5E39", font=ctk.CTkFont(size=13, weight="bold"))
         self.start_button.pack(side="left", padx=(0, 8))
 
-        # ■ Stop Button (Red, Compact)
-        self.stop_button = ctk.CTkButton(
-            inner_container, 
-            text="■ Stop", 
-            command=self.stop_automation, 
-            state="disabled", 
-            width=90,
-            height=32,
-            corner_radius=8,
-            fg_color="#C53030", # Material Red
-            hover_color="#9B2C2C",
-            font=ctk.CTkFont(size=13, weight="bold")
-        )
+        self.stop_button = ctk.CTkButton(inner_container, text="■ Stop", command=self.stop_automation, state="disabled", width=90, height=32, corner_radius=8, fg_color="#C53030", hover_color="#9B2C2C", font=ctk.CTkFont(size=13, weight="bold"))
         self.stop_button.pack(side="left", padx=(0, 8))
         
-        # ↺ Reset Button (Gray, Compact)
-        self.reset_button = ctk.CTkButton(
-            inner_container, 
-            text="↺ Reset", 
-            command=self.reset_ui, 
-            width=90,
-            height=32,
-            corner_radius=8,
-            fg_color=("gray70", "#4A4A4A"), 
-            hover_color=("gray60", "#3A3A3A"),
-            text_color="white",
-            font=ctk.CTkFont(size=13)
-        )
+        self.reset_button = ctk.CTkButton(inner_container, text="↺ Reset", command=self.reset_ui, width=90, height=32, corner_radius=8, fg_color=("gray70", "#4A4A4A"), hover_color=("gray60", "#3A3A3A"), text_color="white", font=ctk.CTkFont(size=13))
         self.reset_button.pack(side="left")
-
-        # 4. Return the Outer Wrapper
-        # Now, no matter how the child tab packs this (fill='x', sticky='ew'),
-        # the inner container will always remain floating in the center.
         return outer_wrapper
 
     def _create_log_and_status_area(self, parent_notebook):
@@ -329,24 +432,14 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.progress_bar.pack(side="right", padx=10, fill="x", expand=True)
     
     def set_common_ui_state(self, running: bool):
-        # Update text for running state
-        self.start_button.configure(
-            state="disabled" if running else "normal",
-            text="Running..." if running else "▶ Start"
-        )
+        self.start_button.configure(state="disabled" if running else "normal", text="Running..." if running else "▶ Start")
         self.stop_button.configure(state="normal" if running else "disabled")
         self.reset_button.configure(state="disabled" if running else "normal")
-
-    def start_automation(self):
-        raise NotImplementedError
 
     def stop_automation(self):
         self.app.stop_events[self.automation_key].set()
         self.app.log_message(self.log_display, "Stop signal sent. Finishing current task...", "warning")
 
-    def reset_ui(self):
-        raise NotImplementedError
-        
     def update_status(self, message, progress=None):
         self.status_label.configure(text=f"Status: {message}")
         if progress is not None:
@@ -357,13 +450,11 @@ class BaseAutomationTab(ctk.CTkFrame):
         bg_color = self._apply_appearance_mode(ctk.ThemeManager.theme["CTkFrame"]["fg_color"])
         text_color = self._apply_appearance_mode(ctk.ThemeManager.theme["CTkLabel"]["text_color"])
         heading_bg = self._apply_appearance_mode(ctk.ThemeManager.theme["CTkButton"]["fg_color"])
-        
         style.theme_use("default")
         style.configure("Treeview", background=bg_color, foreground=text_color, fieldbackground=bg_color, borderwidth=0)
         style.map('Treeview', background=[('selected', ctk.ThemeManager.theme["CTkButton"]["fg_color"])])
         style.configure("Treeview.Heading", background=heading_bg, foreground=text_color, relief="flat", font=('Calibri', 10,'bold'))
         style.map("Treeview.Heading", background=[('active', ctk.ThemeManager.theme["CTkButton"]["hover_color"])])
-
         tree.tag_configure('failed', foreground='red')
 
     def _setup_treeview_sorting(self, tree):
@@ -372,30 +463,19 @@ class BaseAutomationTab(ctk.CTkFrame):
 
     def _treeview_sort_column(self, tv, col, reverse):
         l = [(tv.set(k, col), k) for k in tv.get_children('')]
-        try:
-            l.sort(key=lambda t: float(t[0]), reverse=reverse)
-        except ValueError:
-            l.sort(reverse=reverse)
-        for index, (val, k) in enumerate(l):
-            tv.move(k, '', index)
+        try: l.sort(key=lambda t: float(t[0]), reverse=reverse)
+        except ValueError: l.sort(reverse=reverse)
+        for index, (val, k) in enumerate(l): tv.move(k, '', index)
         tv.heading(col, command=lambda: self._treeview_sort_column(tv, col, not reverse))
         
     def export_treeview_to_csv(self, tree, default_filename):
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=".csv",
-            filetypes=[("CSV files", "*.csv")],
-            initialdir=self.app.get_user_downloads_path(),
-            initialfile=default_filename,
-            title="Save CSV Report"
-        )
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialdir=self.app.get_user_downloads_path(), initialfile=default_filename, title="Save CSV Report")
         if not file_path: return
-        
         try:
             with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
                 writer = csv.writer(f)
                 writer.writerow(tree["columns"])
-                for item_id in tree.get_children():
-                    writer.writerow(tree.item(item_id)['values'])
+                for item_id in tree.get_children(): writer.writerow(tree.item(item_id)['values'])
             messagebox.showinfo("Success", f"Report successfully exported to\n{file_path}", parent=self)
         except Exception as e:
             messagebox.showerror("Export Failed", f"An error occurred while saving the CSV file:\n{e}", parent=self)
@@ -403,6 +483,7 @@ class BaseAutomationTab(ctk.CTkFrame):
     def _extract_and_update_workcodes(self, textbox_widget):
         """
         Extracts work codes (6-digit) and wagelist IDs.
+        Updated: Allows duplicates (does not filter unique values).
         """
         try:
             input_content = textbox_widget.get("1.0", tkinter.END)
@@ -423,27 +504,27 @@ class BaseAutomationTab(ctk.CTkFrame):
                     processed_work_codes.append(last_part)
             
             results = processed_work_codes + [wl.upper() for wl in found_wagelists]
-            final_results = list(dict.fromkeys(results))
+            
+            # --- CHANGE MADE HERE ---
+            # Previously: final_results = list(dict.fromkeys(results)) (This removed duplicates)
+            # Now: We keep 'results' as is to allow duplicates.
+            final_results = results 
+            # ------------------------
 
             if final_results:
                 textbox_widget.configure(state="normal")
                 textbox_widget.delete("1.0", tkinter.END)
                 textbox_widget.insert("1.0", "\n".join(final_results))
-                messagebox.showinfo("Extraction Complete", f"Found and extracted {len(final_results)} unique codes.", parent=self)
+                # Update message to reflect total items found, including duplicates
+                messagebox.showinfo("Extraction Complete", f"Found and extracted {len(final_results)} items.", parent=self)
             else:
                 messagebox.showinfo("No Codes Found", "Could not find any matching work codes or wagelist IDs in the text.", parent=self)
         
         except Exception as e:
             messagebox.showerror("Extraction Error", f"An error occurred during extraction: {e}", parent=self)
 
-    # --- Helper for Appearance Mode ---
     def _apply_appearance_mode(self, theme_color_tuple):
-        """
-        Picks the correct color from a (light, dark) tuple based on current mode.
-        """
         if isinstance(theme_color_tuple, (tuple, list)):
-            if ctk.get_appearance_mode().lower() == "light":
-                return theme_color_tuple[0]
-            else:
-                return theme_color_tuple[1]
+            if ctk.get_appearance_mode().lower() == "light": return theme_color_tuple[0]
+            else: return theme_color_tuple[1]
         return theme_color_tuple

@@ -249,12 +249,24 @@ class DemandTab(BaseAutomationTab):
 
         # --- Row 1: Demand Date (From) and Override To Date ---
         ctk.CTkLabel(controls_frame, text="Demand Date:").grid(row=1, column=0, padx=(10, 5), pady=5, sticky="w")
-        self.demand_date_entry = DateEntry(controls_frame)
-        self.demand_date_entry.grid(row=1, column=1, padx=(0, 10), pady=5, sticky="ew")
+
+        # Demand Date Frame
+        d_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        d_date_frame.grid(row=1, column=1, padx=(0, 10), pady=5, sticky="ew")
+        self.demand_date_entry = ctk.CTkEntry(d_date_frame, placeholder_text="DD/MM/YYYY")
+        self.demand_date_entry.pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(d_date_frame, text="📅", width=30, fg_color=("gray85", "gray25"), text_color=("black", "white"),
+                    command=lambda: self.open_date_picker(lambda d: [self.demand_date_entry.delete(0, "end"), self.demand_date_entry.insert(0, d)])).pack(side="right", padx=(5,0))
 
         ctk.CTkLabel(controls_frame, text="Override To Date:").grid(row=1, column=2, padx=(0, 5), pady=5, sticky="w")
-        self.demand_to_date_entry = DateEntry(controls_frame)
-        self.demand_to_date_entry.grid(row=1, column=3, padx=5, pady=5, sticky="ew")
+
+        # Override Date Frame
+        to_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        to_date_frame.grid(row=1, column=3, padx=5, pady=5, sticky="ew")
+        self.demand_to_date_entry = ctk.CTkEntry(to_date_frame, placeholder_text="Optional")
+        self.demand_to_date_entry.pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(to_date_frame, text="📅", width=30, fg_color=("gray85", "gray25"), text_color=("black", "white"),
+                    command=lambda: self.open_date_picker(lambda d: [self.demand_to_date_entry.delete(0, "end"), self.demand_to_date_entry.insert(0, d)])).pack(side="right", padx=(5,0))
 
         # --- Row 2: Days and No. of Labour ---
         
@@ -966,7 +978,12 @@ class DemandTab(BaseAutomationTab):
         if not messagebox.askokcancel("Reset?", "Clear inputs, selections, logs?"): return
         self.state_combobox.set(""); self.panchayat_entry.delete(0, 'end'); self.days_entry.delete(0, 'end'); self.search_entry.delete(0, 'end')
         self.allocation_work_key_entry.delete(0, 'end')
-        self.demand_date_entry.clear(); self.demand_to_date_entry.clear(); 
+        
+        # --- FIX: Use delete(0, 'end') instead of clear() ---
+        self.demand_date_entry.delete(0, 'end')
+        self.demand_to_date_entry.delete(0, 'end')
+        # ----------------------------------------------------
+
         self.csv_path = None; self.all_applicants_data.clear()
         self.file_label.configure(text="No file loaded.", text_color="gray")
         self.select_all_button.pack_forget(); self.clear_selection_button.pack_forget()
@@ -1703,13 +1720,14 @@ class DemandTab(BaseAutomationTab):
                 except ValueError: pass
             except Exception as e: print(f"Err loading demand inputs: {e}")
             
-        self.demand_date_entry.set_date(date_to_set)
+        # --- FIX: Use delete/insert ---
+        self.demand_date_entry.delete(0, "end")
+        self.demand_date_entry.insert(0, date_to_set)
         
-        # Load override date if present
+        self.demand_to_date_entry.delete(0, "end")
         if demand_to_date_set:
-             self.demand_to_date_entry.set_date(demand_to_date_set)
-        else:
-             self.demand_to_date_entry.clear()
+             self.demand_to_date_entry.insert(0, demand_to_date_set)
+        # ------------------------------
         
         self.days_entry.delete(0, 'end')
         self.days_entry.insert(0, days_to_set)

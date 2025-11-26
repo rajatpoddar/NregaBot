@@ -51,13 +51,23 @@ class MusterrollGenTab(BaseAutomationTab):
         
         ctk.CTkLabel(controls_frame, text="Note: Must exactly match the name on the NREGA website.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky='w', padx=15, pady=(0,10))
         
+        # --- Start Date ---
         ctk.CTkLabel(controls_frame, text="तारीख से (DD/MM/YYYY):").grid(row=2, column=0, sticky='w', padx=15, pady=5)
-        self.start_date_entry = DateEntry(controls_frame)
-        self.start_date_entry.grid(row=2, column=1, sticky='ew', padx=(15,5), pady=5)
-        
+        start_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        start_date_frame.grid(row=2, column=1, sticky='ew', padx=(15,5), pady=5)
+        self.start_date_entry = ctk.CTkEntry(start_date_frame, placeholder_text="DD/MM/YYYY")
+        self.start_date_entry.pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(start_date_frame, text="📅", width=30, fg_color=("gray85", "gray25"), text_color=("black", "white"),
+                    command=lambda: self.open_date_picker(lambda d: [self.start_date_entry.delete(0, "end"), self.start_date_entry.insert(0, d)])).pack(side="right", padx=(5,0))
+
+        # --- End Date ---
         ctk.CTkLabel(controls_frame, text="तारीख को (DD/MM/YYYY):").grid(row=2, column=2, sticky='w', padx=10, pady=5)
-        self.end_date_entry = DateEntry(controls_frame)
-        self.end_date_entry.grid(row=2, column=3, sticky='ew', padx=(5,15), pady=5)
+        end_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        end_date_frame.grid(row=2, column=3, sticky='ew', padx=(5,15), pady=5)
+        self.end_date_entry = ctk.CTkEntry(end_date_frame, placeholder_text="DD/MM/YYYY")
+        self.end_date_entry.pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(end_date_frame, text="📅", width=30, fg_color=("gray85", "gray25"), text_color=("black", "white"),
+                    command=lambda: self.open_date_picker(lambda d: [self.end_date_entry.delete(0, "end"), self.end_date_entry.insert(0, d)])).pack(side="right", padx=(5,0))
         
         ctk.CTkLabel(controls_frame, text="Select Designation:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
         designation_options = ["Junior Engineer--BP", "Assistant Engineer--BP", "Technical Assistant--BP", "Acrited Engineer(AE)--GP", "Junior Engineer--GP", "Technical Assistant--GP"]
@@ -290,8 +300,15 @@ class MusterrollGenTab(BaseAutomationTab):
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r') as f: data = json.load(f)
                 self.panchayat_entry.insert(0, data.get('panchayat', ''))
-                self.start_date_entry.set_date(data.get('start_date', ''))
-                self.end_date_entry.set_date(data.get('end_date', ''))
+                
+                # --- FIX: Use delete/insert ---
+                self.start_date_entry.delete(0, "end")
+                self.start_date_entry.insert(0, data.get('start_date', ''))
+                
+                self.end_date_entry.delete(0, "end")
+                self.end_date_entry.insert(0, data.get('end_date', ''))
+                # ------------------------------
+
                 self.designation_combobox.set(data.get('designation', ''))
                 self.staff_entry.insert(0, data.get('staff', ''))
                 self.orientation_var.set(data.get('orientation', 'Landscape'))

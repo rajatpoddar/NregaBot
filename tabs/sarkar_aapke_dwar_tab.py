@@ -67,7 +67,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         ctk.CTkButton(btn_frame, text="Clear", width=60, fg_color="#C53030", hover_color="#9B2C2C", command=self.clear_file_selection).pack(side="left", padx=2)
         
         note_text = ("ℹ️ Monitor Mode: Leave File empty. Bot auto-fills Scheme details when you open a new form.\n"
-                     "ℹ️ Bulk Mode: Select Excel/CSV. Bot fills Applicant + Scheme details and Extracts Ack No.")
+                     "ℹ️ Bulk Mode: Select Excel/CSV. Bot fills Applicant + Scheme details and Extracts Ack No.\n"
+                     "ℹ️ Manual Remarks: To enter remarks manually in the UI, click 'Clear' to unlock the fields.")
         
         ctk.CTkLabel(bulk_frame, text=note_text, text_color="gray60", 
                      font=ctk.CTkFont(size=11), justify="left", anchor="w").grid(row=2, column=0, columnspan=3, sticky="w", padx=10, pady=(5, 5))
@@ -81,7 +82,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
 
         # 1. Applicant Remarks
         ctk.CTkLabel(settings_frame, text="Applicant Remarks:").grid(row=1, column=0, sticky="w", padx=10, pady=2)
-        self.app_remarks_entry = ctk.CTkEntry(settings_frame, placeholder_text="Enter Applicant Remarks (e.g. Camp)")
+        self.app_remarks_entry = ctk.CTkEntry(settings_frame, placeholder_text="Default Applicant Remarks (if not in file)")
         self.app_remarks_entry.grid(row=1, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
         # 2. Scheme Type Dropdown
@@ -114,7 +115,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
 
         # 4. Scheme Remarks
         ctk.CTkLabel(settings_frame, text="Scheme Remarks:").grid(row=4, column=0, sticky="w", padx=10, pady=2)
-        self.scheme_remarks_entry = ctk.CTkEntry(settings_frame, placeholder_text="Enter Scheme Remarks")
+        self.scheme_remarks_entry = ctk.CTkEntry(settings_frame, placeholder_text="Default Scheme Remarks (if not in file)")
         self.scheme_remarks_entry.grid(row=4, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
         # Action Buttons
@@ -151,9 +152,9 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         
         self.results_tree.heading("Time", text="Time")
         self.results_tree.heading("Applicant Name", text="Applicant Name")
-        self.results_tree.heading("Scheme Remarks", text="Scheme Remarks") # Updated Column
+        self.results_tree.heading("Scheme Remarks", text="Scheme Remarks") 
         self.results_tree.heading("Status", text="Status")
-        self.results_tree.heading("Ack Number", text="Ack Number") # Updated Column
+        self.results_tree.heading("Ack Number", text="Ack Number")
 
         self.results_tree.column("Time", width=80, anchor="center")
         self.results_tree.column("Applicant Name", width=150, anchor="w")
@@ -214,30 +215,56 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
     def set_ui_state(self, running: bool):
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.app_remarks_entry.configure(state=state)
+        
+        # We handle remarks state separately if a file is loaded
+        has_file = bool(self.file_path_entry.get().strip())
+        
+        if running:
+             self.app_remarks_entry.configure(state="disabled")
+             self.scheme_remarks_entry.configure(state="disabled")
+        elif not has_file:
+             self.app_remarks_entry.configure(state="normal")
+             self.scheme_remarks_entry.configure(state="normal")
+             
         self.scheme_type_combobox.configure(state=state)
         self.service_combobox.configure(state=state)
-        self.scheme_remarks_entry.configure(state=state)
         self.file_path_entry.configure(state=state)
         self.backlog_switch.configure(state=state)
         self.export_button.configure(state=state)
         
         if state == "normal": self._on_format_change(self.export_format_menu.get())
 
+    def _update_remarks_state(self, has_file):
+        """Disables remark fields if file is loaded, indicating file data takes precedence."""
+        state = "disabled" if has_file else "normal"
+        # Visual cue is automatic with state change in CustomTkinter
+        self.app_remarks_entry.configure(state=state)
+        self.scheme_remarks_entry.configure(state=state)
+
     def browse_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("Excel/CSV Files", "*.csv *.xlsx"), ("Excel Files", "*.xlsx")])
         if file_path:
             self.file_path_entry.delete(0, tkinter.END)
             self.file_path_entry.insert(0, file_path)
+            self._update_remarks_state(True) # Disable UI remarks
+
+    def clear_file_selection(self):
+        self.file_path_entry.delete(0, tkinter.END)
+        self._update_remarks_state(False) # Enable UI remarks
 
     def generate_demo_template(self):
-        headers = ["Applicant Name", "Father/Husband Name", "Age", "Mobile No", "Is WhatsApp (Y/N)", "Village", "Address"]
+        # UPDATED: Added Applicant Remarks and Scheme Remarks columns
+        headers = [
+            "Applicant Name", "Father/Husband Name", "Age", "Mobile No", 
+            "Is WhatsApp (Y/N)", "Village", "Address", 
+            "Applicant Remarks", "Scheme Remarks"
+        ]
         file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV Files", "*.csv")], initialfile="SAD_Bulk_Template.csv")
         if file_path:
             try:
                 with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
                     csv.writer(f).writerow(headers)
-                messagebox.showinfo("Success", "Template saved!")
+                messagebox.showinfo("Success", "Template saved with Remark columns!")
             except Exception as e:
                 messagebox.showerror("Error", f"Could not save file: {e}")
 
@@ -342,6 +369,14 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             applicant_name = row.get("Applicant Name", "").strip()
             status_msg = f"Processing {i+1}/{total}: {applicant_name}"
             
+            # --- Logic to prioritize Remarks from File ---
+            row_app_remark = row.get("Applicant Remarks", "").strip()
+            final_app_remark = row_app_remark if row_app_remark else inputs['app_remarks']
+
+            row_scheme_remark = row.get("Scheme Remarks", "").strip()
+            final_scheme_remark = row_scheme_remark if row_scheme_remark else inputs['scheme_remarks']
+            # ---------------------------------------------
+            
             self.app.after(0, self.app.set_status, status_msg)
             self.app.after(0, self.progress_bar.set, (i+1)/total)
             
@@ -375,7 +410,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                     except: pass
 
                 self._safe_send_keys(driver, "address", row.get("Address", ""))
-                self._safe_send_keys(driver, "remarks", inputs['app_remarks'])
+                self._safe_send_keys(driver, "remarks", final_app_remark)
 
                 # 2. Fill Scheme
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -384,7 +419,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                     Select(driver.find_element(By.NAME, "schemeId")).select_by_visible_text(inputs['scheme_type'])
                     time.sleep(1) 
                 except:
-                    self._log_result(applicant_name, inputs['scheme_remarks'], "Failed", "Scheme Type Error")
+                    self._log_result(applicant_name, final_scheme_remark, "Failed", "Scheme Type Error")
                     continue
 
                 try:
@@ -396,11 +431,11 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                             if inputs['service'].lower() in opt.text.lower():
                                 svc_select.select_by_visible_text(opt.text); found = True; break
                         if not found:
-                            self._log_result(applicant_name, inputs['scheme_remarks'], "Failed", "Service Error")
+                            self._log_result(applicant_name, final_scheme_remark, "Failed", "Service Error")
                             continue
                 except: pass
 
-                self._safe_send_keys(driver, "schemeRemarks", inputs['scheme_remarks'])
+                self._safe_send_keys(driver, "schemeRemarks", final_scheme_remark)
 
                 # 3. Submit & Extract Ack No
                 try:
@@ -439,12 +474,12 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         time.sleep(1)
                     except: driver.refresh(); time.sleep(2)
 
-                    self._log_result(applicant_name, inputs['scheme_remarks'], "Success", ack_number)
+                    self._log_result(applicant_name, final_scheme_remark, "Success", ack_number)
                 except Exception as e:
-                    self._log_result(applicant_name, inputs['scheme_remarks'], "Failed", f"Submit Error: {e}")
+                    self._log_result(applicant_name, final_scheme_remark, "Failed", f"Submit Error: {e}")
 
             except Exception as e:
-                self._log_result(applicant_name, inputs['scheme_remarks'], "Failed", str(e))
+                self._log_result(applicant_name, final_scheme_remark, "Failed", str(e))
                 driver.refresh(); time.sleep(3)
 
     def _run_monitor_mode(self, driver, wait, inputs):
@@ -534,6 +569,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.app.clear_log(self.log_display)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         self.app.after(0, self.app.set_status, "Ready")
+        # Ensure fields are re-enabled
+        self._update_remarks_state(False)
 
     def save_inputs(self, inputs):
         try:
@@ -545,17 +582,24 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r') as f:
                     data = json.load(f)
-                    self.file_path_entry.insert(0, data.get('file_path', ''))
+                    file_path = data.get('file_path', '')
+                    self.file_path_entry.insert(0, file_path)
+                    
                     self.app_remarks_entry.insert(0, data.get('app_remarks', ''))
                     self.scheme_type_combobox.set(data.get('scheme_type', 'Service Focus Area'))
                     self.service_combobox.set(data.get('service', ''))
                     self.scheme_remarks_entry.insert(0, data.get('scheme_remarks', ''))
                     if data.get('is_backlog', False): self.backlog_switch.select()
                     else: self.backlog_switch.deselect()
+                    
+                    # Check if file exists to toggle state
+                    if file_path:
+                        self._update_remarks_state(True)
         except: pass
 
     def clear_file_selection(self):
         self.file_path_entry.delete(0, tkinter.END)
+        self._update_remarks_state(False) # Enable UI remarks
 
     # --- Export Logic ---
     def export_report(self):
@@ -568,8 +612,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         if not data: return
 
         # Map data for PDF: [Time, Name, Scheme Remarks, Status, Ack No]
-        # We'll rearrange or use as is. The tree has: Time, Name, SchemeRem, Status, Ack
-        # That order is fine.
         report_data = [[row[0], row[1], row[2], row[3], row[4]] for row in data]
         report_headers = ["Time", "Applicant Name", "Scheme Remarks", "Status", "Ack Number"]
         col_widths = [40, 100, 100, 40, 80]

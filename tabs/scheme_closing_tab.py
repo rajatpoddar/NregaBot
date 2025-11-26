@@ -104,9 +104,12 @@ class SchemeClosingTab(BaseAutomationTab):
         # Sub-frame to hold Date and Checkbox in one line
         date_check_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
         date_check_frame.grid(row=6, column=1, sticky="ew", padx=15, pady=(5, 15))
-        
-        self.completion_date_entry = DateEntry(date_check_frame)
+
+        # Completion Date with Calendar Button
+        self.completion_date_entry = ctk.CTkEntry(date_check_frame, placeholder_text="DD/MM/YYYY", width=120)
         self.completion_date_entry.pack(side="left")
+        ctk.CTkButton(date_check_frame, text="📅", width=30, fg_color=("gray85", "gray25"), text_color=("black", "white"),
+                    command=lambda: self.open_date_picker(lambda d: [self.completion_date_entry.delete(0, "end"), self.completion_date_entry.insert(0, d)])).pack(side="left", padx=(5,0))
         
         self.skip_confirm_checkbox = ctk.CTkCheckBox(
             date_check_frame, 
@@ -236,9 +239,16 @@ class SchemeClosingTab(BaseAutomationTab):
             self.measured_by_var.set(data.get("measured_by", "Junior Engineer(BP)"))
             self.measured_name_entry.insert(0, data.get("measured_name", ""))
             self.cert_no_entry.insert(0, data.get("cert_no_start", ""))
-            self.completion_date_entry.set_date(data.get("completion_date", ""))
+            
+            # --- FIX: Use delete/insert instead of set_date ---
+            date_val = data.get("completion_date", "")
+            self.completion_date_entry.delete(0, "end")
+            self.completion_date_entry.insert(0, date_val)
+            
         except FileNotFoundError:
-            self.completion_date_entry.set_date(datetime.now().strftime("%d/%m/%Y"))
+            # Set today's date if no file found
+            self.completion_date_entry.delete(0, "end")
+            self.completion_date_entry.insert(0, datetime.now().strftime("%d/%m/%Y"))
         except Exception as e:
             print(f"Error loading inputs: {e}")
 
@@ -452,7 +462,10 @@ class SchemeClosingTab(BaseAutomationTab):
             self.measured_by_var.set("Junior Engineer(BP)")
             self.measured_name_entry.delete(0, "end")
             self.cert_no_entry.delete(0, "end")
-            self.completion_date_entry.clear()
+            
+            # --- FIX: Use delete instead of clear() ---
+            self.completion_date_entry.delete(0, "end")
+            
             self.work_codes_textbox.delete("1.0", "end")
             for item in self.results_tree.get_children():
                 self.results_tree.delete(item)

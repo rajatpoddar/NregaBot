@@ -323,10 +323,13 @@ class MrFillTab(BaseAutomationTab):
             time.sleep(1) # Wait for search
 
             # Check for 'lblmsg' error (like Geotag)
-            error_span = driver.find_element(By.ID, "lblmsg")
-            error_text = error_span.text.strip()
-            if error_span and error_text: 
-                raise ValueError(f"{error_text}")
+            try:
+                error_span = driver.find_element(By.ID, "lblmsg")
+                error_text = error_span.text.strip()
+                if error_text: 
+                    raise ValueError(f"{error_text}")
+            except NoSuchElementException:
+                pass
 
             # --- 2. Work Code Select ---
             self.app.after(0, self.app.set_status, f"Selecting Work Code...")
@@ -363,12 +366,26 @@ class MrFillTab(BaseAutomationTab):
                     except NoSuchElementException:
                         self.app.log_message(self.log_display, f"Warning: Holiday column {col_num} not found.", "warning")
             
+            # --- NEW STEP: Fill 'Work Start Date' if Empty ---
+            try:
+                work_start_input = driver.find_element(By.ID, "txtWrkStartDate")
+                # Check if the field is empty (or just whitespace)
+                if not work_start_input.get_attribute("value").strip():
+                    # Get value from 'Date From' (txtDatefrm)
+                    date_from_val = driver.find_element(By.ID, "txtDatefrm").get_attribute("value")
+                    if date_from_val:
+                        work_start_input.clear()
+                        work_start_input.send_keys(date_from_val)
+                        self.app.log_message(self.log_display, f"Auto-filled Work Start Date: {date_from_val}", "info")
+            except Exception as e:
+                # Log warning but don't stop automation
+                self.app.log_message(self.log_display, f"Warning: Could not auto-fill date: {e}", "warning")
+
             # --- 5. Manual Mode Logic ---
             if is_manual_mode:
                 self.app.after(0, self.app.set_status, f"Manual Mode: Pausing for MR: {current_mr_no}")
                 self.app.log_message(self.log_display, f"Manual Mode: Pausing for MR: {current_mr_no}. Please mark absentees and click 'Save'.", "info")
                 
-                # --- MODIFICATION: Wait for the FIRST alert ---
                 try:
                     # Wait up to 10 minutes (600s) for the user to click 'Save' which triggers the first alert
                     alert = WebDriverWait(driver, 600).until(EC.alert_is_present())
@@ -376,9 +393,7 @@ class MrFillTab(BaseAutomationTab):
                     alert.accept()
                     self.app.log_message(self.log_display, f"User action detected. Bot handled first alert: '{alert_text}'", "info")
                 except TimeoutException:
-                    # User didn't click 'Save' in 10 minutes
                     raise ValueError("Manual mode timed out. User did not click 'Save'.")
-                # --- END MODIFICATION ---
 
             else:
                 # --- 6. Auto-Submit Logic ---
@@ -411,12 +426,10 @@ class MrFillTab(BaseAutomationTab):
                 self._log_result(work_key, current_mr_no, "Failed", "No final confirmation alert found (Timeout).")
 
         except ValueError as e:
-            # Catches specific errors like Geotag
             error_message = str(e)
             self._log_result(work_key, current_mr_no, "Failed", error_message)
         
         except (IndexError, NoSuchElementException) as e:
-            # Catches dropdown/element errors
             display_msg = str(e)
             if "Muster Roll (MR) not found" in display_msg: details = "MR not found (or not available)."
             elif "Work code not found" in display_msg: details = "Work Code not found."
