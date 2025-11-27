@@ -72,8 +72,8 @@ jobs:
   
         # ✅ NEW: Create Secure Windows Core Zip (Compiled .pyc with Python 3.11)
         - name: Create Secure Core Zip (Windows)
+          shell: python
           run: |
-            python -c "
             import os, shutil, zipfile, compileall
             
             version = '${{ needs.get-release-info.outputs.version }}'
@@ -108,8 +108,6 @@ jobs:
             
             shutil.rmtree(temp_dir)
             print(f'Success: Created {zip_name}')
-            "
-          shell: cmd
 
         - name: Upload Windows Artifacts
           uses: actions/upload-artifact@v4
