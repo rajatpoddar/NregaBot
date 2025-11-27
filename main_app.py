@@ -2137,14 +2137,41 @@ class NregaBotApp(ctk.CTk):
     def check_for_updates_background(self):
         def _check():
             try:
-                resp = requests.get(f"{config.MAIN_WEBSITE_URL}/version.json", timeout=10); data = resp.json()
+                # Timeout badha diya taaki slow connection pe fail na ho
+                resp = requests.get(f"{config.MAIN_WEBSITE_URL}/version.json", timeout=15)
+                data = resp.json()
                 lat = data.get("latest_version")
+                
+                # Current version se comparison
                 if lat and parse_version(lat) > parse_version(config.APP_VERSION):
-                    self.update_info = {"status": "available", "version": lat, "url": data.get("download_url_windows"), "changelog": data.get("changelog", {}).get(lat, [])}
+                    
+                    # --- SMART UPDATE LOGIC START ---
+                    core_upd = data.get("core_update", {})
+                    is_smart = False
+                    download_url = data.get("download_url_windows") # Default to EXE
+                    
+                    # Check agar Smart Update available hai aur Full Reinstall required nahi hai
+                    if core_upd and not core_upd.get("force_full_reinstall", False):
+                        download_url = core_upd.get("url")
+                        is_smart = True
+                    # --- SMART UPDATE LOGIC END ---
+
+                    self.update_info = {
+                        "status": "available", 
+                        "version": lat, 
+                        "url": download_url, 
+                        "is_smart_update": is_smart, # UI ko batane ke liye flag
+                        "changelog": data.get("changelog", {}).get(lat, [])
+                    }
                     self.after(0, self.show_update_prompt, lat)
-                else: self.update_info = {"status": "updated", "version": lat}
-            except: self.update_info['status'] = 'error'
-            finally: self.after(0, self._update_about_tab_info)
+                else:
+                    self.update_info = {"status": "updated", "version": lat}
+            except Exception as e: 
+                print(f"Update Check Error: {e}")
+                self.update_info['status'] = 'error'
+            finally: 
+                self.after(0, self._update_about_tab_info)
+        
         threading.Thread(target=_check, daemon=True).start()
 
     def show_update_prompt(self, version):
@@ -2158,18 +2185,154 @@ class NregaBotApp(ctk.CTk):
     def download_and_install_update(self, url, version):
         about = self.tab_instances.get("About")
         if not about: return
-        about.update_button.configure(state="disabled"); about.update_progress.grid(row=4, column=0, pady=10, padx=20, sticky='ew')
+        
+        # UI Update
+        about.update_button.configure(state="disabled", text="Downloading...")
+        about.update_progress.grid(row=4, column=0, pady=10, padx=20, sticky='ew')
+        
+        is_smart = self.update_info.get("is_smart_update", False)
+        
         def _worker():
             try:
-                dl_path = os.path.join(self.get_user_downloads_path(), url.split('/')[-1])
+                # File name decide karein (EXE ya ZIP)
+                filename = url.split('/')[-1]
+                dl_path = os.path.join(self.get_user_downloads_path(), filename)
+                
+                # Download Logic
                 with requests.get(url, stream=True) as r:
-                    r.raise_for_status(); total = int(r.headers.get('content-length', 0)); dl=0
+                    r.raise_for_status()
+                    total = int(r.headers.get('content-length', 0))
+                    dl = 0
                     with open(dl_path, 'wb') as f:
-                        for chunk in r.iter_content(8192): f.write(chunk); dl+=len(chunk); self.after(0, about.update_progress.set, dl/total)
-                if sys.platform == "win32": os.startfile(dl_path); self.after(200, os._exit, 0)
-                else: subprocess.call(["open", dl_path])
-            except Exception as e: self.after(0, messagebox.showerror, "Error", str(e))
+                        for chunk in r.iter_content(8192):
+                            f.write(chunk)
+                            dl += len(chunk)
+                            if total > 0:
+                                self.after(0, about.update_progress.set, dl/total)
+
+                self.after(0, lambda: self.set_status("Installing update..."))
+
+                # --- INSTALLATION LOGIC ---
+                if is_smart and url.endswith(".zip"):
+                    # Agar ZIP hai to Smart Update function call karein
+                    self.after(0, lambda: self._apply_smart_update(dl_path))
+                else:
+                    # Agar EXE hai to purana logic (Full Installer)
+                    if sys.platform == "win32":
+                        os.startfile(dl_path)
+                        self.after(1000, os._exit, 0) # Thoda time diya installer load hone ke liye
+                    else:
+                        subprocess.call(["open", dl_path])
+                        
+            except Exception as e:
+                self.after(0, messagebox.showerror, "Update Failed", str(e))
+                self.after(0, lambda: about.update_button.configure(state="normal", text="Retry Update"))
+
         threading.Thread(target=_worker, daemon=True).start()
+
+def _apply_smart_update(self, zip_path):
+        """
+        Smart Update Logic (Windows & macOS):
+        1. Extract ZIP to temp folder.
+        2. Create a script (.bat for Win, .sh for Mac) to swap files.
+        3. Run script and close app.
+        """
+        import zipfile
+        import stat
+
+        try:
+            # 1. Temp folder setup
+            extract_dir = os.path.join(self.get_data_path(), "update_temp")
+            if os.path.exists(extract_dir):
+                shutil.rmtree(extract_dir)
+            os.makedirs(extract_dir)
+
+            # 2. Extract ZIP
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+            
+            # 3. Get Application Paths
+            current_exe = sys.executable
+            app_dir = os.path.dirname(current_exe)
+            
+            # Dev mode check (Safety)
+            if not getattr(sys, 'frozen', False):
+                messagebox.showinfo("Dev Mode", "Update extracted to 'update_temp'. Cannot auto-restart in dev mode.")
+                return
+
+            self.play_sound("update")
+            messagebox.showinfo("Update Ready", "Application will restart to apply changes.")
+
+            # --- WINDOWS LOGIC ---
+            if sys.platform == "win32":
+                batch_script_path = os.path.join(self.get_data_path(), "updater.bat")
+                
+                # Windows Script: Wait -> Copy -> Clean -> Restart
+                script_content = f"""
+@echo off
+title Updating NREGA Bot...
+echo Waiting for application to close...
+timeout /t 2 /nobreak > NUL
+
+echo Installing updates...
+xcopy /s /y "{extract_dir}\\*" "{app_dir}\\"
+
+echo Cleaning up...
+rmdir /s /q "{extract_dir}"
+del "{zip_path}"
+
+echo Restarting Application...
+start "" "{current_exe}"
+
+echo Done.
+del "%~f0" & exit
+"""
+                with open(batch_script_path, "w") as bat:
+                    bat.write(script_content)
+
+                # Run Batch file hidden/minimized logic works best via startfile
+                os.startfile(batch_script_path)
+
+            # --- MACOS LOGIC ---
+            elif sys.platform == "darwin":
+                shell_script_path = os.path.join(self.get_data_path(), "updater.sh")
+                
+                # macOS Script: Sleep -> Copy -> Clean -> Open
+                script_content = f"""#!/bin/bash
+echo "Updating NREGA Bot..."
+sleep 2
+
+echo "Copying files..."
+# cp -R overwrites existing files in app_dir
+cp -R "{extract_dir}/"* "{app_dir}/"
+
+echo "Cleaning up..."
+rm -rf "{extract_dir}"
+rm "{zip_path}"
+
+echo "Restarting..."
+# 'open' command handles .app bundles better usually, but executing binary works for internal restart
+"{current_exe}" &
+
+# Delete this script
+rm "$0"
+"""
+                with open(shell_script_path, "w") as sh:
+                    sh.write(script_content)
+
+                # Make script executable (chmod +x)
+                st = os.stat(shell_script_path)
+                os.chmod(shell_script_path, st.st_mode | stat.S_IEXEC)
+
+                # Run Shell script in background
+                subprocess.Popen(["/bin/bash", shell_script_path])
+
+            # 4. Force Close App
+            self.on_closing(force=True)
+            sys.exit(0)
+
+        except Exception as e:
+            messagebox.showerror("Update Error", f"Failed to apply smart update:\n{e}")
 
 def initialize_webdriver_manager():
     try:

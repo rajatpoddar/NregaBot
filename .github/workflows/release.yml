@@ -1,4 +1,3 @@
-# .github/workflows/release.yml
 name: Create Application Release
 
 on:
@@ -38,16 +37,17 @@ jobs:
           echo "$CHANGELOG_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-  # --- 2. Build for Windows (Loader + Secure Core Zip) ---
+  # --- 2. Build for Windows (Loader EXE + Secure Win Core Zip) ---
   build-windows:
-      name: Build for Windows
+      name: Build Windows (Loader & Core)
       needs: get-release-info
       runs-on: windows-latest
       steps:
         - name: Checkout code
           uses: actions/checkout@v4
   
-        - name: Set up Python
+        # Using Python 3.11 for Windows builds (Standard for your EXE)
+        - name: Set up Python 3.11
           uses: actions/setup-python@v5
           with:
             python-version: '3.11'
@@ -63,43 +63,53 @@ jobs:
           run: choco install innosetup --yes
           shell: powershell
   
-        # ✅ Run build script (Builds the Loader.exe)
-        - name: Run Windows build script
+        # Build the Windows Loader EXE
+        - name: Run Windows build script (Loader)
           run: |
             set APP_VERSION=${{ needs.get-release-info.outputs.version }}
             build_windows.bat
           shell: cmd
   
-        # ✅ NEW: Create SECURE Core Zip (Compiled .pyc files)
-        # Yeh step code ko compile karega aur source (.py) files delete kar dega
-        - name: Create Secure Core Zip (Compiled .pyc)
+        # ✅ NEW: Create Secure Windows Core Zip (Compiled .pyc with Python 3.11)
+        - name: Create Secure Core Zip (Windows)
           run: |
-            $version = "${{ needs.get-release-info.outputs.version }}"
-            $coreDir = "dist/core_temp"
-
-            # 1. Create Temp Directory
-            New-Item -ItemType Directory -Force -Path $coreDir
-
-            # 2. Copy Source Files (Including folders like tabs)
-            # Sirf wo files copy karein jo update karni hain
-            Copy-Item -Path main_app.py, utils.py, config.py, version.json, location_data.py -Destination $coreDir
-            Copy-Item -Path tabs -Destination $coreDir -Recurse
-
-            # 3. Compile to Bytecode (.pyc)
-            # -b: Legacy mode (creates .pyc in same folder, not __pycache__)
-            # -f: Force recompile
-            python -m compileall -b -f $coreDir
-
-            # 4. Delete Original Source Code (.py)
-            # Taaki zip me sirf compiled code jaye
-            Get-ChildItem -Path $coreDir -Include *.py -Recurse | Remove-Item
-
-            # 5. Create Zip from Compiled Files
-            Compress-Archive -Path "$coreDir/*" -DestinationPath dist/core_v$version.zip
+            python -c "
+            import os, shutil, zipfile, compileall
             
-            # Cleanup Temp Folder
-            Remove-Item -Path $coreDir -Recurse -Force
-          shell: powershell
+            version = '${{ needs.get-release-info.outputs.version }}'
+            zip_name = f'dist/core_win_v{version}.zip'
+            temp_dir = 'dist/core_temp_win'
+            
+            # 1. Clean temp
+            if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
+            
+            # 2. Copy Files (Ignore unwanted)
+            def ignore_func(dir, files):
+                return [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', 'installer.iss', '.vscode']]
+            
+            shutil.copytree('.', temp_dir, ignore=ignore_func)
+            
+            # 3. Compile to .pyc (Legacy mode for direct compatibility)
+            print('Compiling Windows Core (Py3.11)...')
+            compileall.compile_dir(temp_dir, force=True, legacy=True)
+            
+            # 4. Zip (Include .pyc and Assets, Exclude .py)
+            with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for root, dirs, files in os.walk(temp_dir):
+                    for file in files:
+                        # SECURITY: Skip Source Code
+                        if file.endswith('.py'): continue
+                        # Skip binaries and build scripts
+                        if file.endswith(('.exe', '.bat', '.sh', '.spec', '.ps1')): continue
+                        
+                        full_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(full_path, temp_dir)
+                        zf.write(full_path, rel_path)
+            
+            shutil.rmtree(temp_dir)
+            print(f'Success: Created {zip_name}')
+            "
+          shell: cmd
 
         - name: Upload Windows Artifacts
           uses: actions/upload-artifact@v4
@@ -107,12 +117,74 @@ jobs:
             name: windows-builds
             path: |
               dist/installer/*.exe
-              dist/core_v${{ needs.get-release-info.outputs.version }}.zip
+              dist/core_win_*.zip
             retention-days: 1
 
-  # --- 3. Build for Linux (Loader) ---
+  # --- 3. Build for macOS (Secure Mac Core Zip ONLY) ---
+  # Note: Requires a macOS runner to get Python 3.12 naturally or verify environment
+  build-macos-core:
+    name: Build macOS Core Update
+    needs: get-release-info
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ✅ Using Python 3.12 explicitly for macOS builds (Matches your local Mac env)
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Create Secure Core Zip (macOS)
+        run: |
+          python3 -c "
+          import os, shutil, zipfile, compileall
+          
+          version = '${{ needs.get-release-info.outputs.version }}'
+          dist_dir = 'dist'
+          if not os.path.exists(dist_dir): os.makedirs(dist_dir)
+          
+          zip_name = f'{dist_dir}/core_mac_v{version}.zip'
+          temp_dir = f'{dist_dir}/core_temp_mac'
+          
+          if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
+          
+          # Copy Logic
+          def ignore_func(dir, files):
+              return [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', '.vscode', '.DS_Store']]
+          
+          shutil.copytree('.', temp_dir, ignore=ignore_func)
+          
+          # Compile (Python 3.12 Bytecode)
+          print('Compiling macOS Core (Py3.12)...')
+          compileall.compile_dir(temp_dir, force=True, legacy=True)
+          
+          # Zip Logic
+          with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zf:
+              for root, dirs, files in os.walk(temp_dir):
+                  for file in files:
+                      if file.endswith('.py'): continue
+                      if file.endswith(('.exe', '.bat', '.sh', '.spec', '.DS_Store')): continue
+                      
+                      full_path = os.path.join(root, file)
+                      rel_path = os.path.relpath(full_path, temp_dir)
+                      zf.write(full_path, rel_path)
+          
+          shutil.rmtree(temp_dir)
+          print(f'Success: Created {zip_name}')
+          "
+
+      - name: Upload macOS Core Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-core-build
+          path: dist/core_mac_*.zip
+          retention-days: 1
+
+  # --- 4. Build for Linux (Portable Loader) ---
   build-linux:
-    name: Build for Linux (Portable)
+    name: Build Linux Loader
     needs: get-release-info
     runs-on: ubuntu-latest
     steps:
@@ -130,11 +202,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Create .env file
-        run: echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" > .env
-
-      # ✅ Updated PyInstaller Command for Loader Architecture (Linux)
-      # Hidden imports added taaki core libraries loader ke sath pack ho jayein
       - name: Build Loader with PyInstaller
         run: |
           pyinstaller --noconfirm --windowed --onefile --name "NREGA Bot" \
@@ -143,7 +210,6 @@ jobs:
           --add-data="theme.json:." \
           --add-data="changelog.json:." \
           --add-data="assets:assets" \
-          --add-data=".env:." \
           --add-data="jobcard.jpeg:." \
           --add-data="tabs:tabs" \
           --collect-all customtkinter \
@@ -174,10 +240,10 @@ jobs:
           path: dist/NREGABot-v${{ needs.get-release-info.outputs.version }}-Linux.tar.gz
           retention-days: 1
 
-  # --- 4. Publish Release ---
+  # --- 5. Publish Release ---
   publish-release:
     name: Publish GitHub Release
-    needs: [get-release-info, build-windows, build-linux]
+    needs: [get-release-info, build-windows, build-macos-core, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -195,4 +261,6 @@ jobs:
           tag_name: v${{ needs.get-release-info.outputs.version }}
           files: |
             artifacts/windows-builds/**/*
+            artifacts/macos-core-build/**/*
             artifacts/linux-build/*
+            version.json
