@@ -5,6 +5,8 @@
   "core_update": {
     "version": "2.8.3",
     "url": "https://nregabot.com/updates/core_v2.8.3.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v2.8.3.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v2.8.3.zip",
     "force_full_reinstall": false
   },
   "changelog": {
