@@ -491,7 +491,8 @@ class NregaBotApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.withdraw() # Hide initially for smooth splash transition
-        self.disabled_features = []
+        self.global_disabled_features = []
+        self.trial_restricted_features = []
         # --- FAST STARTUP CONFIG ---
         self.initial_width = 1100
         self.initial_height = 800
@@ -728,16 +729,50 @@ class NregaBotApp(ctk.CTk):
 
     def _setup_licensed_ui(self):
         # Yahan layout destroy/recreate karne ki bajaye, bas UNLOCK karein
-        # Isse app smooth chalega aur clicks block nahi honge.
         self._unlock_app()
+        
+        # --- NEW LOGIC: Offline Lock Support with Fallback ---
+        try:
+            # 1. Global restrictions load karein
+            self.global_disabled_features = self.license_info.get('global_disabled_features', [])
+            
+            # 2. Trial restrictions load karein
+            key_type = str(self.license_info.get('key_type', '')).lower()
+            
+            if key_type == 'trial':
+                # Check karein ki kya 'trial_restricted_features' key license info mein मौजूद hai?
+                if 'trial_restricted_features' in self.license_info:
+                    # Agar key hai (matlab nayi file hai), to uski value use karein
+                    self.trial_restricted_features = self.license_info['trial_restricted_features']
+                else:
+                    # FAIL-SAFE: Agar key missing hai (purani file hai) aur server offline hai, 
+                    # to RISK mat lo. Default PREMIUM features ko lock kar do.
+                    # Aap chahein to yahan saare features ke naam daal sakte hain.
+                    self.trial_restricted_features = [
+                        "Sarkar Aapke Dwar", "SAD Update Status", "FTO Generation", 
+                        "MR Gen", "MR Fill", "MR Payment", "Gen Wagelist", 
+                        "Send Wagelist", "Demand", "Allocation", "Work Allocation",
+                        "eMB Entry", "eMB Verify", "WC Gen", "IF Editor"
+                    ]
+            else:
+                self.trial_restricted_features = []
+                
+            # 3. Turant lock apply karein
+            self._apply_feature_flags()
+            
+        except Exception as e:
+            print(f"Error applying local restrictions: {e}")
+        # ---------------------------------------
         
         is_expiring = self.check_expiry_and_notify()
         self._preload_and_update_about_tab()
         self._ping_server_in_background()
         
-        # Default tab par le jayein
-        first_tab = list(list(self.get_tabs_definition().values())[0].keys())[0]
-        self.show_frame("About" if is_expiring else first_tab)
+        try:
+            first_tab = list(list(self.get_tabs_definition().values())[0].keys())[0]
+            self.show_frame("About" if is_expiring else first_tab)
+        except:
+            self.show_frame("About")
         
         self.check_for_updates_background()
         self.set_status("Ready")
@@ -936,6 +971,11 @@ class NregaBotApp(ctk.CTk):
             threading.Thread(target=self.validate_on_server, args=(self.license_info['key'], True), daemon=True).start()
             return True
         except Exception: return False
+
+    def show_trial_lock_alert(self, feature_name):
+        self.play_sound("error")
+        if messagebox.askyesno("Premium Feature", f"'{feature_name}' is a premium feature available in paid plans.\n\nUpgrade to a full license to unlock unlimited access.\n\nWould you like to upgrade now?"):
+            self.show_purchase_window()
 
     def _lock_app_to_about_tab(self):
         self.show_frame("About")
@@ -1257,53 +1297,78 @@ class NregaBotApp(ctk.CTk):
         self.theme_combo = ctk.CTkOptionMenu(self, width=0, height=0)
 
     def _fetch_app_config(self):
-        """Fetches global configuration (Announcement + Disabled Features)."""
+        """Fetches global configuration (Announcement + Features)."""
         def _worker():
             try:
                 url = f"{config.LICENSE_SERVER_URL}/api/app-config"
-                # UPDATE: Timeout ko 5 se badhakar 20 kar diya gaya hai
-                # Taaki agar database slow ho to bhi request fail na ho.
                 resp = requests.get(url, timeout=20)
                 
                 if resp.status_code == 200:
                     data = resp.json()
                     
-                    # 1. Handle Announcement
                     msg = data.get("global_announcement", "")
                     if msg:
                         self.after(0, lambda: self.announcement_label.update_text(msg))
                     
-                    # 2. Handle Disabled Features
-                    self.disabled_features = data.get("disabled_features", [])
-                    self.after(0, self._apply_feature_flags) # UI Update Trigger karein
+                    # Alag-alag lists update karein
+                    self.global_disabled_features = data.get("disabled_features", [])
+                    
+                    # Trial list sirf tab update karein agar user trial par hai
+                    # --- FIX: Case-insensitive check (.lower()) ---
+                    if (self.license_info.get('key_type') or '').lower() == 'trial':
+                        self.trial_restricted_features = data.get("trial_restricted_features", [])
+                    else:
+                        self.trial_restricted_features = [] # Paid user ke liye empty
+                        
+                    self.after(0, self._apply_feature_flags)
                     
             except Exception as e:
-                # Error ko print karein taaki debugging mein aasani ho
                 print(f"Config Fetch Error: {e}")
             finally:
-                # Poll every 2 minutes (120000 ms)
                 self.after(120000, self._fetch_app_config)
         
         threading.Thread(target=_worker, daemon=True).start()
 
     def _apply_feature_flags(self):
-        """Disables buttons based on server config."""
+        """Applies visual locks or maintenance modes based on server config."""
         if not hasattr(self, 'nav_buttons'): return
+        
+        # Check locally if user is trial (server se aayi list sirf trial users ke liye bhari hogi, par double check sahi hai)
+        is_trial = self.license_info.get('key_type') == 'trial'
 
         for name, btn in self.nav_buttons.items():
-            if name in self.disabled_features:
-                # Disable the button
-                btn.configure(state="disabled", fg_color=("gray90", "gray30")) 
-                # Optional: Update text to show maintenance
-                if "⚠️" not in btn.cget("text"):
-                    btn.configure(text=f"{name} ⚠️ (Maintenance)")
+            # Pehle purane labels clean karein
+            current_text = btn.cget("text")
+            clean_text = current_text.replace(" ⚠️ (Maintenance)", "").replace(" 🔒", "")
+            
+            # Priority 1: Global Kill Switch (Sabke liye band - Grayed out)
+            if name in self.global_disabled_features:
+                btn.configure(
+                    state="disabled", 
+                    fg_color=("gray90", "gray30"),
+                    text=f"{clean_text} ⚠️ (Maintenance)"
+                )
+            
+            # Priority 2: Trial Restriction (Sirf Trial walo ke liye - Lock Icon + Clickable Alert)
+            elif name in self.trial_restricted_features:
+                btn.configure(
+                    state="normal",  # Normal rakhein taaki click ho sake
+                    fg_color=("gray95", "gray25"), # Thoda alag color
+                    text=f"{clean_text} 🔒"
+                )
+                # Command replace karein taaki click karne par alert aaye
+                # Lambda fix: capture 'name' correctly
+                btn.configure(command=lambda n=name: self.show_trial_lock_alert(n))
+                
+            # Priority 3: Normal Active State
             else:
-                # Enable if it was previously disabled but now enabled on server
-                if btn.cget("state") == "disabled":
-                    btn.configure(state="normal", fg_color="transparent")
-                    # Remove warning text if present
-                    clean_text = btn.cget("text").replace(" ⚠️ (Maintenance)", "")
-                    btn.configure(text=clean_text)
+                btn.configure(
+                    state="normal", 
+                    fg_color="transparent",
+                    text=clean_text
+                )
+                # Original command restore karein
+                btn.configure(command=lambda n=name: self.show_frame(n))
 
     def _cycle_theme(self):
         modes = ["System", "Light", "Dark"]
@@ -1449,7 +1514,7 @@ class NregaBotApp(ctk.CTk):
                 self.button_to_category_frame[name] = cat_frame
 
                 # Check immediately if disabled (agar config pehle hi load ho chuka hai)
-                if name in self.disabled_features:
+                if name in self.global_disabled_features:
                     btn.configure(state="disabled", text=f"{name} ⚠️ (Maintenance)")
                 
         self._filter_nav_menu(self.last_selected_category)
@@ -1794,7 +1859,6 @@ class NregaBotApp(ctk.CTk):
 
     def validate_on_server(self, key, is_startup_check=False):
         try:
-            # --- NEW: Sending app_version ---
             payload = {
                 "key": key, 
                 "machine_id": self.machine_id,
@@ -1806,6 +1870,18 @@ class NregaBotApp(ctk.CTk):
             data = resp.json()
             if resp.status_code == 200 and data.get("status") == "valid":
                 self.license_info = {**data, 'key': key}
+                
+                # --- UPDATE START ---
+                # Update lists from validation response
+                if 'global_disabled_features' in data:
+                    self.global_disabled_features = data['global_disabled_features']
+                
+                if 'trial_restricted_features' in data:
+                    self.trial_restricted_features = data['trial_restricted_features']
+                
+                self.after(0, self._apply_feature_flags)
+                # --- UPDATE END ---
+
                 with open(get_data_path('license.dat'), 'w') as f: json.dump(self.license_info, f)
                 if not is_startup_check: self.play_sound("success"); messagebox.showinfo("License Valid", "Activation successful!")
                 return True

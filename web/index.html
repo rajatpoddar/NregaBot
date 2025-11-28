@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
     <title>NREGA Bot: The Ultimate Tool for NREGA Task Automation</title>
     <meta name="description"
@@ -24,6 +24,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -36,11 +37,26 @@
         }
     </script>
 
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Ye line zaroori hai manual toggle ke liye
+        }
+    </script>
+
     <style>
+        /* --- CRITICAL MOBILE FIXES --- */
+        html,
         body {
-            font-family: 'Inter', sans-serif;
             overflow-x: hidden;
-            /* Prevent horizontal scrollbar caused by AOS */
+            max-width: 100vw;
+            position: relative;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Prevent AOS from causing horizontal scroll */
+        [data-aos] {
+            overflow-x: hidden;
         }
 
         .feature-card {
@@ -56,12 +72,8 @@
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
         }
 
-        html {
-            scroll-behavior: smooth;
-        }
-
         #mobile-menu {
-            transition: opacity 0.3s ease-in-out;
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
         }
 
         .swiper-button-next,
@@ -82,241 +94,371 @@
         .swiper-pagination-bullet-active {
             background-color: #3b82f6 !important;
         }
+
+        .animate-gradient-x {
+            background-size: 200% 200%;
+            animation: gradient-x 3s ease infinite;
+        }
+
+        @keyframes gradient-x {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translate3d(0, 20px, 0); }
+            to { opacity: 1; transform: translate3d(0, 0, 0); }
+        }
+
+        .animate-fade-in-up {
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
     </style>
 </head>
 
 <body class="bg-gray-50 text-gray-800 antialiased dark:bg-gray-900 dark:text-gray-200">
 
-    <header
-        class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm sticky top-0 z-50 dark:border-b dark:border-gray-800">
-        <div class="container mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
-            <a href="#home" class="text-xl font-bold text-gray-900 flex items-center gap-2 dark:text-white">
-                <img src="/logo.png" alt="NREGA Bot Logo" class="h-8 w-8 rounded-full">
-                <span>NREGA Bot</span>
-            </a>
-            <nav class="hidden md:flex items-center space-x-8">
-                <a href="#home"
-                    class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Home</a>
-                <a href="how-to-use.html"
-                    class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">How
-                    to Use</a>
-                <a href="#faq"
-                    class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">FAQ</a>
-                <a href="https://tools.nregabot.com" target="_blank" rel="noopener noreferrer"
-                    class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Tools</a>
-                <a href="contact.html"
-                    class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Contact</a>
-                <a href="https://bookmark.nregabot.com" target="_blank" rel="noopener noreferrer"
-                    class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Bookmarks</a>
-                <a href="https://license.nregabot.com/login" target="_blank" rel="noopener noreferrer"
-                    class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Login</a>
-            </nav>
-            <a href="https://license.nregabot.com/check-license"
-                class="hidden md:inline-block bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">Get
-                License Key</a>
-            <button id="mobile-menu-button"
-                class="md:hidden p-2 text-gray-600 hover:text-gray-900 z-50 dark:text-gray-400 dark:hover:text-white"
-                aria-label="Open menu"><svg id="menu-open-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
-                </svg><svg id="menu-close-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none"
-                    viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg></button>
+    <header class="fixed top-0 w-full z-50 transition-all duration-300 bg-white/70 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800">
+        <div class="container mx-auto px-4 sm:px-6 py-3">
+            <div class="flex justify-between items-center">
+                <a href="#home" class="flex items-center gap-2 group">
+                    <div class="relative">
+                        <div class="absolute -inset-1 bg-blue-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-200"></div>
+                        <img src="/logo.png" alt="NREGA Bot Logo" class="relative h-9 w-9 rounded-full ring-2 ring-white dark:ring-gray-800">
+                    </div>
+                    <span class="text-xl font-bold text-gray-900 dark:text-white tracking-tight">NREGA Bot</span>
+                </a>
+
+                <nav class="hidden md:flex items-center gap-1 bg-gray-100/50 dark:bg-gray-800/50 p-1 rounded-full border border-gray-200/50 dark:border-gray-700">
+                    <a href="#home" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">Home</a>
+                    <a href="how-to-use.html" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">How to Use</a>
+                    <a href="#faq" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">FAQ</a>
+                    <a href="https://tools.nregabot.com" target="_blank" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">Tools</a>
+                    <a href="https://license.nregabot.com/login" target="_blank" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">Login</a>
+                </nav>
+
+                <div class="flex items-center gap-3">
+                    <a href="https://license.nregabot.com/check-license"
+                        class="hidden md:inline-flex items-center justify-center px-5 py-2 text-sm font-bold text-white transition-all duration-200 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg hover:from-blue-700 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 shadow-lg shadow-blue-500/30">
+                        Get License Key
+                    </a>
+                    
+                    <button id="mobile-menu-button" class="md:hidden p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 transition-colors">
+                        <svg id="menu-open-icon" class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                        <svg id="menu-close-icon" class="w-7 h-7 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+            </div>
         </div>
     </header>
 
-    <div id="mobile-menu"
-        class="hidden fixed inset-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-40 flex flex-col items-center justify-center">
-        <nav class="flex flex-col items-center space-y-8 text-xl">
-            <a href="#home"
-                class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Home</a>
-            <a href="how-to-use.html"
-                class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">How to
-                Use</a>
-            <a href="#faq"
-                class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">FAQ</a>
-            <a href="https://tools.nregabot.com" target="_blank" rel="noopener noreferrer"
-                class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Tools</a>
-            <a href="contact.html"
-                class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Contact</a>
-            <a href="https://bookmark.nregabot.com" target="_blank" rel="noopener noreferrer"
-                class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Bookmarks</a>
-            <a href="https://license.nregabot.com/login" target="_blank" rel="noopener noreferrer"
-                class="mobile-link text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Login</a>
-            <a href="https://license.nregabot.com/check-license"
-                class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors mt-8 dark:bg-blue-500 dark:hover:bg-blue-600">Get
-                License Key</a>
+    <div id="mobile-menu" class="fixed inset-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl transform translate-x-full transition-transform duration-300 md:hidden flex flex-col items-center justify-center">
+        <nav class="flex flex-col items-center space-y-6 text-center">
+            <a href="#home" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">Home</a>
+            <a href="how-to-use.html" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">How to Use</a>
+            <a href="#faq" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">FAQ</a>
+            <a href="https://tools.nregabot.com" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">Tools</a>
+            <a href="https://license.nregabot.com/login" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">Login</a>
+            
+            <div class="pt-8">
+                <a href="https://license.nregabot.com/check-license" class="px-8 py-4 text-lg font-bold text-white bg-blue-600 rounded-xl shadow-xl hover:bg-blue-700">Get License Key</a>
+            </div>
         </nav>
     </div>
 
     <div id="main-content">
         <section id="home">
+            <div class="pt-20 md:pt-24 pb-2 bg-gray-50 dark:bg-gray-900">
+                <div class="container mx-auto px-4 relative z-20">
+                    <div class="bg-gradient-to-r from-blue-700 via-blue-600 to-blue-800 rounded-xl shadow-lg shadow-blue-500/20 text-white py-3 px-4 md:px-8 flex flex-col md:flex-row justify-between items-center gap-3 md:gap-6 border border-blue-500/30">
+                        
+                        <div class="flex items-center gap-3">
+                            <span class="flex h-3 w-3 relative">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                            </span>
+                            <p class="font-medium text-sm md:text-base">
+                                <span class="font-bold text-blue-100">New Update:</span> 
+                                Version 2.8.3 is live with Smart Updates!
+                            </p>
+                        </div>
 
-            <div class="bg-blue-600 dark:bg-blue-500">
-                <div class="container mx-auto px-4 sm:px-6 py-3 text-center text-white">
-                    <p>
-                        <span class="font-bold bg-white text-blue-600 rounded-full px-2 py-0.5 text-xs mr-2">NEW</span>
-                        <strong>Version 2.8.3 Released!</strong> Now with <strong>Smart Updates</strong> and a 
-                        <strong>Modern Calendar UI</strong>!
-                        <a href="#downloads" class="underline ml-2 hover:text-blue-200">Download Now &rarr;</a>
-                    </p>
+                        <a href="#downloads" class="group flex items-center gap-2 text-sm font-bold bg-white/10 hover:bg-white/20 px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/30 backdrop-blur-sm">
+                            Update Now
+                            <i class="fa-solid fa-cloud-arrow-down group-hover:translate-y-0.5 transition-transform"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
 
-            <main class="container mx-auto px-6 pt-16 pb-12 text-center" data-aos="fade-up">
-                <h2 class="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight dark:text-white">Automate
-                    Your NREGA Tasks.</h2>
-                <p class="mt-4 text-lg text-gray-600 max-w-3xl mx-auto dark:text-gray-400">Stop wasting hours on
-                    repetitive data entry. NREGA Bot handles your most tedious tasks so you can focus on what matters.
+            <main class="container mx-auto px-6 pt-16 pb-16 text-center relative z-10 overflow-hidden" data-aos="fade-up">
+                
+                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-sm font-semibold mb-8 animate-fade-in-up">
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    </span>
+                    Now with Smart Updates & Cloud Sync
+                </div>
+
+                <h2 class="text-5xl md:text-7xl font-extrabold tracking-tight leading-tight text-gray-900 dark:text-white mb-6">
+                    Automate Your <br class="hidden md:block" />
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 animate-gradient-x">NREGA Tasks.</span>
+                </h2>
+
+                <p class="mt-6 text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
+                    Stop wasting hours on repetitive data entry. NREGA Bot handles your most tedious tasks efficiently, securely, and automatically.
                 </p>
 
-                <div id="downloads" class="mt-10">
-                    <p class="text-gray-600 mb-4 dark:text-gray-400">Download the app and start your 30-day free trial
-                        instantly.</p>
-                    <div
-                        class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <div id="downloads" class="mt-12">
+                    <p class="text-gray-500 dark:text-gray-400 mb-6 font-medium text-sm uppercase tracking-wide">Start your 30-day free trial instantly</p>
+                    
+                    <div class="flex flex-col md:flex-row justify-center items-center gap-4">
                         <a href="https://nregabot.com/updates/NREGABot-v2.8.3-Setup.exe"
-                            class="bg-blue-600 text-white font-bold px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-lg w-full sm:w-auto dark:bg-blue-500 dark:hover:bg-blue-600">Download
-                            for Windows</a>
+                            class="flex items-center justify-center gap-2 bg-blue-600 text-white font-bold px-8 py-3.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-500/30 text-lg w-full md:w-auto dark:bg-blue-500 dark:hover:bg-blue-600 group transform hover:-translate-y-1">
+                            <i class="fa-brands fa-windows text-xl group-hover:scale-110 transition-transform"></i>
+                            Download for Windows
+                        </a>
+                        
                         <a href="https://nregabot.com/updates/NREGABot-v2.8.3-macOS.dmg"
-                            class="bg-gray-700 text-white font-bold px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors text-lg w-full sm:w-auto dark:bg-gray-600 dark:hover:bg-gray-700">Download
-                            for macOS</a>
+                            class="flex items-center justify-center gap-2 bg-gray-800 text-white font-bold px-8 py-3.5 rounded-xl hover:bg-black transition-all shadow-lg hover:shadow-gray-500/30 text-lg w-full md:w-auto dark:bg-gray-700 dark:hover:bg-gray-600 group transform hover:-translate-y-1">
+                            <i class="fa-brands fa-apple text-xl group-hover:scale-110 transition-transform"></i>
+                            Download for macOS
+                        </a>
+
+                        <a href="https://nregabot.com/updates/NREGABot-v2.8.3-Linux.tar.gz"
+                            class="flex items-center justify-center gap-2 bg-orange-600 text-white font-bold px-8 py-3.5 rounded-xl hover:bg-orange-700 transition-all shadow-lg hover:shadow-orange-500/30 text-lg w-full md:w-auto group transform hover:-translate-y-1">
+                            <i class="fa-brands fa-linux text-xl group-hover:scale-110 transition-transform"></i>
+                            Download for Linux
+                        </a>
                     </div>
-                    <p class="mt-6 text-sm text-gray-500 dark:text-gray-400"><a href="versions.html"
-                            class="underline hover:text-blue-600 dark:hover:text-blue-400">Looking for an older
-                            version?</a></p>
+                    
+                    <p class="mt-8 text-sm text-gray-500 dark:text-gray-400">
+                        <a href="versions.html" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors border-b border-dashed border-gray-400 hover:border-blue-500 pb-0.5">Looking for an older version?</a>
+                    </p>
                 </div>
             </main>
 
-            <section class="py-16 bg-white dark:bg-gray-800">
-                <div class="container mx-auto px-6">
-                    <div class="text-center mb-12" data-aos="fade-up">
-                        <h3 class="text-3xl font-bold text-gray-900 dark:text-white">A Modern Dashboard for Modern Needs
+            <section class="py-24 bg-white dark:bg-gray-900 relative overflow-hidden">
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-purple-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="container mx-auto px-6 relative z-10">
+                    <div class="text-center mb-16" data-aos="fade-up">
+                        <h3 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white">
+                            A Modern Dashboard <br>
+                            <span class="text-gray-500 dark:text-gray-400">for Modern Needs</span>
                         </h3>
-                        <p class="text-gray-600 mt-2 dark:text-gray-400">Clean, intuitive, and powerful. Built to make
-                            your job easier.</p>
+                        <p class="text-gray-600 mt-4 dark:text-gray-400 max-w-2xl mx-auto text-lg">
+                            Clean, intuitive, and powerful interface designed to make your job easier, faster, and error-free.
+                        </p>
                     </div>
 
-                    <div class="swiper-container max-w-5xl mx-auto relative group overflow-hidden rounded-xl"
-                        data-aos="zoom-in">
-                        <div class="swiper-wrapper">
-                            <div class="swiper-slide"><img src="/assets/Muster_Roll_Generator.png"
-                                    alt="Muster Roll Generator Screenshot" class="shadow-lg"></div>
-                            <div class="swiper-slide"><img src="/assets/Duplicate_MR_Print.png"
-                                    alt="Duplicate MR Print Screenshot" class="shadow-lg"></div>
-                            <div class="swiper-slide"><img src="/assets/Update_Outcome.png"
-                                    alt="Update Outcome Screenshot" class="shadow-lg"></div>
-                            <div class="swiper-slide"><img src="/assets/IF_Editor.png" alt="IF Editor Screenshot"
-                                    class="shadow-lg"></div>
-                            <div class="swiper-slide"><img src="/assets/MSR_Processor.png"
-                                    alt="MSR Processor Screenshot" class="shadow-lg"></div>
-                            <div class="swiper-slide"><img src="/assets/eMB_entry.png" alt="eMB Entry Screenshot"
-                                    class="shadow-lg"></div>
-                            <div class="swiper-slide"><img src="/assets/Verify_ABPS.png" alt="Verify ABPS Screenshot"
-                                    class="shadow-lg"></div>
-                        </div>
+                    <div class="relative max-w-6xl mx-auto" data-aos="zoom-in" data-aos-duration="800">
+                        <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur opacity-20"></div>
+                        
+                        <div class="relative bg-gray-900 rounded-xl shadow-2xl overflow-hidden border border-gray-800">
+                            <div class="bg-gray-800/80 backdrop-blur-md px-4 py-3 flex items-center gap-2 border-b border-gray-700">
+                                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                                <div class="ml-4 flex-1 bg-gray-900/50 rounded-md h-6 max-w-md mx-auto hidden md:block"></div>
+                            </div>
 
-                        <div class="swiper-pagination !bottom-[-30px]"></div>
+                            <div class="swiper-container group cursor-grab active:cursor-grabbing">
+                                <div class="swiper-wrapper">
+                                    <div class="swiper-slide">
+                                        <img src="/assets/Muster_Roll_Generator.png?v=2" alt="Light" class="w-full h-auto dark:hidden">
+                                        <img src="/assets/Muster_Roll_Generator_dark.png?v=2" alt="Dark" class="w-full h-auto hidden dark:block">
+                                    </div>
 
-                        <div
-                            class="swiper-button-prev opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        </div>
-                        <div
-                            class="swiper-button-next opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    <div class="swiper-slide">
+                                        <img src="/assets/Duplicate_MR_Print.png?v=2" alt="Light" class="w-full h-auto dark:hidden">
+                                        <img src="/assets/Duplicate_MR_Print_dark.png?v=2" alt="Dark" class="w-full h-auto hidden dark:block">
+                                    </div>
+
+                                    <div class="swiper-slide">
+                                        <img src="/assets/Update_Outcome.png?v=2" alt="Light" class="w-full h-auto dark:hidden">
+                                        <img src="/assets/Update_Outcome_dark.png?v=2" alt="Dark" class="w-full h-auto hidden dark:block">
+                                    </div>
+
+                                    <div class="swiper-slide">
+                                        <img src="/assets/IF_Editor.png?v=2" alt="Light" class="w-full h-auto dark:hidden">
+                                        <img src="/assets/IF_Editor_dark.png?v=2" alt="Dark" class="w-full h-auto hidden dark:block">
+                                    </div>
+
+                                    <div class="swiper-slide">
+                                        <img src="/assets/MSR_Processor.png?v=2" alt="Light" class="w-full h-auto dark:hidden">
+                                        <img src="/assets/MSR_Processor_dark.png?v=2" alt="Dark" class="w-full h-auto hidden dark:block">
+                                    </div>
+
+                                    <div class="swiper-slide">
+                                        <img src="/assets/eMB_entry.png?v=2" alt="Light" class="w-full h-auto dark:hidden">
+                                        <img src="/assets/eMB_entry_dark.png?v=2" alt="Dark" class="w-full h-auto hidden dark:block">
+                                    </div>
+
+                                    <div class="swiper-slide">
+                                        <img src="/assets/Verify_ABPS.png?v=2" alt="Light" class="w-full h-auto dark:hidden">
+                                        <img src="/assets/Verify_ABPS_dark.png?v=2" alt="Dark" class="w-full h-auto hidden dark:block">
+                                    </div>
+                                </div>
+                                
+                                <div class="swiper-button-prev !text-white !w-12 !h-12 !bg-black/50 !rounded-full !backdrop-blur-sm transition-opacity opacity-0 group-hover:opacity-100 hover:!bg-blue-600"></div>
+                                <div class="swiper-button-next !text-white !w-12 !h-12 !bg-black/50 !rounded-full !backdrop-blur-sm transition-opacity opacity-0 group-hover:opacity-100 hover:!bg-blue-600"></div>
+                                <div class="swiper-pagination !bottom-4"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
-            <section id="support" class="py-20 bg-gray-100 dark:bg-black/50">
-                <div class="container mx-auto px-6 text-center" data-aos="fade-up">
-                    <h3 class="text-3xl font-bold text-gray-900 dark:text-white">Support the Project</h3>
-                    <p class="text-gray-600 dark:text-gray-400 mt-2 max-w-3xl mx-auto">Your 30-day free trial starts
-                        automatically. After the trial, please consider purchasing a license to support app maintenance,
-                        bug fixes, and future updates. All plans include <strong>500 MB of Cloud Storage</strong>.
-                    </p>
 
-                    <!-- <div class="mt-8 mb-6 p-4 bg-green-100 dark:bg-green-900/50 border border-green-300 dark:border-green-700 rounded-lg max-w-md mx-auto" data-aos="zoom-in">
-                         <p class="text-lg font-semibold text-green-800 dark:text-green-200">🎉 Festival Discount! 🎉</p>
-                         <p class="mt-1 text-green-700 dark:text-green-300">Use code <strong class="font-mono bg-green-200 dark:bg-green-800 px-1.5 py-0.5 rounded">FESTIVAL15</strong> at checkout for <strong class="font-semibold">15% OFF</strong> any plan!</p>
-                    </div> -->
-                    <div class="mt-12 grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+            <section id="support" class="py-24 bg-gray-50 dark:bg-gray-900 relative">
+                <div class="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                    <div class="absolute -top-24 -right-24 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+                    <div class="absolute -bottom-24 -left-24 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+                </div>
 
-                        <div class="bg-white rounded-xl shadow-lg p-6 border dark:border-gray-700 flex flex-col dark:bg-gray-800"
+                <div class="container mx-auto px-6 relative z-10">
+                    <div class="text-center mb-16" data-aos="fade-up">
+                        <h3 class="text-4xl font-extrabold text-gray-900 dark:text-white">Simple, Transparent Pricing
+                        </h3>
+                        <p class="text-lg text-gray-600 dark:text-gray-400 mt-4 max-w-2xl mx-auto">
+                            Start with a 30-day free trial. Upgrade to unlock premium features and cloud storage.
+                        </p>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+
+                        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 p-6 flex flex-col h-full hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
                             data-aos="fade-up" data-aos-delay="100">
-                            <h4 class="font-bold text-xl flex items-center justify-center">
-                                <span>Monthly Plan</span>
-                                <span
-                                    class="bg-yellow-200 text-yellow-800 text-xs font-bold ml-2 px-2.5 py-0.5 rounded-full dark:bg-yellow-900 dark:text-yellow-300">50%
-                                    OFF</span>
-                            </h4>
-                            <p class="text-4xl font-extrabold my-4 flex items-baseline justify-center gap-x-2">
-                                <span>₹99</span>
-                                <span class="text-xl font-medium text-gray-400 line-through">₹199</span>
-                            </p>
-                            <p class="text-gray-600 dark:text-gray-400 text-sm mb-6">A 1-Month license key. Perfect for
-                                short-term needs. <br><b>Renew at Regular Price (₹199)</b></p>
+                            <div class="mb-4">
+                                <span class="bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Short Term</span>
+                            </div>
+                            <h4 class="text-xl font-bold text-gray-900 dark:text-white">Monthly</h4>
+                            <div class="mt-4 flex items-baseline">
+                                <span class="text-4xl font-extrabold text-gray-900 dark:text-white">₹99</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400 ml-2 line-through">₹199</span>
+                            </div>
+                            <p class="text-xs text-red-500 dark:text-red-400 font-medium mt-1">Renews at regular price ₹199</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-4 mb-6">Perfect for temporary staff or short-term projects.</p>
+
+                            <ul class="space-y-3 mb-8 flex-1">
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-300"><i class="fa-solid fa-check text-green-500 mr-3"></i> All Premium Features</li>
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-300"><i class="fa-solid fa-check text-green-500 mr-3"></i> 500 MB Cloud Storage</li>
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-300"><i class="fa-solid fa-check text-green-500 mr-3"></i> Email Support</li>
+                            </ul>
+
                             <a href="https://license.nregabot.com/check-license"
-                                class="mt-auto bg-gray-800 text-white font-semibold w-full py-2 rounded-lg hover:bg-black transition-colors dark:bg-gray-700 dark:hover:bg-gray-600">Get
-                                Key</a>
+                                class="w-full block text-center bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-bold py-3 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                Get Key
+                            </a>
                         </div>
 
-                        <div class="bg-white rounded-xl shadow-lg p-6 border dark:border-gray-700 flex flex-col dark:bg-gray-800"
+                        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 p-6 flex flex-col h-full hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
                             data-aos="fade-up" data-aos-delay="200">
-                            <h4 class="font-bold text-xl flex items-center justify-center">
-                                <span>Quarterly Plan</span>
-                                <span
-                                    class="bg-yellow-200 text-yellow-800 text-xs font-bold ml-2 px-2.5 py-0.5 rounded-full dark:bg-yellow-900 dark:text-yellow-300">51%
-                                    OFF</span>
-                            </h4>
-                            <p class="text-4xl font-extrabold my-4 flex items-baseline justify-center gap-x-2">
-                                <span>₹289</span>
-                                <span class="text-xl font-medium text-gray-400 line-through">₹597</span>
-                            </p>
-                            <p class="text-gray-600 dark:text-gray-400 text-sm mb-6">A 3-Month license key. A great
-                                balance of value and flexibility. <br><b>Renew at Regular Price (₹597)</b></p>
+                            <div class="mb-4">
+                                <span class="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Popular</span>
+                            </div>
+                            <h4 class="text-xl font-bold text-gray-900 dark:text-white">Quarterly</h4>
+                            <div class="mt-4 flex items-baseline">
+                                <span class="text-4xl font-extrabold text-gray-900 dark:text-white">₹289</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400 ml-2 line-through">₹597</span>
+                            </div>
+                            <p class="text-xs text-red-500 dark:text-red-400 font-medium mt-1">Renews at regular price ₹597</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-4 mb-6">Great balance of flexibility and value for money.</p>
+
+                            <ul class="space-y-3 mb-8 flex-1">
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-300"><i class="fa-solid fa-check text-green-500 mr-3"></i> All Premium Features</li>
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-300"><i class="fa-solid fa-check text-green-500 mr-3"></i> 500 MB Cloud Storage</li>
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-300"><i class="fa-solid fa-check text-green-500 mr-3"></i> Priority Email Support</li>
+                            </ul>
+
                             <a href="https://license.nregabot.com/check-license"
-                                class="mt-auto bg-gray-800 text-white font-semibold w-full py-2 rounded-lg hover:bg-black transition-colors dark:bg-gray-700 dark:hover:bg-gray-600">Get
-                                Key</a>
+                                class="w-full block text-center bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30">
+                                Get Key
+                            </a>
                         </div>
 
-                        <div class="bg-white rounded-xl shadow-lg p-6 border dark:border-gray-700 flex flex-col dark:bg-gray-800"
+                        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 p-6 flex flex-col h-full hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
                             data-aos="fade-up" data-aos-delay="300">
-                            <h4 class="font-bold text-xl flex items-center justify-center">
-                                <span>Half Yearly Plan</span>
-                                <span
-                                    class="bg-yellow-200 text-yellow-800 text-xs font-bold ml-2 px-2.5 py-0.5 rounded-full dark:bg-yellow-900 dark:text-yellow-300">52%
-                                    OFF</span>
-                            </h4>
-                            <p class="text-4xl font-extrabold my-4 flex items-baseline justify-center gap-x-2">
-                                <span>₹569</span>
-                                <span class="text-xl font-medium text-gray-400 line-through">₹1194</span>
-                            </p>
-                            <p class="text-gray-600 dark:text-gray-400 text-sm mb-6">A 6-Month license key. Ideal for
-                                longer projects. <br><b>Renew at Regular Price (₹1194)</b></p>
+                            <div class="mb-4">
+                                <span class="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Value</span>
+                            </div>
+                            <h4 class="text-xl font-bold text-gray-900 dark:text-white">Half Yearly</h4>
+                            <div class="mt-4 flex items-baseline">
+                                <span class="text-4xl font-extrabold text-gray-900 dark:text-white">₹569</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400 ml-2 line-through">₹1194</span>
+                            </div>
+                            <p class="text-xs text-red-500 dark:text-red-400 font-medium mt-1">Renews at regular price ₹1194</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-4 mb-6">Ideal for season-long projects and consistent work.</p>
+
+                            <ul class="space-y-3 mb-8 flex-1">
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-300"><i class="fa-solid fa-check text-green-500 mr-3"></i> All Premium Features</li>
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-300"><i class="fa-solid fa-check text-green-500 mr-3"></i> 500 MB Cloud Storage</li>
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-300"><i class="fa-solid fa-check text-green-500 mr-3"></i> Priority Support</li>
+                            </ul>
+
                             <a href="https://license.nregabot.com/check-license"
-                                class="mt-auto bg-gray-800 text-white font-semibold w-full py-2 rounded-lg hover:bg-black transition-colors dark:bg-gray-700 dark:hover:bg-gray-600">Get
-                                Key</a>
+                                class="w-full block text-center bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-bold py-3 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                Get Key
+                            </a>
                         </div>
 
-                        <div class="bg-blue-600 text-white rounded-xl shadow-lg p-6 border border-blue-700 flex flex-col ring-4 ring-blue-300 dark:ring-blue-500/50"
+                        <div class="relative bg-gray-900 dark:bg-black rounded-2xl shadow-2xl p-6 flex flex-col h-full transform md:-translate-y-4 border border-gray-800 overflow-hidden"
                             data-aos="fade-up" data-aos-delay="400">
-                            <h4 class="font-bold text-xl flex items-center justify-center">
-                                <span>Yearly Plan</span>
-                                <span
-                                    class="bg-yellow-400 text-yellow-900 text-xs font-bold ml-2 px-2.5 py-0.5 rounded-full">58%
-                                    OFF</span>
-                            </h4>
-                            <p class="text-4xl font-extrabold my-4 flex items-baseline justify-center gap-x-2">
-                                <span>₹999</span>
-                                <span class="text-xl font-medium text-blue-200 line-through">₹2388</span>
-                            </p>
-                            <p class="opacity-90 text-sm mb-6">A 1-Year license key. The best value for dedicated users.
-                                <br><b>Renew at Regular Price (₹2388)</b>
-                            </p>
+                            
+                            <div class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-4 py-1.5 rounded-bl-2xl z-20 shadow-sm">
+                                BEST VALUE
+                            </div>
+
+                            <div class="mb-4">
+                                <span class="bg-gray-700 text-gray-200 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Long Term</span>
+                            </div>
+                            <h4 class="text-xl font-bold text-white">Yearly Plan</h4>
+                            <div class="mt-4 flex items-baseline">
+                                <span class="text-4xl font-extrabold text-white">₹999</span>
+                                <span class="text-sm text-gray-400 ml-2 line-through">₹2388</span>
+                            </div>
+                            <p class="text-xs text-yellow-400 font-medium mt-1">Renews at regular price ₹2388</p>
+                            <p class="text-sm text-gray-400 mt-4 mb-6">Maximum savings. Set it and forget it for the whole year.</p>
+
+                            <ul class="space-y-3 mb-8 flex-1">
+                                <li class="flex items-center text-sm text-gray-300"><i class="fa-solid fa-check text-yellow-400 mr-3"></i> <strong>All Premium Features</strong></li>
+                                <li class="flex items-center text-sm text-gray-300"><i class="fa-solid fa-check text-yellow-400 mr-3"></i> <strong>500 MB Cloud Storage</strong></li>
+                                <li class="flex items-center text-sm text-gray-300"><i class="fa-solid fa-check text-yellow-400 mr-3"></i> Premium Priority Support</li>
+                                <li class="flex items-center text-sm text-gray-300"><i class="fa-solid fa-check text-yellow-400 mr-3"></i> Early Access to New Features</li>
+                            </ul>
+
                             <a href="https://license.nregabot.com/check-license"
-                                class="mt-auto bg-white text-blue-600 font-semibold w-full py-2 rounded-lg hover:bg-blue-100 transition-colors">Get
-                                Key</a>
+                                class="w-full block text-center bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-500/40">
+                                Get Yearly Key
+                            </a>
+                        </div>
+
+                    </div>
+
+                    <div
+                        class="mt-16 grid md:grid-cols-3 gap-8 text-center border-t border-gray-200 dark:border-gray-800 pt-10">
+                        <div data-aos="fade-up" data-aos-delay="500">
+                            <i class="fa-solid fa-shield-halved text-3xl text-blue-600 dark:text-blue-400 mb-3"></i>
+                            <h5 class="font-bold text-gray-900 dark:text-white">Secure Payments</h5>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Processed securely via Razorpay
+                                (UPI, Cards, Netbanking).</p>
+                        </div>
+                        <div data-aos="fade-up" data-aos-delay="600">
+                            <i class="fa-solid fa-bolt text-3xl text-yellow-500 mb-3"></i>
+                            <h5 class="font-bold text-gray-900 dark:text-white">Instant Activation</h5>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">License key delivered to your email
+                                immediately after payment.</p>
+                        </div>
+                        <div data-aos="fade-up" data-aos-delay="700">
+                            <i class="fa-solid fa-users text-3xl text-purple-500 mb-3"></i>
+                            <h5 class="font-bold text-gray-900 dark:text-white">Bulk Licenses?</h5>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                Need keys for your whole block?
+                                <a href="contact.html" class="text-blue-600 hover:underline font-semibold">Contact
+                                    us</a> for reseller pricing.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -327,421 +469,671 @@
                     <div class="text-center mb-16" data-aos="fade-up">
                         <h3 class="text-3xl font-bold text-gray-900 dark:text-white">Powerful Automation Features</h3>
                         <p class="text-gray-600 mt-2 dark:text-gray-400">Everything you need to streamline your
-                            workflow.</p>
+                            workflow. <span class="text-yellow-600 dark:text-yellow-400 font-semibold"><i
+                                    class="fa-solid fa-lock text-sm"></i> = Premium Feature</span></p>
                     </div>
+
                     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up">
-                            <h4>MR Generator</h4>
+                            <h4 class="font-bold text-lg">MR Generator</h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Automatically generate and download Muster
                                 Roll PDFs for one or all work codes.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="50">
-                            <h4>Duplicate MR Print</h4>
+                            <h4 class="font-bold text-lg">Duplicate MR Print</h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Find and save all MSRs for multiple work
-                                codes. Now includes a 'Merge Saved PDFs' button to combine all results into one file.
-                            </p>
+                                codes. Includes a 'Merge Saved PDFs' utility.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="100">
-                            <h4>Update Outcome</h4>
+                            <h4 class="font-bold text-lg">Update Outcome</h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Quickly update the 'Estimated Outcome' for
                                 a list of work codes without manual entry.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="150">
-                            <h4>MSR Processor</h4>
+                            <h4 class="font-bold text-lg">MSR Processor</h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Process and save Muster Rolls for a list of
                                 work codes, with results shown instantly.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="200">
-                            <h4>FTO Generation</h4>
-                            <p class="text-gray-600 dark:text-gray-400 mt-2">Automates FTO verification. Now includes a
-                                workflow button to check pending ABPS labour via MR Tracking.</p>
+                            <h4 class="font-bold text-lg">FTO Generation</h4>
+                            <p class="text-gray-600 dark:text-gray-400 mt-2">Automates FTO verification. Includes
+                                workflow to check pending ABPS labour via MR Tracking.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="250">
-                            <h4>Wagelist Automation</h4>
+                            <h4 class="font-bold text-lg">Wagelist Automation</h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Generate new wagelists and send them for
-                                e-FMS payment processing with a single click. (Bug fixes applied)</p>
+                                e-FMS payment processing with a single click.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-yellow-50 dark:bg-gray-800 p-6 rounded-lg border border-yellow-200 dark:border-gray-600 relative overflow-hidden"
                             data-aos="fade-up" data-aos-delay="300">
-                            <h4>Jobcard Verification</h4>
+                            <div
+                                class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                                PREMIUM</div>
+                            <h4 class="font-bold text-lg flex items-center gap-2">
+                                Jobcard Verification <i class="fa-solid fa-lock text-yellow-500 text-sm"></i>
+                            </h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Verify job cards and automatically upload
-                                the correct family photo based on the job card number.</p>
+                                the correct family photo based on job card number.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="350">
-                            <h4>eMB Entry</h4>
+                            <h4 class="font-bold text-lg">eMB Entry</h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Fill the Measurement Book (MB) entry page
                                 for multiple work codes automatically.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-yellow-50 dark:bg-gray-800 p-6 rounded-lg border border-yellow-200 dark:border-gray-600 relative overflow-hidden"
                             data-aos="fade-up" data-aos-delay="400">
-                            <h4>eMB Verify</h4>
+                            <div
+                                class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                                PREMIUM</div>
+                            <h4 class="font-bold text-lg flex items-center gap-2">
+                                eMB Verify <i class="fa-solid fa-lock text-yellow-500 text-sm"></i>
+                            </h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Automate the verification process for
                                 Measurement Book entries in bulk.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-yellow-50 dark:bg-gray-800 p-6 rounded-lg border border-yellow-200 dark:border-gray-600 relative overflow-hidden"
                             data-aos="fade-up" data-aos-delay="450">
-                            <h4>Scheme Closing</h4>
+                            <div
+                                class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                                PREMIUM</div>
+                            <h4 class="font-bold text-lg flex items-center gap-2">
+                                Scheme Closing <i class="fa-solid fa-lock text-yellow-500 text-sm"></i>
+                            </h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Close out multiple schemes efficiently by
-                                automating the finalization process. (Bug fixes applied)</p>
+                                automating the finalization process.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-yellow-50 dark:bg-gray-800 p-6 rounded-lg border border-yellow-200 dark:border-gray-600 relative overflow-hidden"
                             data-aos="fade-up" data-aos-delay="500">
-                            <h4>Delete Work Allocation</h4>
+                            <div
+                                class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                                PREMIUM</div>
+                            <h4 class="font-bold text-lg flex items-center gap-2">
+                                Delete Work Allocation <i class="fa-solid fa-lock text-yellow-500 text-sm"></i>
+                            </h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Quickly remove work allocations for a list
                                 of Muster Roll numbers.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="550">
-                            <h4>Workcode Gen (Dynamic)</h4>
+                            <h4 class="font-bold text-lg">Workcode Gen (Dynamic)</h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Create new work codes in bulk by loading
-                                categories from the website and reading data from a simple CSV file.</p>
+                                categories and reading data from a simple CSV file.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-yellow-50 dark:bg-gray-800 p-6 rounded-lg border border-yellow-200 dark:border-gray-600 relative overflow-hidden"
                             data-aos="fade-up" data-aos-delay="600">
-                            <h4>IF Editor (Dynamic)</h4>
+                            <div
+                                class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                                PREMIUM</div>
+                            <h4 class="font-bold text-lg flex items-center gap-2">
+                                IF Editor (Dynamic) <i class="fa-solid fa-lock text-yellow-500 text-sm"></i>
+                            </h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Automate the multi-page IF editing process
-                                with a flexible UI for all settings, using a simple CSV for work codes.</p>
+                                with flexible UI settings.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-yellow-50 dark:bg-gray-800 p-6 rounded-lg border border-yellow-200 dark:border-gray-600 relative overflow-hidden"
                             data-aos="fade-up" data-aos-delay="650">
-                            <h4>Verify ABPS</h4>
+                            <div
+                                class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                                PREMIUM</div>
+                            <h4 class="font-bold text-lg flex items-center gap-2">
+                                Verify ABPS <i class="fa-solid fa-lock text-yellow-500 text-sm"></i>
+                            </h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Automate checking worker Aadhaar numbers
-                                with NPCI, with an auto-mode to process all villages in a panchayat.</p>
+                                with NPCI. Includes auto-mode for village-wise processing.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="700">
-                            <h4>MR Fill</h4>
+                            <h4 class="font-bold text-lg">MR Fill</h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Automatically fill Muster Rolls.
-                                Intelligently marks holidays as absent and includes a manual mode for custom attendance.
-                            </p>
+                                Intelligently marks holidays as absent with custom attendance modes.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="750">
-                            <h4>MR Tracking</h4>
-                            <p class="text-gray-600 dark:text-gray-400 mt-2">Track MR status. Now includes intelligent
-                                ABPS pendency checking, a new 'T+8 to T+15' filter, and a workflow to forward data to
-                                the new Zero MR tab.</p>
+                            <h4 class="font-bold text-lg">MR Tracking</h4>
+                            <p class="text-gray-600 dark:text-gray-400 mt-2">Track MR status with intelligent ABPS
+                                pendency checking and 'T+8 to T+15' filtering.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="800">
-                            <h4>Dashboard Report</h4>
-                            <p class="text-gray-600 dark:text-gray-400 mt-2">Fetch and view comprehensive dashboard
-                                reports, with full export capabilities and a workflow to send data to MR Fill.</p>
+                            <h4 class="font-bold text-lg">Demand Automation</h4>
+                            <p class="text-gray-600 dark:text-gray-400 mt-2">Process Demand for work. Intelligently
+                                divides remaining mandays if laborers are near their limit.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="850">
-                            <h4>Workcode Extractor</h4>
+                            <h4 class="font-bold text-lg">Workcode Extractor</h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">A handy utility to parse and extract clean
                                 lists of work codes from any block of text.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="900">
-                            <h4>Issued MR Details <span
-                                    class="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full ml-1">NEW</span>
-                            </h4>
+                            <h4 class="font-bold text-lg">Issued MR Details</h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Fetches the 'e-muster issued' report for a
-                                panchayat and extracts all work codes. Includes a workflow to send data to 'Duplicate MR
-                                Print'.</p>
+                                panchayat. Connects directly to 'Duplicate MR Print'.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="950">
-                            <h4>PDF Merger <span
-                                    class="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full ml-1">NEW</span>
-                            </h4>
-                            <p class="text-gray-600 dark:text-gray-400 mt-2">A utility to select, re-order, and merge
-                                multiple PDF files into one single document, saved in a 'Merged_Pdf_Output' folder.</p>
+                            <h4 class="font-bold text-lg">PDF Merger</h4>
+                            <p class="text-gray-600 dark:text-gray-400 mt-2">Utility to select, re-order, and merge
+                                multiple PDF files into one single document.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-yellow-50 dark:bg-gray-800 p-6 rounded-lg border border-yellow-200 dark:border-gray-600 relative overflow-hidden"
                             data-aos="fade-up" data-aos-delay="1000">
-                            <h4>Zero MR <span
-                                    class="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full ml-1">NEW</span>
+                            <div
+                                class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                                PREMIUM</div>
+                            <h4 class="font-bold text-lg flex items-center gap-2">
+                                Zero MR <i class="fa-solid fa-lock text-yellow-500 text-sm"></i>
                             </h4>
-                            <p class="text-gray-600 dark:text-gray-400 mt-2">A new automation to submit 'Zero MR' for
-                                muster rolls that have not been filled between T+8 and T+15 days.</p>
+                            <p class="text-gray-600 dark:text-gray-400 mt-2">Submit 'Zero MR' automatically for muster
+                                rolls that have not been filled between T+8 and T+15 days.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
-                            data-aos="fade-up" data-aos-delay="???">
-                            <h4>Work Allocation <span
-                                    class="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full ml-1">NEW</span>
-                            </h4>
-                            <p class="text-gray-600 dark:text-gray-400 mt-2">New automation to allocate work to job
-                                cards. Includes a workflow to run automatically after 'Demand' is completed.</p>
-                        </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="1050">
-                            <h4>Sarkar Aapke Dwar <span
-                                    class="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 font-semibold px-2 py-0.5 rounded-full ml-1">NEW</span>
-                            </h4>
-                            <p class="text-gray-600 dark:text-gray-400 mt-2">Automate entries for the 'Sarkar Aapke
-                                Dwar' program efficiently. Handle bulk data entry for camps.</p>
+                            <h4 class="font-bold text-lg">Work Allocation</h4>
+                            <p class="text-gray-600 dark:text-gray-400 mt-2">Automate work allocation to job cards. Runs
+                                automatically after 'Demand' is completed.</p>
                         </div>
-                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700"
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
                             data-aos="fade-up" data-aos-delay="1100">
-                            <h4>SAD Update Status <span
-                                    class="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 font-semibold px-2 py-0.5 rounded-full ml-1">NEW</span>
+                            <h4 class="font-bold text-lg">Sarkar Aapke Dwar</h4>
+                            <p class="text-gray-600 dark:text-gray-400 mt-2">Automate entries for the 'Sarkar Aapke
+                                Dwar' program. Handle bulk data entry for camps.</p>
+                        </div>
+
+                        <div class="feature-card bg-yellow-50 dark:bg-gray-800 p-6 rounded-lg border border-yellow-200 dark:border-gray-600 relative overflow-hidden"
+                            data-aos="fade-up" data-aos-delay="1150">
+                            <div
+                                class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                                PREMIUM</div>
+                            <h4 class="font-bold text-lg flex items-center gap-2">
+                                SAD Update Status <i class="fa-solid fa-lock text-yellow-500 text-sm"></i>
                             </h4>
                             <p class="text-gray-600 dark:text-gray-400 mt-2">Automatically check and update the status
                                 of applications submitted during Sarkar Aapke Dwar camps.</p>
                         </div>
+
+                        <div class="feature-card bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
+                            data-aos="fade-up" data-aos-delay="1200">
+                            <h4 class="font-bold text-lg">Resend Rejected WG</h4>
+                            <p class="text-gray-600 dark:text-gray-400 mt-2">Easily identify and resend rejected
+                                wagelists for processing without starting from scratch.</p>
+                        </div>
+
                     </div>
                 </div>
             </section>
 
-            <section class="py-12 bg-blue-50 dark:bg-blue-900/20 border-y border-blue-100 dark:border-blue-800">
-                <div class="container mx-auto px-6 text-center">
-                    <span class="inline-block p-3 rounded-full bg-blue-100 text-blue-600 mb-4"><i
-                            class="fa-solid fa-gift text-2xl"></i></span>
-                    <h3 class="text-3xl font-bold text-gray-900 dark:text-white">Refer & Earn Free Validity!</h3>
-                    <p class="text-gray-600 dark:text-gray-400 mt-2 max-w-2xl mx-auto">
-                        Share your unique referral code found in "My Account". When a friend joins and buys a plan,
-                        <strong>you get 15 Days of Extra Validity added instantly!</strong>
-                    </p>
-                </div>
-            </section>
-
-            <section id="getting-started" class="py-16 lg:py-20 bg-gray-100 dark:bg-black/50">
+            <section class="py-16 bg-white dark:bg-gray-900">
                 <div class="container mx-auto px-6">
-                    <div class="text-center mb-16" data-aos="fade-up">
-                        <h2 class="text-4xl font-extrabold text-gray-900 dark:text-white">Getting Started</h2>
-                        <p class="text-lg text-gray-600 dark:text-gray-400 mt-4 max-w-3xl mx-auto">Download our demo
-                            files to see how to structure your data for our most powerful automations.</p>
-                    </div>
-                    <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
-                        <div class="instruction-card bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700 overflow-hidden"
-                            data-aos="fade-up">
-                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">Workcode Generator CSV</h3>
-                            <p class="text-gray-600 dark:text-gray-400 mt-2 mb-4">Use this format for the 'WC Gen' tab.
-                                The CSV provides the dynamic data for each work code you want to create.</p>
-                            <pre
-                                class="bg-gray-100 text-gray-800 p-4 rounded-md text-sm overflow-x-auto dark:bg-gray-900 dark:text-gray-300"><code>priority,work_name,...,job_card,beneficiary_type</code></pre>
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                <a href="https://bills.nregabot.com/work_code_generator" target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="inline-block bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">
-                                    Generate CSV Online
-                                </a>
-                                <a href="/assets/demo_wc_gen.csv" download
-                                    class="inline-block bg-green-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-700 transition-colors dark:bg-green-500 dark:hover:bg-green-600">
-                                    Download Demo
+                    <div class="relative overflow-hidden bg-gray-900 dark:bg-black rounded-3xl shadow-2xl p-8 md:p-12 text-center md:text-left border border-gray-800">
+                        
+                        <div class="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-purple-600/30 rounded-full blur-3xl pointer-events-none"></div>
+                        <div class="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-blue-600/30 rounded-full blur-3xl pointer-events-none"></div>
+
+                        <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                            
+                            <div class="max-w-2xl">
+                                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-bold uppercase tracking-wider mb-4">
+                                    <i class="fa-solid fa-gift"></i> Limited Offer
+                                </div>
+                                <h3 class="text-3xl md:text-4xl font-extrabold text-white mb-4">
+                                    Refer a Friend, <span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">Get 15 Days Free!</span>
+                                </h3>
+                                <p class="text-gray-400 text-lg leading-relaxed">
+                                    Love using NREGA Bot? Share your unique referral code found in your account. When they subscribe, you instantly get <strong>extra validity</strong> added to your plan.
+                                </p>
+                            </div>
+
+                            <div class="flex-shrink-0">
+                                <a href="https://license.nregabot.com/login" target="_blank" class="inline-flex items-center justify-center gap-3 bg-white text-gray-900 font-bold px-8 py-4 rounded-xl hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+                                    <i class="fa-solid fa-share-nodes text-xl"></i>
+                                    Get My Referral Code
                                 </a>
                             </div>
-                        </div>
 
-                        <div class="instruction-card bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700 overflow-hidden"
-                            data-aos="fade-up" data-aos-delay="100">
-                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">IF Editor CSV</h3>
-                            <p class="text-gray-600 dark:text-gray-400 mt-2 mb-4">Use this simplified format for the 'IF
-                                Editor' tab. All other settings are now configured in the app's UI.</p>
-                            <pre
-                                class="bg-gray-100 text-gray-800 p-4 rounded-md text-sm overflow-x-auto dark:bg-gray-900 dark:text-gray-300"><code>work_code,beneficiary_type,job_card</code></pre>
-                            <a href="/assets/demo_if_edit.csv" download
-                                class="mt-4 inline-block bg-green-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-700 transition-colors dark:bg-green-500 dark:hover:bg-green-600">Download
-                                IF Edit Demo</a>
                         </div>
-
-                        <div class="instruction-card bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700 overflow-hidden"
-                            data-aos="fade-up" data-aos-delay="200">
-                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">Demand Automation CSV</h3>
-                            <p class="text-gray-600 dark:text-gray-400 mt-2 mb-4">Required for the 'Demand' tab. Now
-                                intelligently divides remaining mandays if laborers are near their 100-day limit.</p>
-                            <pre
-                                class="bg-gray-100 text-gray-800 p-4 rounded-md text-sm overflow-x-auto dark:bg-gray-900 dark:text-gray-300"><code>Name of Applicant,Job card number</code></pre>
-                            <div class="mt-4 flex flex-wrap gap-2"> <a
-                                    href="https://bills.nregabot.com/extract-job-cards" target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="inline-block bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">
-                                    Generate CSV Online
-                                </a>
-                                <a href="/assets/demo_demand.csv" download
-                                    class="inline-block bg-green-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-700 transition-colors dark:bg-green-500 dark:hover:bg-green-600">Download
-                                    Demand Demo</a>
-                            </div>
-                        </div>
-
                     </div>
                 </div>
             </section>
-        </section>
 
-        <section id="stats" class="py-16 bg-gray-100 dark:bg-black/50">
-            <div class="container mx-auto px-6">
-                <div class="text-center mb-12" data-aos="fade-up">
-                    <h3 class="text-3xl font-bold text-gray-900 dark:text-white">Join Our Growing Community</h3>
-                    <p class="text-gray-600 mt-2 dark:text-gray-400">Trusted by operators and staff across the country.
-                    </p>
-                </div>
-                <div class="max-w-3xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700 text-center"
-                        data-aos="fade-up" data-aos-delay="100">
-                        <span id="total-users-count"
-                            class="text-5xl font-extrabold text-blue-600 dark:text-blue-400">0</span>
-                        <p class="text-xl font-semibold text-gray-700 dark:text-gray-300 mt-2">Total Users</h>
-                        <p class="text-gray-500 dark:text-gray-400">Includes all trial and paid members who have joined.
+            <section id="getting-started" class="py-24 bg-white dark:bg-gray-900 relative">
+                <div class="container mx-auto px-6 relative z-10">
+                    <div class="text-center mb-16" data-aos="fade-up">
+                        <span
+                            class="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Resources</span>
+                        <h2 class="text-4xl font-extrabold text-gray-900 dark:text-white mt-4">Start Automating in
+                            Minutes</h2>
+                        <p class="text-lg text-gray-600 dark:text-gray-400 mt-4 max-w-2xl mx-auto">
+                            Download demo files or use our online tools to format your data correctly for automation.
                         </p>
                     </div>
-                    <div class="bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700 text-center"
-                        data-aos="fade-up" data-aos-delay="200">
-                        <span id="paid-users-count"
-                            class="text-5xl font-extrabold text-green-600 dark:text-green-400">0</span>
-                        <p class="text-xl font-semibold text-gray-700 dark:text-gray-300 mt-2">Paid Subscriptions</p>
-                        <p class="text-gray-500 dark:text-gray-400">Total number of licenses purchased and renewed.</p>
+
+                    <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
+
+                        <div class="group bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 relative overflow-hidden"
+                            data-aos="fade-up" data-aos-delay="100">
+                            <div
+                                class="absolute -top-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
+                                <i class="fa-solid fa-file-csv text-9xl text-blue-600"></i>
+                            </div>
+
+                            <div class="relative z-10 flex flex-col h-full">
+                                <div
+                                    class="w-14 h-14 bg-blue-100 dark:bg-blue-900/50 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+                                    <i class="fa-solid fa-bolt text-2xl text-blue-600 dark:text-blue-400"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Workcode Generator</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                                    Generate bulk workcodes instantly. Use the online tool or upload a CSV.
+                                </p>
+
+                                <div
+                                    class="bg-gray-900 rounded-lg p-4 mb-6 font-mono text-xs text-gray-300 border border-gray-700 shadow-md">
+                                    <div class="flex gap-1.5 mb-3 border-b border-gray-700 pb-2">
+                                        <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                                        <div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                                        <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                                    </div>
+                                    <code
+                                        class="block overflow-x-auto whitespace-nowrap text-blue-300">priority,work_name,scheme...</code>
+                                </div>
+
+                                <div class="mt-auto flex flex-col gap-3">
+                                    <a href="https://bills.nregabot.com/work_code_generator" target="_blank"
+                                        class="w-full text-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-blue-500/20">
+                                        Open Online Tool
+                                    </a>
+                                    <a href="/assets/demo_wc_gen.csv" download
+                                        class="w-full text-center px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                        <i class="fa-solid fa-download mr-2"></i>Download CSV
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="group bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 relative overflow-hidden"
+                            data-aos="fade-up" data-aos-delay="200">
+                            <div
+                                class="absolute -top-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
+                                <i class="fa-solid fa-pen-to-square text-9xl text-green-600"></i>
+                            </div>
+
+                            <div class="relative z-10 flex flex-col h-full">
+                                <div
+                                    class="w-14 h-14 bg-green-100 dark:bg-green-900/50 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+                                    <i class="fa-solid fa-pen-fancy text-2xl text-green-600 dark:text-green-400"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">IF Editor Automation
+                                </h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                                    Edit Integrated Form details for multiple works using this simple format.
+                                </p>
+
+                                <div
+                                    class="bg-gray-900 rounded-lg p-4 mb-6 font-mono text-xs text-gray-300 border border-gray-700 shadow-md">
+                                    <div class="flex gap-1.5 mb-3 border-b border-gray-700 pb-2">
+                                        <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                                        <div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                                        <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                                    </div>
+                                    <code
+                                        class="block overflow-x-auto whitespace-nowrap text-green-300">work_code,beneficiary_type...</code>
+                                </div>
+
+                                <div class="mt-auto">
+                                    <a href="/assets/demo_if_edit.csv" download
+                                        class="w-full flex items-center justify-center px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-green-500/20">
+                                        <i class="fa-solid fa-download mr-2"></i>Download Demo CSV
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="group bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 relative overflow-hidden"
+                            data-aos="fade-up" data-aos-delay="300">
+                            <div
+                                class="absolute -top-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
+                                <i class="fa-solid fa-list-check text-9xl text-purple-600"></i>
+                            </div>
+
+                            <div class="relative z-10 flex flex-col h-full">
+                                <div
+                                    class="w-14 h-14 bg-purple-100 dark:bg-purple-900/50 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+                                    <i class="fa-solid fa-users-gear text-2xl text-purple-600 dark:text-purple-400"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Demand Automation</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                                    Process bulk demand entries. Extract job card data easily online.
+                                </p>
+
+                                <div
+                                    class="bg-gray-900 rounded-lg p-4 mb-6 font-mono text-xs text-gray-300 border border-gray-700 shadow-md">
+                                    <div class="flex gap-1.5 mb-3 border-b border-gray-700 pb-2">
+                                        <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                                        <div class="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                                        <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                                    </div>
+                                    <code
+                                        class="block overflow-x-auto whitespace-nowrap text-purple-300">Applicant Name,Job Card No...</code>
+                                </div>
+
+                                <div class="mt-auto flex flex-col gap-3">
+                                    <a href="https://bills.nregabot.com/extract-job-cards" target="_blank"
+                                        class="w-full text-center px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-purple-500/20">
+                                        Extract Data Online
+                                    </a>
+                                    <a href="/assets/demo_demand.csv" download
+                                        class="w-full text-center px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                        <i class="fa-solid fa-download mr-2"></i>Download CSV
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
 
-
-
-        <section id="faq" class="py-16 lg:py-20">
-            <div class="container mx-auto px-6">
-                <div class="text-center mb-16" data-aos="fade-up">
-                    <h2 class="text-4xl font-extrabold text-gray-900 dark:text-white">Frequently Asked Questions</h2>
-                    <p class="text-lg text-gray-600 dark:text-gray-400 mt-4 max-w-3xl mx-auto">Have questions? We've got
-                        answers.</p>
+            <section id="stats" class="py-24 bg-blue-600 dark:bg-blue-900 relative overflow-hidden">
+                <div
+                    class="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-white/10 blur-3xl pointer-events-none">
                 </div>
-                <div class="max-w-3xl mx-auto space-y-4">
-                    <details class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm cursor-pointer"
-                        data-aos="fade-up">
-                        <summary class="font-semibold text-lg">Is my NREGA data safe?</summary>
-                        <p class="text-gray-600 dark:text-gray-400 mt-4">Absolutely. The application works by automating
-                            your local browser. It only reads what's on the screen to perform its tasks. None of your
-                            NREGA data, work codes, or personal information is ever sent to our servers.</p>
-                    </details>
-                    <details class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm cursor-pointer"
-                        data-aos="fade-up">
-                        <summary class="font-semibold text-lg">What happens after my 30-day free trial ends?</summary>
-                        <p class="text-gray-600 dark:text-gray-400 mt-4">After 30 days, the automation features will be
-                            disabled. To continue using the app, you can support the project by purchasing a monthly or
-                            yearly license key.</p>
-                    </details>
-                    <details class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm cursor-pointer"
-                        data-aos="fade-up">
-                        <summary class="font-semibold text-lg">How do I get a license key after purchasing?</summary>
-                        <p class="text-gray-600 dark:text-gray-400 mt-4">After making a payment on our secure license
-                            page, your key will be generated instantly and sent to your registered email address.</p>
-                    </details>
-                    <details class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm cursor-pointer"
-                        data-aos="fade-up">
-                        <summary class="font-semibold text-lg">Can I use one license key on multiple computers?
-                        </summary>
-                        <p class="text-gray-600 dark:text-gray-400 mt-4">Each license key is valid for the number of
-                            devices you selected during purchase (1, 2, or 3). The license is locked to the first few
-                            computers it is activated on. If you need to change a computer, please contact support.</p>
-                    </details>
-                    <details class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm cursor-pointer"
-                        data-aos="fade-up">
-                        <summary class="font-semibold text-lg">Why do I need to launch a browser from the app?</summary>
-                        <p class="text-gray-600 dark:text-gray-400 mt-4">The app launches a browser (Chrome or Firefox)
-                            with a special profile and a connection that allows the application to securely automate
-                            data entry tasks. Your regular browser will not work for automation.</p>
-                    </details>
+                <div
+                    class="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 rounded-full bg-white/10 blur-3xl pointer-events-none">
                 </div>
-            </div>
+
+                <div class="container mx-auto px-6 relative z-10">
+                    <div class="grid lg:grid-cols-2 gap-12 items-center">
+
+                        <div class="text-left" data-aos="fade-right">
+                            <div
+                                class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/30 border border-blue-400/30 text-white text-xs font-semibold uppercase tracking-wider mb-6">
+                                <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> Live Stats
+                            </div>
+                            <h3 class="text-4xl lg:text-5xl font-extrabold text-white mb-6 leading-tight">
+                                Join Our Growing <br> Community
+                            </h3>
+                            <p class="text-blue-100 text-lg mb-8 max-w-xl leading-relaxed">
+                                Thousands of operators and block staff trust NREGA Bot to simplify their daily workload.
+                                Be part of the revolution in automation.
+                            </p>
+                            <div class="flex flex-wrap gap-4">
+                                <a href="https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn" target="_blank"
+                                    class="inline-flex items-center px-6 py-3.5 bg-white text-blue-700 font-bold rounded-xl hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                                    <i class="fa-brands fa-whatsapp text-2xl mr-2.5"></i> Join WhatsApp Group
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-6" data-aos="fade-left">
+                            <div
+                                class="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-2xl text-center transform hover:scale-105 transition-transform duration-300 shadow-xl">
+                                <div class="text-5xl font-extrabold text-white mb-2" id="total-users-count">0</div>
+                                <div class="text-blue-200 font-bold uppercase tracking-wider text-xs">Total Users</div>
+                            </div>
+
+                            <div
+                                class="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-2xl text-center transform hover:scale-105 transition-transform duration-300 shadow-xl">
+                                <div class="text-5xl font-extrabold text-green-300 mb-2" id="paid-users-count">0</div>
+                                <div class="text-blue-200 font-bold uppercase tracking-wider text-xs">Paid Subscribers
+                                </div>
+                            </div>
+
+                            <div
+                                class="col-span-2 bg-blue-800/40 rounded-xl p-4 border border-white/10 flex flex-col sm:flex-row items-center justify-center gap-4 text-center sm:text-left">
+                                <div class="flex -space-x-3">
+                                    <div class="w-10 h-10 rounded-full border-2 border-blue-500 bg-gray-300 bg-cover"
+                                        style="background-image: url('https://i.pravatar.cc/100?img=11');"></div>
+                                    <div class="w-10 h-10 rounded-full border-2 border-blue-500 bg-gray-300 bg-cover"
+                                        style="background-image: url('https://i.pravatar.cc/100?img=12');"></div>
+                                    <div class="w-10 h-10 rounded-full border-2 border-blue-500 bg-gray-300 bg-cover"
+                                        style="background-image: url('https://i.pravatar.cc/100?img=33');"></div>
+                                    <div
+                                        class="w-10 h-10 rounded-full border-2 border-blue-500 bg-white text-blue-600 flex items-center justify-center text-xs font-bold">
+                                        +500</div>
+                                </div>
+                                <p class="text-white text-sm font-medium">Operators joined this month!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="py-24 bg-white dark:bg-gray-900">
+                <div class="container mx-auto px-6">
+                    <div class="text-center mb-16" data-aos="fade-up">
+                        <span
+                            class="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Support</span>
+                        <h2 class="text-4xl font-extrabold text-gray-900 dark:text-white mt-4">Frequently Asked
+                            Questions</h2>
+                        <p class="text-lg text-gray-600 dark:text-gray-400 mt-4 max-w-2xl mx-auto">
+                            Have questions? We've got answers.
+                        </p>
+                    </div>
+
+                    <div class="max-w-3xl mx-auto space-y-4">
+
+                        <details
+                            class="group bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-300 hover:shadow-md"
+                            data-aos="fade-up">
+                            <summary
+                                class="flex justify-between items-center p-6 cursor-pointer list-none bg-white dark:bg-gray-800/50">
+                                <span class="text-lg font-bold text-gray-900 dark:text-white">Is my NREGA data
+                                    safe?</span>
+                                <span class="transition-transform duration-300 group-open:rotate-180">
+                                    <i class="fa-solid fa-chevron-down text-gray-500"></i>
+                                </span>
+                            </summary>
+                            <div
+                                class="px-6 pb-6 pt-2 text-gray-600 dark:text-gray-300 leading-relaxed border-t border-gray-100 dark:border-gray-700/50">
+                                Absolutely. The application works by automating your local browser. It only reads what's
+                                on the screen to perform its tasks. None of your NREGA data, work codes, or personal
+                                information is ever sent to our servers.
+                            </div>
+                        </details>
+
+                        <details
+                            class="group bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-300 hover:shadow-md"
+                            data-aos="fade-up" data-aos-delay="50">
+                            <summary
+                                class="flex justify-between items-center p-6 cursor-pointer list-none bg-white dark:bg-gray-800/50">
+                                <span class="text-lg font-bold text-gray-900 dark:text-white">What happens after my
+                                    30-day free trial ends?</span>
+                                <span class="transition-transform duration-300 group-open:rotate-180">
+                                    <i class="fa-solid fa-chevron-down text-gray-500"></i>
+                                </span>
+                            </summary>
+                            <div
+                                class="px-6 pb-6 pt-2 text-gray-600 dark:text-gray-300 leading-relaxed border-t border-gray-100 dark:border-gray-700/50">
+                                After 30 days, the automation features will be disabled. To continue using the app, you
+                                can support the project by purchasing a monthly, quarterly, or yearly license key from
+                                the "Pricing" section above.
+                            </div>
+                        </details>
+
+                        <details
+                            class="group bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-300 hover:shadow-md"
+                            data-aos="fade-up" data-aos-delay="100">
+                            <summary
+                                class="flex justify-between items-center p-6 cursor-pointer list-none bg-white dark:bg-gray-800/50">
+                                <span class="text-lg font-bold text-gray-900 dark:text-white">How do I get a license key
+                                    after purchasing?</span>
+                                <span class="transition-transform duration-300 group-open:rotate-180">
+                                    <i class="fa-solid fa-chevron-down text-gray-500"></i>
+                                </span>
+                            </summary>
+                            <div
+                                class="px-6 pb-6 pt-2 text-gray-600 dark:text-gray-300 leading-relaxed border-t border-gray-100 dark:border-gray-700/50">
+                                After making a payment on our secure license page, your key will be generated instantly
+                                and sent to your registered email address within seconds. Check your spam folder if you
+                                don't see it.
+                            </div>
+                        </details>
+
+                        <details
+                            class="group bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-300 hover:shadow-md"
+                            data-aos="fade-up" data-aos-delay="150">
+                            <summary
+                                class="flex justify-between items-center p-6 cursor-pointer list-none bg-white dark:bg-gray-800/50">
+                                <span class="text-lg font-bold text-gray-900 dark:text-white">Can I use one license key
+                                    on multiple computers?</span>
+                                <span class="transition-transform duration-300 group-open:rotate-180">
+                                    <i class="fa-solid fa-chevron-down text-gray-500"></i>
+                                </span>
+                            </summary>
+                            <div
+                                class="px-6 pb-6 pt-2 text-gray-600 dark:text-gray-300 leading-relaxed border-t border-gray-100 dark:border-gray-700/50">
+                                Each license key is valid for the number of devices you selected during purchase (1, 2,
+                                or 3). The license is locked to the specific computers it is first activated on. If you
+                                change your PC, please contact support to reset your key.
+                            </div>
+                        </details>
+
+                        <details
+                            class="group bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-300 hover:shadow-md"
+                            data-aos="fade-up" data-aos-delay="200">
+                            <summary
+                                class="flex justify-between items-center p-6 cursor-pointer list-none bg-white dark:bg-gray-800/50">
+                                <span class="text-lg font-bold text-gray-900 dark:text-white">Why do I need to launch a
+                                    browser from the app?</span>
+                                <span class="transition-transform duration-300 group-open:rotate-180">
+                                    <i class="fa-solid fa-chevron-down text-gray-500"></i>
+                                </span>
+                            </summary>
+                            <div
+                                class="px-6 pb-6 pt-2 text-gray-600 dark:text-gray-300 leading-relaxed border-t border-gray-100 dark:border-gray-700/50">
+                                The app launches a browser (Chrome, Edge, or Firefox) with a special "debugging"
+                                connection. This secure connection allows NREGA Bot to fill forms and click buttons for
+                                you. Your regular browser window doesn't allow external control for security reasons.
+                            </div>
+                        </details>
+
+                    </div>
+                </div>
+            </section>
         </section>
     </div>
 
     <footer class="bg-gray-100 dark:bg-gray-900 border-t border-gray-300 dark:border-gray-800">
-        <div class="container mx-auto px-6 py-10">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
-                <!-- Left: Logo & tagline -->
-                <div class="flex flex-col items-center md:items-start">
-                    <div class="flex items-center gap-2 mb-3">
-                        <!-- Light mode logo -->
-                        <img src="assets/logo-dark.png" alt="NREGA Bot Logo (Light)"
-                            class="h-10 w-10 rounded-full dark:hidden">
-                        <!-- Dark mode logo -->
-                        <img src="assets/logo-white.png" alt="NREGA Bot Logo (Dark)"
-                            class="h-10 w-10 rounded-full hidden dark:inline-block">
-                        <h3 class="text-xl font-bold text-gray-900 dark:text-white">NREGA Bot</h3>
+        <div class="container mx-auto px-6 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+                
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3 mb-2 group">
+                        <div class="relative">
+                            <div class="absolute -inset-2 bg-blue-500/40 dark:bg-blue-400/40 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
+                            
+                            <img src="assets/logo-dark.png" alt="NREGA Bot Logo" class="relative z-10 h-10 w-10 rounded-full dark:hidden transition-transform group-hover:scale-105">
+                            <img src="assets/logo-white.png" alt="NREGA Bot Logo" class="relative z-10 h-10 w-10 rounded-full hidden dark:inline-block transition-transform group-hover:scale-105">
+                        </div>
+                        
+                        <h3 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">NREGA Bot</h3>
                     </div>
-
-                    <!-- 24x7 Support badge -->
+                    
                     <div class="inline-flex items-center gap-2 text-sm">
                         <span class="px-3 py-1 rounded-full border border-green-500/40 bg-green-50 text-green-700 font-semibold
                              dark:bg-green-900/30 dark:text-green-300 dark:border-green-600/40">
-                            📞 24×7 Support
+                            <i class="fa-solid fa-headset mr-1"></i> 24×7 Support
                         </span>
                     </div>
 
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-3">
-                        &copy; 2025 Poddar Solutions. All rights reserved.
+                    <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mt-2">
+                        Simplifying MGNREGA workflows since 2024. Trusted by thousands of operators across India.
                     </p>
-
-                    <p class="mt-4 text-sm">
-                        Interested in bulk licenses? <a href="contact.html"
-                            class="text-blue-600 hover:underline">Contact us to become a Reseller</a> and manage users
-                        in your district.
-                    </p>
-                </div>
-
-                <!-- Middle: Quick Links -->
-                <div>
-                    <h3 class="font-semibold text-gray-900 dark:text-white">Quick Links</h3>
-                    <nav class="mt-4 space-y-2">
-                        <a href="about.html"
-                            class="block text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">About Us</a>
-                        <a href="privacy.html"
-                            class="block text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">Privacy Policy</a>
-                        <a href="terms.html"
-                            class="block text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">Terms &amp;
-                            Conditions</a>
-                        <a href="refund.html"
-                            class="block text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">Refund Policy</a>
-                    </nav>
-                </div>
-
-                <!-- Right: Support & Payments -->
-                <div class="flex flex-col items-center md:items-end">
-                    <h3 class="font-semibold text-gray-900 dark:text-white">Support</h3>
-                    <nav class="mt-4 space-y-2 text-center md:text-right">
-                        <a href="contact.html"
-                            class="block text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">Contact Us</a>
-                        <a href="#faq" class="block text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">FAQ</a>
-                        <a href="https://chat.whatsapp.com/your-support-group-link" target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg transition w-full md:w-auto">
-                            <!-- WhatsApp icon -->
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="currentColor"
-                                viewBox="0 0 24 24">
-                                <path
-                                    d="M20.52 3.48A11.94 11.94 0 0 0 12.01 0C5.38 0 .01 5.37.01 12c0 2.11.55 4.14 1.6 5.94L0 24l6.28-1.64A12 12 0 1 0 20.52 3.48ZM12 21.57c-1.88 0-3.67-.49-5.26-1.42l-.38-.22-3.7.97.99-3.63-.23-.38A9.54 9.54 0 1 1 21.57 12 9.57 9.57 0 0 1 12 21.57Zm5.27-7.15c-.29-.15-1.71-.85-1.98-.95-.27-.1-.46-.15-.66.13-.19.28-.75.94-.92 1.14-.17.2-.34.23-.62.08-.29-.14-1.22-.45-2.33-1.44-1-.88-1.63-1.97-1.81-2.29-.18-.33-.02-.5.12-.65.14-.15.29-.34.44-.52.15-.18.2-.3.29-.49.1-.2.05-.37-.02-.52-.07-.15-.65-1.56-.89-2.14-.24-.58-.48-.5-.66-.5l-.56-.01c-.2 0-.5.07-.77.36-.27.29-1.01.99-1.01 2.41s1.06 2.84 1.2 3.03c.14.19 2.04 3.11 4.94 4.37s2.9.84 3.43.78c.53-.06 1.71-.69 1.95-1.36.24-.67.24-1.25.17-1.37-.07-.12-.27-.2-.55-.35Z" />
-                            </svg>
-                            Join WhatsApp Group
-                        </a>
-                    </nav>
-
-                    <!-- Payments: Visa, Mastercard, UPI -->
-                    <div class="flex items-center gap-4 mt-6">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/Visa_Logo.png" alt="Visa"
-                            class="h-6">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/0/04/Mastercard-logo.png"
-                            alt="Mastercard" class="h-6">
-
-                        <!-- Inline UPI logo (always shows) -->
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" class="h-6" aria-label="UPI">
-                            <rect width="120" height="40" fill="none" />
-                            <!-- UPI word -->
-                            <text x="10" y="26" font-size="20" font-family="Inter, system-ui, Arial, sans-serif"
-                                font-weight="800" fill="currentColor">UPI</text>
-                            <!-- tri-color arrow -->
-                            <polygon points="78,12 88,20 78,28" fill="#ff7a00"></polygon>
-                            <polygon points="88,20 104,20 104,16 88,16" fill="#ff7a00"></polygon>
-                            <polygon points="88,20 104,20 104,24 88,24" fill="#2ea043"></polygon>
-                        </svg>
+                    
+                    <div class="flex items-center gap-4 pt-2">
+                        <a href="#" class="text-gray-400 hover:text-blue-600 dark:hover:text-white transition-colors"><i class="fa-brands fa-facebook text-xl"></i></a>
+                        <a href="#" class="text-gray-400 hover:text-blue-400 dark:hover:text-white transition-colors"><i class="fa-brands fa-twitter text-xl"></i></a>
+                        <a href="#" class="text-gray-400 hover:text-pink-600 dark:hover:text-white transition-colors"><i class="fa-brands fa-instagram text-xl"></i></a>
+                        <a href="#" class="text-gray-400 hover:text-red-600 dark:hover:text-white transition-colors"><i class="fa-brands fa-youtube text-xl"></i></a>
                     </div>
+                </div>
+
+                <div>
+                    <h4 class="text-gray-900 dark:text-white font-bold mb-6 uppercase text-sm tracking-wider">Quick Links</h4>
+                    <ul class="space-y-3 text-sm font-medium">
+                        <li><a href="#home" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Home</a></li>
+                        <li><a href="how-to-use.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">How to Use</a></li>
+                        <li><a href="https://tools.nregabot.com" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Tools</a></li>
+                        <li><a href="contact.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Contact Us</a></li>
+                        <li><a href="https://license.nregabot.com/login" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">My Account</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="text-gray-900 dark:text-white font-bold mb-6 uppercase text-sm tracking-wider">Legal</h4>
+                    <ul class="space-y-3 text-sm font-medium">
+                        <li><a href="privacy.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Privacy Policy</a></li>
+                        <li><a href="terms.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Terms of Service</a></li>
+                        <li><a href="refund.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Refund Policy</a></li>
+                        <li><a href="about.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">About Us</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="text-gray-900 dark:text-white font-bold mb-6 uppercase text-sm tracking-wider">Get in Touch</h4>
+                    <ul class="space-y-4 text-sm font-medium">
+                        <li class="flex items-start gap-3 group">
+                            <div class="mt-1 bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-envelope"></i>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-gray-500 dark:text-gray-500 uppercase font-bold">Email Us</span>
+                                <a href="mailto:nregabot@gmail.com" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">nregabot@gmail.com</a>
+                            </div>
+                        </li>
+                        
+                        <li class="pt-2">
+                            <a href="https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn" target="_blank" 
+                               class="inline-flex items-center justify-center w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-green-500/30 group">
+                                <i class="fa-brands fa-whatsapp mr-2 text-xl group-hover:scale-110 transition-transform"></i> 
+                                Join Community
+                            </a>
+                            <p class="text-xs text-gray-500 dark:text-gray-500 mt-2 text-center">Get instant updates & help</p>
+                        </li>
+                    </ul>
                 </div>
             </div>
 
-            <div
-                class="mt-10 border-t border-gray-300 dark:border-gray-700 pt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                Made with ❤️ by <strong>Rajat Poddar</strong>
+            <div class="border-t border-gray-300 dark:border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                <p>&copy; 2025 Poddar Solutions. All rights reserved.</p>
+                <div class="flex items-center gap-4 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/Visa_Logo.png" alt="Visa" class="h-5">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/0/04/Mastercard-logo.png" alt="Mastercard" class="h-5">
+                    <div class="flex items-center gap-1 font-bold text-gray-400">
+                        <i class="fa-solid fa-indian-rupee-sign"></i> UPI
+                    </div>
+                </div>
             </div>
         </div>
     </footer>
@@ -753,9 +1145,9 @@
         document.addEventListener('DOMContentLoaded', function () {
             // Initialize AOS
             AOS.init({
-                duration: 400, // Fast animation (800ms -> 400ms)
+                duration: 400,
                 once: true,
-                offset: 0, // Trigger immediately when element is in view
+                offset: 0,
             });
 
             // Mobile Menu
@@ -763,8 +1155,24 @@
             const mobileMenu = document.getElementById('mobile-menu');
             const menuOpenIcon = document.getElementById('menu-open-icon');
             const menuCloseIcon = document.getElementById('menu-close-icon');
-            const mobileLinks = document.querySelectorAll('#mobile-menu .mobile-link'); // <-- BUG FIX IS HERE
-            function toggleMenu() { const isHidden = mobileMenu.classList.contains('hidden'); mobileMenu.classList.toggle('hidden'); menuOpenIcon.classList.toggle('hidden', !isHidden); menuCloseIcon.classList.toggle('hidden', isHidden); document.body.style.overflow = isHidden ? 'hidden' : ''; }
+            const mobileLinks = document.querySelectorAll('#mobile-menu .mobile-link'); 
+            
+            function toggleMenu() { 
+                const isHidden = mobileMenu.classList.contains('translate-x-full'); 
+                
+                if (isHidden) {
+                    mobileMenu.classList.remove('translate-x-full');
+                    menuOpenIcon.classList.add('hidden');
+                    menuCloseIcon.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden'; // Lock scroll
+                } else {
+                    mobileMenu.classList.add('translate-x-full');
+                    menuOpenIcon.classList.remove('hidden');
+                    menuCloseIcon.classList.add('hidden');
+                    document.body.style.overflow = ''; // Unlock scroll
+                }
+            }
+            
             mobileMenuButton.addEventListener('click', toggleMenu);
             mobileLinks.forEach(link => { link.addEventListener('click', () => { if (link.getAttribute('href').startsWith('#')) { toggleMenu(); } }); });
 

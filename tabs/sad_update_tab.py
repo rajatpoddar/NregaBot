@@ -306,7 +306,8 @@ class SADUpdateStatusTab(BaseAutomationTab):
 
                 try:
                     driver.get("https://sarkaraapkedwar.jharkhand.gov.in/#/application/search")
-                    wait = WebDriverWait(driver, 5)
+                    # Increased base wait time for initial page load
+                    wait = WebDriverWait(driver, 10)
 
                     inp = wait.until(EC.presence_of_element_located((By.NAME, "accNo")))
                     inp.clear(); inp.send_keys(search_term)
@@ -333,9 +334,9 @@ class SADUpdateStatusTab(BaseAutomationTab):
                     
                     # --- CHECK FOR DROPDOWN OR DISPOSED STATUS ---
                     try:
-                        # --- FAST SKIP LOGIC ---
-                        # Wait ONLY 2 seconds for dropdown. If not found, assume already disposed.
-                        short_wait = WebDriverWait(driver, 2.0)
+                        # --- NETWORK FIX: Increased timeout from 2.0s to 10.0s ---
+                        # This ensures slow internet doesn't trigger "Already Disposed"
+                        short_wait = WebDriverWait(driver, 10.0)
                         select_elem = short_wait.until(EC.presence_of_element_located((By.TAG_NAME, "select")))
                         
                         # Dropdown found -> Select value
@@ -354,7 +355,7 @@ class SADUpdateStatusTab(BaseAutomationTab):
                             continue
 
                     except TimeoutException:
-                        # Dropdown NOT found within 2 seconds -> Mark as Already Disposed
+                        # Dropdown NOT found within 10 seconds -> Mark as Already Disposed
                         self.log("--> Already Disposed (No dropdown)")
                         self.add_result(search_term, "Skipped", "Already Disposed")
                         continue # Skip to next item immediately
@@ -364,11 +365,11 @@ class SADUpdateStatusTab(BaseAutomationTab):
                         self.add_result(search_term, "Failed", "Dropdown error")
                         continue
 
-                    time.sleep(0.5)
+                    time.sleep(1.0) # Small sleep before clicking buttons for safety
 
                     if action_val == "2": 
                         try:
-                            set_docs_btn = WebDriverWait(driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Set Documents')]")))
+                            set_docs_btn = WebDriverWait(driver, 3).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Set Documents')]")))
                             driver.execute_script("arguments[0].click();", set_docs_btn)
                             time.sleep(0.5)
                         except: pass
@@ -381,9 +382,9 @@ class SADUpdateStatusTab(BaseAutomationTab):
                             driver.execute_script("arguments[0].click();", update_btn)
                             
                             try:
-                                ok_btn = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.swal2-confirm")))
+                                ok_btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.swal2-confirm")))
                                 driver.execute_script("arguments[0].click();", ok_btn)
-                                WebDriverWait(driver, 3).until(EC.invisibility_of_element_located((By.CSS_SELECTOR, "div.swal2-container")))
+                                WebDriverWait(driver, 5).until(EC.invisibility_of_element_located((By.CSS_SELECTOR, "div.swal2-container")))
                             except: pass
                             
                             processed_success += 1
