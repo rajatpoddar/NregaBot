@@ -103,26 +103,63 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Starting ABPS Verification...")
         self.app.after(0, self.app.set_status, "Running ABPS Verification...")
 
-        # This set will now store tuples: (job_card, applicant_name)
         session_processed_jobcards = set()
 
         try:
             driver = self.app.get_driver()
             if not driver: return
 
-            wait = WebDriverWait(driver, 20) # Main wait
-            short_wait = WebDriverWait(driver, 5) # Shorter wait for existence checks
+            wait = WebDriverWait(driver, 20)
+            short_wait = WebDriverWait(driver, 5)
+            
+            # Navigate
             driver.get(config.ABPS_VERIFY_CONFIG["url"])
+            
+            # --- CHECK URL (Prevent errors on Login Page) ---
+            current_url = driver.current_url
+            self.app.log_message(self.log_display, f"Loaded URL: {current_url}")
+            
+            if "login" in current_url.lower():
+                self.app.log_message(self.log_display, "Error: Redirected to Login page. Please log in first.", "error")
+                messagebox.showerror("Session Expired", "It seems your session has expired. Please log in again.")
+                return
 
-            # 1. Select Panchayat and determine villages
+            # 1. Select Panchayat
             self.app.log_message(self.log_display, f"Selecting Panchayat: {panchayat}")
-            Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))).select_by_visible_text(panchayat)
-            self.app.update_history("panchayat_name", panchayat)
-            time.sleep(1)
 
-            village_dd_id = "ctl00_ContentPlaceHolder1_DDL_Village"
-            wait.until(lambda d: len(Select(d.find_element(By.ID, village_dd_id)).options) > 1)
-            all_villages = [opt.text for opt in Select(driver.find_element(By.ID, village_dd_id)).options if opt.get_attribute("value") != "00"]
+            # Strategy: Use CSS Selector with wildcard (id*='DDL_panchayat') to match ANY ID containing DDL_panchayat
+            try:
+                # First wait for ANY select to appear (ensures page loaded)
+                wait.until(EC.presence_of_element_located((By.TAG_NAME, "select")))
+                
+                # Find Panchayat Dropdown Robustly
+                panchayat_select = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']")))
+                
+                # Scroll into view (fixes issues if element is off-screen)
+                driver.execute_script("arguments[0].scrollIntoView(true);", panchayat_select)
+                
+                Select(panchayat_select).select_by_visible_text(panchayat)
+                self.app.update_history("panchayat_name", panchayat)
+                time.sleep(1) # Allow page to refresh
+                
+            except TimeoutException:
+                # Fallback: Try Name attribute if ID fails
+                try:
+                    panchayat_select = driver.find_element(By.NAME, "ctl00$ContentPlaceHolder1$DDL_panchayat")
+                    Select(panchayat_select).select_by_visible_text(panchayat)
+                    self.app.update_history("panchayat_name", panchayat)
+                    time.sleep(1)
+                except Exception:
+                     raise Exception("Could not find Panchayat dropdown. Please ensure you are logged in and on the correct page.")
+
+            # 2. Handle Village Dropdown (CSS Selector)
+            village_css = "select[id*='DDL_Village']"
+            
+            # Wait for options > 1 (Loaded)
+            wait.until(lambda d: len(Select(d.find_element(By.CSS_SELECTOR, village_css)).options) > 1)
+            
+            village_select_elem = driver.find_element(By.CSS_SELECTOR, village_css)
+            all_villages = [opt.text for opt in Select(village_select_elem).options if opt.get_attribute("value") != "00"]
             
             villages_to_process = [village] if village else all_villages
             if village and village not in all_villages:
@@ -134,46 +171,43 @@ class AbpsVerifyTab(BaseAutomationTab):
                 self.app.log_message(self.log_display, f"\n--- Processing Village {i+1}/{len(villages_to_process)}: {current_village} ---")
                 
                 try:
-                    Select(wait.until(EC.presence_of_element_located((By.ID, village_dd_id)))).select_by_visible_text(current_village)
+                    # Re-find element using CSS Selector
+                    Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, village_css)))).select_by_visible_text(current_village)
                     self.app.update_history("village_name", current_village)
                     
-                    table_id = "ctl00_ContentPlaceHolder1_gvData"
-                    
+                    # Table handling...
+                    table_xpath = "//table[contains(@id, 'gvData')]"
                     try:
-                        short_wait.until(EC.presence_of_element_located((By.ID, table_id)))
+                        short_wait.until(EC.presence_of_element_located((By.XPATH, table_xpath)))
                     except TimeoutException:
                         self.app.log_message(self.log_display, f"No records found for {current_village}. Skipping.", "warning")
-                        continue # Skip to the next village
+                        continue
 
                     page_number = 1
-                    # --- PAGE LOOP ---
                     while True:
                         if self.app.stop_events[self.automation_key].is_set(): break
                         self.app.log_message(self.log_display, f"Scanning page {page_number}...")
                         
                         page_processed_count = 0
-                        # --- RE-SCAN LOOP ---
                         while True:
                             if self.app.stop_events[self.automation_key].is_set(): break
 
-                            unprocessed_rows_xpath = f"//table[@id='{table_id}']/tbody/tr[position()>1 and .//input[contains(@id, 'btn_showuid')]]"
+                            # Row XPath logic
+                            unprocessed_rows_xpath = f"//table[contains(@id, 'gvData')]/tbody/tr[position()>1 and .//input[contains(@id, 'btn_showuid')]]"
                             potential_rows = driver.find_elements(By.XPATH, unprocessed_rows_xpath)
                             
                             row_to_process = None
-                            # --- FIX: These variables will store the unique key ---
                             job_card, app_name = "N/A", "N/A"
                             unique_key = None
                             
                             for row in potential_rows:
                                 try:
-                                    # --- FIX: Get both job card and name to create a unique key ---
                                     jc_num = row.find_element(By.XPATH, ".//td[2]").text
                                     ap_name = row.find_element(By.XPATH, ".//td[4]").text
-                                    key = (jc_num, ap_name) # The unique tuple
+                                    key = (jc_num, ap_name) 
 
                                     if key not in session_processed_jobcards:
                                         row_to_process = row
-                                        # --- Store the values we found ---
                                         job_card = jc_num
                                         app_name = ap_name
                                         unique_key = key
@@ -184,7 +218,6 @@ class AbpsVerifyTab(BaseAutomationTab):
                                 self.app.log_message(self.log_display, "No new unprocessed records found on this page view.")
                                 break
 
-                            # --- We now have job_card and app_name from the loop above ---
                             try:
                                 self.app.after(0, self.update_status, f"Page {page_number}, Processing: {app_name}", 0.5)
 
@@ -203,7 +236,6 @@ class AbpsVerifyTab(BaseAutomationTab):
                             except (TimeoutException, StaleElementReferenceException, NoSuchElementException) as e:
                                 self._log_result(job_card, app_name, f"Error: {type(e).__name__}")
                             finally:
-                                # --- FIX: Add the unique_key (tuple) to the set ---
                                 if unique_key:
                                     session_processed_jobcards.add(unique_key)
                                     page_processed_count += 1
@@ -212,15 +244,16 @@ class AbpsVerifyTab(BaseAutomationTab):
                         
                         if page_processed_count > 0:
                             self.app.log_message(self.log_display, "Saving all verified records for this page...")
-                            table_element = driver.find_element(By.ID, table_id)
-                            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btnProceed2").click()
+                            save_btn_css = "input[id*='btnProceed2']"
+                            table_element = driver.find_element(By.XPATH, table_xpath)
+                            driver.find_element(By.CSS_SELECTOR, save_btn_css).click()
                             wait.until(EC.staleness_of(table_element))
                             self.app.log_message(self.log_display, "Page saved.")
 
                         try:
                             next_page_link = driver.find_element(By.LINK_TEXT, str(page_number + 1))
                             self.app.log_message(self.log_display, "Moving to next page...")
-                            table_element = driver.find_element(By.ID, table_id)
+                            table_element = driver.find_element(By.XPATH, table_xpath)
                             next_page_link.click()
                             wait.until(EC.staleness_of(table_element))
                             page_number += 1

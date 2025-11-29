@@ -315,7 +315,10 @@ class MsrTab(BaseAutomationTab):
         """Handles the generation of the improved PDF report for MSR."""
         try:
             headers = self.results_tree['columns']
-            col_widths = [70, 35, 140, 25] # Adjusted widths for A4 Landscape
+            # Adjusted column widths for A4 Landscape (Approx total 280mm)
+            # Workcode (50), Status (30), Details (160), Timestamp (40)
+            col_widths = [50, 30, 160, 40] 
+            
             title = f"MSR Payment Status Report: {self.panchayat_entry.get().strip()}"
             report_date = datetime.now().strftime('%d %b %Y')
             

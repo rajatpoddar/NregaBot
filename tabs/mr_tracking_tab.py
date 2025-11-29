@@ -212,8 +212,6 @@ class MrTrackingTab(BaseAutomationTab):
         # --- END NEW TAB ---
 
     def _on_filter_check_changed(self):
-        # (Is function mein koi badlaav nahi hai)
-        
         # Determine which checkbox (if any) is now checked
         if self.zero_mr_filter_var.get() == 1:
             # Zero MR is checked, disable others
@@ -243,7 +241,6 @@ class MrTrackingTab(BaseAutomationTab):
             self.zero_mr_filter_check.configure(state="normal")
 
     def set_ui_state(self, running: bool):
-        # (Is function mein koi badlaav nahi hai)
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         
@@ -270,7 +267,6 @@ class MrTrackingTab(BaseAutomationTab):
         self.abps_export_format_menu.configure(state=state)
 
     def set_for_abps_check(self):
-        # (Is function mein koi badlaav nahi hai)
         """
         Pre-sets the UI to check for 'Pending for ABPS'.
         Called from another tab (e.g., FTO Generation).
@@ -284,11 +280,6 @@ class MrTrackingTab(BaseAutomationTab):
 
 
     def reset_ui(self, reset_all_filters=True):
-        # (Is function mein koi badlaav nahi hai)
-        # Clear inputs (optional, based on user preference)
-        # self.state_entry.delete(0, tkinter.END)
-        # ...
-        
         if reset_all_filters:
             # Reset checkboxes
             self.pending_only_var.set(0)
@@ -304,7 +295,6 @@ class MrTrackingTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Form has been reset.")
         self.update_status("Ready", 0.0)
         
-    # --- Naya Function: Naya browser instance banane ke liye (HEADLESS) ---
     def _get_new_driver(self):
         """
         Ek naya, alag HEADLESS Chrome browser instance banata hai.
@@ -312,33 +302,17 @@ class MrTrackingTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Naya Headless Chrome browser shuru kar raha hoon...", "info")
         try:
             chrome_options = ChromeOptions()
-            
-            # --- HEADLESS MODE ---
-            chrome_options.add_argument("--headless=new") # Updated syntax for better compatibility
-            # ---------------------
-
-            # --- FIX FOR EGL / GPU ERRORS on MAC ---
-            chrome_options.add_argument("--disable-gpu")  # GPU Hardware acceleration band karein
+            chrome_options.add_argument("--headless=new")
+            chrome_options.add_argument("--disable-gpu")
             chrome_options.add_argument("--disable-software-rasterizer")
-            # ---------------------------------------
-
-            # --- CONSOLE LOG CLEANUP ---
-            chrome_options.add_argument("--log-level=3")  # Sirf fatal errors dikhaye, warnings chhupaye
+            chrome_options.add_argument("--log-level=3")
             chrome_options.add_argument("--silent")
-            # ---------------------------
-
-            # Standard Headless Flags
             chrome_options.add_argument("--window-size=1920,1080") 
-            chrome_options.add_argument("--disable-dev-shm-usage") # Memory issues ke liye
+            chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--no-sandbox")
-            
-            # "Chrome is being controlled" banner hatane ke liye
             chrome_options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"]) 
             
-            # webdriver-manager ka istemaal karke driver manage karein
             service = ChromeService(ChromeDriverManager().install())
-            
-            # Service logs ko bhi suppress karein
             service.creation_flags = subprocess.CREATE_NO_WINDOW if config.OS_SYSTEM == "Windows" else 0
             
             driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -350,7 +324,6 @@ class MrTrackingTab(BaseAutomationTab):
             messagebox.showerror("Browser Error", f"Naya Headless Chrome browser shuru nahi ho saka.\n\nError: {e}\n\nKya Chrome installed hai?")
             return None
         
-    # --- Badlaav: `start_automation` ab naya driver banayega ---
     def start_automation(self):
         self.run_mr_payment_button.pack_forget() # Hide button on new run
         self.run_emb_entry_button.pack_forget() # Hide button on new run
@@ -379,7 +352,6 @@ class MrTrackingTab(BaseAutomationTab):
         self.app.update_history("mr_track_block", inputs['block'])
         self.app.update_history("mr_track_panchayat", inputs['panchayat'])
         
-        # --- NAYA BADLAAV: Driver ko yahan banayein ---
         if self.driver:
             self.app.log_message(self.log_display, "Ek automation pehle se chal raha hai. Rukiye...", "warning")
             messagebox.showwarning("Automation Jaari Hai", "Report generation pehle se chal raha hai.")
@@ -390,16 +362,10 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "ERROR: WebDriver nahi mila. Automation ruka.", "error")
             return # Driver nahi mila toh kuch mat karo
         
-        # UI ko lock karein
         self.app.after(0, self.set_ui_state, True) 
-        
-        # Ab thread start karein (yeh self.driver ka istemaal karega)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
-        # --- End Badlaav ---
 
-    # --- Badlaav: `run_automation_logic` ab `self.driver` ka istemaal karega ---
     def run_automation_logic(self, inputs):
-        # self.app.after(0, self.set_ui_state, True) <-- Yeh line `start_automation` mein chali gayi hai
         self.app.after(0, self.app.set_status, "Starting MR Tracking...") # App-wide status
         self.app.after(0, self.update_status, "Initializing...", 0.0) # Tab-specific status
         self.app.clear_log(self.log_display)
@@ -408,11 +374,10 @@ class MrTrackingTab(BaseAutomationTab):
         self.zero_mr_data = [] # <-- NEW: Initialize list for Zero MR data
         
         try:
-            # driver = self.app.get_driver() # <-- YEH LINE HATA DI GAYI
-            driver = self.driver # <-- NAYA: self.driver ka istemaal karein
+            driver = self.driver 
             if not driver:
                 self.app.log_message(self.log_display, "ERROR: Browser driver not found.", "error")
-                return # Exit early
+                return 
                 
             wait = WebDriverWait(driver, 20)
             
@@ -422,15 +387,14 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Navigating to MR Tracking page...")
             driver.get(url)
             
-            main_window_handle = driver.current_window_handle # Store main window
+            main_window_handle = driver.current_window_handle 
             
-            # --- Define element IDs from the HTML ---
             STATE_ID = "ctl00_ContentPlaceHolder1_ddl_state"
             DIST_ID = "ctl00_ContentPlaceHolder1_ddl_dist"
             BLOCK_ID = "ctl00_ContentPlaceHolder1_ddl_blk"
             PANCH_ID = "ctl00_ContentPlaceHolder1_ddl_pan"
-            RADIO_PAYMENT_PENDING_ID = "ctl00_ContentPlaceHolder1_Rbtn_pay_1" # <-- Renamed
-            RADIO_T8_T15_ID = "ctl00_ContentPlaceHolder1_Rbtn_pay_2" # <-- NEW
+            RADIO_PAYMENT_PENDING_ID = "ctl00_ContentPlaceHolder1_Rbtn_pay_1"
+            RADIO_T8_T15_ID = "ctl00_ContentPlaceHolder1_Rbtn_pay_2" 
             SUBMIT_BTN_ID = "ctl00_ContentPlaceHolder1_Button1"
             TABLE_XPATH = "//table[@bordercolor='#EBEBEB' and .//b[text()='SNo.']]"
 
@@ -442,7 +406,7 @@ class MrTrackingTab(BaseAutomationTab):
                     EC.presence_of_element_located((By.XPATH, f"//select[@id='{dropdown_id}']/option[position()>1]"))
                 )
                 self.app.log_message(self.log_display, "Dropdown populated.")
-                time.sleep(0.5) # Add a small buffer for the UI to settle
+                time.sleep(0.5) 
 
             self.app.after(0, self.app.set_status, f"Selecting State: {inputs['state']}")
             self.app.after(0, self.update_status, "Selecting State...", 0.15)
@@ -471,15 +435,12 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Setting filter...")
             self.app.after(0, self.update_status, "Setting filter...", 0.5)
             
-            # --- NEW: Radio button selection logic ---
             if inputs['zero_mr_filter']:
                 self.app.log_message(self.log_display, "Selecting '...T+8 and T+15'")
                 wait.until(EC.element_to_be_clickable((By.ID, RADIO_T8_T15_ID))).click()
             else:
-                # Both 'Pending for filling' and 'Pending for ABPS' use this same base report
                 self.app.log_message(self.log_display, "Selecting 'Where payment is pending'")
                 wait.until(EC.element_to_be_clickable((By.ID, RADIO_PAYMENT_PENDING_ID))).click()
-            # --- END NEW logic ---
             
             self.app.after(0, self.app.set_status, "Submitting form...")
             self.app.after(0, self.update_status, "Submitting form...", 0.55)
@@ -490,7 +451,7 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.after(0, self.update_status, "Waiting for report...", 0.6)
             self.app.log_message(self.log_display, "Waiting for report table...")
             table = wait.until(EC.presence_of_element_located((By.XPATH, TABLE_XPATH)))
-            rows = table.find_elements(By.XPATH, ".//tr[position()>1]") # Skip header row
+            rows = table.find_elements(By.XPATH, ".//tr[position()>1]") 
             
             total_rows = len(rows)
             if total_rows == 0:
@@ -505,14 +466,13 @@ class MrTrackingTab(BaseAutomationTab):
             displayed_rows = 0
             abps_pending_count = 0
             pending_filling_count = 0
-            abps_pending_mrs = [] # --- To store data for drill-down ---
+            abps_pending_mrs = [] 
             
             for i, row in enumerate(rows):
                 if self.app.stop_events[self.automation_key].is_set():
                     self.app.log_message(self.log_display, "Stop signal received.", "warning")
                     break
                 
-                # Progress from 0.6 to 0.8
                 progress = 0.6 + ( (i + 1) / total_rows ) * 0.2
                 status_msg = f"Processing row {i+1}/{total_rows}"
                 self.app.after(0, self.app.set_status, status_msg)
@@ -524,8 +484,8 @@ class MrTrackingTab(BaseAutomationTab):
                     
                 row_data = [cell.text.strip() for cell in cells]
                 
-                panchayat_name = row_data[1] # <-- For Zero MR
-                muster_roll_no = row_data[2] # <-- For Zero MR
+                panchayat_name = row_data[1] 
+                muster_roll_no = row_data[2] 
                 work_code = row_data[5]
                 muster_status = row_data[7]
                 wagelist_no = row_data[9]
@@ -536,7 +496,6 @@ class MrTrackingTab(BaseAutomationTab):
                 is_abps_pending = "Pending for signature of 1st Signatory" in first_sign_date and not fto_no and not fto_date
                 is_pending_filling = "Pending for filling" in muster_status
 
-                # Apply filter logic
                 if inputs['abps_pending']:
                     if not is_abps_pending:
                         continue 
@@ -544,22 +503,18 @@ class MrTrackingTab(BaseAutomationTab):
                     if not is_pending_filling:
                         continue 
 
-                    # NAYA CHECK: Agar pending hai, toh check karo ki '0 days' ya '1 days' wala hai ya nahi
-                    # MODIFIED: Ab ye 0 aur 1 dono din wale records ko skip karega
                     if "since 0 days" in muster_status or "since 1 days" in muster_status or "since 1 Day" in muster_status:
                         self.app.log_message(self.log_display, f"Skipping MR {muster_roll_no} (0/1 days pending).", "info")
-                        continue # Is row ko skip kar do
+                        continue 
                     
                     
                 elif inputs['zero_mr_filter']:
-                    # Store data including the panchayat name from the row
                     self.zero_mr_data.append({
                         "panchayat": panchayat_name,
                         "work_code": work_code,
                         "msr_no": muster_roll_no
                     })
                 
-                # Row passes filters
                 self.app.after(0, lambda data=tuple(row_data): self.results_tree.insert("", "end", values=data))
                 displayed_rows += 1
                 
@@ -568,7 +523,6 @@ class MrTrackingTab(BaseAutomationTab):
                 
                 if is_abps_pending:
                     abps_pending_count += 1
-                    # --- Store data for drill-down ---
                     abps_pending_mrs.append({
                         "panchayat": row_data[1],
                         "mr_no": row_data[2],
@@ -583,19 +537,15 @@ class MrTrackingTab(BaseAutomationTab):
                  self.success_message = None 
                  return 
 
-            # Update workcode list
-            # unique_workcodes = list(dict.fromkeys(workcode_list)) # Remove duplicates <-- DONT remove duplicates
-            self.app.after(0, self._update_workcode_textbox, "\n".join(workcode_list)) # <-- Use the full list
+            self.app.after(0, self._update_workcode_textbox, "\n".join(workcode_list))
             
-            # --- NEW: ABPS Drill-Down Logic ---
             if inputs['abps_pending'] and abps_pending_mrs:
                 self.app.log_message(self.log_display, f"Found {abps_pending_count} MRs pending for ABPS. Now finding workers...")
                 
-                # De-duplicate wagelists
                 wagelists_to_search = {}
                 for mr in abps_pending_mrs:
                   wl = mr["wagelist_no"]
-                  if not wl: # Skip if wagelist is blank
+                  if not wl: 
                       self.app.log_message(self.log_display, f"Skipping MR {mr['mr_no']} (Workcode: {mr['work_code']}) as Wagelist No. is blank.", "warning")
                       continue
                   if wl not in wagelists_to_search:
@@ -608,7 +558,6 @@ class MrTrackingTab(BaseAutomationTab):
                 for i, (wagelist_no, mr_list) in enumerate(wagelists_to_search.items()):
                     if self.app.stop_events[self.automation_key].is_set(): break
                     
-                    # Progress from 0.8 to 1.0
                     progress = 0.8 + ( (i + 1) / total_wl ) * 0.2
                     status_msg = f"Scanning Wagelist {i+1}/{total_wl} ({wagelist_no})"
                     self.app.after(0, self.app.set_status, status_msg)
@@ -616,12 +565,9 @@ class MrTrackingTab(BaseAutomationTab):
                     
                     self._search_wagelist_for_pending_abps(driver, wait, inputs, wagelist_no, mr_list, main_window_handle)
 
-                # Switch back to main window just in case
                 if driver.current_window_handle != main_window_handle:
                     driver.switch_to.window(main_window_handle)
-            # --- END ABPS Drill-Down ---
 
-            # --- NEW: Dynamic success message ---
             if inputs['abps_pending']:
                 self.success_message = f"MR Tracking complete. Found {abps_pending_count} MRs pending for ABPS."
             elif inputs['pending_only']:
@@ -634,11 +580,8 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Processing complete. {self.success_message.replace('MR Tracking complete. ', '')}", "success")
             
         except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as e:
-            # --- NAYA: Retry logic ---
             if driver and "Session Expired" in driver.page_source:
                 self.app.log_message(self.log_display, "Session expired, par yeh headless hai, isliye retry nahi kar rahe.", "warning")
-                # Yahan retry logic add kar sakte hain, lekin headless mein session manage karna alag hai.
-                # Abhi ke liye, error de kar exit karte hain.
                 error_msg = "Session Expired during headless operation. Please try again."
                 self.app.log_message(self.log_display, error_msg, "error")
                 messagebox.showerror("Automation Error", error_msg)
@@ -655,18 +598,16 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Unexpected Error")
             self.success_message = None
         finally:
-            # --- NAYA BADLAAV: Driver ko yahan quit karein ---
-            if self.driver: # self.driver ko check karein
+            if self.driver: 
                 try:
                     self.driver.quit()
                     self.app.after(0, self.app.log_message, self.log_display, "Automation ne browser ko band kar diya hai.", "info")
                 except Exception as e:
                     self.app.after(0, self.app.log_message, self.log_display, f"Browser band karne mein error: {e}", "warning")
             
-            self.driver = None # Tab ka driver state reset karein
-            # --- End Badlaav ---
+            self.driver = None 
             
-            self.app.after(0, self.set_ui_state, False) # UI ko unlock karein
+            self.app.after(0, self.set_ui_state, False) 
             
             final_app_status = "Automation Stopped" if self.app.stop_events[self.automation_key].is_set() else \
                               ("Automation Finished" if hasattr(self, 'success_message') and self.success_message else "Automation Failed")
@@ -677,115 +618,87 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.after(0, self.update_status, final_tab_status, 1.0)
 
             if not self.app.stop_events[self.automation_key].is_set():
-                 self.app.after(5000, lambda: self.app.set_status("Ready")) # Reset app status
-                 self.app.after(5000, lambda: self.update_status("Ready", 0.0)) # Reset tab status
+                 self.app.after(5000, lambda: self.app.set_status("Ready")) 
+                 self.app.after(5000, lambda: self.update_status("Ready", 0.0)) 
 
-            # --- NEW: Logic to show correct button ---
             if hasattr(self, 'success_message') and self.success_message and not self.app.stop_events[self.automation_key].is_set():
                 self.app.after(100, lambda: messagebox.showinfo("Complete", self.success_message))
                 
-                # Check which buttons to show
                 if inputs.get('zero_mr_filter', False):
                     self.app.after(0, lambda: self.run_zero_mr_button.pack(side="left", padx=(10, 0)))
                 else:
                     self.app.after(0, lambda: self.run_mr_payment_button.pack(side="left", padx=(10, 0)))
                     self.app.after(0, lambda: self.run_emb_entry_button.pack(side="left", padx=(10, 0)))
-            # --- END NEW logic ---
 
-    # --- NEW METHOD to search wagelist ---
     def _search_wagelist_for_pending_abps(self, driver, wait, inputs, wagelist_no, mr_list, main_window_handle):
-        # (Is function mein koi badlaav nahi hai)
         try:
-            # Open homesearch in a new tab to avoid issues
             self.app.log_message(self.log_display, f"   Opening homesearch tab for {wagelist_no}...")
             driver.execute_script("window.open(arguments[0], '_blank');", "https://mnregaweb4.nic.in/netnrega/homesearch.htm")
-            time.sleep(1) # Give tab time to open
+            time.sleep(1) 
             
             popup_handle = [handle for handle in driver.window_handles if handle != main_window_handle][-1]
             driver.switch_to.window(popup_handle)
 
-            # Wait for the iframe to be present and switch to it
             self.app.log_message(self.log_display, "   Waiting for iframe...")
             wait.until(EC.frame_to_be_available_and_switch_to_it((By.TAG_NAME, "iframe")))
             self.app.log_message(self.log_display, "   ...Switched to iframe.")
             
-            # Now we are inside the iframe
-            # Action 1: Select "WageList" (This causes a postback)
             self.app.log_message(self.log_display, "   Selecting 'WageList' from dropdown...")
             Select(wait.until(EC.element_to_be_clickable((By.ID, "ddl_search")))).select_by_value("WageList")
             
-            # Wait for the *content* of the next dropdown to be ready after Postback 1.
             self.app.log_message(self.log_display, "   Waiting for State dropdown to populate (Postback 1)...")
             wait.until(EC.presence_of_element_located((By.XPATH, "//select[@id='ddl_state']/option[text()='ANDAMAN AND NICOBAR']")))
             self.app.log_message(self.log_display, "   ...State dropdown populated.")
             
-            # Action 2: Now it's safe to select the state (This causes Postback 2)
             self.app.log_message(self.log_display, f"   Selecting State: {inputs['state'].upper()}...")
             state_select = Select(wait.until(EC.element_to_be_clickable((By.ID, "ddl_state"))))
             state_select.select_by_visible_text(inputs['state'].upper())
             
-            # Wait for district to be populated (this is the 2nd wait)
             self.app.log_message(self.log_display, "   Waiting for District dropdown to populate (Postback 2)...")
             wait.until(EC.presence_of_element_located((By.XPATH, f"//select[@id='ddl_district']/option[text()='{inputs['district'].upper()}']")))
             self.app.log_message(self.log_display, "   ...District dropdown populated.")
             
-            # Action 3: Select District (This causes Postback 3)
             self.app.log_message(self.log_display, f"   Selecting District: {inputs['district'].upper()}...")
             dist_select = Select(driver.find_element(By.ID, "ddl_district"))
-            dist_select.select_by_visible_text(inputs['district'].upper()) # Use text
+            dist_select.select_by_visible_text(inputs['district'].upper()) 
             
-            # Add the simple time.sleep(2) to wait for Postback 3
             self.app.log_message(self.log_display, "   Waiting for final postback (2 sec)...")
             time.sleep(2)
             self.app.log_message(self.log_display, "   ...Wait complete.")
 
-            # Action 4: Enter Wagelist (using your corrected ID)
             self.app.log_message(self.log_display, f"   Entering Wagelist No: {wagelist_no}...")
-            # Re-find the element to be safe
             keyword_box = wait.until(EC.element_to_be_clickable((By.ID, "txt_keyword2")))
             keyword_box.send_keys(wagelist_no)
             
-            # Action 5: Click "GO" button (which is also inside the iframe)
             self.app.log_message(self.log_display, "   Clicking 'GO'...")
             driver.find_element(By.XPATH, "//input[@value='GO']").click()
 
-            # Wait for the *new* window (the actual popup) to open
             self.app.log_message(self.log_display, "   Waiting for search result popup...")
             wait.until(EC.number_of_windows_to_be(3))
             self.app.log_message(self.log_display, "   ...Search result popup appeared.")
             
-            # Find the handle for this new popup
             wagelist_search_popup_handle = [h for h in driver.window_handles if h != main_window_handle and h != popup_handle][0]
             driver.switch_to.window(wagelist_search_popup_handle)
 
-            # Click wagelist link in popup
             self.app.log_message(self.log_display, "   Clicking wagelist link in popup...")
             wl_link = wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, wagelist_no)))
             wl_link.click()
 
-            # --- FIX: Wait for an element on the details page, not the title ---
             self.app.log_message(self.log_display, "   Waiting for wagelist details page...")
             wait.until(EC.presence_of_element_located((By.ID, "lb_main")))
             self.app.log_message(self.log_display, "   ...Wagelist details page loaded.")
             
-            # Analyze details table
             self.app.log_message(self.log_display, f"   Scanning {wagelist_no} for pending workers...")
-            # Use the 'lb_main' span to find the table, as it's a sibling/parent
             details_table = wait.until(EC.presence_of_element_located((By.XPATH, "//span[@id='lb_main']/ancestor::center/table[1]")))
-            worker_rows = details_table.find_elements(By.XPATH, ".//tr[position() > 1]") # Skip header
+            worker_rows = details_table.find_elements(By.XPATH, ".//tr[position() > 1]") 
             
-            found_workers = set() # De-duplicate workers *within* this wagelist
+            found_workers = set() 
             
             for row in worker_rows:
                 cells = row.find_elements(By.TAG_NAME, "td")
                 
-                # --- FIX: Check cell count based on the provided HTML (15 columns) ---
                 if len(cells) < 15: continue 
                 
-                # --- FIX: Update column indices based on wagelist details page.htm ---
-                # 8 = Reg No. (JH-22-003...)
-                # 9 = Applicant Name
-                # 12 = FTO No.
                 jobcard_no = cells[8].text.strip()
                 applicant_name = cells[9].text.strip()
                 fto_no = cells[12].text.strip()
@@ -793,7 +706,6 @@ class MrTrackingTab(BaseAutomationTab):
                 if not fto_no and (jobcard_no, applicant_name) not in found_workers:
                     found_workers.add((jobcard_no, applicant_name))
                     self.app.log_message(self.log_display, f"      > Found pending: {applicant_name} ({jobcard_no})")
-                    # Log this worker for *each* MR that uses this wagelist
                     for mr in mr_list:
                         result_data = (mr["panchayat"], mr["mr_no"], mr["work_code"], wagelist_no, applicant_name, jobcard_no)
                         self.app.after(0, lambda data=result_data: self.abps_results_tree.insert("", "end", values=data))
@@ -804,7 +716,6 @@ class MrTrackingTab(BaseAutomationTab):
         except Exception as e:
             self.app.log_message(self.log_display, f"   ERROR scanning wagelist {wagelist_no}: {type(e).__name__} {str(e).splitlines()[0]}", "error")
         finally:
-            # Close all popups and switch back
             self.app.log_message(self.log_display, "   Closing popup windows...")
             for handle in driver.window_handles:
                 if handle != main_window_handle:
@@ -812,15 +723,14 @@ class MrTrackingTab(BaseAutomationTab):
                     driver.close()
             driver.switch_to.window(main_window_handle)
             self.app.log_message(self.log_display, "   ...Finished wagelist scan.")
-            time.sleep(0.5) # Small pause
+            time.sleep(0.5) 
 
     def _run_mr_payment(self):
-        # (Is function mein koi badlaav nahi hai)
         """Called when the 'Run MR Payment' button is clicked."""
-        workcodes = self.workcode_textbox.get("1.0", tkinter.END).strip()
+        workcodes_raw = self.workcode_textbox.get("1.0", tkinter.END).strip()
         panchayat_name = self.panchayat_entry.get().strip()
 
-        if not workcodes:
+        if not workcodes_raw:
             messagebox.showwarning("No Data", "There are no workcodes to send to the MR Payment tab.", parent=self)
             return
         
@@ -828,16 +738,26 @@ class MrTrackingTab(BaseAutomationTab):
             messagebox.showwarning("Invalid Panchayat", "A specific Panchayat name must be selected to run MR Payment.", parent=self)
             return
 
-        # Call the new method in the main app
-        self.app.switch_to_msr_tab_with_data(workcodes, panchayat_name)
+        # --- UPDATED LOGIC: Extract last 6 digits ---
+        processed_list = []
+        for code in workcodes_raw.splitlines():
+            code = code.strip()
+            if code:
+                # Split by '/', take last part, take last 6 chars
+                short_code = code.split('/')[-1][-6:]
+                processed_list.append(short_code)
+        
+        final_workcodes = "\n".join(processed_list)
+        # --- END UPDATED LOGIC ---
+
+        self.app.switch_to_msr_tab_with_data(final_workcodes, panchayat_name)
 
     def _run_emb_entry(self):
-        # (Is function mein koi badlaav nahi hai)
         """Called when the 'Run eMB Entry' button is clicked."""
-        workcodes = self.workcode_textbox.get("1.0", tkinter.END).strip()
+        workcodes_raw = self.workcode_textbox.get("1.0", tkinter.END).strip()
         panchayat_name = self.panchayat_entry.get().strip()
 
-        if not workcodes:
+        if not workcodes_raw:
             messagebox.showwarning("No Data", "There are no workcodes to send to the eMB Entry tab.", parent=self)
             return
         
@@ -845,35 +765,51 @@ class MrTrackingTab(BaseAutomationTab):
             messagebox.showwarning("Invalid Panchayat", "A specific Panchayat name must be selected to run eMB Entry.", parent=self)
             return
 
-        # Call the new method in the main app
-        self.app.switch_to_emb_entry_with_data(workcodes, panchayat_name)
+        # --- UPDATED LOGIC: Extract last 6 digits ---
+        processed_list = []
+        for code in workcodes_raw.splitlines():
+            code = code.strip()
+            if code:
+                # Split by '/', take last part, take last 6 chars
+                short_code = code.split('/')[-1][-6:]
+                processed_list.append(short_code)
+        
+        final_workcodes = "\n".join(processed_list)
+        # --- END UPDATED LOGIC ---
 
-    # --- NEW: Updated function to send data to Zero MR tab ---
+        self.app.switch_to_emb_entry_with_data(final_workcodes, panchayat_name)
+
     def _run_zero_mr(self):
-        # (Is function mein koi badlaav nahi hai)
         """Called when the 'Forward to Zero MR' button is clicked."""
         if not hasattr(self, 'zero_mr_data') or not self.zero_mr_data:
             messagebox.showwarning("No Data", "No Workcode/MSR data found to forward.", parent=self)
             return
 
-        # The panchayat name is *inside* self.zero_mr_data for each row.
-        # No need to get it from the entry box.
-        
         self.app.log_message(self.log_display, f"Sending {len(self.zero_mr_data)} MRs to Zero MR tab...")
         
-        # This assumes you will add a 'switch_to_zero_mr_tab_with_data' method
-        # to your main App class that accepts a list of dictionaries.
-        self.app.switch_to_zero_mr_tab_with_data(self.zero_mr_data)
+        # --- UPDATED LOGIC: Extract last 6 digits for Zero MR Data ---
+        processed_data = []
+        for item in self.zero_mr_data:
+            original_wc = item['work_code']
+            # Process WC: Split by '/', take last part, take last 6 chars
+            short_wc = original_wc.split('/')[-1][-6:]
+            
+            processed_data.append({
+                "panchayat": item['panchayat'],
+                "work_code": short_wc, # Updated workcode
+                "msr_no": item['msr_no']
+            })
+        # --- END UPDATED LOGIC ---
+        
+        self.app.switch_to_zero_mr_tab_with_data(processed_data)
 
     def _update_workcode_textbox(self, text):
-        # (Is function mein koi badlaav nahi hai)
         self.workcode_textbox.configure(state="normal")
         self.workcode_textbox.delete("1.0", tkinter.END)
         self.workcode_textbox.insert("1.0", text)
         self.workcode_textbox.configure(state="disabled")
 
     def _copy_workcodes(self):
-        # (Is function mein koi badlaav nahi hai)
         text = self.workcode_textbox.get("1.0", tkinter.END).strip()
         if text:
             self.app.clipboard_clear()
@@ -883,7 +819,6 @@ class MrTrackingTab(BaseAutomationTab):
             messagebox.showwarning("Empty", "There are no workcodes to copy.", parent=self)
 
     def export_report(self):
-        # (Is function mein koi badlaav nahi hai)
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "There are no results to export.")
             return
@@ -893,27 +828,22 @@ class MrTrackingTab(BaseAutomationTab):
         export_format = self.export_format_menu.get()
         
         current_year = datetime.now().strftime("%Y")
-        current_date_str = datetime.now().strftime("%d-%b-%Y") # e.g., 29-Oct-2025
+        current_date_str = datetime.now().strftime("%d-%b-%Y") 
         
-        # --- Prepare data from Treeview ---
         headers = self.results_tree['columns']
         data = [self.results_tree.item(item, 'values') for item in self.results_tree.get_children()]
         
-        # --- Prepare Title ---
         title = f"MR Tracking Report Panchayat - {panchayat}"
         date_str = f"Date - {datetime.now().strftime('%d-%m-%Y')}"
         
-        # --- Folder Creation Logic ---
-        downloads_path = self.app.get_user_downloads_path() # <-- Use Downloads path
-        # Path: Downloads/NregaBot/Reports 2025/Panchayat
-        target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", safe_panchayat) # <-- Add "NregaBot"
+        downloads_path = self.app.get_user_downloads_path() 
+        target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", safe_panchayat) 
         try:
             os.makedirs(target_dir, exist_ok=True)
         except OSError as e:
              messagebox.showerror("Folder Error", f"Could not create report directory:\n{target_dir}\nError: {e}")
              return
 
-        # --- File Name Logic ---
         if "Excel" in export_format:
             ext = ".xlsx"
             file_type_tuple = ("Excel Workbook", "*.xlsx")
@@ -945,14 +875,11 @@ class MrTrackingTab(BaseAutomationTab):
             )
             if not file_path: return
 
-            # Column widths for PDF (must match header count: 14)
-            col_widths = [10, 20, 25, 30, 15, 45, 20, 45, 20, 25, 25, 20, 20, 20] # Tuned manually
-            # Normalize widths to fit page
+            col_widths = [10, 20, 25, 30, 15, 45, 20, 45, 20, 25, 25, 20, 20, 20] 
             total_width_ratio = sum(col_widths)
-            effective_page_width = 297 - 20 # A4 Landscape width minus margins
+            effective_page_width = 297 - 20 
             actual_col_widths = [(w / total_width_ratio) * effective_page_width for w in col_widths]
             
-            # Pass the separate title and date string to the PDF function
             success = self.generate_report_pdf(data, headers, actual_col_widths, title, date_str, file_path)
             if success:
                 messagebox.showinfo("Success", f"PDF report saved successfully to:\n{file_path}")
@@ -974,9 +901,7 @@ class MrTrackingTab(BaseAutomationTab):
             if success:
                 messagebox.showinfo("Success", f"PNG report saved successfully to:\n{file_path}")
 
-    # --- NEW: Export for ABPS Tab ---
     def _export_abps_report(self):
-        # (Is function mein koi badlaav nahi hai)
         if not self.abps_results_tree.get_children():
             messagebox.showinfo("No Data", "There are no ABPS results to export.")
             return
@@ -993,10 +918,8 @@ class MrTrackingTab(BaseAutomationTab):
         title = f"ABPS Pendency Report - {panchayat}"
         date_str = f"Date - {datetime.now().strftime('%d-%m-%Y')}"
         
-        # --- UPDATED Folder Creation Logic ---
-        downloads_path = self.app.get_user_downloads_path() # <-- Use Downloads path
-        # Path: Downloads/NregaBot/Reports 2025/Panchayat
-        target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", safe_panchayat) # <-- Add "NregaBot"
+        downloads_path = self.app.get_user_downloads_path() 
+        target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", safe_panchayat) 
         try:
             os.makedirs(target_dir, exist_ok=True)
         except OSError as e:
@@ -1018,11 +941,8 @@ class MrTrackingTab(BaseAutomationTab):
         success = self._save_to_excel(data, headers, f"{title} {date_str}", file_path)
         if success:
             messagebox.showinfo("Success", f"ABPS Excel report saved successfully to:\n{file_path}")
-    # --- END NEW METHOD ---
 
     def _save_to_excel(self, data, headers, full_title, file_path):
-        # (Is function mein koi badlaav nahi hai)
-        """Saves the data to an Excel file with formatting."""
         try:
             df = pd.DataFrame(data, columns=headers)
             with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
@@ -1030,28 +950,24 @@ class MrTrackingTab(BaseAutomationTab):
                 df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=1)
                 worksheet = writer.sheets[sheet_name]
                 
-                # --- Title ---
                 worksheet['A1'] = full_title
                 worksheet['A1'].font = Font(bold=True, size=14)
                 worksheet['A1'].alignment = Alignment(horizontal='center', vertical='center')
                 worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
                 
-                # --- Header Formatting ---
                 header_font = Font(bold=True)
                 header_fill = PatternFill(start_color="DDEEFF", end_color="DDEEFF", fill_type="solid")
-                for cell in worksheet["2:2"]: # The header row (row 2)
+                for cell in worksheet["2:2"]: 
                     cell.font = header_font
                     cell.fill = header_fill
 
-                # --- Auto-fit columns ---
                 for col_idx, col in enumerate(df.columns, 1):
                     column_letter = get_column_letter(col_idx)
                     try:
-                        # Get max length of header or data
                         max_length = max(len(str(col)), df[col].astype(str).map(len).max())
                     except (TypeError, ValueError):
-                         max_length = len(str(col)) # Fallback to header length
-                    adjusted_width = min((max_length + 2), 50) # Cap width at 50
+                         max_length = len(str(col)) 
+                    adjusted_width = min((max_length + 2), 50) 
                     worksheet.column_dimensions[column_letter].width = adjusted_width
             return True
         except Exception as e:
@@ -1059,14 +975,10 @@ class MrTrackingTab(BaseAutomationTab):
             return False
 
     def generate_report_pdf(self, data, headers, col_widths, title, date_str, file_path):
-        # (Is function mein koi badlaav nahi hai)
-        """ Overrides base method to use Unicode font, add footer, adjust formatting, and reduce row gaps. """
-        
         class PDFWithFooter(FPDF):
             def footer(self):
                 self.set_y(-15) 
                 try:
-                    # Use regular font style
                     self.set_font(font_name, '', 8) 
                 except NameError: 
                     self.set_font('Helvetica', '', 8) 
@@ -1076,7 +988,7 @@ class MrTrackingTab(BaseAutomationTab):
 
         try:
             pdf = PDFWithFooter(orientation="L", unit="mm", format="A4")
-            pdf.set_auto_page_break(auto=True, margin=15) # Ensure auto page break with margin
+            pdf.set_auto_page_break(auto=True, margin=15) 
             pdf.add_page()
             
             try:
@@ -1088,37 +1000,31 @@ class MrTrackingTab(BaseAutomationTab):
             except RuntimeError:
                 font_name = "Helvetica" 
 
-            # --- Title ---
             pdf.set_font(font_name, "B", 14) 
             pdf.cell(0, 10, title, 0, 1, "C")
             pdf.set_font(font_name, "", 10) 
             pdf.cell(0, 8, date_str, 0, 1, "R") 
             pdf.ln(4) 
 
-            # --- Headers ---
             pdf.set_font(font_name, "B", 7) 
             pdf.set_fill_color(200, 220, 255)
-            header_height = 8 # Define header height
+            header_height = 8 
             
-            # Ensure col_widths length matches headers length for safety
             if len(col_widths) != len(headers):
                 self.app.log_message(self.log_display, "PDF Export Warning: Column width count mismatch.", "warning")
-                # Fallback: create equal widths if mismatch
                 col_widths = [(pdf.w - 2 * pdf.l_margin) / len(headers)] * len(headers)
                 
             for i, header in enumerate(headers):
                 pdf.cell(col_widths[i], header_height, header, 1, 0, "C", fill=True) 
             pdf.ln()
 
-            # --- Data Rows ---
             pdf.set_font(font_name, "", 6) 
-            line_height = 4 # Define line height
+            line_height = 4 
             
             for row_data in data:
                 if len(row_data) != len(headers):
                     continue
 
-                # --- Calculate row height based on content wrapping ---
                 max_lines = 1
                 for i, cell_text in enumerate(row_data):
                     lines = pdf.multi_cell(col_widths[i], line_height, str(cell_text), border=0, align='L', split_only=True)
@@ -1127,17 +1033,14 @@ class MrTrackingTab(BaseAutomationTab):
                 
                 row_height = line_height * max_lines
                 
-                # --- Check for page break BEFORE drawing the row ---
                 if pdf.get_y() + row_height > pdf.page_break_trigger:
                     pdf.add_page()
-                    # Redraw headers on new page
                     pdf.set_font(font_name, "B", 7)
                     for i, header in enumerate(headers):
                          pdf.cell(col_widths[i], header_height, header, 1, 0, "C", fill=True)
                     pdf.ln()
-                    pdf.set_font(font_name, "", 6) # Reset data font
+                    pdf.set_font(font_name, "", 6) 
 
-                # --- Draw the row using multi_cell for wrapping ---
                 y_start = pdf.get_y()
                 x_start = pdf.l_margin 
                 
@@ -1156,10 +1059,7 @@ class MrTrackingTab(BaseAutomationTab):
             return False
 
     def _save_to_png(self, data, headers, title, date_str, file_path):
-        # (Is function mein koi badlaav nahi hai)
-        """Generates a professional-looking report as a PNG image."""
         try:
-            # --- Font setup ---
             try:
                 font_path_regular = resource_path("assets/fonts/NotoSansDevanagari-Regular.ttf")
                 font_path_bold = resource_path("assets/fonts/NotoSansDevanagari-Bold.ttf")
@@ -1174,52 +1074,44 @@ class MrTrackingTab(BaseAutomationTab):
                 font_header = ImageFont.load_default(size=16)
                 font_body = ImageFont.load_default(size=14)
 
-            # --- Image dimensions and colors ---
-            img_width = 2400  # High resolution for readability
+            img_width = 2400  
             margin_x = 80
             margin_y = 60
             
-            header_bg_color = (220, 235, 255) # Light blue
-            row_even_bg_color = (255, 255, 255) # White
-            row_odd_bg_color = (245, 245, 245)  # Light grey
-            text_color = (0, 0, 0) # Black
-            border_color = (180, 180, 180) # Grey
+            header_bg_color = (220, 235, 255) 
+            row_even_bg_color = (255, 255, 255) 
+            row_odd_bg_color = (245, 245, 245)  
+            text_color = (0, 0, 0) 
+            border_color = (180, 180, 180) 
 
-            draw_start_y = margin_y # Y position to start drawing content
+            draw_start_y = margin_y 
 
-            # --- Calculate column widths (heuristic approach) ---
-            # Max width for each column based on content and header
             col_widths_pixels = []
-            min_col_width = 100 # Minimum width for a column
+            min_col_width = 100 
             
-            # Calculate initial widths based on header text
             for i, header in enumerate(headers):
                 text_width = font_header.getlength(header)
-                col_widths_pixels.append(max(min_col_width, text_width + 40)) # Add padding
+                col_widths_pixels.append(max(min_col_width, text_width + 40)) 
 
-            # Adjust for body content
             for row_data in data:
                 for i, cell_text in enumerate(row_data):
-                    lines = self._wrap_text(str(cell_text), font_body, col_widths_pixels[i] - 20) # Simulate wrap for width calc
+                    lines = self._wrap_text(str(cell_text), font_body, col_widths_pixels[i] - 20) 
                     max_text_width = 0
                     for line in lines:
                         max_text_width = max(max_text_width, font_body.getlength(line))
-                    col_widths_pixels[i] = max(col_widths_pixels[i], max_text_width + 40) # Add padding
+                    col_widths_pixels[i] = max(col_widths_pixels[i], max_text_width + 40) 
 
-            # Distribute remaining space if total width is less than img_width - 2*margin_x
             current_total_width = sum(col_widths_pixels)
             available_width = img_width - 2 * margin_x
             if current_total_width < available_width:
                 extra_space_per_col = (available_width - current_total_width) / len(col_widths_pixels)
                 col_widths_pixels = [w + extra_space_per_col for w in col_widths_pixels]
 
-            current_total_width = sum(col_widths_pixels) # Re-calculate after distribution
+            current_total_width = sum(col_widths_pixels) 
             
-            # Estimate total height required
-            estimated_row_height = font_body.getbbox("Tg")[3] - font_body.getbbox("Tg")[1] + 20 # Base height + padding
-            estimated_header_height = font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] + 20 # Base height + padding
+            estimated_row_height = font_body.getbbox("Tg")[3] - font_body.getbbox("Tg")[1] + 20 
+            estimated_header_height = font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] + 20 
 
-            # Title and date height
             title_bbox = font_title.getbbox(title)
             date_bbox = font_date.getbbox(date_str)
             title_height = title_bbox[3] - title_bbox[1]
@@ -1227,95 +1119,82 @@ class MrTrackingTab(BaseAutomationTab):
 
             total_estimated_height = margin_y * 2 + title_height + date_height + 20 + estimated_header_height + (len(data) * estimated_row_height)
             
-            # Start with a base image, will expand if needed
             img = Image.new("RGB", (img_width, int(total_estimated_height)), (255, 255, 255))
             draw = ImageDraw.Draw(img)
 
             current_y = margin_y
             
-            # --- Draw Title ---
             title_text_width = font_title.getlength(title)
             title_x = (img_width - title_text_width) / 2
             draw.text((title_x, current_y), title, font=font_title, fill=text_color)
             current_y += title_height + 5
 
-            # --- Draw Date ---
             date_text_width = font_date.getlength(date_str)
             date_x = img_width - margin_x - date_text_width
             draw.text((date_x, current_y), date_str, font=font_date, fill=text_color)
-            current_y += date_height + 20 # Space after date and before table
+            current_y += date_height + 20 
 
-            # --- Draw Headers ---
             header_y_start = current_y
             header_height = 0
-            # Calculate max header height considering wrapping
             for i, header in enumerate(headers):
                 wrapped_header = self._wrap_text(header, font_header, col_widths_pixels[i] - 10)
-                line_height = font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] # Basic line height
-                header_height = max(header_height, len(wrapped_header) * line_height + 10) # Add padding
+                line_height = font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] 
+                header_height = max(header_height, len(wrapped_header) * line_height + 10) 
             
-            # Draw header cells
             current_x = margin_x
             for i, header in enumerate(headers):
                 draw.rectangle([current_x, header_y_start, current_x + col_widths_pixels[i], header_y_start + header_height], fill=header_bg_color, outline=border_color, width=1)
                 
                 wrapped_header = self._wrap_text(header, font_header, col_widths_pixels[i] - 20)
-                text_y = header_y_start + (header_height - len(wrapped_header) * font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] ) / 2 # Center vertically
+                text_y = header_y_start + (header_height - len(wrapped_header) * font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] ) / 2 
                 
                 for line in wrapped_header:
                     line_width = font_header.getlength(line)
                     draw.text((current_x + (col_widths_pixels[i] - line_width) / 2, text_y), line, font=font_header, fill=text_color)
-                    text_y += font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] # Move to next line
+                    text_y += font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] 
                 current_x += col_widths_pixels[i]
             current_y += header_height
 
-            # --- Draw Data Rows ---
             for row_idx, row_data in enumerate(data):
                 row_bg_color = row_even_bg_color if row_idx % 2 == 0 else row_odd_bg_color
 
-                # Calculate row height dynamically based on content wrapping
                 max_row_text_height = 0
                 temp_wrapped_cells = []
                 for i, cell_text in enumerate(row_data):
-                    wrapped_lines = self._wrap_text(str(cell_text), font_body, col_widths_pixels[i] - 20) # 20 for internal padding
+                    wrapped_lines = self._wrap_text(str(cell_text), font_body, col_widths_pixels[i] - 20) 
                     temp_wrapped_cells.append(wrapped_lines)
-                    line_height = font_body.getbbox("Tg")[3] - font_body.getbbox("Tg")[1] # Basic line height
+                    line_height = font_body.getbbox("Tg")[3] - font_body.getbbox("Tg")[1] 
                     max_row_text_height = max(max_row_text_height, len(wrapped_lines) * line_height)
 
-                row_data_height = max_row_text_height + 10 # Add vertical padding
+                row_data_height = max_row_text_height + 10 
 
-                # If current_y plus next row height exceeds image height, expand image
                 if current_y + row_data_height + margin_y > img.height:
-                    new_height = int(img.height + (row_data_height + margin_y) * 1.5) # Expand by 1.5 rows
+                    new_height = int(img.height + (row_data_height + margin_y) * 1.5) 
                     new_img = Image.new("RGB", (img_width, new_height), (255, 255, 255))
                     new_img.paste(img, (0, 0))
                     img = new_img
-                    draw = ImageDraw.Draw(img) # Update draw object for new image
+                    draw = ImageDraw.Draw(img) 
 
                 current_x = margin_x
                 for i, cell_text in enumerate(row_data):
-                    # Draw cell background
                     draw.rectangle([current_x, current_y, current_x + col_widths_pixels[i], current_y + row_data_height], fill=row_bg_color, outline=border_color, width=1)
                     
-                    # Draw wrapped text
                     wrapped_lines = temp_wrapped_cells[i]
-                    text_y = current_y + 5 # Small top padding
+                    text_y = current_y + 5 
                     for line in wrapped_lines:
-                        draw.text((current_x + 10, text_y), line, font=font_body, fill=text_color) # 10 for left padding
-                        text_y += font_body.getbbox("Tg")[3] - font_body.getbbox("Tg")[1] # Move to next line
+                        draw.text((current_x + 10, text_y), line, font=font_body, fill=text_color) 
+                        text_y += font_body.getbbox("Tg")[3] - font_body.getbbox("Tg")[1] 
                     current_x += col_widths_pixels[i]
                 current_y += row_data_height
 
-            # Crop image to actual content if it expanded too much
             final_img = img.crop((0, 0, img_width, current_y + margin_y))
-            final_img.save(file_path, "PNG", dpi=(300, 300)) # Save at 300 DPI for quality
+            final_img.save(file_path, "PNG", dpi=(300, 300)) 
             return True
         except Exception as e:
             messagebox.showerror("PNG Export Error", f"Could not generate PNG report.\nError: {e}", parent=self)
             return False
 
     def _wrap_text(self, text, font, max_width):
-        # (Is function mein koi badlaav nahi hai)
         """Helper to wrap text for Pillow."""
         if not text:
             return [""]
@@ -1332,7 +1211,6 @@ class MrTrackingTab(BaseAutomationTab):
         return lines
 
     def save_inputs(self, inputs):
-        # (Is function mein koi badlaav nahi hai)
         """Saves non-sensitive inputs for this tab."""
         save_data = {
             'state': inputs.get('state'),
@@ -1348,7 +1226,6 @@ class MrTrackingTab(BaseAutomationTab):
             print(f"Error saving MR Tracking inputs: {e}")
 
     def load_inputs(self):
-        # (Is function mein koi badlaav nahi hai)
         """Loads saved inputs for this tab."""
         try:
             config_file = self.app.get_data_path("mr_tracking_inputs.json")
