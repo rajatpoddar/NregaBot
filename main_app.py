@@ -1018,14 +1018,21 @@ class NregaBotApp(ctk.CTk):
             self.play_sound("error")
             messagebox.showerror("Error", "Google Chrome not found."); return
         try:
-            # --- UPDATE: Added flags to keep browser active when minimized ---
+            # --- UPDATED CMD WITH GPU DISABLE FLAGS ---
             cmd = [
                 b_path, 
                 f"--remote-debugging-port={port}", 
                 f"--user-data-dir={p_dir}",
-                "--disable-backgrounding-occluded-windows", # New Flag
-                "--disable-renderer-backgrounding",       # New Flag
-                "--disable-background-timer-throttling",  # New Flag
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
+                "--disable-background-timer-throttling",
+                
+                # These flags fix the Terminal Errors:
+                "--disable-gpu",                  # Fixes EGL/Bad Attribute error
+                "--disable-software-rasterizer",  # Fixes graphical glitches
+                "--log-level=3",                  # Hides INFO/WARNING messages
+                "--silent",                       # Hides other output
+                
                 config.MAIN_WEBSITE_URL, 
                 "https://bookmark.nregabot.com/"
             ]

@@ -9,7 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException, StaleElementReferenceException
 from .base_tab import BaseAutomationTab
 
 class SADUpdateStatusTab(BaseAutomationTab):
@@ -109,7 +109,6 @@ class SADUpdateStatusTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
         self.results_tree.tag_configure('Success', foreground='green')
         self.results_tree.tag_configure('Failed', foreground='red')
-        # --- ADDED: Yellow/Orange color for Skipped/Already Disposed ---
         self.results_tree.tag_configure('Skipped', foreground='#D35400') # Burnt Orange
 
         # TAB 4: Logs
@@ -295,6 +294,7 @@ class SADUpdateStatusTab(BaseAutomationTab):
             if not driver: return
 
             processed_success = 0
+            wait = WebDriverWait(driver, 20)
             
             for idx, search_term in enumerate(items):
                 if self.app.stop_events[self.automation_key].is_set():
@@ -305,19 +305,62 @@ class SADUpdateStatusTab(BaseAutomationTab):
                 self.app.after(0, self.app.set_status, status_msg)
 
                 try:
-                    driver.get("https://sarkaraapkedwar.jharkhand.gov.in/#/application/search")
-                    # Increased base wait time for initial page load
-                    wait = WebDriverWait(driver, 10)
-
-                    inp = wait.until(EC.presence_of_element_located((By.NAME, "accNo")))
-                    inp.clear(); inp.send_keys(search_term)
+                    target_url = "https://sarkaraapkedwar.jharkhand.gov.in/#/application/search"
                     
-                    # Tab out & Sleep
-                    inp.send_keys(Keys.TAB)
-                    time.sleep(0.5)
+                    # Refresh page logic
+                    try:
+                        driver.get(target_url)
+                        time.sleep(3.0) # Increased sleep for React render
+                        
+                        # --- CRITICAL FIX: WAIT FOR OVERLAYS TO DISAPPEAR ---
+                        try:
+                            # Wait for any sweet alert container to NOT be visible
+                            wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, "div.swal2-container")))
+                            wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "swal2-shown")))
+                        except: pass
+                        
+                    except Exception as e:
+                        self.log(f"Navigation Error: {e}")
+                        continue
 
-                    search_btn = driver.find_element(By.XPATH, "//button[contains(., 'Search Applicant')]")
-                    driver.execute_script("arguments[0].click();", search_btn)
+                    # --- MULTI-STRATEGY LOCATOR ---
+                    inp = None
+                    # Strategy 1: By Name (Standard)
+                    try:
+                        inp = wait.until(EC.visibility_of_element_located((By.NAME, "accNo")))
+                    except TimeoutException:
+                        # Strategy 2: By Placeholder (Visual)
+                        try:
+                            inp = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@placeholder='Enter Acknowledgement No']")))
+                        except TimeoutException:
+                            # Strategy 3: By Label proximity (Structure)
+                            try:
+                                inp = wait.until(EC.visibility_of_element_located((By.XPATH, "//label[contains(., 'Acknowledgement')]/following::input[1]")))
+                            except TimeoutException:
+                                self.log(f"--> Input Box Not Found (Timeout)")
+                                self.add_result(search_term, "Failed", "Input box not found")
+                                continue
+
+                    # Robust clearing for React inputs (Ctrl+A -> Backspace)
+                    try:
+                        inp.click()
+                        time.sleep(0.2)
+                        inp.send_keys(Keys.CONTROL + "a")
+                        inp.send_keys(Keys.BACK_SPACE)
+                        time.sleep(0.2)
+                        
+                        # Type and Search
+                        inp.send_keys(search_term)
+                        inp.send_keys(Keys.TAB)
+                        time.sleep(0.5)
+
+                        search_btn = driver.find_element(By.XPATH, "//button[contains(., 'Search Applicant')]")
+                        driver.execute_script("arguments[0].click();", search_btn)
+                    except Exception as e:
+                         self.log(f"--> Typing Error: {e}")
+                         self.add_result(search_term, "Failed", "Typing Error")
+                         continue
+
                     
                     # --- FIND UPDATE BUTTON (ICON) ---
                     try:
@@ -328,14 +371,13 @@ class SADUpdateStatusTab(BaseAutomationTab):
                             fallback_btn = driver.find_element(By.XPATH, "//a[contains(., 'Update')]")
                             driver.execute_script("arguments[0].click();", fallback_btn)
                         except:
-                            self.log("--> Not Found")
+                            self.log("--> Record Not Found")
                             self.add_result(search_term, "Failed", "Record/Update Link not found")
                             continue
                     
                     # --- CHECK FOR DROPDOWN OR DISPOSED STATUS ---
                     try:
-                        # --- NETWORK FIX: Increased timeout from 2.0s to 10.0s ---
-                        # This ensures slow internet doesn't trigger "Already Disposed"
+                        # --- NETWORK FIX: Increased timeout ---
                         short_wait = WebDriverWait(driver, 10.0)
                         select_elem = short_wait.until(EC.presence_of_element_located((By.TAG_NAME, "select")))
                         
@@ -355,17 +397,17 @@ class SADUpdateStatusTab(BaseAutomationTab):
                             continue
 
                     except TimeoutException:
-                        # Dropdown NOT found within 10 seconds -> Mark as Already Disposed
+                        # Dropdown NOT found -> Mark as Already Disposed
                         self.log("--> Already Disposed (No dropdown)")
                         self.add_result(search_term, "Skipped", "Already Disposed")
-                        continue # Skip to next item immediately
+                        continue 
 
                     except Exception as e:
                         self.log(f"--> Error finding Select: {e}")
                         self.add_result(search_term, "Failed", "Dropdown error")
                         continue
 
-                    time.sleep(1.0) # Small sleep before clicking buttons for safety
+                    time.sleep(1.0) 
 
                     if action_val == "2": 
                         try:
