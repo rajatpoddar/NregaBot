@@ -1340,42 +1340,90 @@ class NregaBotApp(ctk.CTk):
         """Applies visual locks or maintenance modes based on server config."""
         if not hasattr(self, 'nav_buttons'): return
         
-        # Check locally if user is trial (server se aayi list sirf trial users ke liye bhari hogi, par double check sahi hai)
-        is_trial = self.license_info.get('key_type') == 'trial'
+        # Parse current app version
+        current_ver = parse_version(config.APP_VERSION)
 
         for name, btn in self.nav_buttons.items():
-            # Pehle purane labels clean karein
+            # Clean old labels
             current_text = btn.cget("text")
-            clean_text = current_text.replace(" ⚠️ (Maintenance)", "").replace(" 🔒", "")
+            clean_text = current_text.replace(" ⚠️", "").replace(" 🔒", "").replace(" (Update)", "").replace(" (Maintenance)", "")
             
-            # Priority 1: Global Kill Switch (Sabke liye band - Grayed out)
-            if name in self.global_disabled_features:
-                btn.configure(
-                    state="disabled", 
-                    fg_color=("gray90", "gray30"),
-                    text=f"{clean_text} ⚠️ (Maintenance)"
-                )
+            # Reset to default first
+            btn.configure(state="normal", fg_color="transparent", text=clean_text, command=lambda n=name: self.show_frame(n))
+
+            # --- Priority 1: Global Kill Switch (Smart Logic) ---
+            # Now self.global_disabled_features is expected to be a Dict
+            # But handle List case for backward compatibility
+            disabled_data = None
+            if isinstance(self.global_disabled_features, list):
+                if name in self.global_disabled_features:
+                    disabled_data = {"fix_version": None}
+            elif isinstance(self.global_disabled_features, dict):
+                disabled_data = self.global_disabled_features.get(name)
+
+            if disabled_data:
+                fix_version_str = disabled_data.get('fix_version')
+                is_update_available = False
+                
+                if fix_version_str:
+                    try:
+                        if parse_version(fix_version_str) > current_ver:
+                            is_update_available = True
+                    except: pass
+
+                if is_update_available:
+                    # Case A: Update Available
+                    btn.configure(
+                        state="normal", # Keep clickable
+                        fg_color=("orange", "#D97706"), # Orange warning color
+                        text=f"{clean_text} ⚠️ (Update)",
+                        command=lambda n=name, v=fix_version_str: self.show_feature_update_alert(n, v)
+                    )
+                else:
+                    # Case B: Maintenance (No fix yet OR user already has the fix)
+                    # If user has the fix (current >= fix), we should strictly enable it.
+                    # But if it's in the disabled list, it implies it's broken for *everyone* unless filtered by version.
+                    # Simple Logic: If it's in the list, it's broken.
+                    
+                    btn.configure(
+                        state="normal", # Keep clickable for message
+                        fg_color=("red", "#991B1B"), # Red error color
+                        text=f"{clean_text} ⚠️ (Maintenance)",
+                        command=lambda n=name: self.show_feature_maintenance_alert(n)
+                    )
             
-            # Priority 2: Trial Restriction (Sirf Trial walo ke liye - Lock Icon + Clickable Alert)
+            # Priority 2: Trial Restriction (Unchanged)
             elif name in self.trial_restricted_features:
                 btn.configure(
-                    state="normal",  # Normal rakhein taaki click ho sake
-                    fg_color=("gray95", "gray25"), # Thoda alag color
-                    text=f"{clean_text} 🔒"
+                    state="normal",
+                    fg_color=("gray95", "gray25"),
+                    text=f"{clean_text} 🔒",
+                    command=lambda n=name: self.show_trial_lock_alert(n)
                 )
-                # Command replace karein taaki click karne par alert aaye
-                # Lambda fix: capture 'name' correctly
-                btn.configure(command=lambda n=name: self.show_trial_lock_alert(n))
-                
-            # Priority 3: Normal Active State
-            else:
-                btn.configure(
-                    state="normal", 
-                    fg_color="transparent",
-                    text=clean_text
-                )
-                # Original command restore karein
-                btn.configure(command=lambda n=name: self.show_frame(n))
+
+    def show_feature_update_alert(self, feature_name, fix_version):
+        """Shows alert when a feature is disabled but a fix is available."""
+        self.play_sound("error")
+        if messagebox.askyesno(
+            "Update Required", 
+            f"The '{feature_name}' feature has been updated in version {fix_version}.\n\n"
+            f"Please update NREGA Bot to the latest version to use this automation.\n\n"
+            "Would you like to check for updates now?"
+        ):
+            # Switch to About tab and check for updates
+            self.show_frame("About")
+            self.tab_instances.get("About").tab_view.set("Updates")
+            self.check_for_updates_background()
+
+    def show_feature_maintenance_alert(self, feature_name):
+        """Shows alert when a feature is disabled for maintenance."""
+        self.play_sound("error")
+        messagebox.showwarning(
+            "Under Maintenance", 
+            f"The '{feature_name}' automation is currently down due to changes in the NREGA website.\n\n"
+            "Our team is working on a fix. Please wait for a new update.\n"
+            "We will notify you soon."
+        )
 
     def _cycle_theme(self):
         modes = ["System", "Light", "Dark"]
