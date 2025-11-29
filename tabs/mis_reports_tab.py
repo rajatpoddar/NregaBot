@@ -377,3 +377,19 @@ class MisReportsTab(BaseAutomationTab):
             self.block_entry.insert(0, data.get('block', ''))
         except Exception as e:
             print(f"Error loading MIS inputs: {e}")
+
+    def reset_ui(self):
+        """Resets inputs and checkboxes."""
+        super().reset_ui() # Call base to clear logs/status
+        
+        # Clear Text Inputs
+        self.state_entry.delete(0, tkinter.END)
+        self.district_entry.delete(0, tkinter.END)
+        self.block_entry.delete(0, tkinter.END)
+        
+        # Reset Checkboxes to Checked
+        self._toggle_all_checkboxes(select=True)
+        
+        # Clear Treeview
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)

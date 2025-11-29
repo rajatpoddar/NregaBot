@@ -81,6 +81,25 @@ class SAReportTab(BaseAutomationTab):
     def set_ui_state(self, running: bool):
         self.set_common_ui_state(running); state = "disabled" if running else "normal"; self.panchayat_entry.configure(state=state); self.year_entry.configure(state=state); self.status_entry.configure(state=state)
 
+    def reset_ui(self):
+        """Resets inputs to default."""
+        super().reset_ui() # Call base to clear logs/status
+        
+        # Clear Panchayat
+        self.panchayat_entry.delete(0, tkinter.END)
+        
+        # Reset Dropdowns (Select first option if available)
+        try:
+            current_year = datetime.now().year
+            default_year = f"{current_year}-{current_year+1}"
+            self.year_entry.set(default_year)
+            self.status_entry.set("Pending")
+        except: pass
+        
+        # Clear Treeview
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
+
     def start_automation(self):
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         inputs = {'panchayat': self.panchayat_entry.get().strip(), 'year': self.year_entry.get().strip(), 'status': self.status_entry.get().strip()}

@@ -585,6 +585,18 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.stop_button.configure(state="normal" if running else "disabled")
         self.reset_button.configure(state="disabled" if running else "normal")
 
+    def reset_ui(self):
+        """
+        Default reset behavior. Subclasses should override this 
+        to clear specific input fields.
+        """
+        self.update_status("Ready", 0)
+        self.app.set_status("Ready")
+        # Optional: Clear logs
+        self.log_display.configure(state="normal")
+        self.log_display.delete("1.0", tkinter.END)
+        self.log_display.configure(state="disabled")
+
     def stop_automation(self):
         self.app.stop_events[self.automation_key].set()
         self.app.log_message(self.log_display, "Stop signal sent. Finishing current task...", "warning")
