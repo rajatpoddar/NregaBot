@@ -21,10 +21,17 @@ if GITHUB_TOKEN:
 def download_file(url, dest_path):
     print(f"Downloading: {dest_path}")
     try:
+        # stream=True rakhenge, lekin content decode karke likhenge
         with requests.get(url, headers=HEADERS, stream=True) as r:
             r.raise_for_status()
             with open(dest_path, 'wb') as f:
-                shutil.copyfileobj(r.raw, f)
+                # OLD CODE (Problem yahan thi): shutil.copyfileobj(r.raw, f)
+                
+                # NEW CODE (Fix): iter_content use karein jo automatic decompress karega
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        
         if dest_path.endswith("version.json"):
              os.chmod(dest_path, 0o644)
         return True
