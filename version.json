@@ -1,15 +1,21 @@
 {
-  "latest_version": "2.8.3",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.8.3-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.8.3-macOS.dmg",
+  "latest_version": "2.8.3.1",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.8.3.1-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.8.3.1-macOS.dmg",
   "core_update": {
-    "version": "2.8.3",
-    "url": "https://nregabot.com/updates/core_v2.8.3.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v2.8.3.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v2.8.3.zip",
+    "version": "2.8.3.1",
+    "url": "https://nregabot.com/updates/core_v2.8.3.1.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v2.8.3.1.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v2.8.3.1.zip",
     "force_full_reinstall": false
   },
   "changelog": {
+    "2.8.3.1": [
+      "✨ **New Feature (Smart Alerts):** Implemented a 'Smart Kill Switch' for feature management. Instead of just disabling a button, users now receive specific alerts if an update is required or if a feature is under maintenance.",
+      "🐞 **Bug Fix (Verify APBS):** Resolved critical issues in the APBS Verification automation to ensure reliable processing and data validation.",
+      "🐞 **Bug Fix (SAD Update Status):** Fixed bugs preventing successful status updates in the Sarkar Aapke Dwar automation.",
+      "🛠 **Improvement (PDF Export):** Fixed a bug causing silent failures or formatting errors when exporting reports to PDF across various modules."
+    ],
     "2.8.3": [
       "🛠 **Improvement (MR Fill):** Added auto-fill for 'Work Start Date'. If empty, it now copies the date from 'Date From' field before saving.",
       "🐞 **Bug Fix (Workcode Extractor):** Removed duplicate filtering. Now extracts all occurrences of work codes, even if they appear multiple times.",
