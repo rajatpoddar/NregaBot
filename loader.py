@@ -209,28 +209,46 @@ class ModernSplashScreen(ctk.CTk):
         """Cleanly closes splash and transitions to main app."""
         self.is_destroyed = True # Stop UI updates
         
-        # --- FIX FOR macOS SEGMENTATION FAULT ---
-        # CustomTkinter crashes on macOS if initialized twice in the same process.
-        # If running as a script (not frozen EXE) on Mac, we launch main_app as a subprocess.
+        # --- FIX FOR macOS TERMINAL & SEGMENTATION FAULT ---
         if sys.platform == "darwin" and not getattr(sys, 'frozen', False):
             try:
-                self.destroy() # Close window visually
+                # 1. Hide Splash (Don't destroy, prevents crash)
+                self.withdraw()
                 
-                # Prepare environment to include core.zip in imports
-                env = os.environ.copy()
+                # 2. Setup Environment variables explicitly
                 if os.path.exists(CORE_ZIP_PATH):
-                    python_path = env.get("PYTHONPATH", "")
-                    env["PYTHONPATH"] = f"{CORE_ZIP_PATH}{os.pathsep}{python_path}"
+                    current_path = os.environ.get("PYTHONPATH", "")
+                    os.environ["PYTHONPATH"] = f"{CORE_ZIP_PATH}{os.pathsep}{current_path}"
                 
-                # Launch Main App cleanly
-                subprocess.Popen([sys.executable, "main_app.py"], env=env)
-                sys.exit(0) # Exit Loader process completely
+                # 3. CRITICAL FIX: 'execv' replaces the current loader process with main_app.
+                # Terminal will WAIT for this new process to finish.
+                os.execv(sys.executable, [sys.executable, "main_app.py"])
+                
             except Exception as e:
-                print(f"Failed to subprocess launch: {e}")
-        # ----------------------------------------
+                print(f"Failed to launch: {e}")
+                sys.exit(1)
 
-        self.destroy()
-        
+        # Non-macOS / Frozen logic
+        self.quit() # Break mainloop
+
+# --- Entry Point ---
+if __name__ == "__main__":
+    if HAS_UI_LIBS:
+        app = ModernSplashScreen()
+        try:
+            app.mainloop() # Code halts here until self.quit() is called
+        except KeyboardInterrupt:
+            app.destroy()
+            sys.exit(0)
+            
+        # --- TRANSITION LOGIC ---
+        # Loop has ended. Now destroy splash resources properly.
+        try:
+            app.destroy()
+        except:
+            pass
+            
+        # NOW load the main app in a clean state
         if os.path.exists(CORE_ZIP_PATH):
             sys.path.insert(0, CORE_ZIP_PATH)
         
@@ -245,15 +263,7 @@ class ModernSplashScreen(ctk.CTk):
             root.withdraw()
             messagebox.showerror("Critical Error", f"Failed to launch application:\n{e}")
             sys.exit(1)
-
-# --- Entry Point ---
-if __name__ == "__main__":
-    if HAS_UI_LIBS:
-        app = ModernSplashScreen()
-        try:
-            app.mainloop()
-        except KeyboardInterrupt:
-            app.destroy()
+            
     else:
         print("Launching NREGA Bot (Headless Mode)...")
         if os.path.exists(CORE_ZIP_PATH):

@@ -74,66 +74,49 @@ class SkeletonLoader(ctk.CTkFrame):
     def __init__(self, parent, rows=5, **kwargs):
         super().__init__(parent, fg_color="transparent", **kwargs)
         self.pack(fill="both", expand=True, padx=20, pady=20)
-        
         self.placeholders = []
-        
-        # Nakli rows banate hain (Gray boxes)
         for _ in range(rows):
-            # Ek row container
             row_frame = ctk.CTkFrame(self, fg_color="transparent")
             row_frame.pack(fill="x", pady=10)
-            
-            # Icon jaisa gola (Circle placeholder)
             icon_ph = ctk.CTkFrame(row_frame, width=40, height=40, corner_radius=20, fg_color=("gray85", "gray25"))
             icon_ph.pack(side="left", padx=(0, 15))
-            
-            # Text lines placeholders
             text_frame = ctk.CTkFrame(row_frame, fg_color="transparent")
             text_frame.pack(side="left", fill="x", expand=True)
-            
-            # Title line (Lambii)
             line1 = ctk.CTkFrame(text_frame, height=15, width=200, fg_color=("gray85", "gray25"))
             line1.pack(anchor="w", pady=(0, 5))
-            
-            # Subtitle line (Chhoti)
             line2 = ctk.CTkFrame(text_frame, height=12, width=120, fg_color=("gray90", "gray30"))
             line2.pack(anchor="w")
-            
             self.placeholders.extend([icon_ph, line1, line2])
-            
         self.animate_step = 0
         self.animating = True
         self._animate()
 
     def _animate(self):
-        if not self.animating: return
+        # FIX: Check if widget exists
+        if not self.animating or not self.winfo_exists(): return
         
-        # Colors toggle karke "Breathe" effect banayenge
-        # Light mode colors
         l1, l2 = "gray85", "gray90" 
-        # Dark mode colors
         d1, d2 = "gray25", "gray30"
         
         if self.animate_step == 0:
-            color_set = (l2, d2) # Thoda light
+            color_set = (l2, d2) 
             self.animate_step = 1
         else:
-            color_set = (l1, d1) # Thoda dark
+            color_set = (l1, d1) 
             self.animate_step = 0
             
         for p in self.placeholders:
             try:
-                p.configure(fg_color=color_set)
+                # Double safety check
+                if p.winfo_exists():
+                    p.configure(fg_color=color_set)
             except: pass
             
-        # Har 800ms (0.8 sec) mein color badlega
         self.after(800, self._animate)
 
     def stop(self):
         self.animating = False
         self.destroy()
-
-# --- REPLACE MarqueeLabel Class in main_app.py ---
 
 class MarqueeLabel(ctk.CTkFrame):
     def __init__(self, parent, text, speed=1, **kwargs):
@@ -152,65 +135,57 @@ class MarqueeLabel(ctk.CTkFrame):
         )
         self.canvas.pack(fill="both", expand=True)
         
-        self.items = []  # List to store text segments
+        self.items = [] 
         self.total_width = 0
         self.canvas_width = 1
+        self.is_running = True  # Animation control flag
         
         self.bind("<Configure>", self._on_resize)
-        self.update_text(text) # Initial render
+        self.bind("<Destroy>", self._on_destroy) # Event for cleanup
+        self.update_text(text) 
         self._animate()
+
+    def _on_destroy(self, event):
+        """Called when widget is destroyed."""
+        self.is_running = False
 
     def _on_resize(self, event):
         self.canvas_width = event.width
         self.update_colors()
 
     def update_colors(self):
-        mode = ctk.get_appearance_mode()
-        bg_color = self._apply_appearance_mode(self.safe_bg)
-        self.canvas.configure(bg=bg_color)
-        
-        # Update text colors based on mode (Links stay blue)
-        default_color = "gray90" if mode == "Dark" else "gray40"
-        for item in self.items:
-            if not item.get('is_link'):
-                self.canvas.itemconfig(item['id'], fill=default_color)
+        try:
+            if not self.winfo_exists(): return
+            mode = ctk.get_appearance_mode()
+            bg_color = self._apply_appearance_mode(self.safe_bg)
+            self.canvas.configure(bg=bg_color)
+            default_color = "gray90" if mode == "Dark" else "gray40"
+            for item in self.items:
+                if not item.get('is_link'):
+                    self.canvas.itemconfig(item['id'], fill=default_color)
+        except Exception: pass
 
     def _parse_html(self, text):
-        """Parses simple HTML tags: <b>, <i>, <a href="...">."""
-        # Regex to split text by tags
-        # Captures: <b>...</b>, <i>...</i>, <a href="...">...</a>
         pattern = re.compile(r'(<a\s+href="([^"]+)">(.+?)</a>|<b>(.+?)</b>|<i>(.+?)</i>)')
-        
         parts = []
         last_pos = 0
-        
         for match in pattern.finditer(text):
-            # Add text before the tag
             if match.start() > last_pos:
                 parts.append({'text': text[last_pos:match.start()], 'type': 'normal'})
-            
             full_match = match.group(0)
-            
             if full_match.startswith('<a'):
-                url = match.group(2)
-                content = match.group(3)
-                parts.append({'text': content, 'type': 'link', 'url': url})
+                parts.append({'text': match.group(3), 'type': 'link', 'url': match.group(2)})
             elif full_match.startswith('<b>'):
-                content = match.group(4)
-                parts.append({'text': content, 'type': 'bold'})
+                parts.append({'text': match.group(4), 'type': 'bold'})
             elif full_match.startswith('<i>'):
-                content = match.group(5)
-                parts.append({'text': content, 'type': 'italic'})
-                
+                parts.append({'text': match.group(5), 'type': 'italic'})
             last_pos = match.end()
-            
-        # Add remaining text
         if last_pos < len(text):
             parts.append({'text': text[last_pos:], 'type': 'normal'})
-            
         return parts if parts else [{'text': text, 'type': 'normal'}]
 
     def update_text(self, new_text):
+        if not self.winfo_exists(): return
         self.raw_text = new_text
         self.canvas.delete("all")
         self.items = []
@@ -218,15 +193,11 @@ class MarqueeLabel(ctk.CTkFrame):
         
         mode = ctk.get_appearance_mode()
         default_color = "gray90" if mode == "Dark" else "gray40"
-        link_color = "#3B82F6" # Blue
-        
-        # Fonts
+        link_color = "#3B82F6"
         base_font_family = "Segoe UI" if os.name == "nt" else "Arial"
-        # Emojis ke liye Segoe UI Emoji Windows par fallback karta hai automatically usually
         
         parsed_segments = self._parse_html(new_text)
-        
-        current_x = 10 # Start padding
+        current_x = 10 
         y_pos = 15
         
         for seg in parsed_segments:
@@ -235,32 +206,18 @@ class MarqueeLabel(ctk.CTkFrame):
             fill_color = default_color
             is_link = False
             
-            if seg['type'] == 'bold':
-                font_spec = (base_font_family, 13, "bold")
-            elif seg['type'] == 'italic':
-                font_spec = (base_font_family, 13, "italic")
+            if seg['type'] == 'bold': font_spec = (base_font_family, 13, "bold")
+            elif seg['type'] == 'italic': font_spec = (base_font_family, 13, "italic")
             elif seg['type'] == 'link':
                 font_spec = (base_font_family, 13, "underline")
                 fill_color = link_color
                 is_link = True
             
-            text_id = self.canvas.create_text(
-                current_x, y_pos, 
-                text=text_content, 
-                anchor="w", 
-                fill=fill_color, 
-                font=font_spec
-            )
-            
+            text_id = self.canvas.create_text(current_x, y_pos, text=text_content, anchor="w", fill=fill_color, font=font_spec)
             bbox = self.canvas.bbox(text_id)
             width = bbox[2] - bbox[0] if bbox else 0
             
-            item_data = {
-                'id': text_id,
-                'width': width,
-                'is_link': is_link,
-                'url': seg.get('url')
-            }
+            item_data = {'id': text_id, 'width': width, 'is_link': is_link, 'url': seg.get('url')}
             self.items.append(item_data)
             
             if is_link:
@@ -269,39 +226,54 @@ class MarqueeLabel(ctk.CTkFrame):
                 self.canvas.tag_bind(text_id, "<Leave>", lambda e: self.canvas.configure(cursor="arrow"))
             
             current_x += width
-            
         self.total_width = current_x
 
     def _animate(self):
+        # 1. First Check: Is the flag set to stop?
+        if not self.is_running: return
+
+        # 2. Second Check: Does the widget actually exist?
+        try:
+            if not self.winfo_exists():
+                self.is_running = False
+                return
+        except Exception:
+            self.is_running = False
+            return
+
         if not self.items:
             self.after(100, self._animate)
             return
 
-        # Check if first item has gone off screen completely
-        first_item = self.items[0]
-        first_coords = self.canvas.coords(first_item['id'])
-        
-        # Calculate shift needed if text is fully off-screen left
-        # We use the last item to determine where the text ends
-        last_item = self.items[-1]
-        last_coords = self.canvas.coords(last_item['id'])
-        
-        # If the ENTIRE text block has moved past the left edge
-        # (Checking the last item's X position + its width)
-        if last_coords[0] + last_item['width'] < 0:
-            # Reset all items to start from the right side
-            offset = self.canvas_width + 20
-            current_x_reset = offset
-            
-            for item in self.items:
-                self.canvas.coords(item['id'], current_x_reset, 15)
-                current_x_reset += item['width']
-        else:
-            # Move everything left
-            for item in self.items:
-                self.canvas.move(item['id'], -self.speed, 0)
+        try:
+            first_item = self.items[0]
+            # 3. Third Check: Does the canvas item exist?
+            try:
+                self.canvas.bbox(first_item['id'])
+            except:
+                return # Canvas items gone
 
-        self.after(20, self._animate)
+            last_item = self.items[-1]
+            last_coords = self.canvas.coords(last_item['id'])
+            
+            if not last_coords: 
+                self.after(20, self._animate)
+                return
+
+            if last_coords[0] + last_item['width'] < 0:
+                offset = self.canvas_width + 20
+                current_x_reset = offset
+                for item in self.items:
+                    self.canvas.coords(item['id'], current_x_reset, 15)
+                    current_x_reset += item['width']
+            else:
+                for item in self.items:
+                    self.canvas.move(item['id'], -self.speed, 0)
+
+            self.after(20, self._animate)
+        except Exception:
+            # Silent fail to avoid terminal spam
+            self.is_running = False
 
 class ToastNotification(ctk.CTkToplevel):
     def __init__(self, parent, message, kind="success", duration=3000):
@@ -525,14 +497,15 @@ class NregaBotApp(ctk.CTk):
         self.splash = self._create_splash_screen()
         self.splash.update() 
 
-        # --- FIX: Load Icons on MAIN THREAD immediately ---
-        # Loading images is IO bound but creating CTkImage is GUI bound. 
-        # Must be done on Main Thread.
+        # --- FIX 1: LOAD ICONS ON MAIN THREAD ---
+        # MUST be done here, NOT in a thread, or the app will crash on launch
         self._load_all_icons() 
 
-        # --- STEP 2: START HEAVY LOADING IN BACKGROUND ---
-        # Only put non-GUI logic here (Network, Sentry, Calculations)
+        # Now start the background thread for non-GUI tasks
         threading.Thread(target=self._background_initialization, daemon=True).start()
+
+        # Define cleanup protocol to fix the "Hang" issue
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def _background_initialization(self):
         """Loads heavy libraries and assets in background to keep UI responsive"""
@@ -876,12 +849,14 @@ class NregaBotApp(ctk.CTk):
             return
 
         try:
-            # FIX: Use native macOS player instead of Pygame to prevent GameController crash
             if config.OS_SYSTEM == "Darwin":
-                # Run afplay in background so it doesn't freeze UI
-                subprocess.Popen(["afplay", sound_file])
+                # CRITICAL FIX: Add stdout/stderr=subprocess.DEVNULL
+                subprocess.Popen(
+                    ["afplay", sound_file], 
+                    stdout=subprocess.DEVNULL, 
+                    stderr=subprocess.DEVNULL
+                )
             else:
-                # Use Pygame for Windows
                 import pygame
                 pygame.mixer.Sound(sound_file).play()
         except Exception as e:
@@ -1032,7 +1007,6 @@ class NregaBotApp(ctk.CTk):
             self.play_sound("error")
             messagebox.showerror("Error", "Google Chrome not found."); return
         try:
-            # --- UPDATED CMD WITH GPU DISABLE FLAGS ---
             cmd = [
                 b_path, 
                 f"--remote-debugging-port={port}", 
@@ -1040,20 +1014,24 @@ class NregaBotApp(ctk.CTk):
                 "--disable-backgrounding-occluded-windows",
                 "--disable-renderer-backgrounding",
                 "--disable-background-timer-throttling",
-                
-                # These flags fix the Terminal Errors:
-                "--disable-gpu",                  # Fixes EGL/Bad Attribute error
-                "--disable-software-rasterizer",  # Fixes graphical glitches
-                "--log-level=3",                  # Hides INFO/WARNING messages
-                "--silent",                       # Hides other output
-                
+                "--disable-gpu",
+                "--disable-software-rasterizer",
+                "--log-level=3",
+                "--silent",
                 config.MAIN_WEBSITE_URL, 
                 "https://bookmark.nregabot.com/"
             ]
-            # ---------------------------------------------------------------
             
             flags = 0x00000008 if config.OS_SYSTEM == "Windows" else 0
-            subprocess.Popen(cmd, creationflags=flags, start_new_session=(config.OS_SYSTEM != "Windows"))
+            # CRITICAL FIX: stdout aur stderr ko DEVNULL kiya gaya
+            subprocess.Popen(
+                cmd, 
+                creationflags=flags, 
+                start_new_session=(config.OS_SYSTEM != "Windows"),
+                stdout=subprocess.DEVNULL, 
+                stderr=subprocess.DEVNULL
+            )
+            
             self.play_sound("success")
             messagebox.showinfo("Chrome Launched", "Chrome is starting. Please log in to the NREGA website.")
         except Exception as e: 
@@ -1069,21 +1047,27 @@ class NregaBotApp(ctk.CTk):
             self.play_sound("error")
             messagebox.showerror("Error", "Microsoft Edge not found."); return
         try:
-            # --- UPDATE: Added flags to keep browser active when minimized ---
             cmd = [
                 b_path, 
                 f"--remote-debugging-port={port}", 
                 f"--user-data-dir={p_dir}",
-                "--disable-backgrounding-occluded-windows", # New Flag
-                "--disable-renderer-backgrounding",       # New Flag
-                "--disable-background-timer-throttling",  # New Flag
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
+                "--disable-background-timer-throttling",
                 config.MAIN_WEBSITE_URL, 
                 "https://bookmark.nregabot.com/"
             ]
-            # ---------------------------------------------------------------
 
             flags = 0x00000008 if config.OS_SYSTEM == "Windows" else 0
-            subprocess.Popen(cmd, creationflags=flags, start_new_session=(config.OS_SYSTEM != "Windows"))
+            # CRITICAL FIX: stdout aur stderr ko DEVNULL kiya gaya
+            subprocess.Popen(
+                cmd, 
+                creationflags=flags, 
+                start_new_session=(config.OS_SYSTEM != "Windows"),
+                stdout=subprocess.DEVNULL, 
+                stderr=subprocess.DEVNULL
+            )
+            
             self.play_sound("success")
             messagebox.showinfo("Edge Launched", "Edge is starting. Please log in to the NREGA website.")
         except Exception as e: 
@@ -2251,18 +2235,22 @@ class NregaBotApp(ctk.CTk):
     def clear_log(self, log): log.configure(state="normal"); log.delete("1.0", tkinter.END); log.configure(state="disabled")
 
     def on_closing(self, force=False):
-        if force or messagebox.askokcancel("Quit", "Quit application?"):
-            self.play_sound("shutdown"); time.sleep(0.5)
-            self.attributes("-alpha", 0.0); self.active_automations.clear(); self.allow_sleep()
-            if self.driver: 
-                try: self.driver.quit()
-                except: pass
-            for e in self.stop_events.values(): e.set()
-            try: 
-                import pygame
-                pygame.mixer.quit()
+        # FIX: Ensure prompt appears on top using parent=self
+        if force or messagebox.askokcancel("Quit", "Quit application?", parent=self):
+            
+            # 1. Visual Feedback (Turant Hide karein)
+            try:
+                # Sound trigger karo (ab ye block nahi karega Update 3 ki wajah se)
+                self.play_sound("shutdown")
+                self.attributes("-alpha", 0.0) # Window Gayab
+                
+                # CRITICAL REMOVAL: self.update() aur time.sleep() hata diya
+                # Ye dono functions band hoti hui window par HANG karte hain.
             except: pass
-            self.destroy()
+            
+            # 2. Nuclear Option: Force Kill Process Immediately
+            import os
+            os._exit(0)
 
     def prevent_sleep(self):
         if not self.active_automations:
