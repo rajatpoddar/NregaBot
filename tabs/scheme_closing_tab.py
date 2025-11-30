@@ -18,7 +18,6 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
-from .date_entry_widget import DateEntry
 
 class SchemeClosingTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):

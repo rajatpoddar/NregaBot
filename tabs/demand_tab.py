@@ -13,7 +13,6 @@ from selenium.webdriver.common.keys import Keys
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
-from .date_entry_widget import DateEntry
 
 # --- Cloud File Picker Toplevel Window ---
 class CloudFilePicker(ctk.CTkToplevel):
