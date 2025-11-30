@@ -2399,8 +2399,6 @@ def _apply_smart_update(self, zip_path):
             # --- WINDOWS LOGIC ---
             if sys.platform == "win32":
                 batch_script_path = os.path.join(self.get_data_path(), "updater.bat")
-                
-                # Windows Script: Wait -> Copy -> Clean -> Restart
                 script_content = f"""
 @echo off
 title Updating NREGA Bot...
@@ -2422,42 +2420,43 @@ del "%~f0" & exit
 """
                 with open(batch_script_path, "w") as bat:
                     bat.write(script_content)
-
-                # Run Batch file hidden/minimized logic works best via startfile
                 os.startfile(batch_script_path)
 
-            # --- MACOS LOGIC ---
+            # --- MACOS LOGIC (CRITICAL FIX) ---
             elif sys.platform == "darwin":
                 shell_script_path = os.path.join(self.get_data_path(), "updater.sh")
                 
-                # macOS Script: Sleep -> Copy -> Clean -> Open
+                # FIX: Added 'xattr -cr' to remove quarantine and 'chmod +x' for permission
                 script_content = f"""#!/bin/bash
 echo "Updating NREGA Bot..."
 sleep 2
 
 echo "Copying files..."
-# cp -R overwrites existing files in app_dir
 cp -R "{extract_dir}/"* "{app_dir}/"
+
+echo "Fixing Permissions & Security..."
+# 1. Remove Quarantine Attribute (Crash Fix)
+xattr -cr "{app_dir}"
+# 2. Ensure Executable Permission
+chmod +x "{current_exe}"
 
 echo "Cleaning up..."
 rm -rf "{extract_dir}"
 rm "{zip_path}"
 
 echo "Restarting..."
-# 'open' command handles .app bundles better usually, but executing binary works for internal restart
 "{current_exe}" &
 
-# Delete this script
 rm "$0"
 """
                 with open(shell_script_path, "w") as sh:
                     sh.write(script_content)
 
-                # Make script executable (chmod +x)
+                # Make script executable
                 st = os.stat(shell_script_path)
                 os.chmod(shell_script_path, st.st_mode | stat.S_IEXEC)
 
-                # Run Shell script in background
+                # Run Shell script
                 subprocess.Popen(["/bin/bash", shell_script_path])
 
             # 4. Force Close App
