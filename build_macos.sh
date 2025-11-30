@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# --- Clean previous builds ---
+rm -rf build dist
+rm -rf *.spec
+
 # --- Define app details here ---
 APP_NAME="NREGABot"
 ICON_FILE="assets/app_icon.icns"

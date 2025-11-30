@@ -522,11 +522,16 @@ class NregaBotApp(ctk.CTk):
         self.is_animating = False
         self.splash = None
 
-        # --- STEP 1: SHOW SPLASH IMMEDIATELY ---
         self.splash = self._create_splash_screen()
-        self.splash.update() # Force render
+        self.splash.update() 
+
+        # --- FIX: Load Icons on MAIN THREAD immediately ---
+        # Loading images is IO bound but creating CTkImage is GUI bound. 
+        # Must be done on Main Thread.
+        self._load_all_icons() 
 
         # --- STEP 2: START HEAVY LOADING IN BACKGROUND ---
+        # Only put non-GUI logic here (Network, Sentry, Calculations)
         threading.Thread(target=self._background_initialization, daemon=True).start()
 
     def _background_initialization(self):
@@ -554,8 +559,8 @@ class NregaBotApp(ctk.CTk):
         except Exception: 
             pass
 
-        # 3. Load Icons (Disk I/O)
-        self._load_all_icons()
+        # # 3. Load Icons (Disk I/O)
+        # self._load_all_icons()
 
         # 4. Apply patches
         messagebox.showinfo = self._custom_showinfo
@@ -865,10 +870,19 @@ class NregaBotApp(ctk.CTk):
 
     def play_sound(self, sound_name: str):
         if not self.sound_switch_var.get(): return
+        
+        sound_file = resource_path(f"assets/sounds/{sound_name}.wav")
+        if not os.path.exists(sound_file):
+            return
+
         try:
-            import pygame
-            sound_file = resource_path(f"assets/sounds/{sound_name}.wav")
-            if os.path.exists(sound_file):
+            # FIX: Use native macOS player instead of Pygame to prevent GameController crash
+            if config.OS_SYSTEM == "Darwin":
+                # Run afplay in background so it doesn't freeze UI
+                subprocess.Popen(["afplay", sound_file])
+            else:
+                # Use Pygame for Windows
+                import pygame
                 pygame.mixer.Sound(sound_file).play()
         except Exception as e:
             print(f"Error playing sound '{sound_name}': {e}")
