@@ -83,9 +83,17 @@ jobs:
             # 1. Clean temp
             if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
             
-            # 2. Copy Files (Ignore unwanted)
+            # 2. Copy Files (Ignore unwanted: web folder & screenshots)
             def ignore_func(dir, files):
-                return [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', 'installer.iss', '.vscode']]
+                # Basic ignores including 'web'
+                ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', 'installer.iss', '.vscode', 'web']]
+                
+                # Specific ignore for screenshots inside assets
+                if os.path.basename(dir) == 'assets':
+                    if 'screenshots' in files:
+                        ignored.append('screenshots')
+                        
+                return ignored
             
             shutil.copytree('.', temp_dir, ignore=ignore_func)
             
@@ -148,9 +156,17 @@ jobs:
           
           if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
           
-          # Copy Logic
+          # Copy Logic (Updated to ignore web & screenshots)
           def ignore_func(dir, files):
-              return [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', '.vscode', '.DS_Store']]
+              # Basic ignores including 'web'
+              ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', '.vscode', '.DS_Store', 'web']]
+              
+              # Specific ignore for screenshots inside assets
+              if os.path.basename(dir) == 'assets':
+                  if 'screenshots' in files:
+                      ignored.append('screenshots')
+              
+              return ignored
           
           shutil.copytree('.', temp_dir, ignore=ignore_func)
           

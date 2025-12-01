@@ -7,6 +7,7 @@
     <meta name="description" content="Cancellation and Refund Policy for NREGA Bot.">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -20,48 +21,96 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         .prose { max-width: 80ch; }
+        .prose h3 { font-size: 1.5rem; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem; }
         .prose p { font-size: 1.125rem; line-height: 1.75; margin-bottom: 1.25rem; }
         .prose a { color: #2563eb; text-decoration: none; }
         .prose a:hover { text-decoration: underline; }
-        .dark .prose h1, .dark .prose h3 { color: #fff; }
+        .dark .prose h1, .dark .prose h3, .dark .prose strong { color: #fff; }
         .dark .prose p, .dark .prose ul, .dark .prose li { color: #d1d5db; }
         .dark .prose a { color: #60a5fa; }
+        
+        #mobile-menu {
+            transition: transform 0.3s ease-in-out;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 antialiased dark:bg-gray-900 dark:text-gray-200">
 
-    <header class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-800">
-        <div class="container mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
-            <a href="index.html" class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <img src="/logo.png" alt="NREGA Bot Logo" class="h-8 w-8 rounded-full">
-                <span>NREGA Bot</span>
-            </a>
-            <a href="index.html" class="hidden md:inline-block bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">&larr; Back to Home</a>
+    <header class="fixed top-0 w-full z-50 transition-all duration-300 bg-white/70 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800">
+        <div class="container mx-auto px-4 sm:px-6 py-3">
+            <div class="flex justify-between items-center">
+                <a href="index.html" class="flex items-center gap-2 group">
+                    <div class="relative">
+                        <div class="absolute -inset-1 bg-blue-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-200"></div>
+                        <img src="/logo.png" alt="NREGA Bot Logo" class="relative h-9 w-9 rounded-full ring-2 ring-white dark:ring-gray-800">
+                    </div>
+                    <span class="text-xl font-bold text-gray-900 dark:text-white tracking-tight">NREGA Bot</span>
+                </a>
+
+                <nav class="hidden md:flex items-center gap-1 bg-gray-100/50 dark:bg-gray-800/50 p-1 rounded-full border border-gray-200/50 dark:border-gray-700">
+                    <a href="index.html#home" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">Home</a>
+                    <a href="how-to-use.html" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">How to Use</a>
+                    <a href="index.html#faq" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">FAQ</a>
+                    <a href="https://tools.nregabot.com" target="_blank" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">Tools</a>
+                    <a href="https://license.nregabot.com/login" target="_blank" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">My Account</a>
+                </nav>
+
+                <div class="flex items-center gap-3">
+                    <a href="https://license.nregabot.com/check-license"
+                        class="hidden md:inline-flex items-center justify-center px-5 py-2 text-sm font-bold text-white transition-all duration-200 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg hover:from-blue-700 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 shadow-lg shadow-blue-500/30">
+                        Get License Key
+                    </a>
+                    
+                    <button id="mobile-menu-button" class="md:hidden p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 transition-colors">
+                        <i class="fa-solid fa-bars text-2xl" id="menu-open-icon"></i>
+                        <i class="fa-solid fa-xmark text-2xl hidden" id="menu-close-icon"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </header>
 
-    <main class="container mx-auto px-6 py-16 lg:py-20">
+    <div id="mobile-menu" class="fixed inset-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl transform translate-x-full transition-transform duration-300 md:hidden flex flex-col items-center justify-center">
+        <nav class="flex flex-col items-center space-y-6 text-center">
+            <a href="index.html#home" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">Home</a>
+            <a href="how-to-use.html" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">How to Use</a>
+            <a href="index.html#faq" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">FAQ</a>
+            <a href="https://tools.nregabot.com" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">Tools</a>
+            <a href="https://license.nregabot.com/login" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">My Account</a>
+            
+            <div class="pt-8">
+                <a href="https://license.nregabot.com/check-license" class="px-8 py-4 text-lg font-bold text-white bg-blue-600 rounded-xl shadow-xl hover:bg-blue-700">Get License Key</a>
+            </div>
+        </nav>
+    </div>
+
+    <main class="container mx-auto px-6 py-24 lg:py-32">
         <div class="prose mx-auto">
             <div class="text-center mb-12">
-                <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900">Cancellation & Refund Policy</h1>
-                <p class="text-lg text-gray-600 dark:text-gray-400 mt-4">Last updated: July 25, 2025</p>
+                <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white">Cancellation & Refund Policy</h1>
+                <p class="text-lg text-gray-600 dark:text-gray-400 mt-4">Last updated: September 05, 2025</p>
             </div>
             
-            <p>Thank you for supporting NREGA Bot. We appreciate your contribution which helps us maintain and improve the software.</p>
+            <p>Thank you for supporting NREGA Bot. We strive to provide the best automation experience.</p>
             
-            <p>Payments made to receive a license key are considered donations to support the project's ongoing development, server costs, and maintenance. Due to the nature of digital goods and the provision of a 30-day free trial period for evaluation, we have a strict no-refund policy.</p>
+            <h3>1. No Refunds Policy</h3>
+            <p>All payments made for license keys (One-Time or Subscription) are generally non-refundable. Since we provide a comprehensive <strong>30-day free trial</strong> with full features, we expect users to evaluate the software thoroughly before purchasing.</p>
 
-            <h3>No Refunds</h3>
-            <p>All payments are final and non-refundable. We provide a fully-functional 30-day free trial of the Application so that you can test its features and ensure it meets your needs before making a donation for a license key. We encourage all users to make use of this trial period to make an informed decision.</p>
+            <h3>2. Subscription Cancellation</h3>
+            <p>If you have subscribed to an auto-renewal plan:</p>
+            <ul>
+                <li>You can cancel your subscription at any time.</li>
+                <li>To cancel, log in to your account at <a href="https://license.nregabot.com/login">license.nregabot.com</a>, go to "My Account", and click "Disable Auto-Renewal".</li>
+                <li>Cancellation stops future billing. Your license will remain active until the end of the current paid period.</li>
+                <li>We do not provide refunds for partial months or unused time if you cancel early.</li>
+            </ul>
 
-            <h3>Cancellation</h3>
-            <p>Your license key is valid for the duration you selected (e.g., monthly or yearly). There are no recurring subscriptions. Once your license period expires, the Application will simply revert to its disabled state. You are under no obligation to make another payment.</p>
+            <h3>3. Technical Issues & Exceptions</h3>
+            <p>In the rare event of a technical error (e.g., you were charged but did not receive a key, or a double charge occurred), please contact us immediately.</p>
+            <p>We will investigate the issue and, if the error is on our end or with our payment processor, we will process a refund or extend your validity accordingly.</p>
 
-            <h3>Exceptional Circumstances</h3>
-            <p>In the rare event of a payment error or a technical issue that prevents you from activating a license key you have paid for, please contact our support team immediately. We will work with you to resolve the issue, which may include providing a new key or, in exceptional cases where we are at fault, processing a refund at our sole discretion.</p>
-
-            <h3>Contact Us</h3>
-            <p>If you have any questions about this policy or are facing issues with your license key, please contact us at: <a href="mailto:nregabot@gmail.com">nregabot@gmail.com</a></p>
+            <h3>4. Contact Us</h3>
+            <p>If you have any issues with payments or cancellations, please contact us at: <a href="mailto:nregabot@gmail.com">nregabot@gmail.com</a></p>
         </div>
     </main>
 
@@ -71,5 +120,34 @@
         </div>
     </footer>
 
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const menuOpenIcon = document.getElementById('menu-open-icon');
+            const menuCloseIcon = document.getElementById('menu-close-icon');
+            const mobileLinks = document.querySelectorAll('#mobile-menu .mobile-link'); 
+            
+            function toggleMenu() { 
+                const isHidden = mobileMenu.classList.contains('translate-x-full'); 
+                if (isHidden) {
+                    mobileMenu.classList.remove('translate-x-full');
+                    menuOpenIcon.classList.add('hidden');
+                    menuCloseIcon.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden'; 
+                } else {
+                    mobileMenu.classList.add('translate-x-full');
+                    menuOpenIcon.classList.remove('hidden');
+                    menuCloseIcon.classList.add('hidden');
+                    document.body.style.overflow = ''; 
+                }
+            }
+            
+            if(mobileMenuButton){
+                mobileMenuButton.addEventListener('click', toggleMenu);
+                mobileLinks.forEach(link => { link.addEventListener('click', toggleMenu); });
+            }
+        });
+    </script>
 </body>
 </html>
