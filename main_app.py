@@ -552,6 +552,13 @@ class NregaBotApp(ctk.CTk):
         self.grid_rowconfigure(1, weight=1); self.grid_columnconfigure(0, weight=1)
         self._create_header(); self._create_footer()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        # --- FIX START: Add delay before creating layout to let Tkinter initialize on Mac ---
+        if config.OS_SYSTEM == "Darwin":
+            self.update() 
+            time.sleep(0.1)
+        # --- FIX END ---
+
         self._create_main_layout(for_activation=True)
         self.set_status("Initializing...")
 
