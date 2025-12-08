@@ -1,15 +1,19 @@
 {
-  "latest_version": "2.8.3.2",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.8.3.2-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.8.3.2-macOS.dmg",
+  "latest_version": "2.8.3.3",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.8.3.3-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.8.3.3-macOS.dmg",
   "core_update": {
-    "version": "2.8.3.2",
-    "url": "https://nregabot.com/updates/core_v2.8.3.2.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v2.8.3.2.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v2.8.3.2.zip",
+    "version": "2.8.3.3",
+    "url": "https://nregabot.com/updates/core_v2.8.3.3.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v2.8.3.3.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v2.8.3.3.zip",
     "force_full_reinstall": false
   },
   "changelog": {
+    "2.8.3.3": [
+      "🔒 **Security Update:** Added OTP support for secure login.",
+      "🛠 **Fix:** Demand Automation added export results as csv and pdf."
+    ],
     "2.8.3.2": [
       "🔒 **Security Update:** Added OTP support for secure login.",
       "🛠 **Fix:** Resolved login issues and enforced version check."

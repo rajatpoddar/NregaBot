@@ -5,7 +5,7 @@
 # <div align="center">NREGA Bot</div>
 
 <p align="center">
-  <b>Version 2.8.3 | Now with Smart Updates, Calendar UI, and Enhanced Stability!</b><br />
+  <b>Version 2.8.3.3 | Now with Smart Updates, Calendar UI, and Enhanced Stability!</b><br />
   <a href="https://nregabot.com/#downloads"><strong>Download Now »</strong></a><br /><br />
   <a href="https://nregabot.com/#downloads"><strong>Download Now »</strong></a><br /><br />
   <a href="https://nregabot.com/how-to-use.html">View Instructions</a> ·
@@ -95,8 +95,8 @@ You only need to have a supported web browser installed on your system:
 Download the latest version from the official website:
 
 - Website: [nregabot.com/#downloads](https://nregabot.com/#downloads)
-- **For Windows**: `NREGABot-v2.8.3-Setup.exe`
-- **For macOS**: `NREGABot-v2.8.3-macOS.dmg`
+- **For Windows**: `NREGABot-v2.8.3.3-Setup.exe`
+- **For macOS**: `NREGABot-v2.8.3.3-macOS.dmg`
 
 ### 2️⃣ First-Time Launch & Trial
 

@@ -8,7 +8,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+from selenium.common.exceptions import (
+    TimeoutException, 
+    NoSuchElementException, 
+    StaleElementReferenceException,
+    WebDriverException
+)
 
 import config
 from .base_tab import BaseAutomationTab
@@ -18,10 +23,10 @@ class DelWorkAllocTab(BaseAutomationTab):
     """
     A specific tab class for automating the deletion of Work Allocations on the NREGA website.
     Features:
-    - Search by Panchayat.
+    - Robust Page Loading (Handles 'execution context' errors).
+    - Search by Panchayat (Case insensitive).
     - Filter by 'From Date'.
     - Manual List vs Auto Mode.
-    - Centralized Error Handling.
     """
     def __init__(self, parent, app_instance):
         super().__init__(parent, app_instance, automation_key="del_work_alloc")
@@ -59,7 +64,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         self.from_date_entry = ctk.CTkEntry(date_frame, placeholder_text="DD/MM/YYYY", width=100)
         self.from_date_entry.pack(side="left", padx=5)
 
-        # Calendar Icon Button (Triggers Popup from Base Tab)
+        # Calendar Icon Button
         self.cal_btn = ctk.CTkButton(
             date_frame, 
             text="📅", 
@@ -190,10 +195,39 @@ class DelWorkAllocTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "Form has been reset.")
             self.app.after(0, self.app.set_status, "Ready")
 
+    def _safe_load_page(self, driver, url):
+        """
+        Robustly loads a page with retries, specifically handling
+        'frame does not have execution context' errors.
+        """
+        for attempt in range(3):
+            try:
+                self.app.log_message(self.log_display, f"Loading page (Attempt {attempt+1})...")
+                driver.get(url)
+                # Check for alert immediately after load (session expired?)
+                try:
+                    WebDriverWait(driver, 2).until(EC.alert_is_present())
+                    driver.switch_to.alert.accept()
+                except TimeoutException:
+                    pass
+                return True
+            except Exception as e:
+                err_msg = str(e).lower()
+                if "execution context" in err_msg or "target window already closed" in err_msg:
+                    self.app.log_message(self.log_display, "   -> Browser glitch detected. Retrying...", "warning")
+                    try: 
+                        # Try to stop loading or refresh to reset state
+                        driver.execute_script("window.stop();")
+                    except: 
+                        pass
+                    time.sleep(2)
+                else:
+                    raise e # Raise other errors normally
+        return False
+
     def run_automation_logic(self, panchayat, jobcard_list, target_from_date):
         """
-        The main worker function running in a separate thread.
-        Handles navigation, processing, and error catching.
+        The main worker function.
         """
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
@@ -210,31 +244,70 @@ class DelWorkAllocTab(BaseAutomationTab):
             auto_mode = not bool(jobcard_list)
             items_to_process = []
 
-            # 1. Navigate and Select Panchayat
-            driver.get(config.DEL_WORK_ALLOC_CONFIG["url"])
+            # 1. Navigate Safely
+            url = config.DEL_WORK_ALLOC_CONFIG["url"]
+            if not self._safe_load_page(driver, url):
+                raise Exception("Failed to load page after multiple attempts.")
+
+            # 2. Select Panchayat (With Fuzzy Match)
             wait = WebDriverWait(driver, 20)
             
-            self.app.log_message(self.log_display, "Selecting Panchayat...")
-            panchayat_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code"))))
-            panchayat_dropdown.select_by_visible_text(panchayat)
-            
-            wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
-            time.sleep(1) 
-            self.app.log_message(self.log_display, "Panchayat selected successfully.", "success")
+            try:
+                # Ensure the dropdown is actually visible and interactive
+                panchayat_dropdown_elem = wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
+                panchayat_dropdown = Select(panchayat_dropdown_elem)
+                
+                # --- Fuzzy Matching Logic ---
+                target_p = panchayat.strip().lower()
+                found_option_text = None
+                
+                for opt in panchayat_dropdown.options:
+                    if opt.text.strip().lower() == target_p:
+                        found_option_text = opt.text
+                        break
+                
+                if found_option_text:
+                    self.app.log_message(self.log_display, f"Selecting Panchayat: '{found_option_text}'...")
+                    
+                    # Store current body element to check for staleness (Postback detection)
+                    body_elem = driver.find_element(By.TAG_NAME, "body")
+                    
+                    panchayat_dropdown.select_by_visible_text(found_option_text)
+                    
+                    # --- CRITICAL: Wait for Postback ---
+                    # Selection triggers __doPostBack. We MUST wait for the page to reload.
+                    self.app.log_message(self.log_display, "Waiting for page reload (Postback)...")
+                    try:
+                        wait.until(EC.staleness_of(body_elem))
+                    except TimeoutException:
+                        self.app.log_message(self.log_display, "Warning: Page did not seem to reload. Continuing...", "warning")
+                    
+                    # Wait for Registration dropdown to come back
+                    wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
+                    self.app.log_message(self.log_display, "Panchayat selected successfully.", "success")
+                    
+                else:
+                    available = [o.text for o in panchayat_dropdown.options[:10]]
+                    raise ValueError(f"Panchayat '{panchayat}' not found. Did you mean: {available}?")
 
-            # 2. Determine Items to Process
+            except Exception as e:
+                self.app.log_message(self.log_display, f"Error selecting Panchayat: {e}", "error")
+                return
+
+            # 3. Determine Items to Process
             if auto_mode:
                 self.app.log_message(self.log_display, "Auto Mode: Fetching all Registration IDs.")
-                reg_id_dropdown_element = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
-                reg_id_dropdown = Select(reg_id_dropdown_element)
-                items_to_process = [opt.get_attribute("value") for opt in reg_id_dropdown.options if opt.get_attribute("value")]
+                # Locate dropdown again after refresh
+                reg_id_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration"))))
+                items_to_process = [opt.get_attribute("value") for opt in reg_id_dropdown.options if opt.get_attribute("value") and "Select" not in opt.text]
+                
                 if not items_to_process:
                     self.app.log_message(self.log_display, "No Registration IDs found for this Panchayat.", "warning")
             else:
                 self.app.log_message(self.log_display, f"Manual Mode: Processing {len(jobcard_list)} provided IDs.")
                 items_to_process = jobcard_list
 
-            # 3. Process Loop
+            # 4. Process Loop
             total_items = len(items_to_process)
             for i, item_id in enumerate(items_to_process):
                 if self.app.stop_events[self.automation_key].is_set():
@@ -246,7 +319,7 @@ class DelWorkAllocTab(BaseAutomationTab):
                 # Execute the scraping/action logic
                 self._process_single_id(driver, wait, panchayat, item_id, auto_mode, target_from_date)
 
-            # 4. Completion
+            # 5. Completion
             final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
             self.app.after(0, self.update_status, final_msg, 1.0)
             if not self.app.stop_events[self.automation_key].is_set():
@@ -263,10 +336,6 @@ class DelWorkAllocTab(BaseAutomationTab):
     def _process_single_id(self, driver, wait, panchayat, item_id, is_auto_mode, filter_from):
         """
         Processes a single Jobcard/Reg ID.
-        1. Selects/Searches ID.
-        2. Checks table rows.
-        3. Filters based on 'filter_from' date.
-        4. Submits form if matches are found.
         """
         try:
             # A. Select or Search the ID
@@ -276,9 +345,10 @@ class DelWorkAllocTab(BaseAutomationTab):
                 search_box.clear()
                 search_box.send_keys(item_id)
                 search_box.send_keys(Keys.TAB)
+                
                 # Wait for dropdown update
-                wait.until(lambda d: len(Select(d.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")).options) > 1)
-                time.sleep(1)
+                # Using a generic wait to allow the dropdown to repopulate
+                time.sleep(1.5) 
 
             reg_id_dropdown_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
             reg_id_dropdown = Select(reg_id_dropdown_element)
@@ -369,8 +439,23 @@ class DelWorkAllocTab(BaseAutomationTab):
             # Attempt Recovery (Reload page to reset state)
             try:
                 driver.get(config.DEL_WORK_ALLOC_CONFIG["url"])
-                Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))).select_by_visible_text(panchayat)
+                # We need to re-select Panchayat here because page reloaded to start fresh
+                # But implementing full re-selection logic here is complex. 
+                # Better to just let the loop continue; the next iteration will fail and trigger this block again if not careful.
+                # However, since we are inside a loop that assumes Panchayat is selected, we must re-select it.
+                
+                wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
+                p_dropdown = Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code"))
+                
+                # Quick Fuzzy Match
+                target_p = panchayat.strip().lower()
+                for opt in p_dropdown.options:
+                    if opt.text.strip().lower() == target_p:
+                        p_dropdown.select_by_visible_text(opt.text)
+                        break
+                
                 wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
+
             except Exception as recovery_e:
                 self.app.log_message(self.log_display, f"Recovery failed: {recovery_e}", "error")
 
