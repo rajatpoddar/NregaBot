@@ -126,77 +126,7 @@ jobs:
               dist/core_win_*.zip
             retention-days: 1
 
-  # --- 3. Build for macOS (Secure Mac Core Zip ONLY) ---
-  # Note: Requires a macOS runner to get Python 3.12 naturally or verify environment
-  build-macos-core:
-    name: Build macOS Core Update
-    needs: get-release-info
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # ✅ Using Python 3.12 explicitly for macOS builds (Matches your local Mac env)
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Create Secure Core Zip (macOS)
-        run: |
-          python3 -c "
-          import os, shutil, zipfile, compileall
-          
-          version = '${{ needs.get-release-info.outputs.version }}'
-          dist_dir = 'dist'
-          if not os.path.exists(dist_dir): os.makedirs(dist_dir)
-          
-          zip_name = f'{dist_dir}/core_mac_v{version}.zip'
-          temp_dir = f'{dist_dir}/core_temp_mac'
-          
-          if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
-          
-          # Copy Logic (Updated to ignore web & screenshots)
-          def ignore_func(dir, files):
-              # Basic ignores including 'web'
-              ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', '.vscode', '.DS_Store', 'web']]
-              
-              # Specific ignore for screenshots inside assets
-              if os.path.basename(dir) == 'assets':
-                  if 'screenshots' in files:
-                      ignored.append('screenshots')
-              
-              return ignored
-          
-          shutil.copytree('.', temp_dir, ignore=ignore_func)
-          
-          # Compile (Python 3.12 Bytecode)
-          print('Compiling macOS Core (Py3.12)...')
-          compileall.compile_dir(temp_dir, force=True, legacy=True)
-          
-          # Zip Logic
-          with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zf:
-              for root, dirs, files in os.walk(temp_dir):
-                  for file in files:
-                      if file.endswith('.py'): continue
-                      if file.endswith(('.exe', '.bat', '.sh', '.spec', '.DS_Store')): continue
-                      
-                      full_path = os.path.join(root, file)
-                      rel_path = os.path.relpath(full_path, temp_dir)
-                      zf.write(full_path, rel_path)
-          
-          shutil.rmtree(temp_dir)
-          print(f'Success: Created {zip_name}')
-          "
-
-      - name: Upload macOS Core Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-core-build
-          path: dist/core_mac_*.zip
-          retention-days: 1
-
-  # --- 4. Build for Linux (Portable Loader) ---
+  # --- 3. Build for Linux (Portable Loader) ---
   build-linux:
     name: Build Linux Loader
     needs: get-release-info
@@ -254,10 +184,10 @@ jobs:
           path: dist/NREGABot-v${{ needs.get-release-info.outputs.version }}-Linux.tar.gz
           retention-days: 1
 
-  # --- 5. Publish Release ---
+  # --- 4. Publish Release ---
   publish-release:
     name: Publish GitHub Release
-    needs: [get-release-info, build-windows, build-macos-core, build-linux]
+    needs: [get-release-info, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -275,6 +205,5 @@ jobs:
           tag_name: v${{ needs.get-release-info.outputs.version }}
           files: |
             artifacts/windows-builds/**/*
-            artifacts/macos-core-build/**/*
             artifacts/linux-build/*
             version.json
