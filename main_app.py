@@ -681,6 +681,7 @@ class NregaBotApp(ctk.CTk):
         self._load_icon("emoji_work_alloc", "assets/icons/emojis/work_allocation.png", size=(16,16))
         self._load_icon("emoji_sad_auto", "assets/icons/emojis/thunder.png", size=(16,16))
         self._load_icon("emoji_sad_status", "assets/icons/emojis/sad_status.png", size=(16,16))
+        self._load_icon("emoji_login_automation", "assets/icons/emojis/login_automation.png", size=(16,16))
 
 
     def run_onboarding_if_needed(self):
@@ -1005,14 +1006,29 @@ class NregaBotApp(ctk.CTk):
         try: self.icon_images[name] = ctk.CTkImage(Image.open(resource_path(path)), size=size)
         except Exception as e: print(f"Warning: Could not load icon '{name}': {e}")
 
-    def launch_chrome_detached(self):
+    def launch_chrome_detached(self, target_urls=None):
+        """
+        Launches Chrome with debugging port enabled.
+        Args:
+            target_urls (list): Optional list of URLs to open. 
+                                If None, opens default bookmarks.
+        """
         port, p_dir = "9222", os.path.join(os.path.expanduser("~"), "ChromeProfileForNREGABot")
         os.makedirs(p_dir, exist_ok=True)
         paths = {"Darwin": ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"], "Windows": [r"C:\Program Files\Google\Chrome\Application\chrome.exe", r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"]}
         b_path = next((p for p in paths.get(config.OS_SYSTEM, []) if os.path.exists(p)), None)
+        
         if not b_path: 
             self.play_sound("error")
             messagebox.showerror("Error", "Google Chrome not found."); return
+            
+        # --- Logic Change Here ---
+        # Agar specific URL diya hai to wahi khulega, nahi to default wale
+        if target_urls:
+            urls_to_open = target_urls
+        else:
+            urls_to_open = [config.MAIN_WEBSITE_URL, "https://bookmark.nregabot.com/"]
+            
         try:
             cmd = [
                 b_path, 
@@ -1024,13 +1040,11 @@ class NregaBotApp(ctk.CTk):
                 "--disable-gpu",
                 "--disable-software-rasterizer",
                 "--log-level=3",
-                "--silent",
-                config.MAIN_WEBSITE_URL, 
-                "https://bookmark.nregabot.com/"
-            ]
+                "--silent"
+            ] + urls_to_open # URLs yahan add ho rahe hain
             
             flags = 0x00000008 if config.OS_SYSTEM == "Windows" else 0
-            # CRITICAL FIX: stdout aur stderr ko DEVNULL kiya gaya
+            
             subprocess.Popen(
                 cmd, 
                 creationflags=flags, 
@@ -1039,8 +1053,10 @@ class NregaBotApp(ctk.CTk):
                 stderr=subprocess.DEVNULL
             )
             
-            self.play_sound("success")
-            messagebox.showinfo("Chrome Launched", "Chrome is starting. Please log in to the NREGA website.")
+            if not target_urls: # Sirf tab toast dikhao jab normal launch ho
+                self.play_sound("success")
+                messagebox.showinfo("Chrome Launched", "Chrome is starting. Please log in to the NREGA website.")
+                
         except Exception as e: 
             self.play_sound("error")
             messagebox.showerror("Error", f"Failed to launch Chrome:\n{e}")
@@ -1100,6 +1116,58 @@ class NregaBotApp(ctk.CTk):
         except Exception as e: 
             self.play_sound("error")
             messagebox.showerror("Error", f"Failed to launch Firefox:\n{e}"); self.driver = None; self.active_browser = None
+
+    # --- NEW FUNCTION: Quick Login Automation Logic ---
+    def _quick_login_automation(self):
+        """
+        Checks if Chrome is running. If not, launches it.
+        Checks if credentials exist. 
+        If YES -> Runs automation in background (No Tab Switch).
+        If NO -> Switches to tab for user input.
+        """
+        def _runner():
+            # 1. Check Browser
+            chrome_running = False
+            try:
+                with socket.create_connection(("127.0.0.1", 9222), timeout=0.2):
+                    chrome_running = True
+            except:
+                pass
+
+            if not chrome_running:
+                login_url = "https://nregade4.nic.in/netnrega/Login.aspx?&level=HomePO&state_code=34"
+                self.after(0, lambda: self.launch_chrome_detached(target_urls=[login_url]))
+                time.sleep(4)
+
+            # 2. Check Saved Credentials
+            creds_path = self.get_data_path('user_location_pref.json')
+            has_creds = False
+            if os.path.exists(creds_path):
+                try:
+                    with open(creds_path, 'r') as f:
+                        data = json.load(f)
+                        if data.get("district") and data.get("block"):
+                            has_creds = True
+                except: pass
+
+            # 3. Load Tab (Background or Foreground)
+            # raise_frame=False matlab tab load hoga par samne nahi aayega
+            should_switch = not has_creds
+            self.after(0, lambda: self.show_frame("Login Automation", raise_frame=should_switch))
+
+            # 4. Trigger Automation
+            def _trigger():
+                if "Login Automation" in self.tab_instances:
+                    # Tab mil gaya -> Automation run karo
+                    self.tab_instances["Login Automation"].run_login_thread()
+                else:
+                    # Tab load nahi hua -> Wait karo
+                    self.after(100, _trigger)
+            
+            # Thoda delay taaki initialization ho sake
+            self.after(500, _trigger)
+
+        threading.Thread(target=_runner, daemon=True).start()
 
     def get_driver(self):
         from selenium import webdriver
@@ -1236,10 +1304,20 @@ class NregaBotApp(ctk.CTk):
         )
         self.extractor_btn.pack(side="left", padx=(0, 10))
 
+        # 2. Login Automation Button ---
+        self.quick_login_btn = ctk.CTkButton(
+            controls_frame, text="", image=self.icon_images.get("emoji_login_automation"), 
+            width=35, height=35, corner_radius=8,
+            fg_color=("gray95", "gray25"), hover_color=("gray85", "gray35"),
+            command=self._quick_login_automation
+        )
+        self.quick_login_btn.pack(side="left", padx=(0, 10))
+        # ------------------------------------
+
         # Separator
         ctk.CTkFrame(controls_frame, width=2, height=20, fg_color=("gray90", "gray30")).pack(side="left", padx=(0, 10))
 
-        # 2. Browsers (Grouped) - CRITICAL FIX: Assigning to self variables
+        # 3. Browsers (Grouped) - CRITICAL FIX: Assigning to self variables
         browser_group = ctk.CTkFrame(controls_frame, fg_color="transparent")
         browser_group.pack(side="left", padx=(0, 10))
         
@@ -1270,7 +1348,7 @@ class NregaBotApp(ctk.CTk):
         # Separator
         ctk.CTkFrame(controls_frame, width=2, height=20, fg_color=("gray90", "gray30")).pack(side="left", padx=(0, 10))
 
-        # 3. Settings
+        # 4. Settings
         settings_group = ctk.CTkFrame(controls_frame, fg_color=("gray95", "gray25"), corner_radius=20)
         settings_group.pack(side="left")
 
@@ -1637,6 +1715,7 @@ class NregaBotApp(ctk.CTk):
         from tabs.work_allocation_tab import WorkAllocationTab
         from tabs.sarkar_aapke_dwar_tab import SarkarAapkeDwarTab
         from tabs.sad_update_tab import SADUpdateStatusTab
+        from tabs.login_automation_tab import LoginAutomationTab
 
         return {
             "Core NREGA Tasks": {
@@ -1685,6 +1764,7 @@ class NregaBotApp(ctk.CTk):
             "Application": {
                  "Feedback": {"creation_func": FeedbackTab, "icon": self.icon_images.get("emoji_feedback")},
                  "About": {"creation_func": AboutTab, "icon": self.icon_images.get("emoji_about")},
+                 "Login Automation": {"creation_func": LoginAutomationTab, "icon": self.icon_images.get("emoji_login_automation")},
             }
         }
 
