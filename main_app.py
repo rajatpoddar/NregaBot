@@ -865,7 +865,7 @@ class NregaBotApp(ctk.CTk):
         self.theme_combo = ctk.CTkOptionMenu(self, width=0, height=0)
 
     def _create_main_layout(self, for_activation=False):
-        """Constructs the sidebar and content area."""
+        """Constructs the sidebar and content area with a FIXED header."""
         # Clean old frame
         if hasattr(self, 'main_layout_frame') and self.main_layout_frame.winfo_exists():
             self.main_layout_frame.destroy()
@@ -876,10 +876,25 @@ class NregaBotApp(ctk.CTk):
         self.main_layout_frame.grid_rowconfigure(0, weight=1)
         self.main_layout_frame.grid_columnconfigure(1, weight=1)
         
-        nav_scroll_frame = ctk.CTkScrollableFrame(self.main_layout_frame, width=200, label_text="", fg_color="transparent")
-        nav_scroll_frame.grid(row=0, column=0, sticky="nsw", padx=(0,5))
-        self._create_nav_buttons(nav_scroll_frame)
+        # --- LEFT SIDEBAR CONTAINER ---
+        self.sidebar_container = ctk.CTkFrame(self.main_layout_frame, width=220, corner_radius=0, fg_color="transparent")
+        self.sidebar_container.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        self.sidebar_container.grid_rowconfigure(1, weight=1)
+        self.sidebar_container.grid_columnconfigure(0, weight=1)
+
+        # 1. FIXED HEADER (Dropdown yahan aayega)
+        self.sidebar_header = ctk.CTkFrame(self.sidebar_container, height=50, fg_color="transparent")
+        self.sidebar_header.grid(row=0, column=0, sticky="ew", padx=0, pady=(0, 5))
+        self.sidebar_header.grid_propagate(False) # Height fix rakhne ke liye
+
+        # 2. SCROLLABLE CONTENT (Buttons yahan aayenge)
+        self.nav_scroll_frame = ctk.CTkScrollableFrame(self.sidebar_container, label_text="", fg_color="transparent")
+        self.nav_scroll_frame.grid(row=1, column=0, sticky="nsew")
         
+        # Populate Sidebar
+        self._create_nav_buttons(self.sidebar_header, self.nav_scroll_frame)
+        
+        # --- RIGHT CONTENT AREA ---
         self.content_area = ctk.CTkFrame(self.main_layout_frame)
         self.content_area.grid(row=0, column=1, sticky="nsew")
         self.content_area.grid_rowconfigure(0, weight=1)
@@ -890,29 +905,27 @@ class NregaBotApp(ctk.CTk):
         if for_activation: 
             self._lock_app_to_about_tab()
 
-    def _create_nav_buttons(self, parent):
-        """Populates the navigation sidebar with a modern look."""
+    def _create_nav_buttons(self, header_parent, content_parent):
+        """Populates the navigation sidebar using tab config."""
         self.nav_buttons.clear()
         self.button_to_category_frame.clear()
         self.category_frames.clear()
         self.tab_icon_map = {} 
 
-        # --- 1. Filter Header (Modern Dropdown) ---
-        filter_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        filter_frame.pack(fill="x", padx=10, pady=(15, 5))
-        
+        # --- 1. Filter Dropdown (Fixed Header me) ---
+        # Clear old widgets in header if any
+        for widget in header_parent.winfo_children(): widget.destroy()
+
         categories = ["All Automations"] + list(self.get_tabs_definition().keys())
         
-        # IMPROVED: Clean "Card-like" dropdown style
         self.category_filter_menu = ctk.CTkOptionMenu(
-            filter_frame, 
+            header_parent, 
             values=categories, 
             command=self._on_category_filter_change,
             height=32,
-            width=200,
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-            fg_color=("white", "#2B2B2B"),        # White card in light, Dark card in dark
-            button_color=("gray85", "gray35"),    # Subtle arrow button
+            fg_color=("white", "#2B2B2B"),
+            button_color=("gray85", "gray35"),
             button_hover_color=("gray75", "gray45"),
             text_color=("gray10", "gray90"),
             dropdown_fg_color=("white", "#2B2B2B"),
@@ -922,40 +935,39 @@ class NregaBotApp(ctk.CTk):
             corner_radius=8
         )
         self.category_filter_menu.set(self.last_selected_category)
-        self.category_filter_menu.pack(fill="x")
+        self.category_filter_menu.pack(fill="x", pady=10, padx=5)
 
-        # --- 2. Categories Loop ---
+        # --- 2. Categories & Buttons (Scrollable Area me) ---
         for cat, tabs in self.get_tabs_definition().items():
             
-            # Create Category Section
-            cat_frame = CollapsibleFrame(parent, title=cat)
+            # Category Frame
+            cat_frame = CollapsibleFrame(content_parent, title=cat)
             self.category_frames[cat] = cat_frame
             
             for name, data in tabs.items():
                 self.tab_icon_map[name] = data.get("icon")
 
-                # IMPROVED: Modern Button Styling
                 btn = ctk.CTkButton(
                     cat_frame.content_frame, 
-                    text=f"{name}",                 # Removed space padding, using border_spacing
+                    text=f"{name}", 
                     image=data.get("icon"), 
                     compound="left", 
                     command=lambda n=name: self.show_frame(n), 
                     anchor="w", 
                     font=ctk.CTkFont(family="Segoe UI", size=13, weight="normal"), 
-                    height=40,                      # Taller for better touch/click area
-                    corner_radius=8,                # Rounded Corners
+                    height=40,          
+                    corner_radius=8,    
                     fg_color="transparent", 
                     text_color=("gray30", "gray80"), 
                     hover_color=("gray90", "gray25"),
-                    border_spacing=12               # More breathing room inside button
+                    border_spacing=12    
                 )
                 btn.pack(fill="x", padx=8, pady=2) 
                 
                 self.nav_buttons[name] = btn
                 self.button_to_category_frame[name] = cat_frame
 
-                # --- Restricted/Maintenance Logic ---
+                # Restricted/Maintenance Logic
                 is_disabled = False
                 if isinstance(self.global_disabled_features, list):
                     if name in self.global_disabled_features: is_disabled = True
@@ -1143,7 +1155,7 @@ class NregaBotApp(ctk.CTk):
         for frame in self.category_frames.values():
             frame.pack_forget()
         
-        self.update_idletasks()
+        # FIX: Removed self.update_idletasks() to prevent flickering/glitch
         
         # Repack selected
         if selected_category == "All Automations":
