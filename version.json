@@ -1,15 +1,21 @@
 {
-  "latest_version": "2.8.3.4",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.8.3.4-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.8.3.4-macOS.dmg",
+  "latest_version": "2.9.0",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.9.0-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.9.0-macOS.dmg",
   "core_update": {
-    "version": "2.8.3.4",
-    "url": "https://nregabot.com/updates/core_v2.8.3.4.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v2.8.3.4.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v2.8.3.4.zip",
-    "force_full_reinstall": false
+    "version": "2.9.0",
+    "url": "https://nregabot.com/updates/core_v2.9.0.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v2.9.0.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v2.9.0.zip",
+    "force_full_reinstall": true
   },
   "changelog": {
+    "2.9.0": [
+      "🚨 **CRITICAL UPDATE:** Fixed the 'White Screen/Crash' issue experienced by some users.",
+      "📦 **New Loader Engine:** Completely rewritten update system that now extracts files correctly to prevent missing assets.",
+      "🛠 **Stability Fixes:** Resolved 'Missing Icon' errors and improved application startup speed.",
+      "⚠️ **Important:** If your application is stuck or not opening, please uninstall and download the new Setup v2.9.0 from the website."
+    ],
     "2.8.3.4": [
       "🎨 **UI Overhaul:** Modernized Sidebar & Floating Footer with interactive status bar.",
       "🚀 **Performance Boost:** Significant code refactoring (Modular Architecture) for faster startup and stability.",
@@ -28,8 +34,8 @@
     "2.8.3.1": [
       "✨ **New Feature (Smart Alerts):** Implemented a 'Smart Kill Switch' for feature management.",
       "🐞 **Bug Fix (Verify APBS):** Resolved critical issues in the APBS Verification automation.",
-      "🐞 **Bug Fix (SAD Update Status):** Fixed bugs in Sarkar Aapke Dwar automation.",
-      "🛠 **Improvement (PDF Export):** Fixed silent failures when exporting reports."
+      "🐞 **Bug Fix (SAD Update Status):** Fixed bugs in Sarkar Aapke Dwar status updating.",
+      "⚡ **Optimization:** Reduced memory usage during long automation runs."
     ]
   }
 }
