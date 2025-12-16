@@ -1,4 +1,19 @@
 {
+  "2.8.3.4": [
+      "🎨 **UI Overhaul:** Modernized Sidebar & Floating Footer with interactive status bar.",
+      "🚀 **Performance Boost:** Significant code refactoring (Modular Architecture) for faster startup and stability.",
+      "💾 **Local Database:** Migrated history to SQLite for robust data handling and zero data loss.",
+      "📜 **Activity Log:** New feature to track your daily tasks with timestamps and specific Panchayat/Block details.",
+      "🧠 **Smart Context:** The app now intelligently detects and logs which Panchayat/Agency you are working on."
+    ],
+    "2.8.3.3": [
+      "🔒 **Security Update:** Added OTP support for secure login.",
+      "🛠 **Fix:** Demand Automation added export results as csv and pdf."
+    ],
+    "2.8.3.2": [
+      "🔒 **Security Update:** Added OTP support for secure login.",
+      "🛠 **Fix:** Resolved login issues and enforced version check."
+    ],
   "2.8.3.1": [
       "✨ **New Feature (Smart Alerts):** Implemented a 'Smart Kill Switch' for feature management. Instead of just disabling a button, users now receive specific alerts if an update is required or if a feature is under maintenance.",
       "🐞 **Bug Fix (Verify APBS):** Resolved critical issues in the APBS Verification automation to ensure reliable processing and data validation.",

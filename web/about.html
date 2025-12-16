@@ -7,61 +7,154 @@
     <meta name="description" content="Learn about the mission and creator of NREGA Bot.">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <script>
+        tailwind.config = { darkMode: 'class' }
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
           document.documentElement.classList.add('dark')
         } else {
           document.documentElement.classList.remove('dark')
         }
     </script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .prose { max-width: 80ch; }
-        .prose h2 { font-size: 1.875rem; font-weight: 800; margin-bottom: 1.5rem; }
-        .prose p { font-size: 1.125rem; line-height: 1.75; margin-bottom: 1.25rem; }
-        .prose a { color: #2563eb; }
-        .prose a:hover { text-decoration: underline; }
-        .dark .prose h1, .dark .prose h2 { color: #fff; }
-        .dark .prose p, .dark .prose a { color: #d1d5db; }
-        .dark .prose a { color: #60a5fa; }
-    </style>
+    <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
-<body class="bg-gray-50 text-gray-800 antialiased dark:bg-gray-900 dark:text-gray-200">
+<body class="bg-gray-50 text-gray-800 antialiased dark:bg-gray-900 dark:text-gray-200 flex flex-col min-h-screen">
 
-    <header class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-800">
-        <div class="container mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
-            <a href="index.html" class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <img src="/logo.png" alt="NREGA Bot Logo" class="h-8 w-8 rounded-full">
-                <span>NREGA Bot</span>
-            </a>
-            <a href="index.html" class="hidden md:inline-block bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">&larr; Back to Home</a>
+    <header class="fixed top-0 w-full z-50 transition-all duration-300 bg-white/70 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800">
+        <div class="container mx-auto px-4 sm:px-6 py-3">
+            <div class="flex justify-between items-center">
+                <a href="index.html" class="flex items-center gap-2 group">
+                    <div class="relative">
+                        <div class="absolute -inset-1 bg-blue-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-200"></div>
+                        <img src="/logo.png" alt="NREGA Bot Logo" class="relative h-9 w-9 rounded-full ring-2 ring-white dark:ring-gray-800">
+                    </div>
+                    <span class="text-xl font-bold text-gray-900 dark:text-white tracking-tight">NREGA Bot</span>
+                </a>
+                <nav class="hidden md:flex items-center gap-1 bg-gray-100/50 dark:bg-gray-800/50 p-1 rounded-full border border-gray-200/50 dark:border-gray-700">
+                    <a href="index.html#home" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">Home</a>
+                    <a href="how-to-use.html" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">How to Use</a>
+                    <a href="index.html#faq" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">FAQ</a>
+                    <a href="https://tools.nregabot.com" target="_blank" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">Tools</a>
+                    <a href="https://license.nregabot.com/login" target="_blank" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">My Account</a>
+                </nav>
+                <div class="flex items-center gap-3">
+                    <a href="https://license.nregabot.com/check-license" class="hidden md:inline-flex items-center justify-center px-5 py-2 text-sm font-bold text-white transition-all duration-200 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/30">Get License Key</a>
+                    <button id="mobile-menu-button" class="md:hidden p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 transition-colors">
+                        <i class="fa-solid fa-bars text-2xl" id="menu-open-icon"></i>
+                        <i class="fa-solid fa-xmark text-2xl hidden" id="menu-close-icon"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </header>
-
-    <main class="container mx-auto px-6 py-16 lg:py-20">
-        <div class="prose mx-auto">
-            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 text-center mb-12">About Us</h1>
+    <div id="mobile-menu" class="fixed inset-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl transform translate-x-full transition-transform duration-300 md:hidden flex flex-col items-center justify-center">
+        <nav class="flex flex-col items-center space-y-6 text-center">
+            <a href="index.html" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white">Home</a>
+            <a href="how-to-use.html" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white">How to Use</a>
+            <a href="contact.html" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white">Contact</a>
+            <div class="pt-8"><a href="https://license.nregabot.com/check-license" class="px-8 py-4 text-lg font-bold text-white bg-blue-600 rounded-xl shadow-xl">Get License Key</a></div>
+        </nav>
+    </div>
+    <main class="container mx-auto px-6 py-24 lg:py-32 flex-grow">
+        <div class="max-w-3xl mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <span class="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Our Story</span>
+                <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white mt-4">About Us</h1>
+            </div>
             
-            <h2>Our Mission</h2>
-            <p>NREGA Bot was created with a simple but powerful mission: to empower NREGA data entry operators and administrative staff by automating their most repetitive, time-consuming tasks. We understand that the work you do is critical, but the process can often be tedious. Our goal is to provide a reliable, secure, and user-friendly tool that saves you countless hours, reduces manual errors, and allows you to focus on more important aspects of your work.</p>
+            <div class="space-y-12">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700" data-aos="fade-up" data-aos-delay="100">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-3">
+                        <i class="fa-solid fa-bullseye text-blue-600"></i> Our Mission
+                    </h2>
+                    <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+                        NREGA Bot was created with a simple but powerful mission: to empower NREGA data entry operators and administrative staff by automating their most repetitive, time-consuming tasks. We understand that the work you do is critical, but the process can often be tedious. Our goal is to provide a reliable, secure, and user-friendly tool that saves you countless hours.
+                    </p>
+                </div>
 
-            <h2>Who We Are</h2>
-            <p>This project is developed and maintained by me, <strong>Rajat Poddar</strong>. As a software developer with a deep appreciation for the impact of the NREGA scheme, I saw an opportunity to apply my technical skills to solve a real-world problem faced by operators every day. This app is a passion project born from the desire to make a tangible difference in the efficiency and productivity of public service administration.</p>
-            
-            <h2>Our Commitment to You</h2>
-            <p>We are committed to maintaining your privacy and security above all else. The application is designed to work locally on your computer, ensuring that none of your sensitive NREGA data ever leaves your machine. We believe in transparency and are dedicated to providing a tool that is not only powerful but also trustworthy.</p>
-            <p>Thank you for your interest and support. It's what keeps this project growing and improving.</p>
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700" data-aos="fade-up" data-aos-delay="200">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-3">
+                        <i class="fa-solid fa-user-code text-purple-600"></i> Who We Are
+                    </h2>
+                    <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+                        This project is developed and maintained by me, <strong>Rajat Poddar</strong>. As a software developer with a deep appreciation for the impact of the NREGA scheme, I saw an opportunity to apply my technical skills to solve a real-world problem faced by operators every day. This app is a passion project born from the desire to make a tangible difference.
+                    </p>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700" data-aos="fade-up" data-aos-delay="300">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-3">
+                        <i class="fa-solid fa-shield-halved text-green-600"></i> Commitment to Privacy
+                    </h2>
+                    <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+                        We are committed to maintaining your privacy and security above all else. The application is designed to work locally on your computer, ensuring that none of your sensitive NREGA data ever leaves your machine. We believe in transparency and are dedicated to providing a tool that is not only powerful but also trustworthy.
+                    </p>
+                </div>
+            </div>
         </div>
     </main>
 
-    <footer class="bg-white border-t dark:bg-gray-800 dark:border-gray-700">
-        <div class="container mx-auto px-6 py-8 text-center text-gray-600 dark:text-gray-400 text-sm">
-            <p>&copy; 2025 NREGA Bot by Rajat Poddar. All rights reserved.</p>
+    <footer class="bg-gray-100 dark:bg-gray-900 border-t border-gray-300 dark:border-gray-800">
+        <div class="container mx-auto px-6 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12">
+                <div class="space-y-4">
+                    <h3 class="text-2xl font-bold text-gray-900 dark:text-white">NREGA Bot</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Simplifying MGNREGA workflows since 2024.</p>
+                </div>
+                <div>
+                    <h4 class="text-gray-900 dark:text-white font-bold mb-6 uppercase text-sm">Quick Links</h4>
+                    <ul class="space-y-3 text-sm">
+                        <li><a href="index.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600">Home</a></li>
+                        <li><a href="how-to-use.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600">How to Use</a></li>
+                        <li><a href="contact.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600">Contact Us</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-gray-900 dark:text-white font-bold mb-6 uppercase text-sm">Legal</h4>
+                    <ul class="space-y-3 text-sm">
+                        <li><a href="privacy.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600">Privacy Policy</a></li>
+                        <li><a href="terms.html" class="text-gray-600 dark:text-gray-400 hover:text-blue-600">Terms of Service</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-gray-900 dark:text-white font-bold mb-6 uppercase text-sm">Support</h4>
+                    <ul class="space-y-3 text-sm">
+                        <li><a href="mailto:nregabot@gmail.com" class="text-gray-600 dark:text-gray-400 hover:text-blue-600">nregabot@gmail.com</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-300 dark:border-gray-800 mt-12 pt-8 text-center text-xs text-gray-500">
+                <p>&copy; 2025 Poddar Solutions. All rights reserved.</p>
+            </div>
         </div>
     </footer>
-
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            AOS.init({ duration: 600, once: true });
+            const btn = document.getElementById('mobile-menu-button');
+            const menu = document.getElementById('mobile-menu');
+            const openIcon = document.getElementById('menu-open-icon');
+            const closeIcon = document.getElementById('menu-close-icon');
+            const links = document.querySelectorAll('.mobile-link');
+            function toggleMenu() {
+                const isHidden = menu.classList.contains('translate-x-full');
+                if (isHidden) {
+                    menu.classList.remove('translate-x-full');
+                    openIcon.classList.add('hidden');
+                    closeIcon.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    menu.classList.add('translate-x-full');
+                    openIcon.classList.remove('hidden');
+                    closeIcon.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }
+            }
+            if(btn) btn.addEventListener('click', toggleMenu);
+            links.forEach(l => l.addEventListener('click', toggleMenu));
+        });
+    </script>
 </body>
 </html>

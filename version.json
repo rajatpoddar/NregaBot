@@ -1,15 +1,22 @@
 {
-  "latest_version": "2.8.3.3",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.8.3.3-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.8.3.3-macOS.dmg",
+  "latest_version": "2.8.3.4",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.8.3.4-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.8.3.4-macOS.dmg",
   "core_update": {
-    "version": "2.8.3.3",
-    "url": "https://nregabot.com/updates/core_v2.8.3.3.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v2.8.3.3.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v2.8.3.3.zip",
+    "version": "2.8.3.4",
+    "url": "https://nregabot.com/updates/core_v2.8.3.4.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v2.8.3.4.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v2.8.3.4.zip",
     "force_full_reinstall": false
   },
   "changelog": {
+    "2.8.3.4": [
+      "🎨 **UI Overhaul:** Modernized Sidebar & Floating Footer with interactive status bar.",
+      "🚀 **Performance Boost:** Significant code refactoring (Modular Architecture) for faster startup and stability.",
+      "💾 **Local Database:** Migrated history to SQLite for robust data handling and zero data loss.",
+      "📜 **Activity Log:** New feature to track your daily tasks with timestamps and specific Panchayat/Block details.",
+      "🧠 **Smart Context:** The app now intelligently detects and logs which Panchayat/Agency you are working on."
+    ],
     "2.8.3.3": [
       "🔒 **Security Update:** Added OTP support for secure login.",
       "🛠 **Fix:** Demand Automation added export results as csv and pdf."
