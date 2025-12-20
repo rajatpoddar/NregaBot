@@ -95,6 +95,7 @@ def load_icons():
     _add("emoji_mr_tracking", "assets/icons/emojis/mr_tracking.png", size=(16, 16))
     _add("emoji_issued_mr_report", "assets/icons/emojis/issued_mr_report.png", size=(16, 16))
     _add("emoji_dashboard_report", "assets/icons/emojis/dashboard_report.png", size=(16, 16))
+    _add("emoji_ekyc_report", "assets/icons/emojis/ekyc_report.png", size=(16, 16))
     
     # Others
     _add("emoji_sad_auto", "assets/icons/emojis/thunder.png", size=(16, 16))

@@ -1,15 +1,24 @@
 {
-  "latest_version": "2.9.0",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.9.0-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.9.0-macOS.dmg",
+  "latest_version": "2.9.1",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.9.1-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.9.1-macOS.dmg",
   "core_update": {
-    "version": "2.9.0",
-    "url": "https://nregabot.com/updates/core_v2.9.0.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v2.9.0.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v2.9.0.zip",
-    "force_full_reinstall": true
+    "version": "2.9.1",
+    "url": "https://nregabot.com/updates/core_v2.9.1.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v2.9.1.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v2.9.1.zip",
+    "force_full_reinstall": false
   },
   "changelog": {
+    "2.9.1": [
+      "✨ **New Feature (MR Tracking):** Added 'Pendency Report (T0-T8)' generator for Panchayat-wise analysis.",
+      "✨ **New Feature (Zero MR Integration):** Directly forward data from MR Tracking to Zero MR tab.",
+      "✨ **New Feature (Issued MR):** Added 'Pending demand labour for ABPS' scan at block level.",
+      "✨ **New Feature (File Manager):** Added ability to share cloud folders via public links.",
+      "🎨 **Export Improvements:** Reports can now be exported as Professional PDFs and PNG images.",
+      "🚀 **New Automation (eKYC Report):** Now generate Professional ekyc pending Reports.",
+      "🛠 **UI Updates:** Added Footer Copyright and improved Date Picker interaction."
+    ],
     "2.9.0": [
       "🚨 **CRITICAL UPDATE:** Fixed the 'White Screen/Crash' issue experienced by some users.",
       "📦 **New Loader Engine:** Completely rewritten update system that now extracts files correctly to prevent missing assets.",

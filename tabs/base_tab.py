@@ -606,17 +606,63 @@ class BaseAutomationTab(ctk.CTkFrame):
         if progress is not None:
             self.progress_bar.set(float(progress))
 
-    def style_treeview(self, tree):
+    def style_treeview(self, treeview_widget=None):
+        # Agar argument nahi diya (main_app me), toh ye function global style set karega
         style = ttk.Style()
-        bg_color = self._apply_appearance_mode(ctk.ThemeManager.theme["CTkFrame"]["fg_color"])
-        text_color = self._apply_appearance_mode(ctk.ThemeManager.theme["CTkLabel"]["text_color"])
-        heading_bg = self._apply_appearance_mode(ctk.ThemeManager.theme["CTkButton"]["fg_color"])
-        style.theme_use("default")
-        style.configure("Treeview", background=bg_color, foreground=text_color, fieldbackground=bg_color, borderwidth=0)
-        style.map('Treeview', background=[('selected', ctk.ThemeManager.theme["CTkButton"]["fg_color"])])
-        style.configure("Treeview.Heading", background=heading_bg, foreground=text_color, relief="flat", font=('Calibri', 10,'bold'))
-        style.map("Treeview.Heading", background=[('active', ctk.ThemeManager.theme["CTkButton"]["hover_color"])])
-        tree.tag_configure('failed', foreground='red')
+        style.theme_use("clam")
+
+        # 1. Theme Detection
+        mode = ctk.get_appearance_mode()
+
+        if mode == "Dark":
+            # --- DARK MODE COLORS ---
+            bg_color = "#2b2b2b"        # Table Background
+            text_color = "#e5e7eb"      # Text (Light Gray)
+            row_hover = "#3f3f46"       # Row Hover Color (Thoda sa light dark)
+            selected_bg = "#3B82F6"     # Selection (Blue)
+            
+            header_bg = "#1f2937"       # Header Background (Dark Slate)
+            header_fg = "#ffffff"       # Header Text
+            header_hover = "#374151"    # Header Hover
+        else:
+            # --- LIGHT MODE COLORS ---
+            bg_color = "#ffffff"        # Table Background
+            text_color = "#374151"      # Text (Dark Gray)
+            row_hover = "#f3f4f6"       # Row Hover Color (Very Light Gray)
+            selected_bg = "#3B82F6"     # Selection (Blue)
+            
+            header_bg = "#f9fafb"       # Header Background (Off-white)
+            header_fg = "#111827"       # Header Text (Almost Black)
+            header_hover = "#e5e7eb"    # Header Hover
+
+        # 2. Configure Treeview Body
+        style.configure("Treeview",
+                        background=bg_color,
+                        foreground=text_color,
+                        fieldbackground=bg_color,
+                        rowheight=35,             # Rows thodi spacious
+                        font=("Segoe UI", 11),
+                        borderwidth=0)
+
+        # 3. Configure Rows (Hover & Selection)
+        # Note: 'selected' pehle check hota hai, isliye hover selected row ka color kharab nahi karega
+        style.map("Treeview",
+                  background=[('selected', selected_bg), ('active', row_hover)],
+                  foreground=[('selected', 'white'), ('active', text_color)])
+
+        # 4. Configure Heading
+        style.configure("Treeview.Heading",
+                        background=header_bg,
+                        foreground=header_fg,
+                        relief="flat",
+                        font=("Segoe UI", 12, "bold"))
+
+        style.map("Treeview.Heading",
+                  background=[('active', header_hover)])
+
+        # 5. Fix for file_management_tab (jahan widget pass hota hai)
+        if treeview_widget:
+            treeview_widget.configure(style="Treeview")
 
     def _setup_treeview_sorting(self, tree):
         for col in tree["columns"]:

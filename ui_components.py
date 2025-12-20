@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import tkinter
+import tkinter as tk
 import webbrowser
 import os
 import re
@@ -9,13 +10,14 @@ from utils import resource_path
 # --- 1. COLLAPSIBLE FRAME (Sidebar Categories) ---
 class CollapsibleFrame(ctk.CTkFrame):
     def __init__(self, parent, title=""):
-        super().__init__(parent, fg_color="transparent")
+        # OPTIMIZATION: corner_radius=0 for faster rendering
+        super().__init__(parent, fg_color="transparent", corner_radius=0)
         self.grid_columnconfigure(0, weight=1)
         self.title = title
 
-        # IMPROVED: Added a separator line and better spacing for the header
-        self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(15, 5))
+        # Header Frame
+        self.header_frame = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
+        self.header_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(10, 2)) # Padding reduced
         
         self.header_label = ctk.CTkLabel(
             self.header_frame, 
@@ -24,14 +26,13 @@ class CollapsibleFrame(ctk.CTkFrame):
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             text_color=("gray40", "gray60")
         )
-        self.header_label.pack(side="left", fill="x")
+        self.header_label.pack(side="left", fill="x", expand=True)
 
-        # Optional: Subtle separator line next to text
-        self.separator = ctk.CTkFrame(self.header_frame, height=2, fg_color=("gray90", "gray25"))
-        self.separator.pack(side="left", fill="x", expand=True, padx=(10, 0), pady=8)
+        # OPTIMIZATION: Removed Separator Line (Performance Boost)
+        # Jo line pehle thi wo ab widget load nahi badhayegi
 
-        self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.content_frame.grid(row=1, column=0, sticky="ew", padx=(5, 0))
+        self.content_frame = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
+        self.content_frame.grid(row=1, column=0, sticky="ew", padx=(0, 0))
 
     def add_widget(self, widget, **pack_options):
         widget.pack(in_=self.content_frame, **pack_options)
@@ -54,46 +55,139 @@ class OnboardingStep(ctk.CTkFrame):
         desc_label.pack(pady=(0, 20))
 
 # --- 3. SKELETON LOADER (Loading Effect) ---
+
+class FormSkeleton(tk.Frame):
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        # Background color aapke app theme ke hisab se set karein
+        self.canvas = tk.Canvas(self, bg="white", highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
+        self.bind("<Configure>", self.redraw)
+
+    def redraw(self, event=None):
+        self.canvas.delete("all")
+        w = self.canvas.winfo_width()
+        h = self.canvas.winfo_height()
+        
+        # Skeleton color (Light Grey)
+        skel_color = "#E0E0E0" 
+
+        # 1. Title/Header Block (Top Left)
+        self.canvas.create_rectangle(20, 20, 300, 50, fill=skel_color, outline="")
+
+        # 2. Form Fields (Rows of Label + Input)
+        # Yeh loop 8 lines/rows banayega jo aapke 'data texts' ko represent karega
+        start_y = 80
+        gap = 60 # Har row ke beech ka gap
+        
+        for i in range(8): 
+            y = start_y + (i * gap)
+            
+            # Label Skeleton (Chota box left side)
+            self.canvas.create_rectangle(20, y, 150, y+20, fill=skel_color, outline="")
+            
+            # Input Field Skeleton (Lamba box right side)
+            self.canvas.create_rectangle(170, y, w - 50, y+35, fill=skel_color, outline="")
+
+        # 3. Action Buttons (Bottom)
+        btn_y = start_y + (8 * gap) + 20
+        self.canvas.create_rectangle(20, btn_y, 140, btn_y+40, fill=skel_color, outline="")
+        self.canvas.create_rectangle(160, btn_y, 280, btn_y+40, fill=skel_color, outline="")
 class SkeletonLoader(ctk.CTkFrame):
-    def __init__(self, parent, rows=5, **kwargs):
+    def __init__(self, parent, rows=8, **kwargs):
         super().__init__(parent, fg_color="transparent", **kwargs)
         self.pack(fill="both", expand=True, padx=20, pady=20)
         self.placeholders = []
-        for _ in range(rows):
-            row_frame = ctk.CTkFrame(self, fg_color="transparent")
-            row_frame.pack(fill="x", pady=10)
-            icon_ph = ctk.CTkFrame(row_frame, width=40, height=40, corner_radius=20, fg_color=("gray85", "gray25"))
-            icon_ph.pack(side="left", padx=(0, 15))
-            text_frame = ctk.CTkFrame(row_frame, fg_color="transparent")
-            text_frame.pack(side="left", fill="x", expand=True)
-            line1 = ctk.CTkFrame(text_frame, height=15, width=200, fg_color=("gray85", "gray25"))
-            line1.pack(anchor="w", pady=(0, 5))
-            line2 = ctk.CTkFrame(text_frame, height=12, width=120, fg_color=("gray90", "gray30"))
-            line2.pack(anchor="w")
-            self.placeholders.extend([icon_ph, line1, line2])
+        
+        # --- 1. Header Title ---
+        title_frame = ctk.CTkFrame(self, width=250, height=35, corner_radius=8, fg_color=("gray85", "gray25"))
+        title_frame.pack(anchor="w", pady=(0, 25))
+        self.placeholders.append(title_frame)
+
+        # --- 2. Top Info Cards (The "4 Circles" Area) ---
+        stats_frame = ctk.CTkFrame(self, fg_color="transparent")
+        stats_frame.pack(fill="x", pady=(0, 25))
+        
+        for _ in range(4): # 4 Blocks banayenge
+            card = ctk.CTkFrame(stats_frame, fg_color=("white", "#2B2B2B"), corner_radius=10)
+            card.pack(side="left", expand=True, fill="x", padx=6, ipady=10)
+            
+            # Circle (Icon Placeholder)
+            circle = ctk.CTkFrame(card, width=45, height=45, corner_radius=22, fg_color=("gray85", "gray25"))
+            circle.pack(side="left", padx=(15, 10))
+            
+            # Text Details
+            text_box = ctk.CTkFrame(card, fg_color="transparent")
+            text_box.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            
+            l1 = ctk.CTkFrame(text_box, height=14, width=80, corner_radius=6, fg_color=("gray85", "gray25"))
+            l1.pack(anchor="w", pady=(0, 6))
+            l2 = ctk.CTkFrame(text_box, height=12, width=50, corner_radius=6, fg_color=("gray90", "gray30"))
+            l2.pack(anchor="w")
+            
+            self.placeholders.extend([circle, l1, l2])
+
+        # --- 3. Data List / Table (The "8 Lines" Area) ---
+        table_frame = ctk.CTkFrame(self, fg_color=("white", "#2B2B2B"), corner_radius=12)
+        table_frame.pack(fill="both", expand=True)
+        
+        # Fake Table Header
+        header_row = ctk.CTkFrame(table_frame, height=40, fg_color="transparent")
+        header_row.pack(fill="x", padx=15, pady=(15, 10))
+        h1 = ctk.CTkFrame(header_row, height=20, width=100, corner_radius=5, fg_color=("gray85", "gray25"))
+        h1.pack(side="left", padx=(0, 20))
+        h2 = ctk.CTkFrame(header_row, height=20, width=150, corner_radius=5, fg_color=("gray85", "gray25"))
+        h2.pack(side="left")
+        self.placeholders.extend([h1, h2])
+        
+        # Fake Table Rows
+        for i in range(rows):
+            row = ctk.CTkFrame(table_frame, fg_color="transparent")
+            row.pack(fill="x", padx=15, pady=8)
+            
+            # Row Structure (Multiple columns simulating real data)
+            c1 = ctk.CTkFrame(row, height=16, width=40, corner_radius=8, fg_color=("gray90", "gray30")) # ID
+            c1.pack(side="left", padx=(0, 20))
+            
+            w_text = 200 if i % 2 == 0 else 150
+            c2 = ctk.CTkFrame(row, height=16, width=w_text, corner_radius=8, fg_color=("gray90", "gray30")) # Name
+            c2.pack(side="left", padx=(0, 20))
+            
+            c3 = ctk.CTkFrame(row, height=16, corner_radius=8, fg_color=("gray90", "gray30")) # Details (Flexible)
+            c3.pack(side="left", fill="x", expand=True)
+            
+            self.placeholders.extend([c1, c2, c3])
+            
         self.animate_step = 0
         self.animating = True
         self._animate()
 
     def _animate(self):
         if not self.animating or not self.winfo_exists(): return
-        l1, l2 = "gray85", "gray90" 
-        d1, d2 = "gray25", "gray30"
+        
+        # Thoda modern colors (Light/Dark mode compatible)
+        # Pulse Effect: Light Gray <-> Slightly Darker Gray
+        l1, l2 = "#E0E0E0", "#EEEEEE"  # Light Mode
+        d1, d2 = "#2D3748", "#4A5568"  # Dark Mode
+        
+        mode = ctk.get_appearance_mode()
         
         if self.animate_step == 0:
-            color_set = (l2, d2) 
+            c_light, c_dark = l2, d2
             self.animate_step = 1
         else:
-            color_set = (l1, d1) 
+            c_light, c_dark = l1, d1
             self.animate_step = 0
+            
+        final_color = c_dark if mode == "Dark" else c_light
             
         for p in self.placeholders:
             try:
                 if p.winfo_exists():
-                    p.configure(fg_color=color_set)
+                    p.configure(fg_color=final_color)
             except: pass
             
-        self.after(800, self._animate)
+        self.after(600, self._animate) # Thoda fast animation (600ms)
 
     def stop(self):
         self.animating = False

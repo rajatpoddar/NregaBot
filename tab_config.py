@@ -40,6 +40,7 @@ def get_tabs_definition(app):
     from tabs.sarkar_aapke_dwar_tab import SarkarAapkeDwarTab
     from tabs.sad_update_tab import SADUpdateStatusTab
     from tabs.login_automation_tab import LoginAutomationTab
+    from tabs.ekyc_report_tab import EKycReportTab
 
     # --- DEFINITIONS ---
     return {
@@ -85,6 +86,7 @@ def get_tabs_definition(app):
             "MR Tracking": {"creation_func": MrTrackingTab, "icon": app.icon_images.get("emoji_mr_tracking"), "key": "mr_tracking"},
             "Issued MR Details": {"creation_func": IssuedMrReportTab, "icon": app.icon_images.get("emoji_issued_mr_report"), "key": "issued_mr_report"},
             "Dashboard Report": {"creation_func": DashboardReportTab, "icon": app.icon_images.get("emoji_dashboard_report"), "key": "dashboard_report"},
+            "eKYC Report": {"creation_func": EKycReportTab, "icon": app.icon_images.get("emoji_ekyc_report"), "key": "ekyc_report"},
         },
         "Application": {
              "Feedback": {"creation_func": FeedbackTab, "icon": app.icon_images.get("emoji_feedback")},

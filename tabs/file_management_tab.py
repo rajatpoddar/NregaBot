@@ -117,22 +117,63 @@ class FileManagementTab(ctk.CTkFrame):
         self.delete_button = ctk.CTkButton(action_bar, text="Delete", command=self.delete_selected_item, state="disabled", fg_color="#D32F2F", hover_color="#B71C1C")
         self.delete_button.pack(side="left", padx=5)
 
-    def style_treeview(self, treeview_widget: ttk.Treeview):
+    def style_treeview(self, treeview_widget=None):
+        # Agar argument nahi diya (main_app me), toh ye function global style set karega
         style = ttk.Style()
         style.theme_use("clam")
 
-        current_appearance = ctk.get_appearance_mode().lower()
-        theme_data = ctk.ThemeManager.theme
+        # 1. Theme Detection
+        mode = ctk.get_appearance_mode()
 
-        bg_color = theme_data["CTkFrame"]["fg_color"][0] if current_appearance == "light" else theme_data["CTkFrame"]["fg_color"][1]
-        text_color = theme_data["CTkLabel"]["text_color"][0] if current_appearance == "light" else theme_data["CTkLabel"]["text_color"][1]
-        header_bg = theme_data["CTkButton"]["fg_color"][0] if current_appearance == "light" else theme_data["CTkButton"]["fg_color"][1]
-        selected_color = theme_data["CTkButton"]["hover_color"][0] if current_appearance == "light" else theme_data["CTkButton"]["hover_color"][1]
+        if mode == "Dark":
+            # --- DARK MODE COLORS ---
+            bg_color = "#2b2b2b"        # Table Background
+            text_color = "#e5e7eb"      # Text (Light Gray)
+            row_hover = "#3f3f46"       # Row Hover Color (Thoda sa light dark)
+            selected_bg = "#3B82F6"     # Selection (Blue)
+            
+            header_bg = "#1f2937"       # Header Background (Dark Slate)
+            header_fg = "#ffffff"       # Header Text
+            header_hover = "#374151"    # Header Hover
+        else:
+            # --- LIGHT MODE COLORS ---
+            bg_color = "#ffffff"        # Table Background
+            text_color = "#374151"      # Text (Dark Gray)
+            row_hover = "#f3f4f6"       # Row Hover Color (Very Light Gray)
+            selected_bg = "#3B82F6"     # Selection (Blue)
+            
+            header_bg = "#f9fafb"       # Header Background (Off-white)
+            header_fg = "#111827"       # Header Text (Almost Black)
+            header_hover = "#e5e7eb"    # Header Hover
 
-        style.configure("Treeview", background=bg_color, foreground=text_color, fieldbackground=bg_color, borderwidth=0, rowheight=25)
-        style.map('Treeview', background=[('selected', selected_color)])
-        style.configure("Treeview.Heading", background=header_bg, foreground=text_color, relief="flat", font=('sans-serif', 10, 'bold'))
-        style.map("Treeview.Heading", background=[('active', selected_color)])
+        # 2. Configure Treeview Body
+        style.configure("Treeview",
+                        background=bg_color,
+                        foreground=text_color,
+                        fieldbackground=bg_color,
+                        rowheight=35,             # Rows thodi spacious
+                        font=("Segoe UI", 11),
+                        borderwidth=0)
+
+        # 3. Configure Rows (Hover & Selection)
+        # Note: 'selected' pehle check hota hai, isliye hover selected row ka color kharab nahi karega
+        style.map("Treeview",
+                  background=[('selected', selected_bg), ('active', row_hover)],
+                  foreground=[('selected', 'white'), ('active', text_color)])
+
+        # 4. Configure Heading
+        style.configure("Treeview.Heading",
+                        background=header_bg,
+                        foreground=header_fg,
+                        relief="flat",
+                        font=("Segoe UI", 12, "bold"))
+
+        style.map("Treeview.Heading",
+                  background=[('active', header_hover)])
+
+        # 5. Fix for file_management_tab (jahan widget pass hota hai)
+        if treeview_widget:
+            treeview_widget.configure(style="Treeview")
 
     def on_item_select(self, event=None):
         selected_items = self.files_tree.selection()

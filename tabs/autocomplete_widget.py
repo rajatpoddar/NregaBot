@@ -10,17 +10,23 @@ class AutocompleteEntry(ctk.CTkEntry):
         self.history_key = history_key
         
         self._suggestion_toplevel = None
+        self._suggestion_listbox = None
         
-        # --- For keyboard navigation ---
-        self._active_suggestion_index = -1
-        self._suggestion_labels = []
-        self._suggestion_frames = []
+        # --- PERFORMANCE FIX: Widget Pooling ---
+        # Bar-bar widgets create/destroy karne se lag hota hai.
+        # Hum 5 frames pehle hi bana lenge aur unhe reuse karenge.
+        self._pool_frames = [] 
+        self._pool_labels = []
+        self._pool_buttons = []
+        self._MAX_SUGGESTIONS = 5
+        self._visible_suggestions = []
         
-        # --- Debounce Timer variable ---
+        # --- Debounce Timer ---
         self._typing_timer = None
-        
-        # --- NEW: Flag to prevent re-opening after selection ---
         self._is_selecting = False 
+        
+        # --- Keyboard Navigation ---
+        self._active_suggestion_index = -1
 
         self.bind("<KeyRelease>", self._on_key_release)
         self.bind("<FocusOut>", self._on_focus_out)
@@ -29,183 +35,166 @@ class AutocompleteEntry(ctk.CTkEntry):
         self.bind("<Return>", self._on_enter)
 
     def _on_key_release(self, event):
-        # --- FIX: Agar abhi selection kiya hai, to search mat karo ---
-        if self._is_selecting:
-            return
+        if self._is_selecting: return
+        if event.keysym in ("Up", "Down", "Return", "Enter", "Tab", "Escape"): return
+        if event.keysym in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R"): return
 
-        # Navigation keys ko ignore karein
-        if event.keysym in ("Up", "Down", "Return", "Enter", "Tab", "Escape"):
-            return
-        if event.keysym in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R"):
-            return
-
-        # Debouncing Logic
-        # Agar purana timer chal raha hai toh use cancel karein
-        if self._typing_timer:
-            self.after_cancel(self._typing_timer)
-        
-        # Naya timer start karein (150ms delay) - smooth typing ke liye
+        # Debounce: Fast typing pe lag na ho
+        if self._typing_timer: self.after_cancel(self._typing_timer)
         self._typing_timer = self.after(150, self._process_filtering)
 
     def _process_filtering(self):
-        """Filters suggestions and updates the UI."""
         if not self.winfo_exists(): return
-
         current_text = self.get().lower()
         
         if not current_text:
             self._hide_suggestions()
             return
 
-        # Filter suggestions
-        matching_suggestions = [s for s in self.suggestions if current_text in s.lower()]
+        # Optimized Search: Sirf pehle 5 match dhundo
+        matches = []
+        count = 0
+        for s in self.suggestions:
+            if current_text in s.lower():
+                matches.append(s)
+                count += 1
+                if count >= self._MAX_SUGGESTIONS: break
         
-        if matching_suggestions:
-            self._show_suggestions(matching_suggestions)
+        if matches:
+            self._show_suggestions(matches)
         else:
             self._hide_suggestions()
 
-    def _show_suggestions(self, suggestions):
-        # Agar window pehle se hai, toh use REUSE karein (Destroy mat karein)
-        if not self._suggestion_toplevel or not self._suggestion_toplevel.winfo_exists():
-            self._suggestion_toplevel = ctk.CTkToplevel(self)
-            self._suggestion_toplevel.wm_overrideredirect(True)
-            self._suggestion_toplevel.attributes("-topmost", True)
-            
-            # Initial Listbox Frame
-            self._suggestion_listbox = ctk.CTkFrame(self._suggestion_toplevel, fg_color=("gray90", "gray20"))
-            self._suggestion_listbox.pack(expand=True, fill="both")
-        else:
-            # Agar window hai, to bas purane widgets hatayein
-            for widget in self._suggestion_listbox.winfo_children():
-                widget.destroy()
+    def _init_popup(self):
+        """Popup window aur widgets ko ek baar initialize karein."""
+        if self._suggestion_toplevel and self._suggestion_toplevel.winfo_exists(): return
 
+        self._suggestion_toplevel = ctk.CTkToplevel(self)
+        self._suggestion_toplevel.wm_overrideredirect(True)
+        # FOCUS FIX: Transient set karein taaki ye main window se juda rahe
+        try: self._suggestion_toplevel.transient(self.winfo_toplevel())
+        except: pass
+        self._suggestion_toplevel.attributes("-topmost", True)
+        self._suggestion_toplevel.withdraw()
+
+        self._suggestion_listbox = ctk.CTkFrame(self._suggestion_toplevel, fg_color=("gray90", "gray20"))
+        self._suggestion_listbox.pack(expand=True, fill="both")
+
+        # Pool create karein
+        self._pool_frames = []
+        self._pool_labels = []
+        self._pool_buttons = []
+
+        for i in range(self._MAX_SUGGESTIONS):
+            frame = ctk.CTkFrame(self._suggestion_listbox, fg_color="transparent", corner_radius=0)
+            frame.grid_columnconfigure(0, weight=1)
+            
+            lbl = ctk.CTkLabel(frame, text="", anchor="w", padx=5)
+            lbl.grid(row=0, column=0, sticky="ew")
+            
+            btn = None
+            if self.app and self.history_key:
+                btn = ctk.CTkButton(frame, text="✕", width=20, height=20, fg_color="transparent", 
+                                  text_color="gray", hover_color="gray70", font=("Arial", 10))
+                btn.grid(row=0, column=1, padx=(0, 2))
+            
+            # Events
+            frame.bind("<Button-1>", lambda e, idx=i: self._on_click_suggestion(idx))
+            lbl.bind("<Button-1>", lambda e, idx=i: self._on_click_suggestion(idx))
+            frame.bind("<Enter>", lambda e, idx=i: self._highlight_suggestion(idx))
+            
+            self._pool_frames.append(frame)
+            self._pool_labels.append(lbl)
+            self._pool_buttons.append(btn)
+
+    def _show_suggestions(self, suggestions):
+        self._init_popup()
+        self._visible_suggestions = suggestions
+        
         # Position calculation
         try:
             x = self.winfo_rootx()
             y = self.winfo_rooty() + self.winfo_height()
             w = self.winfo_width()
-            self._suggestion_toplevel.wm_geometry(f"{w}x{y}+{x}+{y}")
+            self._suggestion_toplevel.wm_geometry(f"{w}x{len(suggestions)*30}+{x}+{y}")
+            self._suggestion_toplevel.deiconify()
             self._suggestion_toplevel.lift()
-        except Exception:
-            return # Agar widget destroy ho gaya ho calculation ke dauran
+        except: return
 
-        self._suggestion_labels.clear()
-        self._suggestion_frames.clear()
         self._active_suggestion_index = -1
 
-        # Sirf top 5 suggestions dikhayein
-        for i, item in enumerate(suggestions[:5]):
-            item_frame = ctk.CTkFrame(self._suggestion_listbox, fg_color="transparent")
-            item_frame.pack(fill="x")
-            item_frame.grid_columnconfigure(0, weight=1)
-
-            label = ctk.CTkLabel(item_frame, text=item, anchor="w", padx=5)
-            label.grid(row=0, column=0, sticky="ew")
-            
-            # Delete button
-            if self.app and self.history_key:
-                del_button = ctk.CTkButton(
-                    item_frame, text="✕", width=25, height=25,
-                    fg_color="transparent", text_color=("gray40", "gray60"), hover_color="gray70",
-                    command=lambda val=item: self._delete_suggestion(val)
-                )
-                del_button.grid(row=0, column=1, padx=(0, 5))
-            
-            # Bindings
-            item_frame.bind("<Button-1>", lambda e, val=item: self._select_suggestion(val))
-            label.bind("<Button-1>", lambda e, val=item: self._select_suggestion(val))
-            
-            item_frame.bind("<Enter>", lambda e, index=i: self._on_mouse_enter(index))
-            item_frame.bind("<Leave>", lambda e, index=i: self._on_mouse_leave(index))
-            
-            self._suggestion_labels.append(label)
-            self._suggestion_frames.append(item_frame)
+        # Reuse Widgets (No Destroy)
+        for i in range(self._MAX_SUGGESTIONS):
+            if i < len(suggestions):
+                text = suggestions[i]
+                self._pool_labels[i].configure(text=text)
+                if self._pool_buttons[i]:
+                    self._pool_buttons[i].configure(command=lambda v=text: self._delete_suggestion(v))
+                self._pool_frames[i].pack(fill="x", ipady=2)
+                self._pool_frames[i].configure(fg_color="transparent")
+            else:
+                self._pool_frames[i].pack_forget()
 
     def _hide_suggestions(self):
-        # Timer cancel karein taaki focus out ke baad popup wapas na aa jaye
         if self._typing_timer:
             self.after_cancel(self._typing_timer)
             self._typing_timer = None
-
         if self._suggestion_toplevel:
-            self._suggestion_toplevel.destroy()
-            self._suggestion_toplevel = None
-            
-        self._suggestion_labels.clear()
-        self._suggestion_frames.clear()
+            self._suggestion_toplevel.withdraw()
         self._active_suggestion_index = -1
 
+    def _on_click_suggestion(self, index):
+        if 0 <= index < len(self._visible_suggestions):
+            self._select_suggestion(self._visible_suggestions[index])
+
     def _select_suggestion(self, value):
-        # Timer cancel karein
         if self._typing_timer: self.after_cancel(self._typing_timer)
-        
-        # --- FIX: Flag set karein taaki KeyRelease event ignore ho jaye ---
         self._is_selecting = True
         
         self.delete(0, "end")
         self.insert(0, value)
-        self._hide_suggestions()
-        self.focus()
         
-        # Trigger manual event (Validation triggers ke liye)
+        # --- FOCUS BUG FIX ---
+        # Window ko turant destroy mat karo, thoda delay do taaki click event complete ho jaye
+        # Aur focus wapas entry par force karo
+        self.after(50, self._hide_suggestions)
+        self.focus_force() 
+        
         self.event_generate("<KeyRelease>") 
-        
-        # --- FIX: Flag reset karein ---
         self._is_selecting = False
 
     def _on_focus_out(self, event):
-        # Thoda delay dein taki click register ho sake (agar user list par click kare)
-        self.after(200, self._hide_suggestions)
+        # Delay badhaya taaki click register ho sake
+        self.after(250, self._hide_suggestions)
 
     def _delete_suggestion(self, value):
         if self.app and self.history_key:
             self.app.remove_history(self.history_key, value)
-            
             if value in self.suggestions:
                 self.suggestions.remove(value)
-            
-            # Turant refresh karein bina delay ke
             self.focus()
             self._process_filtering()
 
-    # --- Formatting / Highlight Logic ---
     def _highlight_suggestion(self, index):
-        for i, frame in enumerate(self._suggestion_frames):
-            if i == index:
-                frame.configure(fg_color=("gray80", "gray30")) # Thoda dark highlight
-            else:
-                frame.configure(fg_color="transparent")
-
-    def _on_mouse_enter(self, index):
-        if 0 <= index < len(self._suggestion_frames):
-            self._suggestion_frames[index].configure(fg_color=("gray80", "gray30"))
-            self._active_suggestion_index = index
-
-    def _on_mouse_leave(self, index):
-        if 0 <= index < len(self._suggestion_frames):
-            self._suggestion_frames[index].configure(fg_color="transparent")
-            self._active_suggestion_index = -1
+        for i, frame in enumerate(self._pool_frames):
+            if not frame.winfo_ismapped(): continue
+            color = ("gray80", "gray30") if i == index else "transparent"
+            frame.configure(fg_color=color)
+        self._active_suggestion_index = index
 
     def _on_arrow_down(self, event):
-        if not self._suggestion_toplevel or not self._suggestion_frames: return
-        self._active_suggestion_index += 1
-        if self._active_suggestion_index >= len(self._suggestion_frames):
-            self._active_suggestion_index = 0
+        if not self._visible_suggestions: return
+        self._active_suggestion_index = (self._active_suggestion_index + 1) % len(self._visible_suggestions)
         self._highlight_suggestion(self._active_suggestion_index)
         return "break"
 
     def _on_arrow_up(self, event):
-        if not self._suggestion_toplevel or not self._suggestion_frames: return
-        self._active_suggestion_index -= 1
-        if self._active_suggestion_index < 0:
-            self._active_suggestion_index = len(self._suggestion_frames) - 1
+        if not self._visible_suggestions: return
+        self._active_suggestion_index = (self._active_suggestion_index - 1) % len(self._visible_suggestions)
         self._highlight_suggestion(self._active_suggestion_index)
         return "break"
 
     def _on_enter(self, event):
-        if self._suggestion_toplevel and self._suggestion_labels:
-            if 0 <= self._active_suggestion_index < len(self._suggestion_labels):
-                selected_value = self._suggestion_labels[self._active_suggestion_index].cget("text")
-                self._select_suggestion(selected_value)
-                return "break"
+        if self._visible_suggestions and self._active_suggestion_index != -1:
+            self._select_suggestion(self._visible_suggestions[self._active_suggestion_index])
+            return "break"

@@ -21,7 +21,7 @@ from urllib.parse import urlencode
 
 # --- Third Party UI & System ---
 import tkinter
-from tkinter import messagebox, filedialog
+from tkinter import messagebox, filedialog, ttk
 import customtkinter as ctk
 import requests
 from PIL import Image
@@ -141,6 +141,7 @@ class NregaBotApp(ctk.CTk):
         self.loading_animation_label = None
         self.is_animating = False
         self.splash = None
+        self.expiry_alert_message = None
 
         # --- STARTUP SEQUENCE ---
         
@@ -213,6 +214,8 @@ class NregaBotApp(ctk.CTk):
         """Called on main thread after background loading is done."""
         self.bind("<Button-1>", self._on_global_click, add="+")
         self.bind("<FocusIn>", self._on_window_focus)
+
+        self.style_treeview()
         
         # Build Grid Layout
         self.grid_rowconfigure(1, weight=1)
@@ -258,6 +261,64 @@ class NregaBotApp(ctk.CTk):
             self.splash = None
             self.after(0, self._fade_in_main_window)
 
+    def style_treeview(self, treeview_widget=None):
+        # Agar argument nahi diya (main_app me), toh ye function global style set karega
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        # 1. Theme Detection
+        mode = ctk.get_appearance_mode()
+
+        if mode == "Dark":
+            # --- DARK MODE COLORS ---
+            bg_color = "#2b2b2b"        # Table Background
+            text_color = "#e5e7eb"      # Text (Light Gray)
+            row_hover = "#3f3f46"       # Row Hover Color (Thoda sa light dark)
+            selected_bg = "#3B82F6"     # Selection (Blue)
+            
+            header_bg = "#1f2937"       # Header Background (Dark Slate)
+            header_fg = "#ffffff"       # Header Text
+            header_hover = "#374151"    # Header Hover
+        else:
+            # --- LIGHT MODE COLORS ---
+            bg_color = "#ffffff"        # Table Background
+            text_color = "#374151"      # Text (Dark Gray)
+            row_hover = "#f3f4f6"       # Row Hover Color (Very Light Gray)
+            selected_bg = "#3B82F6"     # Selection (Blue)
+            
+            header_bg = "#f9fafb"       # Header Background (Off-white)
+            header_fg = "#111827"       # Header Text (Almost Black)
+            header_hover = "#e5e7eb"    # Header Hover
+
+        # 2. Configure Treeview Body
+        style.configure("Treeview",
+                        background=bg_color,
+                        foreground=text_color,
+                        fieldbackground=bg_color,
+                        rowheight=35,             # Rows thodi spacious
+                        font=("Segoe UI", 11),
+                        borderwidth=0)
+
+        # 3. Configure Rows (Hover & Selection)
+        # Note: 'selected' pehle check hota hai, isliye hover selected row ka color kharab nahi karega
+        style.map("Treeview",
+                  background=[('selected', selected_bg), ('active', row_hover)],
+                  foreground=[('selected', 'white'), ('active', text_color)])
+
+        # 4. Configure Heading
+        style.configure("Treeview.Heading",
+                        background=header_bg,
+                        foreground=header_fg,
+                        relief="flat",
+                        font=("Segoe UI", 12, "bold"))
+
+        style.map("Treeview.Heading",
+                  background=[('active', header_hover)])
+
+        # 5. Fix for file_management_tab (jahan widget pass hota hai)
+        if treeview_widget:
+            treeview_widget.configure(style="Treeview")
+
     def _fade_in_main_window(self):
         """Positions and shows the main application window."""
         self.update_idletasks()
@@ -277,6 +338,14 @@ class NregaBotApp(ctk.CTk):
         self.deiconify()
         self.lift() 
         self.focus_force() 
+
+        if getattr(self, 'expiry_alert_message', None):
+            def _show_delayed():
+                self.play_sound("error")
+                self.show_toast(self.expiry_alert_message, kind="warning", duration=6000)
+                self.expiry_alert_message = None
+            
+            self.after(1500, _show_delayed)
 
     def run_onboarding_if_needed(self):
         """Runs the onboarding tour for first-time users."""
@@ -676,7 +745,11 @@ class NregaBotApp(ctk.CTk):
         try:
             days = (datetime.fromisoformat(exp.split('T')[0]).date() - datetime.now().date()).days
             if 0 <= days < 7:
-                self.play_sound("error"); messagebox.showwarning("Expiring", f"License expires in {days} days."); self.open_on_about_tab = True; return True
+                # CHANGE: Turant dikhane ke bajaye message store karein
+                # Taaki window load hone ke baad dikha sakein
+                self.expiry_alert_message = f"License expires in {days} days."
+                self.open_on_about_tab = True
+                return True
         except Exception: pass
         return False
 
@@ -882,13 +955,21 @@ class NregaBotApp(ctk.CTk):
         self.sidebar_container.grid_rowconfigure(1, weight=1)
         self.sidebar_container.grid_columnconfigure(0, weight=1)
 
-        # 1. FIXED HEADER (Dropdown yahan aayega)
+        # 1. FIXED HEADER
         self.sidebar_header = ctk.CTkFrame(self.sidebar_container, height=50, fg_color="transparent")
         self.sidebar_header.grid(row=0, column=0, sticky="ew", padx=0, pady=(0, 5))
-        self.sidebar_header.grid_propagate(False) # Height fix rakhne ke liye
+        self.sidebar_header.grid_propagate(False)
 
-        # 2. SCROLLABLE CONTENT (Buttons yahan aayenge)
-        self.nav_scroll_frame = ctk.CTkScrollableFrame(self.sidebar_container, label_text="", fg_color="transparent")
+        # 2. SCROLLABLE CONTENT (OPTIMIZED)
+        # corner_radius=0 makes scrolling significantly smoother
+        self.nav_scroll_frame = ctk.CTkScrollableFrame(
+            self.sidebar_container, 
+            label_text="", 
+            fg_color="transparent",
+            corner_radius=0,
+            scrollbar_button_color=("gray80", "gray30"),
+            scrollbar_button_hover_color=("gray70", "gray20")
+        )
         self.nav_scroll_frame.grid(row=1, column=0, sticky="nsew")
         
         # Populate Sidebar
@@ -913,7 +994,6 @@ class NregaBotApp(ctk.CTk):
         self.tab_icon_map = {} 
 
         # --- 1. Filter Dropdown (Fixed Header me) ---
-        # Clear old widgets in header if any
         for widget in header_parent.winfo_children(): widget.destroy()
 
         categories = ["All Automations"] + list(self.get_tabs_definition().keys())
@@ -922,8 +1002,8 @@ class NregaBotApp(ctk.CTk):
             header_parent, 
             values=categories, 
             command=self._on_category_filter_change,
-            height=32,
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            height=28, # Compact height
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             fg_color=("white", "#2B2B2B"),
             button_color=("gray85", "gray35"),
             button_hover_color=("gray75", "gray45"),
@@ -932,21 +1012,22 @@ class NregaBotApp(ctk.CTk):
             dropdown_text_color=("gray10", "gray90"),
             dropdown_hover_color=("gray90", "gray35"),
             anchor="w",
-            corner_radius=8
+            corner_radius=6
         )
         self.category_filter_menu.set(self.last_selected_category)
-        self.category_filter_menu.pack(fill="x", pady=10, padx=5)
+        self.category_filter_menu.pack(fill="x", pady=(5, 5), padx=5)
 
         # --- 2. Categories & Buttons (Scrollable Area me) ---
         for cat, tabs in self.get_tabs_definition().items():
             
-            # Category Frame
+            # Category Frame - Compact Padding
             cat_frame = CollapsibleFrame(content_parent, title=cat)
             self.category_frames[cat] = cat_frame
             
             for name, data in tabs.items():
                 self.tab_icon_map[name] = data.get("icon")
 
+                # --- UI FIX: Reduced height and padding for compact look ---
                 btn = ctk.CTkButton(
                     cat_frame.content_frame, 
                     text=f"{name}", 
@@ -954,15 +1035,16 @@ class NregaBotApp(ctk.CTk):
                     compound="left", 
                     command=lambda n=name: self.show_frame(n), 
                     anchor="w", 
-                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="normal"), 
-                    height=40,          
-                    corner_radius=8,    
+                    font=ctk.CTkFont(family="Segoe UI", size=12, weight="normal"), 
+                    height=32,           # Reduced from 40 to 32
+                    corner_radius=6,    
                     fg_color="transparent", 
                     text_color=("gray30", "gray80"), 
                     hover_color=("gray90", "gray25"),
-                    border_spacing=12    
+                    border_spacing=8     # Reduced spacing
                 )
-                btn.pack(fill="x", padx=8, pady=2) 
+                # Reduced Vertical Padding (pady=1)
+                btn.pack(fill="x", padx=5, pady=1) 
                 
                 self.nav_buttons[name] = btn
                 self.button_to_category_frame[name] = cat_frame
@@ -1084,7 +1166,7 @@ class NregaBotApp(ctk.CTk):
         # 2. Not Loaded: Show Skeleton
         loading_frame = ctk.CTkFrame(self.content_area)
         loading_frame.grid(row=0, column=0, sticky="nsew")
-        skeleton = SkeletonLoader(loading_frame, rows=4)
+        skeleton = SkeletonLoader(loading_frame, rows=10)
         loading_frame.tkraise()
         self.update_idletasks()
         
@@ -1151,19 +1233,27 @@ class NregaBotApp(ctk.CTk):
         self._filter_nav_menu(selected_category)
 
     def _filter_nav_menu(self, selected_category: str):
-        # Unpack all
-        for frame in self.category_frames.values():
-            frame.pack_forget()
-        
-        # FIX: Removed self.update_idletasks() to prevent flickering/glitch
-        
-        # Repack selected
+        # --- BLINK FIX: Use winfo_manager() instead of winfo_ismapped() ---
+        # winfo_ismapped() unreliable hai (scroll karne par False ho jata hai),
+        # jisse widgets baar-baar repack hote hain aur blink/jump karte hain.
+        # winfo_manager() sirf ye batata hai ki widget packed hai ya nahi (Stable).
+
         if selected_category == "All Automations":
             for cat, frame in self.category_frames.items():
-                frame.pack(fill="x", pady=8, padx=5) 
+                # Agar widget already packed nahi hai, tabhi pack karo
+                if frame.winfo_manager() != "pack":
+                    frame.pack(fill="x", pady=5, padx=2)
         else:
-            if selected_category in self.category_frames:
-                self.category_frames[selected_category].pack(fill="x", pady=5, padx=5)
+            for cat, frame in self.category_frames.items():
+                if cat == selected_category:
+                    if frame.winfo_manager() != "pack":
+                        frame.pack(fill="x", pady=5, padx=2)
+                else:
+                    if frame.winfo_manager() == "pack":
+                        frame.pack_forget()
+        
+        # UI Update (Sirf structure change hone par)
+        self.nav_scroll_frame.update_idletasks()
 
     def show_history_window(self):
         """Displays the recent activity log in a popup."""
@@ -1402,59 +1492,56 @@ class NregaBotApp(ctk.CTk):
         threading.Thread(target=_worker, daemon=True).start()
 
     def _apply_feature_flags(self):
-        """Applies visual locks or maintenance modes based on server config."""
+        """Applies visual locks or maintenance modes with redundancy check."""
         if not hasattr(self, 'nav_buttons'): return
         
         current_ver = parse_version(config.APP_VERSION)
 
         for name, btn in self.nav_buttons.items():
-            # Reset
             current_text = btn.cget("text")
+            # Clean text nikal lo (⚠️ wagera hata ke)
             clean_text = current_text.replace(" ⚠️", "").replace(" 🔒", "").replace(" (Update)", "").replace(" (Maintenance)", "")
             
-            btn.configure(state="normal", fg_color="transparent", text=clean_text, command=lambda n=name: self.show_frame(n))
+            # Default State values
+            new_state = "normal"
+            new_fg = "transparent"
+            new_text = clean_text
+            new_cmd = lambda n=name: self.show_frame(n)
 
-            # 1. Global Kill Switch
+            # 1. Global Kill Switch logic
             disabled_data = None
             if isinstance(self.global_disabled_features, list):
-                if name in self.global_disabled_features:
-                    disabled_data = {"fix_version": None}
+                if name in self.global_disabled_features: disabled_data = {"fix_version": None}
             elif isinstance(self.global_disabled_features, dict):
                 disabled_data = self.global_disabled_features.get(name)
 
             if disabled_data:
                 fix_version_str = disabled_data.get('fix_version')
                 is_update_available = False
-                
-                if fix_version_str:
-                    try:
-                        if parse_version(fix_version_str) > current_ver:
-                            is_update_available = True
-                    except: pass
+                try:
+                    if fix_version_str and parse_version(fix_version_str) > current_ver:
+                        is_update_available = True
+                except: pass
 
                 if is_update_available:
-                    btn.configure(
-                        state="normal",
-                        fg_color=("orange", "#D97706"), 
-                        text=f"{clean_text} ⚠️ (Update)",
-                        command=lambda n=name, v=fix_version_str: self.show_feature_update_alert(n, v)
-                    )
+                    new_fg = ("orange", "#D97706")
+                    new_text = f"{clean_text} ⚠️ (Update)"
+                    new_cmd = lambda n=name, v=fix_version_str: self.show_feature_update_alert(n, v)
                 else:
-                    btn.configure(
-                        state="normal", 
-                        fg_color=("red", "#991B1B"), 
-                        text=f"{clean_text} ⚠️ (Maintenance)",
-                        command=lambda n=name: self.show_feature_maintenance_alert(n)
-                    )
+                    new_fg = ("red", "#991B1B")
+                    new_text = f"{clean_text} ⚠️ (Maintenance)"
+                    new_cmd = lambda n=name: self.show_feature_maintenance_alert(n)
             
-            # 2. Trial Restriction
+            # 2. Trial Restriction logic
             elif name in self.trial_restricted_features:
-                btn.configure(
-                    state="normal",
-                    fg_color=("gray95", "gray25"),
-                    text=f"{clean_text} 🔒",
-                    command=lambda n=name: self.show_trial_lock_alert(n)
-                )
+                new_fg = ("gray95", "gray25")
+                new_text = f"{clean_text} 🔒"
+                new_cmd = lambda n=name: self.show_trial_lock_alert(n)
+
+            # --- OPTIMIZATION: Only update if CHANGED ---
+            # Ye check bar-baar hone wale flicker ko rokega
+            if btn.cget("text") != new_text or btn.cget("fg_color") != new_fg:
+                btn.configure(state=new_state, fg_color=new_fg, text=new_text, command=new_cmd)
 
     def check_for_updates_background(self):
         self.services.check_for_updates_background()
@@ -1469,30 +1556,68 @@ class NregaBotApp(ctk.CTk):
 
     def _apply_smart_update(self, zip_path):
         """
-        Smart Update Logic (Windows & macOS):
-        1. Extract ZIP to temp folder.
-        2. Create a script (.bat for Win, .sh for Mac) to swap files.
-        3. Run script and close app.
+        Smart Update Logic:
+        - Windows: Extract and swap files using batch script.
+        - macOS (Loader): Replace core.zip in AppData.
         """
+        import shutil
         import zipfile
-        import stat
+        
+        # --- MACOS LOGIC (Loader Based) ---
+        if sys.platform == "darwin":
+            try:
+                from appdirs import user_data_dir
+                
+                # 1. Define Paths (Must match loader.py)
+                local_dir = user_data_dir("NREGABot", "PoddarSolutions")
+                core_zip_path = os.path.join(local_dir, "core.zip")
+                version_file = os.path.join(local_dir, "core_version.json")
+                
+                self.play_sound("update")
+                
+                # 2. Replace core.zip with the new downloaded zip
+                if os.path.exists(core_zip_path):
+                    os.remove(core_zip_path)
+                
+                shutil.copy2(zip_path, core_zip_path)
+                
+                # 3. Update Version JSON (Optional but recommended)
+                try:
+                    new_ver = self.update_info.get('version', '0.0.0')
+                    with open(version_file, 'w') as f:
+                        json.dump({"version": new_ver}, f)
+                except: pass
+
+                # 4. Clean up download
+                try: os.remove(zip_path)
+                except: pass
+                
+                messagebox.showinfo("Update Ready", "Update applied successfully.\nThe application will now restart.")
+                
+                # 5. Restart
+                self.on_closing(force=True)
+                
+                # Re-launch the main executable (The Loader)
+                subprocess.Popen([sys.executable])
+                sys.exit(0)
+
+            except Exception as e:
+                messagebox.showerror("Update Error", f"Failed to apply update:\n{e}")
+                return
+
+        # --- WINDOWS LOGIC (Standard) ---
+        extract_dir = os.path.join(self.get_data_path(), "update_temp")
+        if os.path.exists(extract_dir):
+            shutil.rmtree(extract_dir)
+        os.makedirs(extract_dir)
 
         try:
-            # 1. Temp folder setup
-            extract_dir = os.path.join(self.get_data_path(), "update_temp")
-            if os.path.exists(extract_dir):
-                shutil.rmtree(extract_dir)
-            os.makedirs(extract_dir)
-
-            # 2. Extract ZIP
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
             
-            # 3. Get Application Paths
             current_exe = sys.executable
             app_dir = os.path.dirname(current_exe)
             
-            # Dev mode check
             if not getattr(sys, 'frozen', False):
                 messagebox.showinfo("Dev Mode", "Update extracted to 'update_temp'. Cannot auto-restart in dev mode.")
                 return
@@ -1500,10 +1625,8 @@ class NregaBotApp(ctk.CTk):
             self.play_sound("update")
             messagebox.showinfo("Update Ready", "Application will restart to apply changes.")
 
-            # --- WINDOWS LOGIC ---
-            if sys.platform == "win32":
-                batch_script_path = os.path.join(self.get_data_path(), "updater.bat")
-                script_content = f"""
+            batch_script_path = os.path.join(self.get_data_path(), "updater.bat")
+            script_content = f"""
 @echo off
 title Updating NREGA Bot...
 echo Waiting for application to close...
@@ -1522,46 +1645,10 @@ start "" "{current_exe}"
 echo Done.
 del "%~f0" & exit
 """
-                with open(batch_script_path, "w") as bat:
-                    bat.write(script_content)
-                os.startfile(batch_script_path)
-
-            # --- MACOS LOGIC ---
-            elif sys.platform == "darwin":
-                shell_script_path = os.path.join(self.get_data_path(), "updater.sh")
-                script_content = f"""#!/bin/bash
-echo "Updating NREGA Bot..."
-sleep 2
-
-echo "Copying files..."
-cp -R "{extract_dir}/"* "{app_dir}/"
-
-echo "Fixing Permissions & Security..."
-# 1. Remove Quarantine Attribute
-xattr -cr "{app_dir}"
-# 2. Ensure Executable Permission
-chmod +x "{current_exe}"
-
-echo "Cleaning up..."
-rm -rf "{extract_dir}"
-rm "{zip_path}"
-
-echo "Restarting..."
-"{current_exe}" &
-
-rm "$0"
-"""
-                with open(shell_script_path, "w") as sh:
-                    sh.write(script_content)
-
-                # Make script executable
-                st = os.stat(shell_script_path)
-                os.chmod(shell_script_path, st.st_mode | stat.S_IEXEC)
-
-                # Run Shell script
-                subprocess.Popen(["/bin/bash", shell_script_path])
-
-            # 4. Force Close App
+            with open(batch_script_path, "w") as bat:
+                bat.write(script_content)
+            os.startfile(batch_script_path)
+            
             self.on_closing(force=True)
             sys.exit(0)
 
@@ -1577,20 +1664,35 @@ rm "$0"
             self.after(500, lambda: threading.Thread(target=self._validate_in_background, daemon=True).start())
 
     def _on_global_click(self, event):
-        """Global click listener for sound effects."""
-        widget = event.widget
-        while widget:
-            try:
-                if isinstance(widget, (ctk.CTkButton, ctk.CTkOptionMenu, ctk.CTkSwitch, ctk.CTkCheckBox)):
-                    button_text = ""
-                    if hasattr(widget, 'cget'):
-                        try: button_text = widget.cget("text").lower()
-                        except (AttributeError, tkinter.TclError): pass
-                    if "stop" in button_text or "start automation" in button_text: return
+        """Global click listener optimized to prevent scroll glitches."""
+        try:
+            widget = event.widget
+            
+            # --- SUPER FIX: Scrollbar & Canvas Interference ---
+            # Widget ka naam aur class dono check karenge
+            w_class = widget.winfo_class().lower()
+            w_name = str(widget).lower()
+            
+            # Agar user Scrollbar, Slider, ya Canvas (Jisme scroll content hota hai) 
+            # par click/drag kar rha hai to TURANT return karo.
+            if "scrollbar" in w_class or "trough" in w_name or "canvas" in w_class or "slider" in w_class:
+                return
+                
+            # --- Normal Click Sound Logic ---
+            while widget:
+                if isinstance(widget, (ctk.CTkButton, ctk.CTkOptionMenu, ctk.CTkSwitch, ctk.CTkCheckBox, ctk.CTkRadioButton)):
+                    # Stop buttons ko ignore karo
+                    btn_text = ""
+                    try: btn_text = widget.cget("text").lower()
+                    except: pass
+                    
+                    if "stop" in btn_text or "start automation" in btn_text: return
+                    
                     self.play_sound("click")
                     return
                 widget = widget.master
-            except Exception: return
+        except Exception:
+            pass
 
     def _on_sound_toggle_click(self):
         new_val = not self.sound_switch_var.get()
@@ -1703,13 +1805,13 @@ rm "$0"
     def play_sound(self, sound_name: str):
         self.sound_manager.play(sound_name)
 
-    def show_toast(self, message, kind="success"):
+    def show_toast(self, message, kind="success", duration=3000):
         try:
             if hasattr(self, 'current_toast') and self.current_toast and self.current_toast.winfo_exists():
                 self.current_toast.destroy()
             
             self.play_sound("complete" if kind == "success" else "error")
-            self.current_toast = ToastNotification(self, message, kind)
+            self.current_toast = ToastNotification(self, message, kind, duration=duration)
         except Exception as e:
             print(f"Toast Error: {e}")
 

@@ -55,7 +55,6 @@ class MrTrackingTab(BaseAutomationTab):
         self.load_inputs()
 
     def _create_widgets(self):
-        # (Is function mein koi badlaav nahi hai)
         # Frame for all user input controls
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="new", padx=10, pady=10)
@@ -94,7 +93,7 @@ class MrTrackingTab(BaseAutomationTab):
         self.pending_only_check = ctk.CTkCheckBox(filter_frame, 
                                                   text="Show only 'Pending for filling'", 
                                                   variable=self.pending_only_var,
-                                                  command=self._on_filter_check_changed) # <-- Updated
+                                                  command=self._on_filter_check_changed)
         self.pending_only_check.pack(side="left")
 
         # --- NEW Zero MR Checkbox ---
@@ -104,15 +103,13 @@ class MrTrackingTab(BaseAutomationTab):
                                                     variable=self.zero_mr_filter_var,
                                                     command=self._on_filter_check_changed)
         self.zero_mr_filter_check.pack(side="left", padx=(20, 0))
-        # --- End New Checkbox ---
 
         self.abps_pending_var = tkinter.IntVar(value=0)
         self.abps_pending_check = ctk.CTkCheckBox(filter_frame, 
                                                   text="Show only 'Pending for ABPS'", 
                                                   variable=self.abps_pending_var,
-                                                  command=self._on_filter_check_changed) # <-- Updated
+                                                  command=self._on_filter_check_changed)
         self.abps_pending_check.pack(side="left", padx=(20, 0))
-        # --- End New Checkbox ---
 
         action_frame = self._create_action_buttons(parent_frame=controls_frame)
         action_frame.grid(row=5, column=0, columnspan=2, pady=10)
@@ -122,7 +119,7 @@ class MrTrackingTab(BaseAutomationTab):
         notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         workcode_tab = notebook.add("Workcode List")
         results_tab = notebook.add("Results Table")
-        abps_results_tab = notebook.add("ABPS Pendency Results") # --- NEW TAB ---
+        abps_results_tab = notebook.add("ABPS Pendency Results") 
         self._create_log_and_status_area(parent_notebook=notebook)
 
         # 1. Workcode List Tab
@@ -149,14 +146,12 @@ class MrTrackingTab(BaseAutomationTab):
                                                     hover_color="#0E95BA")
         self.run_emb_entry_button.pack_forget() 
 
-        # --- NEW Zero MR Button ---
         self.run_zero_mr_button = ctk.CTkButton(copy_frame,
                                                   text="Forward to Zero MR",
                                                   command=self._run_zero_mr,
                                                   fg_color="#D9534F", 
                                                   hover_color="#C9302C")
         self.run_zero_mr_button.pack_forget()
-        # --- End New Button ---
 
         self.workcode_textbox = ctk.CTkTextbox(workcode_tab, state="disabled")
         self.workcode_textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
@@ -167,10 +162,22 @@ class MrTrackingTab(BaseAutomationTab):
         
         export_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         export_frame.grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        
         self.export_button = ctk.CTkButton(export_frame, text="Export Report", command=self.export_report)
         self.export_button.pack(side="left")
+        
         self.export_format_menu = ctk.CTkOptionMenu(export_frame, values=["Excel (.xlsx)", "PDF (.pdf)", "PNG (.png)"])
         self.export_format_menu.pack(side="left", padx=5)
+
+        # --- NEW BUTTON FOR PENDENCY REPORT ---
+        self.generate_pendency_btn = ctk.CTkButton(
+            export_frame, 
+            text="Generate Pendency Report (T0-T8)", 
+            command=self._open_pendency_report_window,
+            fg_color="#B45309", hover_color="#92400E"
+        )
+        self.generate_pendency_btn.pack(side="left", padx=15)
+        # --------------------------------------
 
         self.results_tree = ttk.Treeview(results_tab, columns=self.report_headers, show='headings')
         for col in self.report_headers: self.results_tree.heading(col, text=col)
@@ -185,7 +192,7 @@ class MrTrackingTab(BaseAutomationTab):
         self.results_tree.configure(yscroll=scrollbar.set); scrollbar.grid(row=1, column=1, sticky='ns')
         self.style_treeview(self.results_tree)
         
-        # 3. --- NEW: ABPS Pendency Results Tab ---
+        # 3. ABPS Pendency Results Tab
         abps_results_tab.grid_columnconfigure(0, weight=1)
         abps_results_tab.grid_rowconfigure(1, weight=1)
         
@@ -209,33 +216,24 @@ class MrTrackingTab(BaseAutomationTab):
         abps_scrollbar = ctk.CTkScrollbar(abps_results_tab, command=self.abps_results_tree.yview)
         self.abps_results_tree.configure(yscroll=abps_scrollbar.set); abps_scrollbar.grid(row=1, column=1, sticky='ns')
         self.style_treeview(self.abps_results_tree)
-        # --- END NEW TAB ---
 
     def _on_filter_check_changed(self):
-        # Determine which checkbox (if any) is now checked
         if self.zero_mr_filter_var.get() == 1:
-            # Zero MR is checked, disable others
             self.pending_only_check.configure(state="disabled")
             self.abps_pending_check.configure(state="disabled")
             self.pending_only_var.set(0)
             self.abps_pending_var.set(0)
-        
         elif self.abps_pending_var.get() == 1:
-            # ABPS is checked, disable others
             self.pending_only_check.configure(state="disabled")
             self.zero_mr_filter_check.configure(state="disabled")
             self.pending_only_var.set(0)
             self.zero_mr_filter_var.set(0)
-            
         elif self.pending_only_var.get() == 1:
-            # Pending for filling is checked, disable others
             self.abps_pending_check.configure(state="disabled")
             self.zero_mr_filter_check.configure(state="disabled")
             self.abps_pending_var.set(0)
             self.zero_mr_filter_var.set(0)
-            
         else:
-            # No checkbox is checked, enable all
             self.pending_only_check.configure(state="normal")
             self.abps_pending_check.configure(state="normal")
             self.zero_mr_filter_check.configure(state="normal")
@@ -249,45 +247,33 @@ class MrTrackingTab(BaseAutomationTab):
         self.block_entry.configure(state=state)
         self.panchayat_entry.configure(state=state)
         
-        # Disable all filter checkboxes when running
         self.pending_only_check.configure(state=state)
         self.abps_pending_check.configure(state=state)
-        self.zero_mr_filter_check.configure(state=state) # <-- New
+        self.zero_mr_filter_check.configure(state=state)
         
-        # If stopping, re-apply mutual exclusion logic
         if state == "normal":
             self._on_filter_check_changed()
         
         self.run_mr_payment_button.configure(state=state)
         self.run_emb_entry_button.configure(state=state)
-        self.run_zero_mr_button.configure(state=state) # <-- New
+        self.run_zero_mr_button.configure(state=state)
+        self.generate_pendency_btn.configure(state=state) # Control new button state
         
-        # --- NEW: Disable export buttons for new tab ---
         self.abps_export_button.configure(state=state)
         self.abps_export_format_menu.configure(state=state)
 
     def set_for_abps_check(self):
-        """
-        Pre-sets the UI to check for 'Pending for ABPS'.
-        Called from another tab (e.g., FTO Generation).
-        """
-        # Clear previous results but don't reset filters
         self.reset_ui(reset_all_filters=False) 
-        
-        # Now, set the ABPS filter
         self.abps_pending_var.set(1)
         self._on_filter_check_changed()
 
-
     def reset_ui(self, reset_all_filters=True):
         if reset_all_filters:
-            # Reset checkboxes
             self.pending_only_var.set(0)
             self.abps_pending_var.set(0)
-            self.zero_mr_filter_var.set(0) # <-- New
-            self._on_filter_check_changed() # Update UI state (enables all)
+            self.zero_mr_filter_var.set(0)
+            self._on_filter_check_changed()
         
-        # Clear all results
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         for item in self.abps_results_tree.get_children(): self.abps_results_tree.delete(item)
         self._update_workcode_textbox("")
@@ -296,9 +282,6 @@ class MrTrackingTab(BaseAutomationTab):
         self.update_status("Ready", 0.0)
         
     def _get_new_driver(self):
-        """
-        Ek naya, alag HEADLESS Chrome browser instance banata hai.
-        """
         self.app.log_message(self.log_display, "Naya Headless Chrome browser shuru kar raha hoon...", "info")
         try:
             chrome_options = ChromeOptions()
@@ -325,13 +308,13 @@ class MrTrackingTab(BaseAutomationTab):
             return None
         
     def start_automation(self):
-        self.run_mr_payment_button.pack_forget() # Hide button on new run
-        self.run_emb_entry_button.pack_forget() # Hide button on new run
-        self.run_zero_mr_button.pack_forget() # <-- New: Hide button
+        self.run_mr_payment_button.pack_forget() 
+        self.run_emb_entry_button.pack_forget() 
+        self.run_zero_mr_button.pack_forget() 
         
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
-        for item in self.abps_results_tree.get_children(): self.abps_results_tree.delete(item) # --- NEW ---
-        self._update_workcode_textbox("") # Clear workcode list
+        for item in self.abps_results_tree.get_children(): self.abps_results_tree.delete(item) 
+        self._update_workcode_textbox("") 
         
         inputs = {
             'state': self.state_entry.get().strip(), 
@@ -340,7 +323,7 @@ class MrTrackingTab(BaseAutomationTab):
             'panchayat': self.panchayat_entry.get().strip(),
             'pending_only': self.pending_only_var.get() == 1,
             'abps_pending': self.abps_pending_var.get() == 1,
-            'zero_mr_filter': self.zero_mr_filter_var.get() == 1 # <-- New
+            'zero_mr_filter': self.zero_mr_filter_var.get() == 1
         }
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['panchayat']]):
@@ -357,21 +340,21 @@ class MrTrackingTab(BaseAutomationTab):
             messagebox.showwarning("Automation Jaari Hai", "Report generation pehle se chal raha hai.")
             return
         
-        self.driver = self._get_new_driver() # Naya driver banayein
+        self.driver = self._get_new_driver()
         if not self.driver:
             self.app.log_message(self.log_display, "ERROR: WebDriver nahi mila. Automation ruka.", "error")
-            return # Driver nahi mila toh kuch mat karo
+            return
         
         self.app.after(0, self.set_ui_state, True) 
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
-        self.app.after(0, self.app.set_status, "Starting MR Tracking...") # App-wide status
-        self.app.after(0, self.update_status, "Initializing...", 0.0) # Tab-specific status
+        self.app.after(0, self.app.set_status, "Starting MR Tracking...") 
+        self.app.after(0, self.update_status, "Initializing...", 0.0) 
         self.app.clear_log(self.log_display)
         self.app.log_message(self.log_display, "Starting MR Tracking automation...")
         
-        self.zero_mr_data = [] # <-- NEW: Initialize list for Zero MR data
+        self.zero_mr_data = [] 
         
         try:
             driver = self.driver 
@@ -724,6 +707,178 @@ class MrTrackingTab(BaseAutomationTab):
             driver.switch_to.window(main_window_handle)
             self.app.log_message(self.log_display, "   ...Finished wagelist scan.")
             time.sleep(0.5) 
+
+    # --- PENDENCY REPORT FEATURE (T0 to T8+) ---
+
+    def _open_pendency_report_window(self):
+        """Calculates and displays the Pendency Report based on current table data."""
+        items = self.results_tree.get_children()
+        if not items:
+            messagebox.showinfo("No Data", "Please run the MR Tracking automation first to get data.")
+            return
+
+        # --- Calculate Data ---
+        summary_data = self._process_pendency_data(items)
+        if not summary_data:
+            messagebox.showinfo("No Pendency Data", "Could not find any 'since X days' text in the current results.")
+            return
+
+        # --- Create Popup Window ---
+        win = ctk.CTkToplevel(self)
+        win.title("Pendency Report (T0 - T8)")
+        win.geometry("900x500")
+        win.transient(self) 
+        
+        # Grid Configuration
+        win.grid_columnconfigure(0, weight=1)
+        win.grid_rowconfigure(1, weight=1)
+
+        # Header
+        header_frame = ctk.CTkFrame(win, fg_color="transparent")
+        header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        ctk.CTkLabel(header_frame, text="Panchayat-wise Pendency Analysis", font=("Arial", 16, "bold")).pack(side="left")
+        
+        export_btn = ctk.CTkButton(header_frame, text="Export Excel", 
+                                   command=lambda: self._export_pendency_excel(summary_data),
+                                   fg_color="#108842", hover_color="#1A994C")
+        export_btn.pack(side="right")
+
+        # Table
+        cols = ["Panchayat", "Total MRs", "T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8+"]
+        tree = ttk.Treeview(win, columns=cols, show='headings')
+        
+        for col in cols:
+            tree.heading(col, text=col)
+            width = 150 if col == "Panchayat" else 60
+            tree.column(col, width=width, anchor="center")
+            
+        tree.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        scrollbar = ctk.CTkScrollbar(win, command=tree.yview)
+        tree.configure(yscroll=scrollbar.set)
+        scrollbar.grid(row=1, column=1, sticky="ns", pady=(0, 10))
+        
+        # Populate Table
+        sorted_panchayats = sorted(summary_data.keys())
+        for panch in sorted_panchayats:
+            row = summary_data[panch]
+            # Calculate total
+            total_mrs = sum(row[f"T{i}"] for i in range(9))
+            
+            values = (
+                panch, total_mrs,
+                row["T0"], row["T1"], row["T2"], row["T3"],
+                row["T4"], row["T5"], row["T6"], row["T7"], row["T8"]
+            )
+            tree.insert("", "end", values=values)
+            
+        self.style_treeview(tree)
+
+    def _process_pendency_data(self, tree_items):
+        """
+        Parses tree items to count days pending.
+        Constraints:
+        1. Look for 'since X days' in text.
+        2. Unique MR per Panchayat (don't count same MR twice).
+        """
+        summary = {} # { "PanchayatName": {T0:0, T1:0... seen_mrs: set()} }
+        
+        # Regex to find number of days
+        # Matches: "since 5 days", "since 1 day", "since 5 Day" (Case Insensitive)
+        regex = re.compile(r'since\s+(\d+)\s*(?:days|day)', re.IGNORECASE)
+
+        for item_id in tree_items:
+            values = self.results_tree.item(item_id, 'values')
+            if not values: continue
+            
+            # Extract relevant columns
+            # Index 1: Panchayat, Index 2: MR No
+            # Index 7: Status, Index 12: 1st Sign, Index 13: 2nd Sign
+            panchayat = values[1]
+            mr_no = values[2]
+            
+            # Combine text fields to search
+            full_text = f"{values[7]} {values[12]} {values[13]}"
+            
+            match = regex.search(full_text)
+            if not match:
+                continue # Skip if no "since X days" found
+                
+            days_pending = int(match.group(1))
+            
+            # Initialize Panchayat Data
+            if panchayat not in summary:
+                summary[panchayat] = {f"T{i}": 0 for i in range(9)}
+                summary[panchayat]["seen_mrs"] = set()
+            
+            # Check Duplicate MR (Constraint: Same MR count 1 hi hoga)
+            if mr_no in summary[panchayat]["seen_mrs"]:
+                continue
+            
+            # Add to seen
+            summary[panchayat]["seen_mrs"].add(mr_no)
+            
+            # Bucket Allocation
+            if days_pending >= 8:
+                summary[panchayat]["T8"] += 1
+            else:
+                summary[panchayat][f"T{days_pending}"] += 1
+                
+        return summary
+
+    def _export_pendency_excel(self, summary_data):
+        if not summary_data: return
+        
+        # Prepare Data
+        export_list = []
+        for panch in sorted(summary_data.keys()):
+            row = summary_data[panch]
+            total = sum(row[f"T{i}"] for i in range(9))
+            export_list.append([
+                panch, total, 
+                row["T0"], row["T1"], row["T2"], row["T3"],
+                row["T4"], row["T5"], row["T6"], row["T7"], row["T8"]
+            ])
+            
+        columns = ["Panchayat", "Total Pending", "T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8+"]
+        
+        # File Dialog
+        filename = f"Pendency_Report_{datetime.now().strftime('%d-%m-%Y')}.xlsx"
+        save_path = filedialog.asksaveasfilename(
+            defaultextension=".xlsx", 
+            initialfile=filename,
+            filetypes=[("Excel Files", "*.xlsx")]
+        )
+        if not save_path: return
+        
+        try:
+            df = pd.DataFrame(export_list, columns=columns)
+            
+            # Formatting with OpenPyXL
+            with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Pendency', index=False)
+                worksheet = writer.sheets['Pendency']
+                
+                # Header Style
+                header_font = Font(bold=True, color="FFFFFF")
+                header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+                
+                for cell in worksheet["1:1"]:
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = Alignment(horizontal="center")
+                    
+                # Adjust Widths
+                worksheet.column_dimensions['A'].width = 25
+                for col in range(2, 13):
+                    col_letter = get_column_letter(col)
+                    worksheet.column_dimensions[col_letter].width = 10
+                    
+            messagebox.showinfo("Success", f"Pendency Report saved to:\n{save_path}")
+            
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to save Excel:\n{e}")
+
+    # --- END PENDENCY REPORT FEATURE ---
 
     def _run_mr_payment(self):
         """Called when the 'Run MR Payment' button is clicked."""

@@ -5,7 +5,7 @@
 # <div align="center">NREGA Bot</div>
 
 <p align="center">
-  <b>Version 2.9.0 | Now with Smart Updates, Calendar UI, and Enhanced Stability!</b><br />
+  <b>Version 2.9.1 | Now with Pendency Reports, Zero MR Integration & ABPS Scan!</b><br />
   <a href="https://nregabot.com/#downloads"><strong>Download Now »</strong></a><br /><br />
   <a href="https://nregabot.com/#downloads"><strong>Download Now »</strong></a><br /><br />
   <a href="https://nregabot.com/how-to-use.html">View Instructions</a> ·
@@ -29,9 +29,9 @@ An intuitive, tab-based interface organized for efficiency:
 
 ### 🔹 General & Application
 - ✨ **Microsoft Edge Support** - Launch and use Microsoft Edge directly from the dashboard for all automations.
-- 🚀 **Smart Updates (New!)** - New Loader Architecture ensures future updates are instant and lightweight (KB size).
-- 📅 **Calendar UI (New!)** - A modern calendar popup across all automations with colored indicators for Sundays/Mondays.
-- 🛡️ **Friendly Error Handling (New!)** - The app now stops gracefully with a clear message if the browser is closed manually.
+- 🚀 **Smart Updates** - New Loader Architecture ensures future updates are instant and lightweight (KB size).
+- 📅 **Calendar UI** - A modern calendar popup across all automations with colored indicators for Sundays/Mondays.
+- 🛡️ **Friendly Error Handling** - The app now stops gracefully with a clear message if the browser is closed manually.
 - 🚀 **Headless Reporting** - Reports like 'MR Tracking' now run in the background.
 - ✨ **Referral Program** - Get 15 days of extra validity when a user you refer purchases their first plan.
 - 💳 **Auto-Renewal** - Enable auto-renewal (subscription) from the website.
@@ -62,19 +62,19 @@ An intuitive, tab-based interface organized for efficiency:
 - ✨ **Update Estimated Outcome** – Quickly update the 'Estimated Outcome' for a list of work codes.
 
 ### 🛠️ Utilities & Verification
-- ⛺ **Sarkar Aapke Dwar (New!)** - Bulk entry automation for camps. Now supports 'Applicant/Scheme Remarks' columns.
-- ✨ **Zero MR** - Submit 'Zero MR' for muster rolls. Improved stability for page refreshes.
+- ⛺ **Sarkar Aapke Dwar** - Bulk entry automation for camps. Now supports 'Applicant/Scheme Remarks' columns.
+- ✨ **Zero MR** - Submit 'Zero MR' for muster rolls. Integrated directly with MR Tracking data.
 - ✅ **Jobcard Verification** – Verify job cards for an entire village and automatically upload the correct family photo.
 - 💳 **Verify ABPS** – Automate checking worker Aadhaar numbers with NPCI.
 - ✨ **Resend Rejected Wagelist** - Automate reprocessing wagelist payments rejected by the bank.
 - ✨ **PDF Merger** - A standalone utility to quickly merge multiple selected PDF files.
 - ✂️ **Workcode Extractor** – Parse and extract clean lists of work codes (Bug fixes applied).
-- 📁 **File Manager** - A built-in cloud file manager to save, organize, and share documents.
+- 📁 **File Manager** - A built-in cloud file manager to save, organize, and **Share Folders** via links.
 
 ### 📊 Reporting
-- ✨ **MR Tracking** - Track MR status in real-time (Headless). Can drill down to find specific laborers pending for ABPS.
+- ✨ **MR Tracking** - Track MR status in real-time (Headless). Features **Pendency Report (T0-T8)** generation and **Zero MR forwarding**.
 - ✨ **Dashboard Report** - Fetch and view comprehensive dashboard reports with full export capabilities.
-- ✨ **Issued MR Details** - Fetch all 'e-muster issued' works for a panchayat and extract work codes.
+- ✨ **Issued MR Details** - Fetch all 'e-muster issued' works. Now includes **ABPS Pending Demand** scan for blocks.
 - 📊 **MIS Reports** - Solves CAPTCHA and downloads multiple MIS reports into a single, multi-sheet Excel file.
 - 📈 **Social Audit Reports** - Automates the process of fetching Social Audit issue details.
 
@@ -95,8 +95,8 @@ You only need to have a supported web browser installed on your system:
 Download the latest version from the official website:
 
 - Website: [nregabot.com/#downloads](https://nregabot.com/#downloads)
-- **For Windows**: `NREGABot-v2.9.0-Setup.exe`
-- **For macOS**: `NREGABot-v2.9.0-macOS.dmg`
+- **For Windows**: `NREGABot-v2.9.1-Setup.exe`
+- **For macOS**: `NREGABot-v2.9.1-macOS.dmg`
 
 ### 2️⃣ First-Time Launch & Trial
 

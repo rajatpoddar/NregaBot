@@ -1,4 +1,19 @@
 {
+  "2.9.1": [
+      "✨ **New Feature (MR Tracking):** Added 'Pendency Report (T0-T8)' generator for Panchayat-wise analysis.",
+      "✨ **New Feature (Zero MR Integration):** Directly forward data from MR Tracking to Zero MR tab.",
+      "✨ **New Feature (Issued MR):** Added 'Pending demand labour for ABPS' scan at block level.",
+      "✨ **New Feature (File Manager):** Added ability to share cloud folders via public links.",
+      "🎨 **Export Improvements:** Reports can now be exported as Professional PDFs and PNG images.",
+      "🚀 **New Automation (eKYC Report):** Now generate Professional ekyc pending Reports.",
+      "🛠 **UI Updates:** Added Footer Copyright and improved Date Picker interaction."
+    ],
+    "2.9.0": [
+      "🚨 **CRITICAL UPDATE:** Fixed the 'White Screen/Crash' issue experienced by some users.",
+      "📦 **New Loader Engine:** Completely rewritten update system that now extracts files correctly to prevent missing assets.",
+      "🛠 **Stability Fixes:** Resolved 'Missing Icon' errors and improved application startup speed.",
+      "⚠️ **Important:** If your application is stuck or not opening, please uninstall and download the new Setup v2.9.0 from the website."
+    ],
   "2.8.3.4": [
       "🎨 **UI Overhaul:** Modernized Sidebar & Floating Footer with interactive status bar.",
       "🚀 **Performance Boost:** Significant code refactoring (Modular Architecture) for faster startup and stability.",
