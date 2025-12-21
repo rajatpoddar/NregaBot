@@ -1,3 +1,4 @@
+# tabs/ekyc_report_tab.py
 import time
 import threading
 import json
@@ -17,7 +18,7 @@ import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry # Using Autocomplete for history
+from .autocomplete_widget import AutocompleteEntry 
 
 class EKycReportTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -35,14 +36,28 @@ class EKycReportTab(BaseAutomationTab):
         input_frame = ctk.CTkFrame(self)
         input_frame.pack(fill="x", padx=10, pady=10)
 
-        # Panchayat Input (Autocomplete)
+        # Panchayat Input (Autocomplete Linked to Global History)
         ctk.CTkLabel(input_frame, text="Panchayat:").grid(row=0, column=0, padx=(10, 5), pady=10, sticky="w")
-        self.panchayat_entry = AutocompleteEntry(input_frame, width=140, placeholder_text="Exact Spelling")
+        self.panchayat_entry = AutocompleteEntry(
+            input_frame, 
+            width=140, 
+            placeholder_text="Exact Spelling",
+            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), # <-- LINKED
+            app_instance=self.app,
+            history_key="panchayat_name"
+        )
         self.panchayat_entry.grid(row=0, column=1, padx=5, pady=10)
 
-        # Village Input (Autocomplete)
+        # Village Input (Autocomplete Linked to Global History)
         ctk.CTkLabel(input_frame, text="Village:").grid(row=0, column=2, padx=(10, 5), pady=10, sticky="w")
-        self.village_entry = AutocompleteEntry(input_frame, width=140, placeholder_text="Leave empty for ALL")
+        self.village_entry = AutocompleteEntry(
+            input_frame, 
+            width=140, 
+            placeholder_text="Leave empty for ALL",
+            suggestions_list=self.app.history_manager.get_suggestions("village_name"), # <-- LINKED
+            app_instance=self.app,
+            history_key="village_name"
+        )
         self.village_entry.grid(row=0, column=3, padx=5, pady=10)
 
         # Filter Dropdown
@@ -74,7 +89,6 @@ class EKycReportTab(BaseAutomationTab):
         # --- Results Table ---
         result_frame = self.tab_view.tab("Results")
         
-        # Added 'Village' column
         columns = ("sno", "village", "jobcard", "name", "abps_status", "ekyc_status")
         self.tree = ttk.Treeview(result_frame, columns=columns, show="headings", selectmode="browse")
         
@@ -148,6 +162,11 @@ class EKycReportTab(BaseAutomationTab):
                 old_html = driver.find_element(By.TAG_NAME, "html")
                 panchayat_dd = Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat"))))
                 panchayat_dd.select_by_visible_text(panchayat_target)
+                
+                # --- NEW: Save Valid Panchayat to Global History ---
+                self.app.update_history("panchayat_name", panchayat_target)
+                # ---------------------------------------------------
+                
                 try: wait.until(EC.staleness_of(old_html))
                 except: time.sleep(3)
             except Exception as e:
@@ -156,16 +175,17 @@ class EKycReportTab(BaseAutomationTab):
             # 3. Determine Villages to Process
             villages_to_process = []
             
-            # Special check: Avoid "All Villages" (99) if typed manually
             if village_target and ("All Village" in village_target or village_target == "99"):
                 self.app.log_message(self.log_display, "Skipping invalid village input '--All Villages--'. Please leave blank to scan all.", "warning")
-                village_target = "" # Treat as blank to scan properly
+                village_target = ""
 
             if village_target:
                 # User provided a specific village
                 villages_to_process.append(village_target)
+                # --- NEW: Save Valid Village to Global History ---
+                self.app.update_history("village_name", village_target)
+                # -------------------------------------------------
             else:
-                # User left blank -> Fetch ALL valid villages
                 self.update_status("Fetching village list...")
                 try:
                     village_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
@@ -173,7 +193,6 @@ class EKycReportTab(BaseAutomationTab):
                     for opt in options:
                         val = opt.get_attribute("value")
                         txt = opt.text.strip()
-                        # Ignore "Select", "All Villages" (99), and empty
                         if val not in ["00", "99"] and txt != "---Select---" and txt != "--All Villages--":
                             villages_to_process.append(txt)
                     
@@ -434,46 +453,23 @@ class EKycReportTab(BaseAutomationTab):
         except Exception as e:
             messagebox.showerror("Error", f"Save Failed: {e}")
 
-    # --- SAVE / LOAD HISTORY LOGIC ---
+    # --- SAVE / LOAD HISTORY LOGIC (Updated to use Global History) ---
     def save_inputs(self):
-        # Update history lists
-        panchayat_val = self.panchayat_entry.get().strip()
-        village_val = self.village_entry.get().strip()
-        
-        # Helper to update list (keep max 20, no duplicates, new on top)
-        def update_list(current_list, new_item):
-            if not new_item: return current_list
-            if new_item in current_list: current_list.remove(new_item)
-            current_list.insert(0, new_item)
-            return current_list[:20]
-
-        # FIX: Use get_data_path to save in correct folder
-        config_file = self.app.get_data_path("ekyc_inputs.json")
-
-        # Load existing first
-        existing_data = {}
-        if os.path.exists(config_file):
-            try:
-                with open(config_file, "r") as f: existing_data = json.load(f)
-            except: pass
-            
-        p_hist = update_list(existing_data.get('panchayat_history', []), panchayat_val)
-        v_hist = update_list(existing_data.get('village_history', []), village_val)
+        # We only save the current text to file for next load.
+        # The history list management is now handled by HistoryManager.
         
         data = {
-            "panchayat": panchayat_val,
-            "village": village_val,
-            "filter": self.filter_var.get(),
-            "panchayat_history": p_hist,
-            "village_history": v_hist
+            "panchayat": self.panchayat_entry.get().strip(),
+            "village": self.village_entry.get().strip(),
+            "filter": self.filter_var.get()
         }
         
         try:
+            config_file = self.app.get_data_path("ekyc_inputs.json")
             with open(config_file, "w") as f: json.dump(data, f, indent=4)
         except: pass
 
     def load_inputs(self):
-        # FIX: Use get_data_path to load from correct folder
         config_file = self.app.get_data_path("ekyc_inputs.json")
         
         if os.path.exists(config_file):
@@ -484,10 +480,5 @@ class EKycReportTab(BaseAutomationTab):
                 self.panchayat_entry.delete(0, "end"); self.panchayat_entry.insert(0, data.get("panchayat", ""))
                 self.village_entry.delete(0, "end"); self.village_entry.insert(0, data.get("village", ""))
                 if data.get("filter"): self.filter_var.set(data.get("filter"))
-                
-                # Set History (Directly update suggestions list)
-                if hasattr(self.panchayat_entry, 'suggestions'):
-                    self.panchayat_entry.suggestions = data.get("panchayat_history", [])
-                    self.village_entry.suggestions = data.get("village_history", [])
                 
             except: pass
