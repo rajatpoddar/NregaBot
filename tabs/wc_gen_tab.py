@@ -169,20 +169,21 @@ class WcGenTab(BaseAutomationTab):
 
     # --- NEW: Function to select PDF ---
     def _select_undertaking_pdf(self):
-        path = filedialog.askopenfilename(
-            title="Select Undertaking PDF",
-            filetypes=[("PDF files", "*.pdf")]
-        )
-        if path:
-            self.undertaking_pdf_path = path
-            filename = os.path.basename(path)
-            # Truncate if too long for display
-            display_name = filename if len(filename) < 25 else filename[:22] + "..."
-            self.pdf_label.configure(text=display_name, text_color=("black", "white"))
-            self.app.log_message(self.log_display, f"Undertaking PDF selected: {filename}")
-        else:
-            # If user cancels, keep previous or reset? Keeping previous usually better UX.
-            pass
+        try:
+            # FIX: 'parent=self' ensures the dialog opens ON TOP of the app
+            path = filedialog.askopenfilename(
+                parent=self, 
+                title="Select Undertaking PDF",
+                filetypes=[("PDF files", "*.pdf")]
+            )
+            if path:
+                self.undertaking_pdf_path = path
+                filename = os.path.basename(path)
+                display_name = filename if len(filename) < 25 else filename[:22] + "..."
+                self.pdf_label.configure(text=display_name, text_color=("black", "white"))
+                self.app.log_message(self.log_display, f"Undertaking PDF selected: {filename}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open file picker: {e}")
     # --- END NEW ---
 
     def _open_wc_tool_link(self):
