@@ -149,7 +149,7 @@ class WcGenTab(BaseAutomationTab):
             if isinstance(child, (ctk.CTkEntry, ctk.CTkComboBox, DateEntry)):
                 child.configure(state="disabled")
         # Ensure PDF button starts disabled until categories are loaded (or you can leave it enabled)
-        self.select_pdf_button.configure(state="disabled") 
+        self.select_pdf_button.configure(state="normal") 
 
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
