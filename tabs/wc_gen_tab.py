@@ -616,16 +616,23 @@ class WcGenTab(BaseAutomationTab):
         village_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlvillage")))
         Select(village_select).select_by_visible_text(village_name)
         
-        # --- Upload Undertaking PDF (Standard Input works in background) ---
+        # --- Upload Undertaking PDF (Fixed for Windows Build) ---
         pdf_path = form_config.get('undertaking_pdf')
         if pdf_path and os.path.exists(pdf_path):
             self.app.log_message(self.log_display, "  > Uploading Undertaking PDF...")
             try:
-                # Direct send_keys usually works best for file inputs even if hidden
+                # Fix 1: Get Absolute Path (Critical for Windows)
+                abs_pdf_path = os.path.abspath(pdf_path)
+
+                # Fix 2: Find element and Force Visibility via JS
+                # (Windows builds often fail if the file input is hidden by CSS)
                 file_input = driver.find_element(By.ID, "ContentPlaceHolder1_File_indiv_work_file_pdf")
-                file_input.send_keys(pdf_path)
-            except Exception: 
-                self.app.log_message(self.log_display, "  > Warning: Could not upload PDF (Element not found or error).", "warning")
+                driver.execute_script("arguments[0].style.display = 'block'; arguments[0].style.visibility = 'visible';", file_input)
+                
+                # Send Keys
+                file_input.send_keys(abs_pdf_path)
+            except Exception as e: 
+                self.app.log_message(self.log_display, f"  > Warning: Could not upload PDF. Error: {e}", "warning")
 
         # --- Step 4: Filling Final Details (JS Safe) ---
         self.app.log_message(self.log_display, "Step 4: Filling Final Details...")
