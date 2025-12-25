@@ -10,22 +10,23 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementNotInteractableException
 import config
 from .base_tab import BaseAutomationTab
 from .date_entry_widget import DateEntry
 from .autocomplete_widget import AutocompleteEntry
-from .demand_tab import CloudFilePicker # <-- Import cloud picker
+from .demand_tab import CloudFilePicker 
 
 class WcGenTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
         super().__init__(parent, app_instance, automation_key="wc_gen")
         self.csv_path = None
+        self.undertaking_pdf_path = None # --- NEW: Variable to store PDF path ---
         self.ui_fields = {}
         self.profiles = {}
         self.profile_file = self.app.get_data_path("wc_gen_profiles.json")
         self.saved_config = {}
-        self.successful_wcs_data = [] # --- NEW: To store full data for export ---
+        self.successful_wcs_data = [] 
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -111,6 +112,16 @@ class WcGenTab(BaseAutomationTab):
         self._create_field(self.step2_frame, "est_labour_cost", "Est. Labour Cost (Lakhs)", 10)
         self._create_field(self.step2_frame, "est_material_cost", "Est. Material Cost (Lakhs)", 11)
 
+        # --- NEW: Undertaking PDF Selection ---
+        ctk.CTkLabel(self.step2_frame, text="Undertaking PDF (Individual):").grid(row=12, column=0, sticky="w", padx=15, pady=5)
+        self.pdf_frame = ctk.CTkFrame(self.step2_frame, fg_color="transparent")
+        self.pdf_frame.grid(row=12, column=1, sticky="ew", padx=15, pady=5)
+        self.select_pdf_button = ctk.CTkButton(self.pdf_frame, text="Select PDF", width=100, command=self._select_undertaking_pdf)
+        self.select_pdf_button.pack(side="left")
+        self.pdf_label = ctk.CTkLabel(self.pdf_frame, text="No file selected", text_color="gray", font=("Arial", 11))
+        self.pdf_label.pack(side="left", padx=10)
+        # --- END NEW ---
+
         step3_frame = ctk.CTkFrame(settings_container)
         step3_frame.grid(row=4, column=0, sticky='ew', pady=(0, 10))
         step3_frame.grid_columnconfigure(1, weight=1)
@@ -122,16 +133,14 @@ class WcGenTab(BaseAutomationTab):
         self.select_button = ctk.CTkButton(file_buttons_frame, text="Select from Computer", command=self.select_csv_file)
         self.select_button.pack(side="left", padx=(0, 10))
         
-        # --- NEW: Add Cloud Button ---
         self.cloud_csv_button = ctk.CTkButton(file_buttons_frame, text="Select from Cloud", command=self._select_csv_from_cloud, fg_color="teal", hover_color="#00695C")
         self.cloud_csv_button.pack(side="left", padx=(0, 10))
-        # --- END NEW ---
 
         self.demo_csv_button = ctk.CTkButton(file_buttons_frame, text="Download Demo CSV", command=lambda: self.app.save_demo_csv("wc_gen"), fg_color="#2E8B57", hover_color="#257247")
         self.demo_csv_button.pack(side="left", padx=(0, 10))
 
         self.online_csv_button = ctk.CTkButton(file_buttons_frame, text="Generate CSV Online", command=self._open_wc_tool_link, fg_color="#1F618D", hover_color="#154360")
-        self.online_csv_button.pack(side="left", padx=(0, 10)) # <-- Modified this line
+        self.online_csv_button.pack(side="left", padx=(0, 10)) 
         
         self.file_label = ctk.CTkLabel(step3_frame, text="No file selected", text_color="gray")
         self.file_label.grid(row=2, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 10))
@@ -139,6 +148,8 @@ class WcGenTab(BaseAutomationTab):
         for child in self.step2_frame.winfo_children():
             if isinstance(child, (ctk.CTkEntry, ctk.CTkComboBox, DateEntry)):
                 child.configure(state="disabled")
+        # Ensure PDF button starts disabled until categories are loaded (or you can leave it enabled)
+        self.select_pdf_button.configure(state="disabled") 
 
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
@@ -156,10 +167,27 @@ class WcGenTab(BaseAutomationTab):
         
         self._create_log_and_status_area(notebook)
 
+    # --- NEW: Function to select PDF ---
+    def _select_undertaking_pdf(self):
+        path = filedialog.askopenfilename(
+            title="Select Undertaking PDF",
+            filetypes=[("PDF files", "*.pdf")]
+        )
+        if path:
+            self.undertaking_pdf_path = path
+            filename = os.path.basename(path)
+            # Truncate if too long for display
+            display_name = filename if len(filename) < 25 else filename[:22] + "..."
+            self.pdf_label.configure(text=display_name, text_color=("black", "white"))
+            self.app.log_message(self.log_display, f"Undertaking PDF selected: {filename}")
+        else:
+            # If user cancels, keep previous or reset? Keeping previous usually better UX.
+            pass
+    # --- END NEW ---
+
     def _open_wc_tool_link(self):
         webbrowser.open_new_tab("https://tools.nregabot.com/work_code_generator")
 
-    # --- NEW: Cloud file selection methods ---
     def _select_csv_from_cloud(self):
         token = self.app.license_info.get('key')
         if not token:
@@ -167,7 +195,7 @@ class WcGenTab(BaseAutomationTab):
             return
 
         picker = CloudFilePicker(parent=self, app_instance=self.app)
-        self.wait_window(picker) # Wait for user to select a file
+        self.wait_window(picker) 
 
         try:
             self.winfo_toplevel().focus_set()
@@ -202,7 +230,7 @@ class WcGenTab(BaseAutomationTab):
         
         try:
             with requests.get(url, headers=headers, stream=True, timeout=30) as r:
-                r.raise_for_status() # Check for HTTP errors
+                r.raise_for_status() 
                 with open(temp_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192): 
                         f.write(chunk)
@@ -213,7 +241,6 @@ class WcGenTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Cloud download failed: {e}", "error")
             messagebox.showerror("Download Failed", f"Could not download file: {e}")
             return None
-    # --- END NEW METHODS ---
 
     def _log_result(self, result_data):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(
@@ -301,6 +328,9 @@ class WcGenTab(BaseAutomationTab):
             return
 
         config_data = {key: field.get() for key, field in self.ui_fields.items()}
+        # Note: We are not saving the PDF path in the profile JSON as file paths might change or not be relevant across sessions/machines
+        # But if you want to save it, you could add it here. For now, I'll skip saving the PDF path to profile.
+        
         self.profiles[profile_name] = config_data
         
         try:
@@ -375,15 +405,46 @@ class WcGenTab(BaseAutomationTab):
             if not driver:
                 self.app.after(0, lambda: self.load_button.configure(state="normal", text="Load Categories from Website"))
                 return
-            driver.get(config.WC_GEN_CONFIG["url"])
-            wait = WebDriverWait(driver, 10)
-            wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlMastercategory")))
+            
+            target_url = config.WC_GEN_CONFIG["url"]
+            self.app.log_message(self.log_display, f"Navigating to: {target_url}")
+            driver.get(target_url)
+            
+            wait = WebDriverWait(driver, 20) # 20 seconds wait
+            
+            try:
+                # Try to find the element
+                wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlMastercategory")))
+            except TimeoutException:
+                # Agar timeout hua, toh check karo ki abhi hum kahan hain
+                current_url = driver.current_url
+                page_title = driver.title
+                
+                if "login" in current_url.lower() or "home" in current_url.lower() or "index" in current_url.lower():
+                    raise Exception(f"Session Expired or Not Logged In.\nCurrent URL: {current_url}\nPlease log in first.")
+                else:
+                    raise Exception(f"Element not found (Timeout).\nCurrent URL: {current_url}\nCheck if the page loaded correctly.")
+
             master_cat_options = self._get_options(driver, "ContentPlaceHolder1_ddlMastercategory")
             agency_options = self._get_options(driver, "ContentPlaceHolder1_ddlExeAgency")
+            
             self.app.after(0, self._update_ui_after_load, master_cat_options, agency_options)
+            
         except Exception as e:
-            error_message = str(e).splitlines()[0]
-            self.app.after(0, lambda msg=error_message: messagebox.showerror("Error", f"Failed to load categories from website: {msg}"))
+            # Full error message capture karein
+            import traceback
+            full_error = traceback.format_exc()
+            print(full_error) # Console mein print karein debugging ke liye
+            
+            # User ko simple message dikhayein
+            error_msg = str(e)
+            if "Message:" in error_msg:
+                 # Selenium ke generic message ko clean karein
+                 error_msg = error_msg.split("Stacktrace:")[0].strip()
+            
+            self.app.after(0, lambda msg=error_msg: messagebox.showerror("Error", f"Failed to load categories:\n{msg}"))
+            self.app.after(0, lambda msg=error_msg: self.app.log_message(self.log_display, f"Error: {msg}", "error"))
+
         finally:
             self.app.after(0, lambda: self.load_button.configure(state="normal", text="Load Categories from Website"))
 
@@ -391,6 +452,9 @@ class WcGenTab(BaseAutomationTab):
         for child in self.step2_frame.winfo_children():
              if isinstance(child, (ctk.CTkEntry, ctk.CTkComboBox, DateEntry)):
                 child.configure(state="normal")
+        
+        # Enable PDF Button
+        self.select_pdf_button.configure(state="normal")
 
         self.ui_fields['master_category'].configure(values=master_cat_options)
         self.ui_fields['executing_agency'].configure(values=agency_options)
@@ -429,11 +493,37 @@ class WcGenTab(BaseAutomationTab):
                 self.app.after(0, lambda: self.app.log_message(self.log_display, "Browser not available for dropdown update.", "warning"))
                 return
             wait = WebDriverWait(driver, 20)
+            
+            # Find the element to select
             select_element = wait.until(EC.element_to_be_clickable((By.ID, current['id'])))
-            body = driver.find_element(By.TAG_NAME, 'body')
+            
+            # Capture the element that is expected to change (the NEXT dropdown)
+            # This is crucial for AJAX handling
+            try:
+                next_element_ref = driver.find_element(By.ID, current['next_id'])
+            except:
+                next_element_ref = None
+
+            # Make the selection
             Select(select_element).select_by_visible_text(selection)
-            wait.until(EC.staleness_of(body))
-            wait.until(EC.element_to_be_clickable((By.ID, current['next_id'])))
+            
+            # --- FIX FOR AJAX UPDATES ---
+            # Instead of waiting for body staleness (which fails on partial updates),
+            # we wait for the NEXT dropdown element to go stale (be removed/replaced).
+            if next_element_ref:
+                try:
+                    wait.until(EC.staleness_of(next_element_ref))
+                except TimeoutException:
+                    # Sometimes update is instant or handled differently, proceed carefully
+                    pass
+            else:
+                # If next element wasn't there yet, just wait a bit for AJAX to start
+                time.sleep(1)
+
+            # Wait for the next element to be present and interactable again
+            wait.until(EC.presence_of_element_located((By.ID, current['next_id'])))
+            time.sleep(0.5) # Small buffer for options to populate
+            
             new_options = self._get_options(driver, current['next_id'])
             self.app.after(0, self._update_next_combobox, current['next'], new_options, list(dependency_map.keys()))
         except Exception as e:
@@ -442,18 +532,24 @@ class WcGenTab(BaseAutomationTab):
 
     def _update_next_combobox(self, next_key, options, all_keys):
         self.ui_fields[next_key].configure(values=options, state="normal")
+        
+        # Check if saved value exists in new options, otherwise default to first option
         saved_value = self.saved_config.get(next_key)
         current_selection = ""
+        
         if saved_value and saved_value in options:
             self.ui_fields[next_key].set(saved_value)
             current_selection = saved_value
         else:
+            # Select the first option by default if saved one is not valid
             current_selection = options[0] if options else ""
             self.ui_fields[next_key].set(current_selection)
         
+        # Trigger update for the next level dropdown automatically
         if current_selection:
             self._on_dropdown_select(next_key, current_selection)
 
+        # Reset all subsequent dropdowns to avoid mismatched data
         start_resetting = False
         for key in all_keys:
             if start_resetting:
@@ -464,8 +560,9 @@ class WcGenTab(BaseAutomationTab):
                 start_resetting = True
     
     def _get_options(self, driver, element_id):
+        # Update: Filter out empty strings "" along with "00" and "0"
         select_element = Select(driver.find_element(By.ID, element_id))
-        return [option.text for option in select_element.options if option.get_attribute("value") not in ["00", "0"]]
+        return [option.text for option in select_element.options if option.get_attribute("value") not in ["00", "0", ""]]
 
     def _process_single_row(self, driver, form_config, row_data):
         try:
@@ -477,13 +574,16 @@ class WcGenTab(BaseAutomationTab):
         driver.get(config.WC_GEN_CONFIG["url"])
         wait = WebDriverWait(driver, 25)
 
+        # Helper function to handle AJAX loading dropdowns
         def select_and_wait(element_id, value):
             self.app.log_message(self.log_display, f"  > Selecting '{value}'...")
             html_element = driver.find_element(By.TAG_NAME, 'html')
-            Select(wait.until(EC.element_to_be_clickable((By.ID, element_id)))).select_by_visible_text(value)
+            # Use Presence Check (Safe for minimized windows)
+            Select(wait.until(EC.presence_of_element_located((By.ID, element_id)))).select_by_visible_text(value)
             wait.until(EC.staleness_of(html_element))
             self.app.log_message(self.log_display, f"  > OK.")
 
+        # --- Step 1: Selecting Categories ---
         self.app.log_message(self.log_display, "Step 1: Selecting Categories...")
         select_and_wait("ContentPlaceHolder1_ddlMastercategory", form_config['master_category'])
         select_and_wait("ContentPlaceHolder1_ddlproposed_work_category", form_config['work_category'])
@@ -492,39 +592,93 @@ class WcGenTab(BaseAutomationTab):
         select_and_wait("ContentPlaceHolder1_ddlproposed_work_type", form_config['work_type'])
         select_and_wait("ContentPlaceHolder1_ddlprostatus", form_config['pro_status'])
 
+        # --- Step 2: Filling Dynamic Fields (JS Safe) ---
         self.app.log_message(self.log_display, "Step 2: Filling Dynamic Fields...")
         dynamic_fields = {
-            "ContentPlaceHolder1_txtdist": total_plants, "ContentPlaceHolder1_txtAdd_dis": covered_area,
-            "ContentPlaceHolder1_txtEst_output": area_plantation, "ContentPlaceHolder1_txtJSA_Inst_unit": total_saplings
+            "ContentPlaceHolder1_txtdist": total_plants, 
+            "ContentPlaceHolder1_txtAdd_dis": covered_area,
+            "ContentPlaceHolder1_txtEst_output": area_plantation, 
+            "ContentPlaceHolder1_txtJSA_Inst_unit": total_saplings
         }
         for field_id, value in dynamic_fields.items():
             if value.strip():
                 try:
-                    field = wait.until(EC.presence_of_element_located((By.ID, field_id))); field.clear(); field.send_keys(value)
+                    # Use JS to set value for reliability
+                    field = wait.until(EC.presence_of_element_located((By.ID, field_id)))
+                    driver.execute_script("arguments[0].value = arguments[1];", field, value)
                 except (NoSuchElementException, TimeoutException): pass 
         
+        # --- Step 3: Selecting Location ---
         self.app.log_message(self.log_display, "Step 3: Selecting Location...")
         select_and_wait("ContentPlaceHolder1_ddlpanch", form_config['panchayat_name'])
-        Select(wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddlvillage")))).select_by_visible_text(village_name)
         
-        self.app.log_message(self.log_display, "Step 4: Filling Final Details...")
-        Select(wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddlridgetype")))).select_by_value(config.WC_GEN_CONFIG["defaults"]["ridge_type"])
-        driver.find_element(By.ID, "ContentPlaceHolder1_txtPriority").send_keys(priority)
-        driver.find_element(By.ID, "ContentPlaceHolder1_txtPropDate").send_keys(form_config['proposal_date'])
-        driver.find_element(By.ID, "ContentPlaceHolder1_txtstartdate").send_keys(form_config['start_date'])
-        driver.find_element(By.ID, "ContentPlaceHolder1_TxtEstlb").send_keys(form_config['est_labour_cost'])
-        driver.find_element(By.ID, "ContentPlaceHolder1_txtEstMat").send_keys(form_config['est_material_cost'])
-        driver.find_element(By.ID, "ContentPlaceHolder1_txtkhtano").send_keys(khata_no)
-        driver.find_element(By.ID, "ContentPlaceHolder1_txtPlotNo").send_keys(plot_no)
+        # Village Select (Presence Check)
+        village_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlvillage")))
+        Select(village_select).select_by_visible_text(village_name)
         
-        work_name_field = driver.find_element(By.ID, "ContentPlaceHolder1_txtworkname")
-        pyperclip.copy(work_name)
-        paste_key = Keys.COMMAND if sys.platform == "darwin" else Keys.CONTROL
-        work_name_field.send_keys(paste_key, 'v'); time.sleep(0.5)
+        # --- Upload Undertaking PDF (Standard Input works in background) ---
+        pdf_path = form_config.get('undertaking_pdf')
+        if pdf_path and os.path.exists(pdf_path):
+            self.app.log_message(self.log_display, "  > Uploading Undertaking PDF...")
+            try:
+                # Direct send_keys usually works best for file inputs even if hidden
+                file_input = driver.find_element(By.ID, "ContentPlaceHolder1_File_indiv_work_file_pdf")
+                file_input.send_keys(pdf_path)
+            except Exception: 
+                self.app.log_message(self.log_display, "  > Warning: Could not upload PDF (Element not found or error).", "warning")
 
+        # --- Step 4: Filling Final Details (JS Safe) ---
+        self.app.log_message(self.log_display, "Step 4: Filling Final Details...")
+        
+        ridge_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlridgetype")))
+        Select(ridge_select).select_by_value(config.WC_GEN_CONFIG["defaults"]["ridge_type"])
+        
+        # Helper to set value via JS
+        def set_val(eid, val):
+            try:
+                el = driver.find_element(By.ID, eid)
+                driver.execute_script("arguments[0].value = arguments[1];", el, val)
+            except: pass
+
+        set_val("ContentPlaceHolder1_txtPriority", priority)
+        set_val("ContentPlaceHolder1_txtPropDate", form_config['proposal_date'])
+        set_val("ContentPlaceHolder1_txtstartdate", form_config['start_date'])
+        
+        # --- COST FILLING & CALCULATION FIX ---
+        # 1. Fill Labour and Material Cost
+        set_val("ContentPlaceHolder1_TxtEstlb", form_config['est_labour_cost'])
+        set_val("ContentPlaceHolder1_txtEstMat", form_config['est_material_cost'])
+        
+        # 2. Trigger Website Calculation Function Manually
+        # (This is needed because JS injection doesn't fire 'onblur' event automatically)
+        try:
+            driver.execute_script("if(typeof TotEstCostFin === 'function') { TotEstCostFin(); }")
+        except Exception:
+            # Fallback: If JS function fails, calculate locally and fill
+            try:
+                total_c = float(form_config['est_labour_cost']) + float(form_config['est_material_cost'])
+                driver.execute_script(f"document.getElementById('ContentPlaceHolder1_Txtestcost').value = '{total_c}';")
+            except: pass
+        # ---------------------------------------
+
+        set_val("ContentPlaceHolder1_txtkhtano", khata_no)
+        set_val("ContentPlaceHolder1_txtPlotNo", plot_no)
+        
+        # --- FIX: Work Name (JS Injection instead of Clipboard) ---
+        # Copy-Paste fails in background. This is much more robust.
+        work_name_field = driver.find_element(By.ID, "ContentPlaceHolder1_txtworkname")
+        driver.execute_script("arguments[0].value = arguments[1];", work_name_field, work_name)
+        time.sleep(0.5)
+
+        # --- Step 5: Selecting Agency and Saving ---
         self.app.log_message(self.log_display, "Step 5: Selecting Agency and Saving...")
-        Select(wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddlExeAgency")))).select_by_visible_text(form_config['executing_agency'])
-        driver.find_element(By.ID, "ContentPlaceHolder1_btSave").click()
+        
+        agency_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlExeAgency")))
+        Select(agency_select).select_by_visible_text(form_config['executing_agency'])
+        
+        # --- FIX: JS Click for Save ---
+        save_btn = driver.find_element(By.ID, "ContentPlaceHolder1_btSave")
+        driver.execute_script("arguments[0].click();", save_btn)
 
         try:
             wait.until(EC.url_contains("ifedit.aspx?work_code="))
@@ -551,9 +705,19 @@ class WcGenTab(BaseAutomationTab):
         if not self.csv_path: messagebox.showwarning("Missing File", "Please select a CSV data file first."); return
         form_config = {key: field.get() for key, field in self.ui_fields.items()}
         form_config["panchayat_name"] = self.panchayat_entry.get().strip()
+        
+        # --- NEW: Pass the PDF path to the config ---
+        form_config["undertaking_pdf"] = self.undertaking_pdf_path
+        # --- END NEW ---
+
         required_fields = ["panchayat_name", "master_category", "work_category", "beneficiary_type", "activity_type", "work_type", "pro_status", "executing_agency", "proposal_date", "start_date", "est_labour_cost", "est_material_cost"]
         if any(not form_config.get(key) for key in required_fields):
             messagebox.showwarning("Input Error", "Please load categories and ensure all configuration fields are filled."); return
+        
+        # We don't necessarily fail if PDF is missing, unless you want to enforce it.
+        # Given "Individual" work usually requires it, you might want to warn, but let's leave it optional 
+        # for flexibility unless you want to strict check it.
+        
         self._save_profile(profile_name="Last Used Config", is_autosave=True)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(form_config,))
         
@@ -612,13 +776,14 @@ class WcGenTab(BaseAutomationTab):
         if hasattr(self, 'copy_logs_button'): self.copy_logs_button.configure(state=state)
 
         self.select_button.configure(state=state)
-        self.cloud_csv_button.configure(state=state) # <-- Set state for new button
+        self.cloud_csv_button.configure(state=state)
         self.panchayat_entry.configure(state=state)
         self.load_button.configure(state=state)
         self.save_profile_button.configure(state=state)
         self.delete_profile_button.configure(state=state)
         self.profile_combobox.configure(state=state)
         self.send_to_if_edit_switch.configure(state=state)
+        self.select_pdf_button.configure(state=state) # <-- Toggle PDF button state
 
         if running:
             for child in self.step2_frame.winfo_children():
@@ -633,6 +798,12 @@ class WcGenTab(BaseAutomationTab):
             self.panchayat_entry.delete(0, tkinter.END)
             self.file_label.configure(text="No file selected")
             self.csv_path = None
+            
+            # --- Reset PDF ---
+            self.undertaking_pdf_path = None
+            self.pdf_label.configure(text="No file selected", text_color="gray")
+            # -----------------
+            
             self.app.clear_log(self.log_display)
             self.send_to_if_edit_switch.deselect()
             self.successful_wcs_data.clear()

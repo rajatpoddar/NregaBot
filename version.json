@@ -1,15 +1,23 @@
 {
-  "latest_version": "2.9.1",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.9.1-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.9.1-macOS.dmg",
+  "latest_version": "2.9.2",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v2.9.2-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v2.9.2-macOS.dmg",
   "core_update": {
-    "version": "2.9.1",
-    "url": "https://nregabot.com/updates/core_v2.9.1.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v2.9.1.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v2.9.1.zip",
+    "version": "2.9.2",
+    "url": "https://nregabot.com/updates/core_v2.9.2.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v2.9.2.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v2.9.2.zip",
     "force_full_reinstall": false
   },
   "changelog": {
+    "2.9.2": [
+      "🚀 **New Feature (Background Mode):** All automations are now optimized to run even if the browser window is minimized.",
+      "✨ **Global Update:** Added a 'Retry Failed' button to all automation tabs to quickly re-process failed entries.",
+      "🎨 **MB Entry Upgrade:** Revamped Result section to support Professional Export (Excel & PDF).",
+      "🐞 **Bug Fix (MB Entry):** Resolved a critical issue where the Work Name was not being selected automatically.",
+      "🛠 **Demand Automation:** Improved stability with robust error handling.",
+      "⚡ **MR Generation:** Enhanced logic for smoother processing and reliability."
+    ],
     "2.9.1": [
       "✨ **New Feature (MR Tracking):** Added 'Pendency Report (T0-T8)' generator for Panchayat-wise analysis.",
       "✨ **New Feature (Zero MR Integration):** Directly forward data from MR Tracking to Zero MR tab.",

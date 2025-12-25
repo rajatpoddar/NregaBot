@@ -199,21 +199,45 @@ class MsrTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
             
     def _process_single_work_code(self, driver, wait, work_key, verify_amount):
+        """
+        Processes a single work code for MSR payment.
+        BACKGROUND-SAFE UPDATE: Uses JS for inputs/clicks and Presence checks.
+        """
         try:
+            # Dismiss alert if present
             try: driver.switch_to.alert.accept()
             except NoAlertPresentException: pass
-            wait.until(EC.presence_of_element_located((By.ID, "txtSearch"))).clear()
-            driver.find_element(By.ID, "txtSearch").send_keys(work_key)
-            wait.until(EC.element_to_be_clickable((By.ID, "ImgbtnSearch"))).click(); time.sleep(1)
-            error_span = driver.find_element(By.ID, "lblError")
-            if error_span and error_span.text.strip(): raise ValueError(f"Site error: '{error_span.text.strip()}'")
+            
+            # --- 1. Search Work Code (Background Safe) ---
+            # Use Presence
+            search_box = wait.until(EC.presence_of_element_located((By.ID, "txtSearch")))
+            # JS Set Value
+            driver.execute_script("arguments[0].value = arguments[1];", search_box, work_key)
+            
+            # JS Click Search Button
+            search_btn = wait.until(EC.presence_of_element_located((By.ID, "ImgbtnSearch")))
+            driver.execute_script("arguments[0].click();", search_btn)
+            
+            time.sleep(1)
+
+            # --- 2. Check Errors ---
+            # Check for error label (Use innerText for background safety)
+            try:
+                error_span = driver.find_element(By.ID, "lblError")
+                err_text = error_span.get_attribute("innerText").strip()
+                if err_text: raise ValueError(f"Site error: '{err_text}'")
+            except NoSuchElementException: pass
+
+            # --- 3. Select Lists (Safe) ---
             work_code_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ddlWorkCode"))))
             if len(work_code_select.options) <= config.MSR_CONFIG["work_code_index"]: raise IndexError("Work code not found.")
             work_code_select.select_by_index(config.MSR_CONFIG["work_code_index"]); time.sleep(1.5)
+            
             msr_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ddlMsrNo"))))
             if len(msr_select.options) <= config.MSR_CONFIG["muster_roll_index"]: raise IndexError("Muster Roll (MSR) not found.")
             msr_select.select_by_index(config.MSR_CONFIG["muster_roll_index"]); time.sleep(1.5)
 
+            # --- 4. Verify Amount ---
             wage_inputs = driver.find_elements(By.XPATH, "//input[starts-with(@name, 'wage_per_day')]")
             filled_wages = [float(inp.get_attribute('value')) for inp in wage_inputs if inp.get_attribute('value') and float(inp.get_attribute('value')) > 0]
             
@@ -226,8 +250,14 @@ class MsrTab(BaseAutomationTab):
                     self._log_result("Rejected", work_key, f"Verify amount not matched ({wage} != {verify_amount})")
                     return
 
-            wait.until(EC.element_to_be_clickable((By.ID, "btnSave"))).click()
+            # --- 5. Save/Submit (Background Safe) ---
+            # JS Click for Save
+            save_btn = wait.until(EC.presence_of_element_located((By.ID, "btnSave")))
+            driver.execute_script("arguments[0].click();", save_btn)
+            
+            # Handle Alert
             WebDriverWait(driver, 10).until(EC.alert_is_present()).accept()
+            
             outcome_found = False
             for _ in range(3):
                 try:
@@ -237,12 +267,16 @@ class MsrTab(BaseAutomationTab):
                     else: self._log_result("Failed", work_key, f"Unknown Alert: {final_alert_text}")
                     outcome_found = True; break
                 except NoAlertPresentException:
-                    if "Expenditure on unskilled labours exceeds sanction amount" in driver.page_source: self._log_result("Failed", work_key, "Exceeds Labour Payment"); outcome_found = True; break
+                    if "Expenditure on unskilled labours exceeds sanction amount" in driver.page_source: 
+                        self._log_result("Failed", work_key, "Exceeds Labour Payment"); outcome_found = True; break
                     time.sleep(1)
+            
             if not outcome_found: self._log_result("Failed", work_key, "No final confirmation found (Timeout).")
+            
             delay = random.uniform(config.MSR_CONFIG["min_delay"], config.MSR_CONFIG["max_delay"])
             self.app.after(0, self.update_status, f"Waiting {delay:.1f}s...")
             time.sleep(delay)
+
         except (ValueError, IndexError, NoSuchElementException, TimeoutException) as e:
             display_msg = "MR not Filled yet." if isinstance(e, IndexError) else "Page timed out or element not found." if isinstance(e, TimeoutException) else str(e)
             self._log_result("Failed", work_key, display_msg)

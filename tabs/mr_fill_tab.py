@@ -304,7 +304,10 @@ class MrFillTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
             
     def _process_single_work_code(self, driver, wait, work_key, holiday_cols, is_manual_mode):
-        """Processes a single work code and its first available MR."""
+        """
+        Processes a single work code and its first available MR.
+        BACKGROUND-SAFE UPDATE: Uses JS for inputs/clicks to support Minimized Browser.
+        """
         current_mr_no = "N/A"
         try:
             # Dismiss any previous alerts
@@ -315,17 +318,25 @@ class MrFillTab(BaseAutomationTab):
             if driver.current_url != config.MR_FILL_CONFIG["url"]:
                 driver.get(config.MR_FILL_CONFIG["url"])
 
-            # --- 1. Work Code Search ---
+            # --- 1. Work Code Search (Background Safe) ---
             self.app.after(0, self.app.set_status, f"Searching for Work Key: {work_key}")
-            wait.until(EC.presence_of_element_located((By.ID, "txtSearch"))).clear()
-            driver.find_element(By.ID, "txtSearch").send_keys(work_key)
-            wait.until(EC.element_to_be_clickable((By.ID, "ImgbtnSearch"))).click()
+            
+            # Use Presence Check
+            search_box = wait.until(EC.presence_of_element_located((By.ID, "txtSearch")))
+            # Use JS to set value (Works in background)
+            driver.execute_script("arguments[0].value = arguments[1];", search_box, work_key)
+            
+            # Use JS Click
+            search_btn = wait.until(EC.presence_of_element_located((By.ID, "ImgbtnSearch")))
+            driver.execute_script("arguments[0].click();", search_btn)
+            
             time.sleep(1) # Wait for search
 
             # Check for 'lblmsg' error (like Geotag)
             try:
                 error_span = driver.find_element(By.ID, "lblmsg")
-                error_text = error_span.text.strip()
+                # Use innerText for background reading
+                error_text = error_span.get_attribute("innerText").strip()
                 if error_text: 
                     raise ValueError(f"{error_text}")
             except NoSuchElementException:
@@ -349,9 +360,9 @@ class MrFillTab(BaseAutomationTab):
             msr_select.select_by_index(1)
             self.app.log_message(self.log_display, f"Processing Work Key: {work_key}, MR No: {current_mr_no}")
             
-            # Wait for table to load by checking for the 'Save' button
+            # Wait for table (Check for Save button presence)
             wait.until(EC.presence_of_element_located((By.ID, "btnsave")))
-            time.sleep(1) # Allow table to render
+            time.sleep(1) 
 
             # --- 4. Mark Holidays ---
             if holiday_cols:
@@ -360,54 +371,55 @@ class MrFillTab(BaseAutomationTab):
                 for col_num in holiday_cols:
                     try:
                         holiday_checkbox_id = f"c_p{col_num}"
+                        # Try to find check box
                         checkbox = driver.find_element(By.ID, holiday_checkbox_id)
                         if not checkbox.is_selected():
+                            # JS Click is safest for background
                             driver.execute_script("arguments[0].click();", checkbox)
                     except NoSuchElementException:
                         self.app.log_message(self.log_display, f"Warning: Holiday column {col_num} not found.", "warning")
             
-            # --- NEW STEP: Fill 'Work Start Date' if Empty ---
+            # --- Fill 'Work Start Date' (Background Safe) ---
             try:
                 work_start_input = driver.find_element(By.ID, "txtWrkStartDate")
-                # Check if the field is empty (or just whitespace)
+                # Check if empty
                 if not work_start_input.get_attribute("value").strip():
-                    # Get value from 'Date From' (txtDatefrm)
                     date_from_val = driver.find_element(By.ID, "txtDatefrm").get_attribute("value")
                     if date_from_val:
-                        work_start_input.clear()
-                        work_start_input.send_keys(date_from_val)
+                        # JS Set Value
+                        driver.execute_script("arguments[0].value = arguments[1];", work_start_input, date_from_val)
                         self.app.log_message(self.log_display, f"Auto-filled Work Start Date: {date_from_val}", "info")
             except Exception as e:
-                # Log warning but don't stop automation
                 self.app.log_message(self.log_display, f"Warning: Could not auto-fill date: {e}", "warning")
 
             # --- 5. Manual Mode Logic ---
             if is_manual_mode:
                 self.app.after(0, self.app.set_status, f"Manual Mode: Pausing for MR: {current_mr_no}")
                 self.app.log_message(self.log_display, f"Manual Mode: Pausing for MR: {current_mr_no}. Please mark absentees and click 'Save'.", "info")
-                
                 try:
-                    # Wait up to 10 minutes (600s) for the user to click 'Save' which triggers the first alert
                     alert = WebDriverWait(driver, 600).until(EC.alert_is_present())
-                    alert_text = alert.text # Get text before accepting
+                    alert_text = alert.text 
                     alert.accept()
                     self.app.log_message(self.log_display, f"User action detected. Bot handled first alert: '{alert_text}'", "info")
                 except TimeoutException:
                     raise ValueError("Manual mode timed out. User did not click 'Save'.")
 
             else:
-                # --- 6. Auto-Submit Logic ---
+                # --- 6. Auto-Submit Logic (Background Safe) ---
                 self.app.after(0, self.app.set_status, f"Auto-submitting MR: {current_mr_no}")
                 self.app.log_message(self.log_display, "Auto-submitting attendance...")
-                driver.find_element(By.ID, "btnsave").click()
                 
-                # Handle first confirmation alert ("Do you want to Save?")
+                # JS Click for Save
+                save_btn = driver.find_element(By.ID, "btnsave")
+                driver.execute_script("arguments[0].click();", save_btn)
+                
+                # Handle first confirmation alert
                 WebDriverWait(driver, 10).until(EC.alert_is_present()).accept()
 
-            # --- 7. Final Alert Handling (for both modes) ---
+            # --- 7. Final Alert Handling ---
             self.app.after(0, self.app.set_status, f"Waiting for final confirmation...")
             outcome_found = False
-            for _ in range(3): # Try for 3 seconds
+            for _ in range(3): 
                 try:
                     final_alert = driver.switch_to.alert
                     final_alert_text = final_alert.text.strip()
@@ -444,6 +456,14 @@ class MrFillTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Critical error processing {work_key}: {e}", "error")
             self._log_result(work_key, current_mr_no, "Failed", f"CRITICAL ERROR: {type(e).__name__}")
         
+    # ... inside MrFillTab class ...
+
+    # 1. FIX: Add this method to handle the Retry button correctly
+    def retry_logic_handler(self):
+        """Override default retry logic to map to the correct text widget (work_key_text)."""
+        self.retry_failed_automation(self.work_key_text)
+
+    # 2. FIX: Update this method to apply the 'success' tag for green color
     def _log_result(self, work_key, mr_no, status, msg):
         """Logs the result to the log display and the results tree."""
         level = "success" if status.lower() == "success" else "error"
@@ -451,7 +471,12 @@ class MrFillTab(BaseAutomationTab):
         details = msg.replace("\n", " ").replace("\r", " ")
         
         self.app.log_message(self.log_display, f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}", level=level)
-        tags = ('failed',) if 'success' not in status.lower() else ()
+        
+        # --- FIX: Explicitly apply 'success' tag for green styling ---
+        if 'success' in status.lower():
+            tags = ('success',)
+        else:
+            tags = ('failed',)
         
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_key, mr_no, status.upper(), details, timestamp), tags=tags))
 

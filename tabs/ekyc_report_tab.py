@@ -42,7 +42,7 @@ class EKycReportTab(BaseAutomationTab):
             input_frame, 
             width=140, 
             placeholder_text="Exact Spelling",
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), # <-- LINKED
+            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
             app_instance=self.app,
             history_key="panchayat_name"
         )
@@ -54,7 +54,7 @@ class EKycReportTab(BaseAutomationTab):
             input_frame, 
             width=140, 
             placeholder_text="Leave empty for ALL",
-            suggestions_list=self.app.history_manager.get_suggestions("village_name"), # <-- LINKED
+            suggestions_list=self.app.history_manager.get_suggestions("village_name"),
             app_instance=self.app,
             history_key="village_name"
         )
@@ -147,26 +147,32 @@ class EKycReportTab(BaseAutomationTab):
             self.update_status("Opening Website...")
             driver.get("https://nregade4.nic.in/Netnrega/UID/AppABPSRpt.aspx")
 
-            # 1. Uncheck Pending
+            # 1. Uncheck Pending (BACKGROUND SAFE)
+            # Use presence_of (not visibility) and JS click to handle minimized window
             try:
                 chk = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_chbx_freshCase")))
-                if chk.is_selected():
+                
+                # Double check with JS if it's really checked (Selenium .is_selected can be flaky if hidden)
+                is_checked = driver.execute_script("return arguments[0].checked;", chk)
+                
+                if is_checked:
                     self.update_status("Unchecking Pending Box...")
-                    chk.click()
-                    time.sleep(3)
-            except: pass
+                    # Force Click using JS (Works even if minimized/unfocused)
+                    driver.execute_script("arguments[0].click();", chk)
+                    
+                    # Wait for refresh (The page usually reloads/flickers here)
+                    try: wait.until(EC.staleness_of(chk))
+                    except: time.sleep(3)
+            except Exception as e:
+                self.app.log_message(self.log_display, f"Warning in Uncheck Pending: {e}", "warning")
 
             # 2. Select Panchayat
             self.update_status(f"Selecting Panchayat: {panchayat_target}")
             try:
                 old_html = driver.find_element(By.TAG_NAME, "html")
-                panchayat_dd = Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat"))))
+                panchayat_dd = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat"))))
                 panchayat_dd.select_by_visible_text(panchayat_target)
-                
-                # --- NEW: Save Valid Panchayat to Global History ---
                 self.app.update_history("panchayat_name", panchayat_target)
-                # ---------------------------------------------------
-                
                 try: wait.until(EC.staleness_of(old_html))
                 except: time.sleep(3)
             except Exception as e:
@@ -176,19 +182,24 @@ class EKycReportTab(BaseAutomationTab):
             villages_to_process = []
             
             if village_target and ("All Village" in village_target or village_target == "99"):
-                self.app.log_message(self.log_display, "Skipping invalid village input '--All Villages--'. Please leave blank to scan all.", "warning")
                 village_target = ""
 
             if village_target:
-                # User provided a specific village
                 villages_to_process.append(village_target)
-                # --- NEW: Save Valid Village to Global History ---
                 self.app.update_history("village_name", village_target)
-                # -------------------------------------------------
             else:
                 self.update_status("Fetching village list...")
                 try:
-                    village_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
+                    # Retry logic for fetching list
+                    village_dd_elem = None
+                    for _ in range(3):
+                        try:
+                            village_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
+                            break
+                        except: time.sleep(1)
+                    
+                    if not village_dd_elem: raise Exception("Village Dropdown not found")
+
                     options = Select(village_dd_elem).options
                     for opt in options:
                         val = opt.get_attribute("value")
@@ -209,15 +220,26 @@ class EKycReportTab(BaseAutomationTab):
                 self.update_status(f"Processing Village {idx}/{total_villages}: {v_name}")
                 self.app.log_message(self.log_display, f"Selecting Village: {v_name}", "info")
                 
-                # Select Village
-                try:
-                    old_html = driver.find_element(By.TAG_NAME, "html")
-                    v_dd = Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"))))
-                    v_dd.select_by_visible_text(v_name)
-                    try: wait.until(EC.staleness_of(old_html))
-                    except: time.sleep(3)
-                except Exception as e:
-                    self.app.log_message(self.log_display, f"Error selecting {v_name}: {e}", "error")
+                # --- RETRY LOGIC FOR SELECTION (Network Bug Fix) ---
+                selection_success = False
+                for attempt in range(1, 4):
+                    try:
+                        old_html = driver.find_element(By.TAG_NAME, "html")
+                        v_dd_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
+                        v_dd = Select(v_dd_elem)
+                        v_dd.select_by_visible_text(v_name)
+                        
+                        try: wait.until(EC.staleness_of(old_html))
+                        except: time.sleep(2)
+                        
+                        selection_success = True
+                        break 
+                    except Exception as e:
+                        self.app.log_message(self.log_display, f"Retry {attempt} for {v_name}...", "warning")
+                        time.sleep(2)
+                
+                if not selection_success:
+                    self.app.log_message(self.log_display, f"Skipping {v_name} (Selection Failed)", "error")
                     continue
 
                 # Scrape this village
@@ -237,6 +259,20 @@ class EKycReportTab(BaseAutomationTab):
         """Helper to scrape data including pagination for the current page"""
         current_page_num = 1
         
+        # --- FIX: FORCE RESET TO PAGE 1 (Pagination Bug Fix) ---
+        try:
+            # Check with simple find_elements to avoid waiting if not present
+            page_one_link = driver.find_elements(By.XPATH, "//a[text()='1']")
+            if page_one_link:
+                # Use JS Click here too for safety in minimized mode
+                self.app.log_message(self.log_display, f"Resetting to Page 1 for {village_name}...", "info")
+                old_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_gvData")
+                driver.execute_script("arguments[0].click();", page_one_link[0])
+                try: WebDriverWait(driver, 10).until(EC.staleness_of(old_table))
+                except: time.sleep(2)
+        except: pass
+        # --------------------------------------------------------
+
         while True:
             if self.app.stop_events[self.automation_key].is_set(): return
 
@@ -284,7 +320,10 @@ class EKycReportTab(BaseAutomationTab):
                 next_link = driver.find_element(By.XPATH, f"//a[contains(@href, 'Page${next_page_num}')]")
                 self.update_status(f"Loading {village_name} - Page {next_page_num}...")
                 old_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_gvData")
-                next_link.click()
+                
+                # JS Click for Pagination as well (Minimized mode safety)
+                driver.execute_script("arguments[0].click();", next_link)
+                
                 try: WebDriverWait(driver, 10).until(EC.staleness_of(old_table))
                 except: time.sleep(3)
                 current_page_num += 1
@@ -334,7 +373,14 @@ class EKycReportTab(BaseAutomationTab):
         # File Setup
         panchayat = self.panchayat_entry.get()
         village_input = self.village_entry.get()
-        village_display = village_input if village_input else "ALL VILLAGES"
+        
+        # --- HEADER & FILENAME LOGIC ---
+        if village_input:
+            file_part = village_input
+            header_text = f"eKYC & ABPS REPORT: {village_input}, {panchayat.upper()}"
+        else:
+            file_part = f"Panchayat - {panchayat}"
+            header_text = f"eKYC & ABPS REPORT: Panchayat - {panchayat.upper()}"
         
         year = datetime.date.today().year
         date_str = datetime.date.today().strftime("%d-%m-%Y")
@@ -343,7 +389,7 @@ class EKycReportTab(BaseAutomationTab):
         save_dir = os.path.join(user_downloads, "NregaBot", f"Reports {year}", panchayat)
         if not os.path.exists(save_dir): os.makedirs(save_dir)
             
-        default_name = f"ekyc_report_{village_display}_{date_str}.xlsx"
+        default_name = f"ekyc_report_{file_part}_{date_str}.xlsx"
         filename = filedialog.asksaveasfilename(initialdir=save_dir, initialfile=default_name, defaultextension=".xlsx", filetypes=[("Excel Files", "*.xlsx")])
 
         if not filename: return
@@ -363,7 +409,7 @@ class EKycReportTab(BaseAutomationTab):
 
             # Header
             ws.merge_cells('A1:F1')
-            ws['A1'] = f"eKYC & ABPS REPORT: {village_display}, {panchayat.upper()}"
+            ws['A1'] = header_text
             ws['A1'].font = Font(size=14, bold=True, color="FFFFFF")
             ws['A1'].fill = header_fill
             ws['A1'].alignment = center
@@ -453,17 +499,12 @@ class EKycReportTab(BaseAutomationTab):
         except Exception as e:
             messagebox.showerror("Error", f"Save Failed: {e}")
 
-    # --- SAVE / LOAD HISTORY LOGIC (Updated to use Global History) ---
     def save_inputs(self):
-        # We only save the current text to file for next load.
-        # The history list management is now handled by HistoryManager.
-        
         data = {
             "panchayat": self.panchayat_entry.get().strip(),
             "village": self.village_entry.get().strip(),
             "filter": self.filter_var.get()
         }
-        
         try:
             config_file = self.app.get_data_path("ekyc_inputs.json")
             with open(config_file, "w") as f: json.dump(data, f, indent=4)
@@ -471,14 +512,10 @@ class EKycReportTab(BaseAutomationTab):
 
     def load_inputs(self):
         config_file = self.app.get_data_path("ekyc_inputs.json")
-        
         if os.path.exists(config_file):
             try:
                 with open(config_file, "r") as f: data = json.load(f)
-                
-                # Set values
                 self.panchayat_entry.delete(0, "end"); self.panchayat_entry.insert(0, data.get("panchayat", ""))
                 self.village_entry.delete(0, "end"); self.village_entry.insert(0, data.get("village", ""))
                 if data.get("filter"): self.filter_var.set(data.get("filter"))
-                
             except: pass

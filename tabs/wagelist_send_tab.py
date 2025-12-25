@@ -212,13 +212,19 @@ class WagelistSendTab(BaseAutomationTab):
             self.app.after(5000, lambda: self.update_status("Ready", 0.0))
 
     def _process_single_wagelist(self, driver, wait, wagelist, fin_year):
+        """Processes a single wagelist (Background Safe)."""
         for attempt in range(2):
             if self.app.stop_events[self.automation_key].is_set(): return False
             try:
-                Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddl_sel")))).select_by_value(wagelist)
+                # Select Wagelist (Presence check)
+                wl_dropdown = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_sel")))
+                Select(wl_dropdown).select_by_value(wagelist)
+                
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_GridView1")))
                 
                 self.app.log_message(self.log_display, f"Selecting all EFMS options for {wagelist}...")
+                
+                # JS Script checks checkboxes (Already good in previous code, kept same)
                 js_script = """
                     const radios = document.querySelectorAll("input[id$='_rdbPayment_2']");
                     let clickedCount = 0;
@@ -235,7 +241,10 @@ class WagelistSendTab(BaseAutomationTab):
                 
                 if self.app.stop_events[self.automation_key].is_set(): return False
                 
-                driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btnsubmit").click()
+                # --- FIX: JS Click for Submit Button (Background Safe) ---
+                submit_btn = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btnsubmit")
+                driver.execute_script("arguments[0].click();", submit_btn)
+                
                 WebDriverWait(driver, 5).until(EC.alert_is_present()).accept()
                 
                 self.app.log_message(self.log_display, f"✅ {wagelist} submitted successfully.", "success")
@@ -244,9 +253,9 @@ class WagelistSendTab(BaseAutomationTab):
                 self.app.log_message(self.log_display, f"[WARN] Attempt {attempt+1} failed for {wagelist}: {type(e).__name__}", "warning")
                 if (attempt == 0):
                     driver.refresh()
-                    wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlfin")))
+                    wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlfin")))
                     Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddlfin")).select_by_value(fin_year)
-                    wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddl_sel")))
+                    wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_sel")))
 
         self.app.log_message(self.log_display, f"❌ {wagelist} failed after multiple attempts.", "error")
         return False

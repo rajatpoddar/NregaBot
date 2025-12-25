@@ -275,14 +275,17 @@ class DuplicateMrTab(BaseAutomationTab):
                 
                 driver.get(url)
                 
-                panchayat_dd_element = wait.until(EC.element_to_be_clickable((By.ID, "ddlPanchayat")))
+                # --- Background Safe: Select Panchayat ---
+                panchayat_dd_element = wait.until(EC.presence_of_element_located((By.ID, "ddlPanchayat")))
                 Select(panchayat_dd_element).select_by_visible_text(panchayat)
                 
-                wc_input = wait.until(EC.element_to_be_clickable((By.ID, "txtWork")))
+                # --- Background Safe: Fill Work Code ---
+                wc_input = wait.until(EC.presence_of_element_located((By.ID, "txtWork")))
+                driver.execute_script("arguments[0].value = arguments[1];", wc_input, work_code)
                 
-                wc_input.clear()
-                wc_input.send_keys(work_code)
-                driver.find_element(By.ID, "imgButtonSearch").click()
+                # --- Background Safe: Click Search ---
+                search_btn = driver.find_element(By.ID, "imgButtonSearch")
+                driver.execute_script("arguments[0].click();", search_btn)
                 time.sleep(2)
 
                 wait.until(lambda d: len(Select(d.find_element(By.ID, "ddlworkcode")).options) > 1)
@@ -293,7 +296,9 @@ class DuplicateMrTab(BaseAutomationTab):
                 current_msr_dd = Select(driver.find_element(By.ID, "ddlmsrno"))
                 current_msr_dd.select_by_value(msr_no)
                 
-                driver.find_element(By.ID, "btnproceed").click()
+                # --- Background Safe: Click Proceed ---
+                proceed_btn = driver.find_element(By.ID, "btnproceed")
+                driver.execute_script("arguments[0].click();", proceed_btn)
                 
                 self.app.log_message(self.log_display, "   - Loading print page content...")
                 
@@ -305,10 +310,10 @@ class DuplicateMrTab(BaseAutomationTab):
                     self.app.log_message(self.log_display, "   - No iframe detected, proceeding in main document.")
 
                 self.app.log_message(self.log_display, "   - Waiting for 'Print' link to become available...")
-                wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "Print")))
+                # Presence check for print link
+                wait.until(EC.presence_of_element_located((By.PARTIAL_LINK_TEXT, "Print")))
                 self.app.log_message(self.log_display, "   - Print page is ready.")
                 
-                # --- PASSING self.output_dir ---
                 pdf_path = self._save_mr_as_pdf(driver, work_code, msr_no, orientation, scale, self.output_dir)
                 
                 if pdf_path: self._log_result(work_code, msr_no, "Saved as PDF")
@@ -328,15 +333,18 @@ class DuplicateMrTab(BaseAutomationTab):
             self._log_result(work_code, "N/A", "Unexpected Error")
 
     def _get_msr_list(self, driver, wait, work_code, panchayat, url):
+        """Helper to get list of MSRs (Background Safe)."""
         self.app.log_message(self.log_display, f"Getting MSR list for Work Code: {work_code}")
         driver.get(url)
         
-        panchayat_dd_element = wait.until(EC.element_to_be_clickable((By.ID, "ddlPanchayat")))
+        panchayat_dd_element = wait.until(EC.presence_of_element_located((By.ID, "ddlPanchayat")))
         Select(panchayat_dd_element).select_by_visible_text(panchayat)
         
-        wc_input = wait.until(EC.element_to_be_clickable((By.ID, "txtWork")))
-        wc_input.clear(); wc_input.send_keys(work_code)
-        driver.find_element(By.ID, "imgButtonSearch").click()
+        wc_input = wait.until(EC.presence_of_element_located((By.ID, "txtWork")))
+        driver.execute_script("arguments[0].value = arguments[1];", wc_input, work_code)
+        
+        search_btn = driver.find_element(By.ID, "imgButtonSearch")
+        driver.execute_script("arguments[0].click();", search_btn)
         time.sleep(2)
         
         wait.until(lambda d: len(Select(d.find_element(By.ID, "ddlworkcode")).options) > 1)
@@ -357,16 +365,15 @@ class DuplicateMrTab(BaseAutomationTab):
     # --- FUNCTION SIGNATURE UPDATED ---
     def _save_mr_as_pdf(self, driver, work_code, msr_no, orientation, scale, output_dir):
         try:
-            # --- PATH LOGIC UPDATED ---
             safe_work_code = work_code.split('/')[-1][-6:]
             filename = f"MR_{safe_work_code}_{msr_no}.pdf"
             filepath = os.path.join(output_dir, filename)
-            # --- END ---
 
             is_landscape = (orientation == "Landscape")
             pdf_scale = scale / 100.0
             pdf_data_base64 = None
 
+            # --- CSS for Orientation ---
             if is_landscape:
                 driver.execute_script(
                     "var css = '@page { size: landscape; }';"
@@ -379,16 +386,43 @@ class DuplicateMrTab(BaseAutomationTab):
                 )
             
             if self.app.active_browser == 'firefox':
+                # Firefox: Inject a fixed div using JavaScript
+                footer_js = """
+                var footer = document.createElement('div');
+                footer.innerText = 'NregaBot.com';
+                footer.style.position = 'fixed';
+                footer.style.bottom = '0';
+                footer.style.right = '0';
+                footer.style.padding = '10px';
+                footer.style.fontSize = '10px';
+                footer.style.color = '#cccccc';  // Light Gray
+                footer.style.fontFamily = 'Arial, sans-serif';
+                footer.style.zIndex = '9999';
+                document.body.appendChild(footer);
+                """
+                driver.execute_script(footer_js)
+                
                 self.app.log_message(self.log_display, "   - Note: PDF Scale setting is not supported for Firefox and will be ignored.", "warning")
                 pdf_data_base64 = driver.print_page()
             
             elif self.app.active_browser == 'chrome':
+                # Chrome: Use Native Footer Template (Best Quality)
+                # Text is light gray (#d3d3d3), right-aligned, small font
+                footer_html = """
+                <div style="font-size: 9px; color: #d3d3d3; margin-right: 30px; margin-left: 30px; width: 100%; text-align: right; font-family: Helvetica, sans-serif;">
+                    NregaBot.com
+                </div>
+                """
+                
                 print_options = {
                     "landscape": is_landscape,
-                    "displayHeaderFooter": False,
+                    "displayHeaderFooter": True,       # <-- Enable Header/Footer
+                    "headerTemplate": "<div></div>",   # <-- Empty Header to hide URL/Date
+                    "footerTemplate": footer_html,     # <-- Our Custom Footer
                     "printBackground": False,
                     "scale": pdf_scale,
-                    "marginTop": 0.4, "marginBottom": 0.4,
+                    "marginTop": 0.4, 
+                    "marginBottom": 0.5,               # <-- Increased slightly to fit footer
                     "marginLeft": 0.4, "marginRight": 0.4
                 }
                 result = driver.execute_cdp_cmd('Page.printToPDF', print_options)

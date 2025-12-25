@@ -175,68 +175,72 @@ class AddActivityTab(BaseAutomationTab):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_key, status, details, timestamp)))
 
     def _process_single_work_key(self, driver, work_key, unit_price, quantity):
+        """Processes a single work key (Background Safe)."""
         wait = WebDriverWait(driver, 20)
         activity_code = config.ADD_ACTIVITY_CONFIG['defaults']['activity_code']
 
         try:
             driver.get(config.ADD_ACTIVITY_CONFIG["url"])
 
-            # 1. Enter work key and trigger reload
+            # 1. Enter work key and trigger reload (JS)
             self.app.log_message(self.log_display, f"Searching for work key: {work_key}")
             work_key_input = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtwrksearchkey')))
-            work_key_input.clear()
-            work_key_input.send_keys(work_key)
+            
+            # Use JS to set value
+            driver.execute_script("arguments[0].value = arguments[1];", work_key_input, work_key)
+            # This existing script triggers the PostBack (essential for update)
             driver.execute_script("javascript:setTimeout('__doPostBack(\\'ctl00$ContentPlaceHolder1$txtwrksearchkey\\',\\'\\')', 0)")
 
-            # 2. Select work from dropdown
+            # 2. Select work from dropdown (Presence Check)
             work_name_dd_id = 'ctl00_ContentPlaceHolder1_ddlworkName'
             wait.until(EC.presence_of_element_located((By.ID, work_name_dd_id)))
             wait.until(lambda d: len(Select(d.find_element(By.ID, work_name_dd_id)).options) > 1)
             Select(driver.find_element(By.ID, work_name_dd_id)).select_by_index(1)
             self.app.log_message(self.log_display, "Work selected. Loading details...")
             
-            # --- FIXED: Check if an activity already exists by inspecting table content ---
+            # Check for existing activity (Use innerText)
             try:
-                # This table always exists, so we check its content.
                 activity_table = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_grdDisplayAct')
-                
-                # If the "No Activity Found" text is present, we can proceed.
-                if "No Activity Found" in activity_table.text:
+                if "No Activity Found" in activity_table.get_attribute("innerText"):
                     self.app.log_message(self.log_display, "No existing activity. Proceeding to add.")
                 else:
-                    # Otherwise, a real activity is listed, so we skip.
                     self.app.log_message(self.log_display, "Activity already exists. Skipping.", "warning")
                     self._log_result(work_key, "Skipped", "An activity is already present.")
                     return
             except NoSuchElementException:
-                # If the table is missing for some reason, it's safe to proceed.
-                self.app.log_message(self.log_display, "Activity table not found. Assuming none exist and proceeding.")
+                self.app.log_message(self.log_display, "Activity table not found. Assuming none exist.")
 
             # 3. Select Activity
             activity_dd_id = 'ctl00_ContentPlaceHolder1_ddlAct'
-            wait.until(EC.element_to_be_clickable((By.ID, activity_dd_id)))
+            wait.until(EC.presence_of_element_located((By.ID, activity_dd_id)))
             Select(driver.find_element(By.ID, activity_dd_id)).select_by_value(activity_code)
+            # Wait for refresh
             wait.until(EC.staleness_of(driver.find_element(By.ID, activity_dd_id)))
 
-            # 4. Fill Unit Price
-            unit_price_input = wait.until(EC.element_to_be_clickable((By.ID, 'ctl00_ContentPlaceHolder1_txtAct_UnitPrice')))
-            unit_price_input.send_keys(unit_price)
-            driver.find_element(By.TAG_NAME, 'body').click()
+            # 4. Fill Unit Price (JS Safe)
+            unit_price_input = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtAct_UnitPrice')))
+            # Set Value via JS
+            driver.execute_script("arguments[0].value = arguments[1];", unit_price_input, unit_price)
+            # Dispatch event to trigger internal calc if needed
+            driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", unit_price_input)
+            # Fallback: click body via JS to trigger blur events
+            driver.execute_script("document.body.click();")
+            
             wait.until(EC.staleness_of(unit_price_input))
 
-            # 5. Fill Quantity
-            quantity_input = wait.until(EC.element_to_be_clickable((By.ID, 'ctl00_ContentPlaceHolder1_txtAct_Qty')))
-            quantity_input.send_keys(quantity)
-            quantity_input.send_keys(Keys.TAB)
+            # 5. Fill Quantity (JS Safe)
+            quantity_input = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtAct_Qty')))
+            driver.execute_script("arguments[0].value = arguments[1];", quantity_input, quantity)
+            driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", quantity_input)
 
             time.sleep(2)
 
-            # 6. Click Save
+            # 6. Click Save (JS Safe)
             self.app.log_message(self.log_display, "Saving activity...")
-            save_button = wait.until(EC.element_to_be_clickable((By.ID, 'ctl00_ContentPlaceHolder1_btsave')))
-            save_button.click()
+            save_button = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_btsave')))
+            driver.execute_script("arguments[0].click();", save_button)
 
-            # Check for success/error message
+            # Check for success/error
             try:
                 WebDriverWait(driver, 10).until(
                     EC.any_of(
@@ -250,29 +254,18 @@ class AddActivityTab(BaseAutomationTab):
                 
             try:
                 success_msg_element = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lblmsg')
-                if success_msg_element.text.strip():
-                    self._log_result(work_key, "Success", success_msg_element.text.strip())
+                if success_msg_element.get_attribute("innerText").strip():
+                    self._log_result(work_key, "Success", success_msg_element.get_attribute("innerText").strip())
                     return
             except NoSuchElementException:
                 pass
 
             try:
                 error_msg_element = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lblError')
-                if error_msg_element.text.strip():
-                    raise ValueError(error_msg_element.text.strip())
+                if error_msg_element.get_attribute("innerText").strip():
+                    raise ValueError(error_msg_element.get_attribute("innerText").strip())
             except NoSuchElementException:
                 pass
 
-        except UnexpectedAlertPresentException as e:
-            self._log_result(work_key, "Failed", f"Unexpected Alert: {e.alert_text}")
-            try:
-                driver.switch_to.alert.accept()
-            except:
-                pass
-        except StaleElementReferenceException:
-            self._log_result(work_key, "Failed", "Page refresh error. The script will retry on the next cycle.")
-        except (TimeoutException, NoSuchElementException, ValueError) as e:
-            error_message = str(e).splitlines()[0]
-            self._log_result(work_key, "Failed", f"Error: {error_message}")
         except Exception as e:
-            self._log_result(work_key, "Failed", f"A critical error occurred: {e}")
+            self._log_result(work_key, "Failed", f"Error: {str(e).splitlines()[0]}")

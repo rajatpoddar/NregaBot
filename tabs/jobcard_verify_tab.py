@@ -2,7 +2,7 @@
 import tkinter
 from tkinter import messagebox, filedialog
 import customtkinter as ctk
-import time, os, sys
+import time, os, sys, json
 from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -21,8 +21,10 @@ class JobcardVerifyTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
         super().__init__(parent, app_instance, automation_key="jc_verify")
         self.photo_folder_path = ""
+        self.pref_file = os.path.join(os.path.abspath("."), "jc_verify_prefs.json") 
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
+        self._load_saved_preferences()
 
     def _create_widgets(self):
         controls_frame = ctk.CTkFrame(self)
@@ -37,14 +39,26 @@ class JobcardVerifyTab(BaseAutomationTab):
         self.village_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("village_name"))
         self.village_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=10)
 
+        # Checkbox Frame
+        chk_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        chk_frame.grid(row=2, column=1, sticky='w', padx=15, pady=(0, 10))
+
         self.process_all_villages_var = tkinter.BooleanVar()
         self.process_all_checkbox = ctk.CTkCheckBox(
-            controls_frame,
+            chk_frame,
             text="Process all villages in this Panchayat",
             variable=self.process_all_villages_var,
             command=self._toggle_village_entry
         )
-        self.process_all_checkbox.grid(row=2, column=1, sticky='w', padx=15, pady=(0, 10))
+        self.process_all_checkbox.grid(row=0, column=0, sticky='w', padx=(0, 15))
+
+        self.verify_account_only_var = tkinter.BooleanVar()
+        self.verify_account_only_chk = ctk.CTkCheckBox(
+            chk_frame,
+            text="Verify only with Account Number",
+            variable=self.verify_account_only_var
+        )
+        self.verify_account_only_chk.grid(row=0, column=1, sticky='w')
 
         photo_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         photo_frame.grid(row=3, column=0, columnspan=2, sticky='ew', padx=15, pady=10)
@@ -72,12 +86,33 @@ class JobcardVerifyTab(BaseAutomationTab):
         else:
             self.village_entry.configure(state="normal")
 
+    def _load_saved_preferences(self):
+        try:
+            if os.path.exists(self.pref_file):
+                with open(self.pref_file, 'r') as f:
+                    data = json.load(f)
+                    if "panchayat" in data: self.panchayat_entry.insert(0, data["panchayat"])
+                    if "village" in data: self.village_entry.insert(0, data["village"])
+                    if "folder" in data and os.path.exists(data["folder"]):
+                        self.photo_folder_path = data["folder"]
+                        self.photo_path_label.configure(text=self.photo_folder_path)
+        except Exception as e:
+            print(f"Error loading prefs: {e}")
+
+    def _save_preferences(self, panchayat, village):
+        try:
+            data = {"panchayat": panchayat, "village": village, "folder": self.photo_folder_path}
+            with open(self.pref_file, 'w') as f:
+                json.dump(data, f)
+        except Exception: pass
+
     def set_ui_state(self, running: bool):
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.panchayat_entry.configure(state=state)
         self.select_folder_button.configure(state=state)
         self.process_all_checkbox.configure(state=state)
+        self.verify_account_only_chk.configure(state=state)
         if running or self.process_all_villages_var.get():
             self.village_entry.configure(state="disabled")
         else:
@@ -95,6 +130,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.panchayat_entry.delete(0, tkinter.END)
             self.village_entry.delete(0, tkinter.END)
             self.process_all_villages_var.set(False)
+            self.verify_account_only_var.set(False)
             self._toggle_village_entry()
             self.photo_folder_path = ""
             self.photo_path_label.configure(text=f"No folder selected (will use default '{config.JOBCARD_VERIFY_CONFIG['default_photo']}')")
@@ -106,6 +142,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         panchayat = self.panchayat_entry.get().strip()
         village = self.village_entry.get().strip()
         process_all = self.process_all_villages_var.get()
+        verify_account_only = self.verify_account_only_var.get()
 
         if not panchayat:
             messagebox.showwarning("Input Required", "Panchayat name is required.")
@@ -114,7 +151,13 @@ class JobcardVerifyTab(BaseAutomationTab):
             messagebox.showwarning("Input Required", "Please enter a Village name or check 'Process all villages'.")
             return
             
-        inputs = {'panchayat': panchayat, 'village': village, 'process_all': process_all}
+        inputs = {
+            'panchayat': panchayat, 
+            'village': village, 
+            'process_all': process_all,
+            'verify_account_only': verify_account_only
+        }
+        self._save_preferences(panchayat, village)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def _get_photo_for_jobcard(self, jobcard_no):
@@ -176,14 +219,28 @@ class JobcardVerifyTab(BaseAutomationTab):
                 wait.until(EC.staleness_of(html_element))
                 
                 try:
-                    msg_element = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
-                    if "no record found" in msg_element.text.lower():
+                    driver.implicitly_wait(1)
+                    msg_element = driver.find_elements(By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
+                    if msg_element and msg_element[0].is_displayed() and "no record found" in msg_element[0].text.lower():
                         self.app.log_message(self.log_display, f"   - Village has no records. Skipping.", "info")
                         continue
-                except NoSuchElementException:
-                    pass
+                finally:
+                    driver.implicitly_wait(20)
 
-                self._process_jobcards_for_current_page(driver, wait)
+                # --- PAGINATION LOOP ---
+                page_count = 1
+                while not self.app.stop_events[self.automation_key].is_set():
+                    self.app.log_message(self.log_display, f"   > Processing Page {page_count}")
+                    
+                    self._process_jobcards_for_current_page(driver, wait, inputs['verify_account_only'])
+                    
+                    # Pass the current page number so we know what to look for (Next = page_count + 1)
+                    if not self._handle_pagination(driver, wait, page_count):
+                        self.app.log_message(self.log_display, "   - End of pages for this village.", "info")
+                        break 
+                    
+                    page_count += 1
+                    time.sleep(2)
 
             if not self.app.stop_events[self.automation_key].is_set():
                 messagebox.showinfo("Success", "Jobcard verification complete for all selected villages.")
@@ -193,63 +250,121 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.app.after(0, self.update_status, "Finished"); self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
     
-    def _process_jobcards_for_current_page(self, driver, wait):
-        jobcard_count = 1
+    def _process_jobcards_for_current_page(self, driver, wait, verify_account_only):
+        row_index = 2 
         while not self.app.stop_events[self.automation_key].is_set():
-            try:
-                jobcard_no = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_hidd_reg"))).get_attribute("value")
-                self.app.log_message(self.log_display, f"   - Verifying Jobcard #{jobcard_count}: {jobcard_no}")
-            except TimeoutException:
-                self.app.log_message(self.log_display, "   - No more jobcards found in this village.", "success"); break
+            row_id_base = f"ctl00_ContentPlaceHolder1_grdData_ctl{row_index:02d}"
             
+            # FAST FAIL: Check if row exists without waiting 20s
+            driver.implicitly_wait(0) 
+            row_check = driver.find_elements(By.ID, f"{row_id_base}_hidd_reg")
+            driver.implicitly_wait(20) 
+            
+            if not row_check:
+                break # End of this page
+            
+            jobcard_no = row_check[0].get_attribute("value")
+            
+            should_skip = False
+            if verify_account_only:
+                try:
+                    ac_element = driver.find_elements(By.ID, f"{row_id_base}_lblAc")
+                    if not ac_element or not ac_element[0].text.strip():
+                        self.app.log_message(self.log_display, f"   - Skipping Jobcard {jobcard_no} (No Account Number)", "info")
+                        should_skip = True
+                except Exception: should_skip = True
+
+            if should_skip:
+                row_index += 1
+                continue
+
+            self.app.log_message(self.log_display, f"   - Verifying Jobcard: {jobcard_no}")
             photo_to_upload = self._get_photo_for_jobcard(jobcard_no)
             
+            upload_link = None
             try:
-                upload_link = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_link_img_F")
-                if photo_to_upload:
-                    main_window_handle = driver.current_window_handle
-                    upload_link.click()
+                links = driver.find_elements(By.ID, f"{row_id_base}_link_img_F")
+                if not links: links = driver.find_elements(By.ID, f"{row_id_base}_link_img_W")
+                if links: upload_link = links[0]
+            except: pass
+
+            if upload_link and photo_to_upload:
+                try:
+                    main_handle = driver.current_window_handle
+                    driver.execute_script("arguments[0].click();", upload_link)
+                    wait.until(EC.number_of_windows_to_be(2))
+                    popup = [h for h in driver.window_handles if h != main_handle][0]
+                    driver.switch_to.window(popup)
+                    WebDriverWait(driver, 5).until(lambda d: "UploadPhoto" in d.current_url)
                     
-                    # --- NEW, MORE ROBUST POP-UP HANDLING ---
-                    try:
-                        wait.until(EC.number_of_windows_to_be(2))
-                        popup_handle = [h for h in driver.window_handles if h != main_window_handle][0]
-                        
-                        time.sleep(1) # Crucial pause before switching
-                        driver.switch_to.window(popup_handle)
-                        
-                        # Wait for the pop-up to finish loading its URL
-                        WebDriverWait(driver, 10).until(lambda d: "UploadPhoto_Verified" in d.current_url)
-                        self.app.log_message(self.log_display, "     - Pop-up loaded successfully.")
-                        
-                        # Now find elements using the reliable CSS selectors
-                        file_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'input[type="file"]')))
-                        file_input.send_keys(photo_to_upload)
-                        
-                        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="submit"]'))).click()
-                        
-                        wait.until(EC.alert_is_present()).accept()
-                        self.app.log_message(self.log_display, "     - Photo uploaded successfully.", "success")
-
-                    finally:
-                        # Ensure we always close the pop-up and switch back
-                        if len(driver.window_handles) > 1:
-                            driver.close()
-                        driver.switch_to.window(main_window_handle)
-
-                else: 
-                    self.app.log_message(self.log_display, "     - Skipping photo upload, no image found.", "warning")
-            except NoSuchElementException: 
-                self.app.log_message(self.log_display, "     - Photo already uploaded, skipping.")
+                    file_input = driver.find_element(By.CSS_SELECTOR, 'input[type="file"]')
+                    file_input.send_keys(photo_to_upload)
+                    driver.find_element(By.CSS_SELECTOR, 'input[type="submit"]').click()
+                    wait.until(EC.alert_is_present()).accept()
+                    self.app.log_message(self.log_display, "     - Photo uploaded successfully.", "success")
+                except Exception as ex:
+                     self.app.log_message(self.log_display, f"     - Upload failed: {str(ex)}", "error")
+                finally:
+                    if len(driver.window_handles) > 1: driver.close()
+                    driver.switch_to.window(main_handle)
             
-            wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_rblDmd_0"))).click()
-            html_element = driver.find_element(By.TAG_NAME, "html")
-            wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_rblJCVer_0"))).click()
-            wait.until(EC.staleness_of(html_element))
-            wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txt_DtrblJCVer"))).send_keys(datetime.now().strftime("%d/%m/%Y"))
-            wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_BtnUpdate"))).click()
-            final_alert = wait.until(EC.alert_is_present())
-            self.app.log_message(self.log_display, f"     - Saved successfully: {final_alert.text}", "success"); final_alert.accept()
-            jobcard_count += 1
-            time.sleep(2)
-            wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch")))
+            try:
+                rblDmd = wait.until(EC.presence_of_element_located((By.ID, f"{row_id_base}_rblDmd_0")))
+                driver.execute_script("arguments[0].click();", rblDmd)
+                
+                html_element = driver.find_element(By.TAG_NAME, "html")
+                rblJCVer = wait.until(EC.presence_of_element_located((By.ID, f"{row_id_base}_rblJCVer_0")))
+                driver.execute_script("arguments[0].click();", rblJCVer)
+                wait.until(EC.staleness_of(html_element))
+                
+                date_input = wait.until(EC.presence_of_element_located((By.ID, f"{row_id_base}_txt_DtrblJCVer")))
+                driver.execute_script("arguments[0].value = arguments[1];", date_input, datetime.now().strftime("%d/%m/%Y"))
+                
+                update_btn = driver.find_element(By.ID, f"{row_id_base}_BtnUpdate")
+                driver.execute_script("arguments[0].click();", update_btn)
+                
+                final_alert = wait.until(EC.alert_is_present())
+                self.app.log_message(self.log_display, f"     - Saved: {final_alert.text}", "success")
+                final_alert.accept()
+                
+                time.sleep(1)
+                wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch")))
+                row_index = 2
+            except Exception as e:
+                self.app.log_message(self.log_display, f"     - Error saving row: {e}", "error")
+                row_index += 1
+
+    def _handle_pagination(self, driver, wait, current_page_num):
+        """Attempts to find and click the next page button using Link Text (Numbers) or '...'"""
+        try:
+            # IMPORTANT: Disable implicit wait for this check so we don't wait 20s if page not found
+            driver.implicitly_wait(0)
+            
+            next_page_str = str(current_page_num + 1)
+            
+            # 1. Try finding exact number "2", "3", "4"
+            # Since the user HTML showed <a ...>2</a>, Link Text is the most reliable way.
+            next_btn = driver.find_elements(By.LINK_TEXT, next_page_str)
+            
+            # 2. If not found, check for "..." (Next block of pages) or "Next"
+            if not next_btn:
+                # We prioritize the LAST "..." because sometimes there is one at the start for 'previous'
+                candidates = driver.find_elements(By.XPATH, "//a[text()='...' or text()='Next' or text()='>>']")
+                if candidates:
+                    next_btn = [candidates[-1]]
+
+            if next_btn:
+                self.app.log_message(self.log_display, f"   - Switching to Page {next_page_str}...", "info")
+                html_element = driver.find_element(By.TAG_NAME, "html")
+                driver.execute_script("arguments[0].click();", next_btn[0])
+                wait.until(EC.staleness_of(html_element))
+                return True
+            
+            return False # No more pages found
+
+        except Exception as e:
+            self.app.log_message(self.log_display, f"   - Pagination check failed: {e}", "warning")
+            return False
+        finally:
+            # ALWAYS restore standard wait time
+            driver.implicitly_wait(20)

@@ -68,6 +68,8 @@ class AbpsVerifyTab(BaseAutomationTab):
         scrollbar = ctk.CTkScrollbar(results_frame, command=self.results_tree.yview)
         self.results_tree.configure(yscroll=scrollbar.set)
         scrollbar.grid(row=1, column=1, sticky='ns')
+        
+        # Style Treeview and configure tags
         self.style_treeview(self.results_tree)
 
     def set_ui_state(self, running: bool):
@@ -112,50 +114,32 @@ class AbpsVerifyTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
             short_wait = WebDriverWait(driver, 5)
             
-            # Navigate
             driver.get(config.ABPS_VERIFY_CONFIG["url"])
             
-            # --- CHECK URL (Prevent errors on Login Page) ---
             current_url = driver.current_url
-            self.app.log_message(self.log_display, f"Loaded URL: {current_url}")
-            
             if "login" in current_url.lower():
-                self.app.log_message(self.log_display, "Error: Redirected to Login page. Please log in first.", "error")
-                messagebox.showerror("Session Expired", "It seems your session has expired. Please log in again.")
+                self.app.log_message(self.log_display, "Error: Redirected to Login page.", "error")
                 return
 
-            # 1. Select Panchayat
+            # --- 1. Select Panchayat (Background Safe) ---
             self.app.log_message(self.log_display, f"Selecting Panchayat: {panchayat}")
-
-            # Strategy: Use CSS Selector with wildcard (id*='DDL_panchayat') to match ANY ID containing DDL_panchayat
             try:
-                # First wait for ANY select to appear (ensures page loaded)
-                wait.until(EC.presence_of_element_located((By.TAG_NAME, "select")))
-                
-                # Find Panchayat Dropdown Robustly
+                # Use Presence Check
                 panchayat_select = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']")))
-                
-                # Scroll into view (fixes issues if element is off-screen)
-                driver.execute_script("arguments[0].scrollIntoView(true);", panchayat_select)
-                
                 Select(panchayat_select).select_by_visible_text(panchayat)
                 self.app.update_history("panchayat_name", panchayat)
-                time.sleep(1) # Allow page to refresh
-                
-            except TimeoutException:
-                # Fallback: Try Name attribute if ID fails
-                try:
+                time.sleep(1)
+            except Exception:
+                 try:
+                    # Fallback locator
                     panchayat_select = driver.find_element(By.NAME, "ctl00$ContentPlaceHolder1$DDL_panchayat")
                     Select(panchayat_select).select_by_visible_text(panchayat)
-                    self.app.update_history("panchayat_name", panchayat)
                     time.sleep(1)
-                except Exception:
-                     raise Exception("Could not find Panchayat dropdown. Please ensure you are logged in and on the correct page.")
+                 except:
+                     raise Exception("Could not find Panchayat dropdown.")
 
-            # 2. Handle Village Dropdown (CSS Selector)
+            # --- 2. Handle Village Dropdown ---
             village_css = "select[id*='DDL_Village']"
-            
-            # Wait for options > 1 (Loaded)
             wait.until(lambda d: len(Select(d.find_element(By.CSS_SELECTOR, village_css)).options) > 1)
             
             village_select_elem = driver.find_element(By.CSS_SELECTOR, village_css)
@@ -171,11 +155,9 @@ class AbpsVerifyTab(BaseAutomationTab):
                 self.app.log_message(self.log_display, f"\n--- Processing Village {i+1}/{len(villages_to_process)}: {current_village} ---")
                 
                 try:
-                    # Re-find element using CSS Selector
                     Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, village_css)))).select_by_visible_text(current_village)
                     self.app.update_history("village_name", current_village)
                     
-                    # Table handling...
                     table_xpath = "//table[contains(@id, 'gvData')]"
                     try:
                         short_wait.until(EC.presence_of_element_located((By.XPATH, table_xpath)))
@@ -192,7 +174,6 @@ class AbpsVerifyTab(BaseAutomationTab):
                         while True:
                             if self.app.stop_events[self.automation_key].is_set(): break
 
-                            # Row XPath logic
                             unprocessed_rows_xpath = f"//table[contains(@id, 'gvData')]/tbody/tr[position()>1 and .//input[contains(@id, 'btn_showuid')]]"
                             potential_rows = driver.find_elements(By.XPATH, unprocessed_rows_xpath)
                             
@@ -200,10 +181,12 @@ class AbpsVerifyTab(BaseAutomationTab):
                             job_card, app_name = "N/A", "N/A"
                             unique_key = None
                             
+                            # Row finding (No interaction here, so standard logic is fine)
                             for row in potential_rows:
                                 try:
-                                    jc_num = row.find_element(By.XPATH, ".//td[2]").text
-                                    ap_name = row.find_element(By.XPATH, ".//td[4]").text
+                                    # Use innerText for background reading
+                                    jc_num = row.find_element(By.XPATH, ".//td[2]").get_attribute("innerText")
+                                    ap_name = row.find_element(By.XPATH, ".//td[4]").get_attribute("innerText")
                                     key = (jc_num, ap_name) 
 
                                     if key not in session_processed_jobcards:
@@ -219,18 +202,26 @@ class AbpsVerifyTab(BaseAutomationTab):
                                 break
 
                             try:
-                                self.app.after(0, self.update_status, f"Page {page_number}, Processing: {app_name}", 0.5)
+                                self.app.after(0, self.update_status, f"Processing: {app_name}", 0.5)
 
-                                row_to_process.find_element(By.XPATH, ".//input[contains(@id, 'btn_showuid')]").click()
+                                # --- FIX: JS Click for Show UID ---
+                                show_btn = row_to_process.find_element(By.XPATH, ".//input[contains(@id, 'btn_showuid')]")
+                                driver.execute_script("arguments[0].click();", show_btn)
+                                
                                 wait.until(EC.staleness_of(row_to_process))
 
+                                # Wait for row refresh
                                 refreshed_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//tr[contains(., '{job_card}') and contains(., '{app_name}')]")))
-                                check_npci_btn = wait.until(EC.element_to_be_clickable(refreshed_row.find_element(By.XPATH, ".//input[contains(@id, 'btn_verifyuid')]")))
-                                check_npci_btn.click()
+                                
+                                # --- FIX: JS Click for Verify UID ---
+                                check_npci_btn = refreshed_row.find_element(By.XPATH, ".//input[contains(@id, 'btn_verifyuid')]")
+                                driver.execute_script("arguments[0].click();", check_npci_btn)
+                                
                                 wait.until(EC.staleness_of(refreshed_row))
 
+                                # Read Status
                                 final_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//tr[contains(., '{job_card}') and contains(., '{app_name}')]")))
-                                status_msg = final_row.find_element(By.XPATH, ".//td[9]/span").text
+                                status_msg = final_row.find_element(By.XPATH, ".//td[9]/span").get_attribute("innerText")
                                 self._log_result(job_card, app_name, status_msg or "Checked")
                                 
                             except (TimeoutException, StaleElementReferenceException, NoSuchElementException) as e:
@@ -244,17 +235,20 @@ class AbpsVerifyTab(BaseAutomationTab):
                         
                         if page_processed_count > 0:
                             self.app.log_message(self.log_display, "Saving all verified records for this page...")
-                            save_btn_css = "input[id*='btnProceed2']"
+                            
+                            # --- FIX: JS Click for Save ---
                             table_element = driver.find_element(By.XPATH, table_xpath)
-                            driver.find_element(By.CSS_SELECTOR, save_btn_css).click()
+                            save_btn = driver.find_element(By.CSS_SELECTOR, "input[id*='btnProceed2']")
+                            driver.execute_script("arguments[0].click();", save_btn)
+                            
                             wait.until(EC.staleness_of(table_element))
                             self.app.log_message(self.log_display, "Page saved.")
 
                         try:
+                            # --- FIX: JS Click for Next Page ---
                             next_page_link = driver.find_element(By.LINK_TEXT, str(page_number + 1))
-                            self.app.log_message(self.log_display, "Moving to next page...")
                             table_element = driver.find_element(By.XPATH, table_xpath)
-                            next_page_link.click()
+                            driver.execute_script("arguments[0].click();", next_page_link)
                             wait.until(EC.staleness_of(table_element))
                             page_number += 1
                         except NoSuchElementException:
@@ -278,4 +272,16 @@ class AbpsVerifyTab(BaseAutomationTab):
 
     def _log_result(self, job_card, app_name, status):
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(job_card, app_name, status, timestamp)))
+        
+        tags = ()
+        status_lower = status.lower()
+        
+        if "fail" in status_lower or "error" in status_lower:
+            tags = ('failed',)
+        elif "skip" in status_lower:
+            tags = ('skipped',)
+        # ABPS me aksar status blank ya 'Checked' aata hai success par
+        elif "success" in status_lower or "checked" in status_lower or "verified" in status_lower:
+            tags = ('success',)
+            
+        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(job_card, app_name, status, timestamp), tags=tags))

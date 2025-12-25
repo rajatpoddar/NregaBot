@@ -8,7 +8,12 @@ from pypdf import PdfWriter # <-- IMPORT ADD KIYA GAYA
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+from selenium.common.exceptions import (
+    TimeoutException, 
+    NoSuchElementException, 
+    StaleElementReferenceException, 
+    UnexpectedAlertPresentException
+)
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
@@ -265,7 +270,46 @@ class MusterrollGenTab(BaseAutomationTab):
         self.save_inputs(inputs)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
-    
+    def retry_logic_handler(self):
+        """
+        Reads failed Work Codes from the results tree, 
+        updates the input box, and restarts automation.
+        """
+        # 1. Failed items dhundo
+        failed_items = []
+        for item_id in self.results_tree.get_children():
+            values = self.results_tree.item(item_id)['values']
+            # Values: (Timestamp, Work Code/Key, Status, Details)
+            work_code = str(values[1])
+            status = str(values[2]).lower()
+            
+            if "success" not in status:
+                failed_items.append(work_code)
+        
+        if not failed_items:
+            messagebox.showinfo("Retry", "No failed items found to retry.")
+            return
+
+        # 2. Confirm karo
+        if not messagebox.askyesno("Retry Failed", f"Found {len(failed_items)} failed/skipped items.\nLoad them and retry?"):
+            return
+
+        # 3. Input Box Update karo
+        self.work_codes_text.configure(state="normal")
+        self.work_codes_text.delete("1.0", tkinter.END)
+        self.work_codes_text.insert("1.0", "\n".join(failed_items))
+        self.work_codes_text.configure(state="disabled")
+
+        # 4. Results clear karo
+        for item in self.results_tree.get_children(): 
+            self.results_tree.delete(item)
+            
+        self.success_count = 0
+        self.skipped_count = 0
+        self.update_status("Retrying failed items...", 0.0)
+
+        # 5. Auto Start
+        self.start_automation()
         
     def reset_ui(self):
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
@@ -458,14 +502,12 @@ class MusterrollGenTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "   - Navigating to MR page...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
             
-            # --- FIX 1: Re-finding Panchayat Dropdown every time ---
+            # --- FIX: Panchayat Select (Presence Check for Background) ---
             self.app.log_message(self.log_display, "   - Selecting Panchayat...")
             panchayat_dropdown = wait.until(EC.presence_of_element_located((By.ID, "exe_agency")))
             Select(panchayat_dropdown).select_by_visible_text(config.AGENCY_PREFIX + inputs['panchayat'])
-            # --- END FIX 1 ---
             
             self.app.log_message(self.log_display, f"   - Selecting work code for '{item}'...")
-            # _select_work_code will handle re-finding the ddlWorkCode element
             full_work_code_text = self._select_work_code(driver, wait, item, inputs['auto_mode'])
             
             if full_work_code_text in session_skip_list:
@@ -473,35 +515,55 @@ class MusterrollGenTab(BaseAutomationTab):
                 return
 
             self.app.log_message(self.log_display, "   - Entering dates and staff details...")
-            driver.find_element(By.ID, "txtDateFrom").send_keys(inputs['start_date'])
-            driver.find_element(By.ID, "txtDateTo").send_keys(inputs['end_date'])
             
-            # --- FIX 2: Re-finding Designation Dropdown after date entry/DOM update ---
-            designation_dropdown = wait.until(EC.element_to_be_clickable((By.ID, "ddldesg")))
+            # --- FIX: Use JavaScript for Dates (Background/Minimize Safe) ---
+            driver.execute_script(f"document.getElementById('txtDateFrom').value = '{inputs['start_date']}';")
+            driver.execute_script(f"document.getElementById('txtDateTo').value = '{inputs['end_date']}';")
+            
+            # --- FIX: Designation Dropdown (Presence Check) ---
+            # 'element_to_be_clickable' minimize hone par fail hota hai
+            designation_dropdown = wait.until(EC.presence_of_element_located((By.ID, "ddldesg")))
             Select(designation_dropdown).select_by_visible_text(inputs['designation'])
 
             self.app.log_message(self.log_display, "   - Waiting for Technical Staff list to populate...")
-            long_wait = WebDriverWait(driver, 30)
+            # Explicit wait for options to load
+            wait.until(EC.presence_of_element_located((By.XPATH, "//select[@id='ddlstaff']/option[position()>1]")))
             
-            # Wait for options to populate in the staff dropdown
-            long_wait.until(EC.presence_of_element_located((By.XPATH, "//select[@id='ddlstaff']/option[position()>1]")))
+            staff_dropdown = Select(driver.find_element(By.ID, "ddlstaff"))
             
-            # --- FIX 3: Re-finding Staff Dropdown after population ---
-            staff_dropdown_element = driver.find_element(By.ID, "ddlstaff")
-            staff_dropdown = Select(staff_dropdown_element)
+            # Case-insensitive match for staff
+            staff_found = False
+            for opt in staff_dropdown.options:
+                if inputs['staff'].lower() == opt.text.lower():
+                    staff_dropdown.select_by_visible_text(opt.text)
+                    staff_found = True
+                    break
             
-            if inputs['staff'] not in [opt.text for opt in staff_dropdown.options]:
-                raise ValueError(f"Staff name '{inputs['staff']}' not found for the selected designation. Please check the name and try again.")
-            staff_dropdown.select_by_visible_text(inputs['staff'])
-            # --- END FIX 3 ---
+            if not staff_found:
+                raise ValueError(f"Staff name '{inputs['staff']}' not found. Check spelling.")
             
             self.app.log_message(self.log_display, "   - Submitting form...")
+            
+            # --- FIX: Submit Button with JS Click (Background Safe) ---
             body_element = driver.find_element(By.TAG_NAME, 'body')
-            driver.find_element(By.ID, "btnProceed").click()
+            btn_proceed = wait.until(EC.presence_of_element_located((By.ID, "btnProceed")))
+            driver.execute_script("arguments[0].click();", btn_proceed)
             
+            # Submit ke baad Alert handling
+            try:
+                WebDriverWait(driver, 5).until(EC.alert_is_present())
+                alert = driver.switch_to.alert
+                alert_text = alert.text
+                alert.accept()
+                self._log_result(item, "Failed", f"Server Alert: {alert_text}")
+                return
+            except TimeoutException:
+                pass # Alert nahi aya, matlab page load hona chahiye
+            
+            # Wait for Page Reload (Staleness of old body)
             wait.until(EC.staleness_of(body_element))
-            time.sleep(2)
             
+            # --- Check for On-Page Errors ---
             error_reason = self._check_for_page_errors(driver)
             if error_reason:
                 self._log_result(item, "Skipped", error_reason)
@@ -515,36 +577,23 @@ class MusterrollGenTab(BaseAutomationTab):
             
             if pdf_path:
                 self.current_session_files.append(pdf_path)
-                
                 if inputs.get('save_to_cloud'):
-                    self.app.log_message(self.log_display, "   - Uploading to cloud storage...")
-                    upload_success = self._upload_to_cloud(pdf_path, inputs['panchayat'])
-                    if upload_success:
-                        log_detail += " & Uploaded to Cloud"
-                        self.app.log_message(self.log_display, "   - Successfully uploaded to cloud.", "success")
+                    self.app.log_message(self.log_display, "   - Uploading to cloud...")
+                    if self._upload_to_cloud(pdf_path, inputs['panchayat']):
+                        log_detail += " & Cloud Uploaded"
                     else:
-                        log_detail += " (Cloud Upload Failed)"
-                        self.app.log_message(self.log_display, "   - Failed to upload to cloud.", "error")
+                        log_detail += " (Cloud Failed)"
 
             if inputs['output_action'] == "Print" and pdf_path:
                 self._print_file(pdf_path)
-                log_detail = f"Printed and Saved as {os.path.basename(pdf_path)}"
 
             self._log_result(item, "Success" if pdf_path else "Failed", log_detail)
             session_skip_list.add(full_work_code_text)
 
-        except (NoSuchElementException, TimeoutException, StaleElementReferenceException) as e:
-            error_message = f"A browser error occurred: {str(e).splitlines()[0]}"
-            self.app.log_message(self.log_display, f"ERROR on '{item}': {error_message}", "error")
-            self._log_result(item, "Failed", "Browser/Timeout Error. Check logs.")
-        except ValueError as e: 
-            error_message = str(e)
-            self.app.log_message(self.log_display, f"CRITICAL VALIDATION ERROR: {error_message}", "error")
-            self._log_result(item, "Failed", error_message)
-            raise e
         except Exception as e:
-            self.app.log_message(self.log_display, f"An unexpected error occurred processing '{item}': {e}", "error")
-            self._log_result(item, "Failed", f"Unexpected Error: {e}")
+            error_msg = str(e).splitlines()[0]
+            self.app.log_message(self.log_display, f"Error on '{item}': {error_msg}", "error")
+            self._log_result(item, "Failed", error_msg)
 
 
     def _save_mr_as_pdf(self, driver, full_work_code, output_dir, orientation, scale):
@@ -565,6 +614,7 @@ class MusterrollGenTab(BaseAutomationTab):
             pdf_scale = scale / 100.0
             pdf_data_base64 = None
 
+            # --- CSS for Orientation ---
             if is_landscape:
                 self.app.log_message(self.log_display, "   - Injecting CSS for landscape orientation...")
                 driver.execute_script(
@@ -578,15 +628,45 @@ class MusterrollGenTab(BaseAutomationTab):
                 )
 
             if self.app.active_browser == 'firefox':
+                # Firefox: Inject a fixed div using JavaScript
+                footer_js = """
+                var footer = document.createElement('div');
+                footer.innerText = 'NregaBot.com';
+                footer.style.position = 'fixed';
+                footer.style.bottom = '0';
+                footer.style.right = '0';
+                footer.style.padding = '10px';
+                footer.style.fontSize = '10px';
+                footer.style.color = '#cccccc';  // Light Gray
+                footer.style.fontFamily = 'Arial, sans-serif';
+                footer.style.zIndex = '9999';
+                document.body.appendChild(footer);
+                """
+                driver.execute_script(footer_js)
+
                 self.app.log_message(self.log_display, "   - Using Firefox's print command...")
                 self.app.log_message(self.log_display, "   - Note: PDF Scale setting is ignored for Firefox.", "warning")
                 pdf_data_base64 = driver.print_page()
 
             elif self.app.active_browser == 'chrome':
                 self.app.log_message(self.log_display, "   - Using Chrome's advanced print command (CDP)...")
+                
+                # Chrome: Use Native Footer Template (Best Quality)
+                footer_html = """
+                <div style="font-size: 9px; color: #d3d3d3; margin-right: 30px; margin-left: 30px; width: 100%; text-align: right; font-family: Helvetica, sans-serif;">
+                    NregaBot.com
+                </div>
+                """
+                
                 print_options = {
-                    "landscape": is_landscape, "displayHeaderFooter": False, "printBackground": False,
-                    "scale": pdf_scale, "marginTop": 0.4, "marginBottom": 0.4,
+                    "landscape": is_landscape,
+                    "displayHeaderFooter": True,       # <-- Enable Header/Footer
+                    "headerTemplate": "<div></div>",   # <-- Empty Header
+                    "footerTemplate": footer_html,     # <-- Custom Footer
+                    "printBackground": False,
+                    "scale": pdf_scale,
+                    "marginTop": 0.4, 
+                    "marginBottom": 0.5,               # <-- Increased slightly to fit footer
                     "marginLeft": 0.4, "marginRight": 0.4
                 }
                 result = driver.execute_cdp_cmd("Page.printToPDF", print_options)
@@ -606,19 +686,24 @@ class MusterrollGenTab(BaseAutomationTab):
             return None
 
     def _select_work_code(self, driver, wait, item, is_auto_mode):
+        """
+        Selects the work code.
+        BACKGROUND-SAFE UPDATE:
+        1. Uses 'presence_of' checks.
+        2. Uses JS for setting search values and clicking search button.
+        3. Preserves Staleness/Slow-Net logic.
+        """
         try:
-            # Panchayat select hone ke baad WorkCode dropdown ko fresh dhundhna jaroori hai
             work_code_dropdown_locator = (By.ID, "ddlWorkCode")
             
             if is_auto_mode:
-                # Auto Mode: Seedha Work Code dropdown ko load hone ka wait karein
-                # Wait until at least two options are present (one empty, one real)
+                # Auto Mode: Wait for dropdown presence (not visibility) and options
+                wait.until(EC.presence_of_element_located(work_code_dropdown_locator))
                 wait.until(lambda d: len(Select(d.find_element(*work_code_dropdown_locator)).options) > 1)
                 
-                # Element ko dobara dhundhkar select karein (StaleElementReferenceException fix)
                 work_code_dropdown = Select(driver.find_element(*work_code_dropdown_locator))
                 
-                # Filter to select only the item that has a value (i.e., not the default "Select")
+                # Iterate to find matching text
                 found_option = next((opt for opt in work_code_dropdown.options if opt.text == item and opt.get_attribute("value")), None)
 
                 if found_option:
@@ -630,20 +715,32 @@ class MusterrollGenTab(BaseAutomationTab):
                     raise NoSuchElementException(f"Could not find a matching work for auto item '{item}'.")
             
             else:
-                # Manual Mode: Search box use karein
+                # Manual Mode: Search box use karein (JS Value Set)
                 search_key = item
                 search_box = wait.until(EC.presence_of_element_located((By.ID, "txtWork")))
-                search_box.clear()
-                search_box.send_keys(search_key)
                 
-                # Search button click karne se DOM phir se badal sakta hai
-                driver.find_element(By.ID, "imgButtonSearch").click()
-                time.sleep(2) # Thoda extra wait dete hain
-
-                # Work Code dropdown ko load hone ka wait karein
+                # --- FIX: JS Set Value (Background Safe) ---
+                driver.execute_script("arguments[0].value = arguments[1];", search_box, search_key)
+                
+                # --- SLOW NET FIX START ---
+                # Search click karne se pehle purana dropdown capture karein
+                old_dropdown = driver.find_element(*work_code_dropdown_locator)
+                
+                # --- FIX: JS Click for Search Button (Background Safe) ---
+                search_btn = driver.find_element(By.ID, "imgButtonSearch")
+                driver.execute_script("arguments[0].click();", search_btn)
+                
+                # Wait karein jab tak purana dropdown GAYAB na ho jaye (Staleness)
+                try:
+                    wait.until(EC.staleness_of(old_dropdown))
+                except TimeoutException:
+                    pass # Kabhi kabhi JS fast hota hai, ignore karein
+                
+                # Ab naye dropdown ke aane ka wait karein
+                wait.until(EC.presence_of_element_located(work_code_dropdown_locator))
                 wait.until(lambda d: len(Select(d.find_element(*work_code_dropdown_locator)).options) > 1)
+                # --- SLOW NET FIX END ---
                 
-                # Element ko dobara dhundhkar select karein (Stale fix)
                 work_code_dropdown = Select(driver.find_element(*work_code_dropdown_locator))
                 
                 found_option = next((opt for opt in work_code_dropdown.options if search_key in opt.text and opt.get_attribute("value")), None)
@@ -677,7 +774,14 @@ class MusterrollGenTab(BaseAutomationTab):
         timestamp = datetime.now().strftime("%H:%M:%S")
         values = (timestamp, item_key, status, details)
         
-        tags = ('failed',) if 'success' not in status.lower() else ()
+        # --- FIX: Explicit Success Tag ---
+        # Pehle code sirf 'failed' check kar raha tha, ab 'success' bhi check karega
+        tags = ()
+        if 'success' in status.lower():
+            tags = ('success',)
+        else:
+            tags = ('failed',)
+        # ---------------------------------
 
         if status == "Success":
             self.success_count += 1

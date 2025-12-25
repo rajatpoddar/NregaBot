@@ -5,8 +5,7 @@
 # <div align="center">NREGA Bot</div>
 
 <p align="center">
-  <b>Version 2.9.1 | Now with Pendency Reports, Zero MR Integration & ABPS Scan!</b><br />
-  <a href="https://nregabot.com/#downloads"><strong>Download Now »</strong></a><br /><br />
+  <b>Version 2.9.2 | Now with Background Mode, Retry Button & Professional MB Export!</b><br />
   <a href="https://nregabot.com/#downloads"><strong>Download Now »</strong></a><br /><br />
   <a href="https://nregabot.com/how-to-use.html">View Instructions</a> ·
   <a href="https://nregabot.com/contact.html">Report Bug</a> ·
@@ -28,6 +27,8 @@ The application works by securely controlling a web browser on your computer, al
 An intuitive, tab-based interface organized for efficiency:
 
 ### 🔹 General & Application
+- 🚀 **Background Mode (New!)** - Automations now continue running smoothly even if you minimize the browser window.
+- ✨ **Retry Failed Button (New!)** - Quickly re-process only the failed entries in any automation with a single click.
 - ✨ **Microsoft Edge Support** - Launch and use Microsoft Edge directly from the dashboard for all automations.
 - 🚀 **Smart Updates** - New Loader Architecture ensures future updates are instant and lightweight (KB size).
 - 📅 **Calendar UI** - A modern calendar popup across all automations with colored indicators for Sundays/Mondays.
@@ -40,10 +41,10 @@ An intuitive, tab-based interface organized for efficiency:
 - ✨ **Reseller Panel** - Resellers can view user stats and send email reminders.
 
 ### 🏗️ Core NREGA Tasks
-- ✨ **Demand Automation** - Demand laborers from a CSV. Supports GP logins, auto-adjusts for 100-day limits.
+- ✨ **Demand Automation** - Demand laborers from a CSV. Supports GP logins, auto-adjusts for 100-day limits. Improved error handling in v2.9.2.
 - ✨ **Work Allocation** - Automatically allocate work. Now includes a **From Date** filter to delete specific allocations.
-- 🗂️ **MR Generator** – Automatically generate and download Muster Roll PDFs. Includes a **Merge PDFs** button.
-- ✨ **MR Fill** - Automatically fill Muster Rolls. Now auto-fills **Work Start Date** if empty.
+- 🗂️ **MR Generator** – Automatically generate and download Muster Roll PDFs. Includes a **Merge PDFs** button. Logic improved in v2.9.2.
+- ✨ **MR Fill** - Automatically fill Muster Rolls. Now supports **Retry Failed** logic.
 - ⚙️ **MSR Processor** – Process and save Muster Rolls from the MSR Payment page.
 - 📤 **FTO Generation** – Automates FTO verification with a workflow to **Check Pending ABPS Labour**.
 - 📋 **Wagelist Automation** – Generate new wagelists and send them for e-FMS payment. Option to **save as PDF**.
@@ -52,7 +53,7 @@ An intuitive, tab-based interface organized for efficiency:
 - 🗑️ **Delete Work Allocation** - Remove work allocations for specified job cards in bulk.
 
 ### 👷 JE & AE Automation
-- ✏️ **eMB Entry** – Automate filling the Measurement Book (MB) entry page for multiple work codes.
+- ✏️ **eMB Entry** – Automate filling the MB entry page. **Now supports Professional Export (Excel/PDF)** and Retry Logic. Fixed Work Name selection bug.
 - 🔍 **eMB Verify** – Quickly verify Measurement Book (MB) entries in bulk.
 
 ### 📝 Records & Workcode
@@ -95,8 +96,8 @@ You only need to have a supported web browser installed on your system:
 Download the latest version from the official website:
 
 - Website: [nregabot.com/#downloads](https://nregabot.com/#downloads)
-- **For Windows**: `NREGABot-v2.9.1-Setup.exe`
-- **For macOS**: `NREGABot-v2.9.1-macOS.dmg`
+- **For Windows**: `NREGABot-v2.9.2-Setup.exe`
+- **For macOS**: `NREGABot-v2.9.2-macOS.dmg`
 
 ### 2️⃣ First-Time Launch & Trial
 

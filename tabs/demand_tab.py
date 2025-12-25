@@ -364,7 +364,7 @@ class DemandTab(BaseAutomationTab):
 
         # Treeview
         cols = ("#", "Job Card No", "Applicant Name", "Status")
-        self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings', style="Custom.Treeview")
+        self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         self.results_tree.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         
         # Scrollbar
@@ -469,15 +469,47 @@ class DemandTab(BaseAutomationTab):
 
     def _clear_processed_selection(self):
         """
-        Deselects all applicants who were processed in the last run.
-        This is called after a successful automation run.
+        Deselects ONLY successfully processed applicants.
+        Keeps 'Failed' or 'Skipped' applicants selected for easy retry.
         """
-        self.app.log_message(self.log_display, "Clearing processed selection...", "info")
-        for app_data in self.all_applicants_data: app_data['_selected'] = False
+        self.app.log_message(self.log_display, "Updating selection based on results...", "info")
+        
+        # 1. Collect Successful JobCard+Name pairs from results
+        successful_pairs = set()
+        for item in self.results_tree.get_children():
+            values = self.results_tree.item(item)['values']
+            # values = (RowID, JC, Name, Status)
+            if len(values) >= 4:
+                jc = str(values[1]).strip()
+                name = str(values[2]).strip()
+                status = str(values[3]).lower()
+                
+                # Agar status me Success ya Already hai, tabhi uncheck karein
+                if "success" in status or "already" in status:
+                    successful_pairs.add((jc, name))
+
+        # 2. Update Master Data
+        deselected_count = 0
+        for app_data in self.all_applicants_data:
+            jc_no = app_data.get('Job card number', '').strip()
+            app_name = app_data.get('Name of Applicant', '').strip()
+            
+            # Agar ye pair successful list me hai, to deselect karo
+            if (jc_no, app_name) in successful_pairs:
+                app_data['_selected'] = False
+                deselected_count += 1
+            # Warna selected rehne do (agar pehle se selected tha)
+
+        # 3. Update Visual Checkboxes
         for widget in self.displayed_checkboxes:
-            if isinstance(widget, ctk.CTkCheckBox) and widget.get() == "on":
-                widget.deselect()
+            if isinstance(widget, ctk.CTkCheckBox):
+                if not widget.applicant_data.get('_selected', False):
+                    widget.deselect()
+                else:
+                    widget.select() # Ensure failed ones stay selected
+
         self._update_selection_summary()
+        self.app.log_message(self.log_display, f"Deselected {deselected_count} successful applicants. Failed items remain checked.")
 
     def _select_csv_from_computer(self):
         """
@@ -1034,7 +1066,7 @@ class DemandTab(BaseAutomationTab):
         self.results_tree.heading("#0", text=""); self.results_tree.heading("#", text="#")
         self.results_tree.heading("Job Card No", text="Job Card No"); self.results_tree.heading("Applicant Name", text="Applicant Name")
         self.results_tree.heading("Status", text="Status")
-        self.style_treeview(self.results_tree) 
+        self.style_treeview(self.results_tree)
 
     def _process_demand(self, state, panchayat, user_days, demand_from, work_start, grouped, base_url, work_key_for_allocation, demand_to_override):
         """
@@ -1172,6 +1204,31 @@ class DemandTab(BaseAutomationTab):
                  self.app.after(5000, lambda: self.app.set_status("Ready")) 
                  self.app.after(5000, lambda: self.update_status("Ready", 0.0))
 
+    # --- Helper Function for Background Execution (Add this above _process_single_job_card) ---
+    def safe_js_fill(self, driver, element, value):
+        """
+        Fills an input using JavaScript and triggers all necessary events 
+        (input, change, blur) to simulate real user interaction.
+        Works in background/minimized mode.
+        """
+        try:
+            driver.execute_script(
+                """
+                arguments[0].value = arguments[1];
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+                """,
+                element, value
+            )
+        except Exception:
+            # Fallback if JS fails
+            try:
+                element.clear()
+                element.send_keys(value + Keys.TAB)
+            except:
+                pass
+
     def _process_single_job_card(self, driver, wait, short_wait, jc, apps_in_jc,
                                  user_days, demand_from, work_start,
                                  days_worked_ids, jc_ids, grid_ids, btn_ids,
@@ -1179,477 +1236,302 @@ class DemandTab(BaseAutomationTab):
                                  base_url, state, demand_to_override): 
         """
         Handles the selenium logic for processing a single job card.
-        This includes selecting the JC, reading worked days, filling demand,
-        and handling submission/retries.
+        MINIMIZE-FRIENDLY UPDATE:
+        1. Uses 'EC.presence_of...' instead of 'visibility' (Works when minimized).
+        2. Uses JavaScript for Clicking (Bypasses UI checks).
+        3. Uses 'innerText' for reading text (Works without rendering).
         """
 
-        def get_worked_days_robustly():
-            """
-            Tries to read the 'Total Days worked' label.
-            Returns -1 on timeout or error.
-            """
-            time.sleep(0.3)
+        def get_worked_days_ultra_fast():
+            """Reads 'Total Days worked' - Minimized Friendly."""
             try:
-                days_el = short_wait.until(EC.visibility_of_element_located((By.ID, days_worked_ids[0])))
-                worked_str = days_el.text.strip(); worked = int(worked_str) if worked_str and worked_str.isdigit() else 0
-                self.app.after(0, self.app.log_message, self.log_display, f"   -> Read Worked Days: {worked}")
-                return worked
-            except Exception as e:
-                # This is a timeout, not necessarily an error (could be new worker)
-                self.app.after(0, self.app.log_message, self.log_display, f"   Warn: Failed reading worked days ({type(e).__name__}).", "warning")
-                return -1 # Return -1 to indicate a failure/timeout
+                # 'presence_of' use kar rahe hain taaki minimize me bhi detect ho
+                days_el = WebDriverWait(driver, 1.0).until(EC.presence_of_element_located((By.ID, days_worked_ids[0])))
+                
+                # .text minimize me kabhi kabhi empty aata hai, isliye 'innerText' use kiya
+                worked_str = days_el.get_attribute("innerText").strip()
+                
+                if not worked_str: return 0
+                return int(worked_str) if worked_str.isdigit() else 0
+            except Exception: return 0
 
         def fill_demand_data(days_distribution): 
-            """
-            Finds the applicants in the web table and fills their demand data.
-            """
+            """Finds the applicants in the web table and fills their demand data."""
             nonlocal filled, processed
             applicants_not_found = set(targets) 
             fill_success = False
+            
+            # 1. Wait for Table (Presence check)
             try:
                 wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")))
-                rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
-            except Exception: self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: Grid not found.", "error"); return False
+            except Exception: 
+                self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: Grid not found.", "error")
+                return False
 
+            # --- PASS 1: CLEANING ---
+            rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
+            for i, r in enumerate(rows):
+                if i == 0: continue 
+                try:
+                    # Use execute_script/innerText for faster checking in background
+                    name_span = r.find_element(By.CSS_SELECTOR, f"span[id*='_job']") 
+                    name_web = name_span.get_attribute("innerText").strip()
+                    is_target = any("".join(tn.lower().split()) in "".join(name_web.lower().split()) for tn in targets)
+                    
+                    if not is_target:
+                        pfx = f"{grid_id}_ctl{i+1:02d}_"
+                        try:
+                            date_fld = r.find_element(By.ID, f"{pfx}dt_app")
+                            if date_fld.get_attribute('value'):
+                                date_fld.clear()
+                        except: pass
+                except: pass
+
+            # --- PASS 2: FILLING ---
             for target_name, days_to_fill in days_distribution.items():
                 if self.app.stop_events[self.automation_key].is_set(): return False
                 
                 if days_to_fill == 0:
-                    self.app.after(0, self.app.log_message, self.log_display, f"   -> Skipping (0d): '{target_name}'.")
-                    processed.add(target_name)
-                    applicants_not_found.discard(target_name) 
-                    fill_success = True 
-                    continue
+                    processed.add(target_name); applicants_not_found.discard(target_name); fill_success = True; continue
                 
                 found = False
+                # Re-fetch rows
                 rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr") 
 
                 for i, r in enumerate(rows):
-                    if i == 0: continue # Skip header row
+                    if i == 0: continue
                     try:
+                        # Presence check instead of visibility
                         name_span = short_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"#{grid_id}_ctl{i+1:02d}_job")))
-                        name_web = name_span.text.strip()
+                        name_web = name_span.get_attribute("innerText").strip()
                         
-                        # Check if name matches
                         if "".join(target_name.lower().split()) in "".join(name_web.lower().split()):
                             applicants_not_found.discard(target_name)
                             pfx = f"{grid_id}_ctl{i+1:02d}_"; ids = {k: pfx+v for k,v in {'from':'dt_app','start':'dt_from','days':'d3','till':'dt_to'}.items()}
-                            from_in = wait.until(EC.element_to_be_clickable((By.ID, ids['from'])))
-                            start_in = wait.until(EC.element_to_be_clickable((By.ID, ids['start'])))
+                            
+                            # Presence checks for inputs
+                            from_in = wait.until(EC.presence_of_element_located((By.ID, ids['from'])))
+                            start_in = wait.until(EC.presence_of_element_located((By.ID, ids['start'])))
 
                             days_in_val = ""
-                            try: 
-                                days_in_chk = driver.find_element(By.ID, ids['days'])
-                                days_in_val = days_in_chk.get_attribute('value')
-                            except NoSuchElementException: pass
+                            try: days_in_val = driver.find_element(By.ID, ids['days']).get_attribute('value')
+                            except: pass
 
-                            # Note: checking needs_upd for To Date is tricky because it's auto-filled.
-                            # We skip the needs_upd check if override is requested to force the update.
                             needs_upd = True 
                             if not demand_to_override:
                                 needs_upd = (from_in.get_attribute('value') != demand_from or start_in.get_attribute('value') != work_start or days_in_val != str(days_to_fill))
 
-                            if not needs_upd: self.app.after(0, self.app.log_message, self.log_display, f"   -> Correct: '{name_web}' ({days_to_fill}d).")
-                            else:
-                                # Fill the form fields
+                            if needs_upd:
                                 self.app.after(0, self.app.log_message, self.log_display, f"   -> Updating: '{name_web}' ({days_to_fill}d)...")
-                                if from_in.get_attribute('value') != demand_from: from_in.clear(); from_in.send_keys(demand_from + Keys.TAB); time.sleep(0.1)
-                                start_in = wait.until(EC.element_to_be_clickable((By.ID, ids['start']))) 
-                                if start_in.get_attribute('value') != work_start: start_in.clear(); start_in.send_keys(work_start + Keys.TAB); time.sleep(1.0) 
-                                else: start_in.send_keys(Keys.TAB); time.sleep(1.0) 
+                                
+                                if from_in.get_attribute('value') != demand_from: 
+                                    from_in.clear(); from_in.send_keys(demand_from + Keys.TAB); time.sleep(0.1)
+                                
+                                start_in = wait.until(EC.presence_of_element_located((By.ID, ids['start']))) 
+                                if start_in.get_attribute('value') != work_start: 
+                                    start_in.clear(); start_in.send_keys(work_start + Keys.TAB); time.sleep(0.3) 
+                                else: 
+                                    start_in.send_keys(Keys.TAB); time.sleep(0.3) 
 
-                                days_in = wait.until(EC.element_to_be_clickable((By.ID, ids['days']))) 
+                                days_in = wait.until(EC.presence_of_element_located((By.ID, ids['days']))) 
                                 days_after = days_in.get_attribute('value')
+                                
                                 if days_after != str(days_to_fill):
-                                    days_in.click(); time.sleep(0.1); cvl = len(days_after or ""); [(days_in.send_keys(Keys.BACKSPACE), time.sleep(0.05)) for _ in range(cvl + 2)] 
+                                    # JavaScript Click for checkbox/field if needed
+                                    # driver.execute_script("arguments[0].click();", days_in) # Optional safe click
+                                    days_in.click(); time.sleep(0.1)
+                                    
+                                    cvl = len(days_after or "")
+                                    [(days_in.send_keys(Keys.BACKSPACE), time.sleep(0.05)) for _ in range(cvl + 2)]
+                                    
                                     days_in.send_keys(str(days_to_fill) + Keys.TAB)
-                                    # Wait for the auto-filled date
-                                    wait.until(lambda d: d.find_element(By.ID, ids['till']).get_attribute("value") != "")
+                                    
+                                    try: wait.until(lambda d: d.find_element(By.ID, ids['till']).get_attribute("value") != "")
+                                    except: pass 
                                 else:
-                                    # Even if days match, hit tab to ensure calculation triggers if needed
-                                    days_in.send_keys(Keys.TAB)
-                                    time.sleep(0.5)
-
-                                # --- OVERRIDE TO DATE LOGIC ---
-                                if demand_to_override:
-                                    try:
-                                        till_in = driver.find_element(By.ID, ids['till'])
-                                        current_till = till_in.get_attribute("value")
-                                        
-                                        if current_till != demand_to_override:
-                                            self.app.after(0, self.app.log_message, self.log_display, f"      -> Overriding To Date: {demand_to_override}")
-                                            till_in.click()
-                                            time.sleep(0.1)
-                                            # Robust clear
-                                            cvl_t = len(current_till or "")
-                                            for _ in range(cvl_t + 3):
-                                                till_in.send_keys(Keys.BACKSPACE)
-                                                time.sleep(0.02)
-                                            
-                                            till_in.send_keys(demand_to_override + Keys.TAB)
-                                            time.sleep(0.5)
-                                    except Exception as e_override:
-                                        self.app.after(0, self.app.log_message, self.log_display, f"      -> Error overriding date: {e_override}", "error")
-                                # ------------------------------
-
-                                self.app.after(0, self.app.log_message, self.log_display, f"   SUCCESS (Fill): '{name_web}'.")
+                                    days_in.send_keys(Keys.TAB); time.sleep(0.2)
+                            
+                            if demand_to_override:
+                                try:
+                                    till_in = driver.find_element(By.ID, ids['till'])
+                                    current_till = till_in.get_attribute("value")
+                                    if current_till != demand_to_override:
+                                        till_in.click(); time.sleep(0.1)
+                                        [(till_in.send_keys(Keys.BACKSPACE), time.sleep(0.02)) for _ in range(len(current_till or "") + 3)]
+                                        till_in.send_keys(demand_to_override + Keys.TAB); time.sleep(0.2)
+                                except Exception: pass
 
                             filled = True; processed.add(target_name); found = True; fill_success = True; break
-                    except UnexpectedAlertPresentException as alert_e:
-                        alert_txt = "Unknown"
-                        try: 
-                            al = driver.switch_to.alert
-                            alert_txt=al.text
-                            al.accept()
-                            self.app.after(0, self.app.log_message, self.log_display, f"   WARN: Alert during fill '{target_name}': '{alert_txt}'.", "warning")
-                            found = False 
-                            break 
-                        except Exception as iae:
-                            self.app.after(0, self.app.log_message, self.log_display, f"   ERROR handling alert: {iae}", "error")
-                            processed.add(target_name) 
-                            self.app.after(0, self._update_results_tree, (jc, target_name, f"FAIL: Alert ({alert_txt})"))
-                            found = True 
-                            break 
-                    except StaleElementReferenceException: self.app.after(0, self.app.log_message, self.log_display, f"   Warn: Stale fill '{target_name}', retry find...", "warning"); found = False; break
-                    except Exception as e_fill: self.app.after(0, self.app.log_message, self.log_display, f"   Warn: Error fill '{target_name}': {type(e_fill).__name__}"); continue
+                    except Exception: continue
 
-                if not found and (StaleElementReferenceException or UnexpectedAlertPresentException): self.app.after(0, self.app.log_message, self.log_display, f"   -> Retrying search '{target_name}'..."); time.sleep(0.5); continue
+                if not found: time.sleep(0.1); continue
 
-            for nf in applicants_not_found: self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: Not found: '{nf}'.", "error"); self.app.after(0, self._update_results_tree, (jc, nf, "Failed (Not found)"))
+            for nf in applicants_not_found: 
+                processed.add(nf) 
+                self.app.after(0, self._update_results_tree, (jc, nf, "Failed (Not found in Table)"))
+            
             return fill_success
 
-        # --- Main logic for _process_single_job_card starts here ---
+        # --- Main logic ---
         try:
-            # 1. Select the Job Card
-            jc_suffix = jc.split('/')[-1]; self.app.after(0, self.app.log_message, self.log_display, f"Processing JC Suffix: {jc_suffix}")
+            jc_suffix = jc.split('/')[-1]
+            self.app.after(0, self.app.log_message, self.log_display, f"Processing JC Suffix: {jc_suffix}")
+            
+            old_days_label = None
+            try: old_days_label = driver.find_element(By.ID, days_worked_ids[0])
+            except: pass
+
             try:
-                jc_el = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f"#{jc_ids[0]}, #{jc_ids[1]}"))); jc_val = jc.split('/')[0]
-                
-                # Try selecting by value first
-                try: 
-                    Select(jc_el).select_by_value(jc_val)
-                    self.app.after(0, self.app.log_message, self.log_display, f"   -> Selected by value: '{jc_val}'")
+                # Use 'presence_of' instead of 'element_to_be_clickable'
+                jc_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"#{jc_ids[0]}, #{jc_ids[1]}")))
+                jc_val = jc.split('/')[0]
+                try: Select(jc_el).select_by_value(jc_val)
                 except NoSuchElementException:
-                    # Value failed, try text prefixes
-                    self.app.after(0, self.app.log_message, self.log_display, f"   -> Value fail, trying text prefixes for: {jc_suffix}")
-                    
-                    # Create a list of possible prefixes to try (e.g., 2-, 02-, 002-)
-                    possible_prefixes = [
-                        f"{jc_suffix}-",
-                        f"{jc_suffix.zfill(2)}-",
-                        f"{jc_suffix.zfill(3)}-"
-                    ]
-                    
+                    possible_prefixes = [f"{jc_suffix}-", f"{jc_suffix.zfill(2)}-", f"{jc_suffix.zfill(3)}-"]
                     found_by_text = False
                     for prefix in possible_prefixes:
-                        if self.app.stop_events[self.automation_key].is_set(): return
                         try:
                             xpath = f".//option[starts-with(normalize-space(.), '{prefix}')]"
-                            self.app.after(0, self.app.log_message, self.log_display, f"   -> Trying prefix: '{prefix}'")
                             opt = jc_el.find_element(By.XPATH, xpath)
                             Select(jc_el).select_by_visible_text(opt.text)
-                            self.app.after(0, self.app.log_message, self.log_display, f"   -> Selected by text: '{opt.text}'")
-                            found_by_text = True
-                            break # Found it, stop looping
-                        except NoSuchElementException:
-                            continue # This prefix didn't work, try the next one
-                    
-                    if not found_by_text:
-                        raise NoSuchElementException(f"Couldn't find JC with any prefix for '{jc_suffix}'.")
+                            found_by_text = True; break
+                        except NoSuchElementException: continue
+                    if not found_by_text: raise NoSuchElementException(f"Couldn't find JC '{jc_suffix}'.")
             
-            except NoSuchElementException as e_jc_select:
-                self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: Job Card '{jc}' not found. Skipping.", "error"); [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), "FAIL: JC Not Found")) for a in apps_in_jc]; return
+                if old_days_label:
+                    self.app.after(0, self.app.set_status, "Waiting for page refresh...")
+                    try: wait.until(EC.staleness_of(old_days_label))
+                    except TimeoutException: pass
+
+            except NoSuchElementException:
+                [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), "FAIL: JC Not Found")) for a in apps_in_jc]; return
 
             targets = [a.get('Name of Applicant', '').strip() for a in apps_in_jc]
-            num_selected = len(targets)
-            if num_selected == 0:
-                self.app.after(0, self.app.log_message, self.log_display, "   SKIPPED: No applicants for this JC.", "warning")
-                return
+            if not targets: return
 
-            # 2. Get Worked Days and Check for early exit
-            self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Reading worked days...") # <-- STATUS UPDATE
-            worked = get_worked_days_robustly() # Can return number, 0, or -1
+            self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Reading worked days...")
             
-            # Handle "worked == -1" (timeout) case
-            if worked == -1: 
-                msg = "Skipped (Timeout)"
-                err_found = False
-                try:
-                    # Check for the specific font error first
-                    err = driver.find_element(By.XPATH, "//font[contains(text(), 'not yet issued')]").text.strip()
-                    msg = "Skipped (JC Not Issued)"
-                    self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: {err}", "error")
-                    err_found = True
-                except NoSuchElementException:
-                    # If not found, check the standard error message IDs
-                    try:
-                        err_el = short_wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, f"#{err_msg_ids[0]}")))
-                        err = err_el.text.strip()
-                        if "not yet issued" in err.lower():
-                            msg = "Skipped (JC Not Issued)"
-                        else:
-                            msg = f"Skipped ({err[:50]}...)" 
-                        self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: {err}", "error")
-                        err_found = True
-                    except (NoSuchElementException, TimeoutException):
-                        # No "not issued" error found. This is the "new worker" case.
-                        self.app.after(0, self.app.log_message, self.log_display, "   INFO: 'Worked days' blank (new worker). Assuming 0 days.", "info")
-                        worked = 0 # Set worked to 0 to proceed
-                        
-                if err_found:
-                    [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), msg)) for a in apps_in_jc]; 
-                    return # Exit this job card early
+            err_found = False; msg = ""
+            try:
+                WebDriverWait(driver, 1.0).until(EC.presence_of_element_located((By.XPATH, "//font[contains(text(), 'not yet issued')]")))
+                msg = "Skipped (JC Not Issued)"; err_found = True
+            except: pass
 
-            # Recalculate avail *after* the -1 check (worked might be 0 now)
+            if err_found:
+                 [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), msg)) for a in apps_in_jc]; return
+
+            worked = get_worked_days_ultra_fast()
             avail = 100 - worked 
-            
             days_distribution = {} 
             
-            if worked != -1 and avail <= 0: 
-                self.app.after(0, self.app.log_message, self.log_display, f"   SKIPPED: >= 100 days ({worked}).", "warning")
-                [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), "Skipped (100 days)")) for a in apps_in_jc]
-                return
+            if avail <= 0: 
+                [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), "Skipped (100 days)")) for a in apps_in_jc]; return
 
-            # 3. Calculate Days to Demand
             adj_days_per_app = user_days 
+            total_needed = user_days * len(targets)
+            if total_needed > avail: adj_days_per_app = avail // len(targets) 
+            elif user_days > avail: adj_days_per_app = avail
             
-            if worked != -1: # We have a valid 'worked' number
-                total_needed = user_days * num_selected
-                
-                if total_needed > avail:
-                    adj_days_per_app = avail // num_selected 
-                    
-                    if adj_days_per_app == 0 and avail > 0: # Not enough for all, give all to first app
-                        self.app.after(0, self.app.log_message, self.log_display, f"   ADJUSTED (Total): Not enough days ({avail}) for {num_selected} apps. Demanding {avail} for 1st app.", "info")
-                        for i, target_name in enumerate(targets):
-                            days_distribution[target_name] = avail if i == 0 else 0
-                    else: # Distribute evenly
-                        self.app.after(0, self.app.log_message, self.log_display, f"   ADJUSTED (Total): Demand -> {adj_days_per_app} days/each (Total avail {avail}).", "info")
-                        for target_name in targets:
-                            days_distribution[target_name] = adj_days_per_app
-                            
-                elif user_days > avail: # Enough total, but user_days is too high
-                    adj_days_per_app = avail
-                    self.app.after(0, self.app.log_message, self.log_display, f"   ADJUSTED: Demand -> {adj_days_per_app} days (Limit: {avail}).", "info")
-                    for target_name in targets:
-                        days_distribution[target_name] = adj_days_per_app
-                else: # No adjustment needed
-                    adj_days_per_app = user_days
-                    self.app.after(0, self.app.log_message, self.log_display, f"   -> Demanding {adj_days_per_app} days (Limit: {avail}).")
-                    for target_name in targets:
-                        days_distribution[target_name] = adj_days_per_app
-            else: # This case should no longer happen, but as a fallback
-                adj_days_per_app = user_days
-                self.app.after(0, self.app.log_message, self.log_display, f"   -> Demanding {adj_days_per_app} days (Limit: Unknown).")
-                for target_name in targets:
-                    days_distribution[target_name] = adj_days_per_app
+            for target_name in targets:
+                days_distribution[target_name] = adj_days_per_app if adj_days_per_app > 0 else (avail if targets.index(target_name)==0 else 0)
 
-            # 4. Find Applicant Table or Handle Error
             grid_id = "";
             try: 
                 grid_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"#{grid_ids[0]}, #{grid_ids[1]}"))); 
-                grid_id = grid_el.get_attribute("id"); 
-                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr"))); 
-                time.sleep(0.5)
+                grid_id = grid_el.get_attribute("id")
             except TimeoutException:
-                msg = "Skipped (Table fail)"; err_found = False
-                try:
-                    err_el = short_wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, f"#{err_msg_ids[0]}")))
-                    err = err_el.text.strip()
-                    if "not yet issued" in err.lower():
-                        msg = "Skipped (JC Not Issued)"
-                    else:
-                        msg = f"Skipped ({err[:50]}...)" 
-                    self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: {err}", "error")
-                    err_found = True
-                except (NoSuchElementException, TimeoutException):
-                    try: 
-                        err = driver.find_element(By.XPATH, "//font[contains(text(), 'not yet issued')]").text.strip()
-                        msg = "Skipped (JC Not Issued)"
-                        self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: {err}", "error")
-                        err_found = True
-                    except NoSuchElementException:
-                        pass 
+                [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), "Skipped (Table fail)")) for a in apps_in_jc]; return
 
-                if not err_found:
-                    self.app.after(0, self.app.log_message, self.log_display, "   ERROR: Table fail (Grid not found and no error message detected).", "error")
-                
-                [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), msg)) for a in apps_in_jc]; 
-                return
-
-            # 5. Clear fields for non-target applicants
+            self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Filling data...") 
             processed = set(); filled = False;
-            rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
-            for i, r in enumerate(rows):
-                if i == 0: continue
-                try:
-                    name_span = short_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"#{grid_id}_ctl{i+1:02d}_job")))
-                    name_web = name_span.text.strip(); is_target = any("".join(tn.lower().split()) in "".join(name_web.lower().split()) for tn in targets)
-                    if not is_target: date_fld = short_wait.until(EC.presence_of_element_located((By.ID, f"{grid_id}_ctl{i+1:02d}_dt_app")));
-                    if date_fld.get_attribute('value'): date_fld.clear()
-                except Exception: pass
             
-            # 6. Fill Data for Target Applicants
-            self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Filling data...") # <-- STATUS UPDATE
             filled = fill_demand_data(days_distribution) 
 
-            # 7. Submit and Handle Response
+            # 7. Submit (MINIMIZE FRIENDLY)
             if filled:
-                self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Submitting...") # <-- STATUS UPDATE
-                total_days_attempt = sum(days_distribution.values())
-                self.app.after(0, self.app.log_message, self.log_display, f"Submitting (Attempt 1) JC {jc_suffix} with {total_days_attempt} total days...")
-                btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f"#{btn_ids[0]}, #{btn_ids[1]}"))); body = driver.find_element(By.TAG_NAME, 'body'); btn.click()
-                res = ""; alert_ok = False; is_100_day_error = False; actual_worked_from_error = -1; remaining_days_calc = -1; is_aadhaar_error = False; reason = "" 
-
+                self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Submitting...")
+                # Use 'presence' instead of 'clickable'
+                btn = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"#{btn_ids[0]}, #{btn_ids[1]}")))
+                
+                # JAVASCRIPT CLICK - The Secret to Minimized Automation
+                driver.execute_script("arguments[0].click();", btn)
+                
+                res = ""; alert_ok = False; 
+                
                 try: 
-                    # Try to get an alert
-                    alert = short_wait.until(EC.alert_is_present()); res = alert.text.strip(); self.app.after(0, self.app.log_message, self.log_display, f"   RESULT (Alert): {res}"); alert.accept(); alert_ok = True
-                    try: wait.until(EC.staleness_of(body)); time.sleep(0.5)
-                    except TimeoutException: time.sleep(1.5)
+                    alert = WebDriverWait(driver, 3).until(EC.alert_is_present())
+                    res = alert.text.strip()
+                    self.app.after(0, self.app.log_message, self.log_display, f"   RESULT (Alert): {res}")
+                    alert.accept()
+                    alert_ok = True
                 except TimeoutException: 
-                    self.app.after(0, self.app.log_message, self.log_display, "   -> No alert...")
                     try:
-                        # No alert, look for an on-page error message
-                        potential_messages = short_wait.until(EC.visibility_of_all_elements_located((By.XPATH, "//font[@color='red'] | //span[contains(@id, '_lblmsg')] | //span[contains(text(), 'Kindly Authenticate Aadhaar')]")))
-                        full_error_text = " ".join([el.text.strip() for el in potential_messages if el.text.strip()]) 
-                        res = full_error_text if full_error_text else "Unknown (No message)" 
+                        # Use presence for error msg reading
+                        potential_messages = short_wait.until(EC.presence_of_all_elements_located((By.XPATH, "//font[@color='red'] | //span[contains(@id, '_lblmsg')]")))
+                        res = " ".join([el.get_attribute("innerText").strip() for el in potential_messages if el.get_attribute("innerText").strip()]) 
+                        if not res: res = "Unknown (No Alert/Msg)"
+                        self.app.after(0, self.app.log_message, self.log_display, f"   RESULT: {res}", "warning")
+                    except: 
+                        res = "Unknown (Timeout)"
 
-                        if "Kindly Authenticate Aadhaar first" in res:
-                            self.app.after(0, self.app.log_message, self.log_display, f"   RESULT (Aadhaar Error): {res}", "error")
-                            is_aadhaar_error = True
-                        elif "Record NOT Saved" in res and "exceeding 100 days limit" in res:
-                            # 100-day error, parse worked days
-                            self.app.after(0, self.app.log_message, self.log_display, f"   RESULT (100-Day Error): {res}", "error")
-                            is_100_day_error = True
-                            match = re.search(r'\(Demand-Absent\)\s*=\s*(\d+)', res, re.IGNORECASE) or re.search(r'Muster-roll\s*=\s*(\d+)', res, re.IGNORECASE)
-                            if match: actual_worked_from_error = int(match.group(1)); self.app.after(0, self.app.log_message, self.log_display, f"      -> Parsed Actual Worked = {actual_worked_from_error}")
-                            else: actual_worked_from_error = -1; self.app.after(0, self.app.log_message, self.log_display, f"      -> Could not parse worked days.", "warning")
-                        else: 
-                            level = "error" if any(e in res.lower() for e in ['error','not saved']) else "info"
-                            self.app.after(0, self.app.log_message, self.log_display, f"   RESULT: {res}", level)
-
-                    except TimeoutException: 
-                        res = "Unknown (No message)"; self.app.after(0, self.app.log_message, self.log_display, f"   RESULT: {res}", "warning")
-                    time.sleep(1.0)
-                except Exception as alert_e: self.app.after(0, self.app.log_message, self.log_display, f"   Alert Error: {alert_e}")
-
-                # 8. Handle 100-Day Error Retry Logic
-                retry_days_distribution = {} 
-                if is_100_day_error:
-                    remaining_days_calc = 100 - actual_worked_from_error if actual_worked_from_error != -1 else -1
-                    if remaining_days_calc > 0:
-                        self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Retrying with {remaining_days_calc} days...") # <-- STATUS UPDATE
-                        self.app.after(0, self.app.log_message, self.log_display, f"   RETRYING: 100d error. Actual: {actual_worked_from_error}. Retrying with {remaining_days_calc} total days.", "info")
-                        
-                        retry_days_per_app = remaining_days_calc // num_selected
-                        
-                        if retry_days_per_app == 0: # Not enough for all, give to first app
-                            self.app.after(0, self.app.log_message, self.log_display, f"   RETRY-DIST: Demanding {remaining_days_calc} for 1st app.", "info")
-                            for i, target_name in enumerate(targets):
-                                retry_days_distribution[target_name] = remaining_days_calc if i == 0 else 0
-                        else: # Distribute evenly
-                            self.app.after(0, self.app.log_message, self.log_display, f"   RETRY-DIST: Demanding {retry_days_per_app} days/each.", "info")
-                            for target_name in targets:
-                                retry_days_distribution[target_name] = retry_days_per_app
-                        
-                        processed = set() 
-                        filled_retry = fill_demand_data(retry_days_distribution)
-                        
-                        if filled_retry:
-                            # Submit the retry
-                            self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Submitting retry...") # <-- STATUS UPDATE
-                            total_retry_days = sum(retry_days_distribution.values())
-                            self.app.after(0, self.app.log_message, self.log_display, f"Submitting (Retry) JC {jc_suffix} with {total_retry_days} total days...")
-                            btn_retry = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f"#{btn_ids[0]}, #{btn_ids[1]}"))); body_retry = driver.find_element(By.TAG_NAME, 'body'); btn_retry.click()
-                            alert_ok = False 
-                            try:
-                                alert_retry = short_wait.until(EC.alert_is_present()); res = alert_retry.text.strip(); self.app.after(0, self.app.log_message, self.log_display, f"   RESULT (Retry Alert): {res}"); alert_retry.accept(); alert_ok = True
-                                try: wait.until(EC.staleness_of(body_retry)); time.sleep(0.5)
-                                except TimeoutException: time.sleep(1.5)
-                            except TimeoutException:
-                                self.app.after(0, self.app.log_message, self.log_display, "   -> No alert on retry.", "warning")
-                                xpaths_retry = ["//font[contains(text(), 'Record NOT Saved')]", "//font[@color='red']", "//span[contains(@id, '_lblmsg') and normalize-space(text())]"]
-                                for xp_r in xpaths_retry:
-                                    try: msg_r = short_wait.until(EC.visibility_of_element_located((By.XPATH, xp_r))); res = msg_r.text.strip(); level = "error"; self.app.after(0, self.app.log_message, self.log_display, f"   RESULT (Retry Fail): {res}", level); break
-                                    except TimeoutException: continue
-                                else: res = "Retry Failed (Unknown)"; self.app.after(0, self.app.log_message, self.log_display, f"   RESULT: {res}", "error")
-                                time.sleep(1.0)
-                            except Exception as retry_alert_e: self.app.after(0, self.app.log_message, self.log_display, f"   Retry Alert Error: {retry_alert_e}")
-                        else: res = "Retry Failed (Re-fill error)"; self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: {res}", "error"); alert_ok = False
-                    else: # 100d error, but 0 or fewer days left
-                        reason = f"({actual_worked_from_error} pending)" if actual_worked_from_error != -1 else "(parse fail)"
-                        self.app.after(0, self.app.log_message, self.log_display, f"   SKIPPED: 100d error, <=0 days left {reason}.", "warning")
-                        res = f"Skipped (100 days {reason})"; alert_ok = False
-
-                # 9. Log Final Status to Results Table
-                spec_err = "is already there" in res.lower() and "demand of" in res.lower(); err_name = ""
-                if spec_err and not alert_ok: # Handle "already demanded" error
-                    try: err_name = res.split("Demand of ")[1].split(" for period")[0].split("  ")[0].strip(); self.app.after(0, self.app.log_message, self.log_display, f"   -> Parsed 'already demanded': '{err_name}'")
-                    except Exception: spec_err = False; self.app.after(0, self.app.log_message, self.log_display, "   -> Couldn't parse name.")
-
-                current_dist = retry_days_distribution if (is_100_day_error and alert_ok and bool(retry_days_distribution)) else days_distribution
-
+                # Final Status Logic
                 for app_data in apps_in_jc:
                     name = app_data.get('Name of Applicant', 'N/A')
-                    if name not in processed: continue 
+                    if name not in processed: 
+                        self.app.after(0, self._update_results_tree, (jc, name, "Failed (Skipped/Not Processed)"))
+                        continue
                     
-                    days_submitted = -1
-                    days_submitted_str = "..."
+                    status_text = res.lower()
+                    is_failure = any(x in status_text for x in ['error', 'fail', 'not saved', 'problem', 'contact', 'select'])
                     
-                    # Find how many days were submitted for this specific applicant
-                    for dist_name, dist_days in current_dist.items():
-                        if "".join(dist_name.lower().split()) in "".join(name.lower().split()):
-                            days_submitted = dist_days
-                            days_submitted_str = f"{dist_days}d"
-                            break
-                            
-                    status = res
-                    if alert_ok: 
-                        status = f"Success ({days_submitted_str})"
-                    elif is_aadhaar_error: status = "FAIL: Aadhaar Auth Required"
-                    elif spec_err and err_name: 
-                        status = res if "".join(err_name.lower().split()) in "".join(name.lower().split()) else f"Success (Batch, {days_submitted_str})"
-                    elif is_100_day_error and remaining_days_calc <= 0 : status = f"Skipped (100 days {reason})"
-                    elif is_100_day_error and not alert_ok : status = f"Retry Failed: {res} ({days_submitted_str})"
-                    elif 'success' not in status.lower() and days_submitted != -1 and not any(e in status.lower() for e in ['fail', 'error', 'unknown', 'skip', 'record not saved', 'aadhaar']):
-                        status += f" ({days_submitted_str})" 
+                    if alert_ok and not is_failure: 
+                        final_status = f"Success"
+                    else:
+                        final_status = f"FAIL: {res}"
                         
-                    self.app.after(0, self._update_results_tree, (jc, name, status))
+                    self.app.after(0, self._update_results_tree, (jc, name, final_status))
             
-            else: # 'filled' was False
-                 self.app.after(0, self.app.log_message, self.log_display, f"   -> No submission for JC {jc_suffix} (all correct, not found, or fill error).")
+            else:
                  for app_data in apps_in_jc:
                      name = app_data.get('Name of Applicant', 'N/A')
                      if name in processed: 
-                         days_correct_str = "..."
-                         for dist_name, dist_days in days_distribution.items():
-                             if "".join(dist_name.lower().split()) in "".join(name.lower().split()):
-                                 days_correct_str = f"{dist_days}d"
-                                 break
-                         self.app.after(0, self._update_results_tree, (jc, name, f"Already Correct ({days_correct_str})"))
+                         self.app.after(0, self._update_results_tree, (jc, name, "Already Correct"))
+                     else:
+                         self.app.after(0, self._update_results_tree, (jc, name, "Failed (Grid Error)"))
 
-        except StaleElementReferenceException:
-            # Handle page refresh by retrying the same function
-            self.app.after(0, self.app.log_message, self.log_display, f"   INFO: Stale element {jc}, retrying...", "warning"); time.sleep(1.0)
-            self._process_single_job_card(driver, wait, short_wait, jc, apps_in_jc, user_days, demand_from, work_start, days_worked_ids, jc_ids, grid_ids, btn_ids, err_msg_ids, base_url, state, demand_to_override)
         except Exception as e:
-            # Catch any other critical error, log it, and try to recover
-            self.app.after(0, self.app.log_message, self.log_display, f"CRITICAL ERROR processing {jc}: {type(e).__name__} - {e}", "error")
+            self.app.after(0, self.app.log_message, self.log_display, f"CRITICAL ERROR processing {jc}: {e}", "error")
             [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), f"FAIL: {type(e).__name__}")) for a in apps_in_jc]
-            try: driver.get(base_url); self.app.after(0, self.app.log_message, self.log_display, f"   Recovering: Navigating start...", "warning"); time.sleep(1)
-            except Exception as nav_e: self.app.after(0, self.app.log_message, self.log_display, f"   Recovery failed: {nav_e}", "error")
-
-
+            try: driver.get(base_url); time.sleep(1)
+            except: pass
+            
+                          
     def _update_results_tree(self, data):
         """
-        Adds a new row to the results treeview.
-        Applies 'failed' or 'warning' tags based on the status message.
+        Adds a new row to the results treeview with correct color tags.
         """
-        jc, name, status = data; row_id = len(self.results_tree.get_children()) + 1
-        status_str, status_low = str(status), str(status).lower(); tags = ()
-        if any(e in status_low for e in ['fail','error','crash','not found','invalid','aadhaar','not saved', 'not issued']): tags = ('failed',)
-        elif any(w in status_low for w in ['skip','adjust','already there','limit', '100 days']): tags = ('warning',)
+        jc, name, status = data
+        row_id = len(self.results_tree.get_children()) + 1
+        
+        status_str = str(status)
+        status_low = status_str.lower()
+        tags = () # Default: No Color (White/Black)
+
+        # 1. Failed Logic (Red)
+        if any(e in status_low for e in ['fail', 'error', 'crash', 'not found', 'invalid', 'aadhaar', 'not saved', 'not issued']):
+            tags = ('failed',)
+            
+        # 2. Warning Logic (Yellow) - 'skipped' is also mapped to warning color now
+        elif any(w in status_low for w in ['skip', 'adjust', 'limit', '100 days']):
+            tags = ('warning',)
+            
+        # 3. Success Logic (Green) - YE MISSING THA
+        elif any(s in status_low for s in ['success', 'saved', 'already', 'done']):
+            tags = ('success',)
+
+        # Display Text Truncation
         disp_status = (status_str[:100] + '...') if len(status_str) > 100 else status_str
+        
         self.results_tree.insert("", "end", iid=row_id, values=(row_id, jc, name, disp_status), tags=tags)
         self.results_tree.yview_moveto(1)
 
@@ -1777,28 +1659,6 @@ class DemandTab(BaseAutomationTab):
         # Force re-evaluation of button visibility using the main update function
         self._update_applicant_display()
 
-    def style_treeview(self, tree):
-        """
-        Applies the current theme (light/dark) to the results treeview.
-        """
-        style = ttk.Style()
-        try: style.theme_use("clam")
-        except tkinter.TclError: pass 
-        bg = self.app._apply_appearance_mode(ctk.ThemeManager.theme["CTkFrame"]["fg_color"])
-        fg = self.app._apply_appearance_mode(ctk.ThemeManager.theme["CTkLabel"]["text_color"])
-        sel = self.app._apply_appearance_mode(ctk.ThemeManager.theme["CTkButton"]["fg_color"])
-        hdr = self.app._apply_appearance_mode(ctk.ThemeManager.theme["CTkTextbox"]["fg_color"])
-        fail_fg, warn_fg = "#FF6B6B", "#FFD700" # Red, Yellow
-
-        style.configure("Treeview", background=bg, foreground=fg, fieldbackground=bg, rowheight=25, borderwidth=0)
-        style.map('Treeview', background=[('selected', sel)], foreground=[('selected', fg)]) 
-        style.configure("Treeview.Heading", background=hdr, foreground=fg, relief="flat", font=('Calibri', 10,'bold'))
-        style.map("Treeview.Heading", background=[('active', '#555555')])
-
-        # Define colors for 'failed' and 'warning' tags
-        tree.tag_configure('failed', foreground=fail_fg)
-        tree.tag_configure('warning', foreground=warn_fg)
-        style.layout("Treeview", [('Treeview.treearea', {'sticky': 'nswe'})])
 
     def _on_format_change(self, selected_format):
         """Disables the filter menu for CSV format as it exports all data."""

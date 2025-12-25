@@ -7,7 +7,7 @@ import os, sys, platform, re
 import calendar
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont 
-from fpdf import FPDF  # <--- Make sure this is imported
+from fpdf import FPDF 
 
 # Import Selenium Exceptions for Error Handling
 from selenium.common.exceptions import NoSuchWindowException, WebDriverException
@@ -176,37 +176,26 @@ class BaseAutomationTab(ctk.CTkFrame):
         super().__init__(parent, fg_color="transparent")
         self.app = app_instance
         self.automation_key = automation_key
+        self.retry_btn = None # Placeholder for retry button
         
-    # --- ADD THIS HELPER METHOD ---
     def open_date_picker(self, callback):
-        """
-        Opens the reusable DatePickerPopup.
-        :param callback: A function that accepts a string (the selected date).
-        """
+        """Opens the reusable DatePickerPopup."""
         DatePickerPopup(self, callback)
 
-    # --- ADD THIS ERROR HANDLER ---
     def handle_error(self, e):
-        """
-        Centralized error handler.
-        Detects manual browser closure and shows user-friendly messages.
-        """
+        """Centralized error handler."""
         error_msg = str(e).lower()
-        
         if "no such window" in error_msg or "target window already closed" in error_msg or "web view not found" in error_msg:
             self.app.log_message(self.log_display, "Automation Stopped: Browser tab/window was closed.", "error")
             messagebox.showwarning("Browser Closed", "Automation stopped because the browser window was closed.")
-        
         elif "invalid session id" in error_msg:
             self.app.log_message(self.log_display, "Error: Browser session lost.", "error")
             messagebox.showwarning("Connection Lost", "Browser session was lost. Please restart the browser.")
-            
         else:
             self.app.log_message(self.log_display, f"Error: {e}", "error")
             messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
 
     def _get_wkhtml_path(self):
-        """Gets the correct path to the wkhtmltoimage executable based on the OS."""
         os_type = platform.system()
     
         if hasattr(sys, '_MEIPASS'):
@@ -225,9 +214,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         return 'wkhtmltoimage'
         
     def generate_report_image(self, data, headers, title, date_str, output_path):
-        """
-        Generates a professional-looking report as a PNG image.
-        """
+        # ... (No changes here)
         try:
             try:
                 font_path_regular = resource_path("assets/fonts/NotoSansDevanagari-Regular.ttf")
@@ -415,73 +402,47 @@ class BaseAutomationTab(ctk.CTkFrame):
             final_lines.extend(lines)
         return final_lines if final_lines else [""]
 
-    # -------------------------------------------------------------------------
-    # NEW PDF GENERATOR (Fixing Silent Failures)
-    # -------------------------------------------------------------------------
     def generate_report_pdf(self, data, headers, col_widths, title, date_str, file_path):
-        """
-        Generates a professional A4 Landscape PDF.
-        """
+        # ... (No changes here)
         try:
-            # Create PDF in Landscape (L), mm units, A4 format
             pdf = ProfessionalPDF(title, date_str, orientation='L', unit='mm', format='A4')
             pdf.alias_nb_pages()
             pdf.add_page()
             
-            # --- Table Settings ---
             line_height = 8
             font_size = 9
             pdf.set_font("Arial", size=font_size)
             
-            # --- Header Row ---
-            pdf.set_fill_color(44, 62, 80) # Dark Blue
-            pdf.set_text_color(255, 255, 255) # White text
+            pdf.set_fill_color(44, 62, 80)
+            pdf.set_text_color(255, 255, 255)
             pdf.set_font("Arial", 'B', 10)
             
-            # Print Headers
             for i, h in enumerate(headers):
                 width = col_widths[i] if i < len(col_widths) else 40
                 pdf.cell(width, 10, str(h), 1, 0, 'C', True)
             pdf.ln()
 
-            # --- Data Rows ---
             pdf.set_font("Arial", size=font_size)
-            pdf.set_text_color(0, 0, 0) # Reset text to black
+            pdf.set_text_color(0, 0, 0)
             
-            fill = False # For zebra striping
+            fill = False
             
             for row in data:
-                # Calculate max height needed for this row
-                # We need to know how many lines the text will wrap into
                 max_lines = 1
-                
-                # Check each cell in the row
                 for i, cell_data in enumerate(row):
-                    text = str(cell_data).encode('latin-1', 'replace').decode('latin-1') # Sanitize Text
+                    text = str(cell_data).encode('latin-1', 'replace').decode('latin-1')
                     width = col_widths[i] if i < len(col_widths) else 40
-                    
-                    # Calculate lines using MultiCell simulation
-                    # FPDF doesn't give a direct way to measure height of MultiCell easily without drawing,
-                    # so we approximate by character count or assume FPDF handling.
-                    # Better approach for FPDF 1.7+:
-                    
-                    # Split text roughly to estimate lines (simple approximation)
-                    # Note: precise method requires using GetStringWidth. 
-                    # Here we use a safe approximation for robust "non-silent" fail.
-                    
                     if text:
                         text_width = pdf.get_string_width(text)
-                        if text_width > width - 2: # -2 for padding
+                        if text_width > width - 2:
                             lines = int(text_width / (width - 2)) + 1
                             if lines > max_lines: max_lines = lines
                             
-                row_height = max_lines * 5 # 5mm per line of text
-                if row_height < 8: row_height = 8 # Minimum row height
+                row_height = max_lines * 5
+                if row_height < 8: row_height = 8
                 
-                # Check Page Break
-                if pdf.get_y() + row_height > 190: # 190mm is roughly safe limit for A4 Landscape
+                if pdf.get_y() + row_height > 190:
                     pdf.add_page()
-                    # Re-print Header
                     pdf.set_fill_color(44, 62, 80)
                     pdf.set_text_color(255, 255, 255)
                     pdf.set_font("Arial", 'B', 10)
@@ -492,7 +453,6 @@ class BaseAutomationTab(ctk.CTkFrame):
                     pdf.set_font("Arial", size=font_size)
                     pdf.set_text_color(0, 0, 0)
                 
-                # Draw Cells
                 pdf.set_fill_color(240, 240, 240) if fill else pdf.set_fill_color(255, 255, 255)
                 
                 current_x = pdf.get_x()
@@ -500,40 +460,34 @@ class BaseAutomationTab(ctk.CTkFrame):
                 
                 for i, cell_data in enumerate(row):
                     width = col_widths[i] if i < len(col_widths) else 40
-                    text = str(cell_data).encode('latin-1', 'replace').decode('latin-1') # Sanitize
+                    text = str(cell_data).encode('latin-1', 'replace').decode('latin-1')
                     
-                    # Color coding for "Status" column
-                    if i == 1: # Assuming Status is column 1
+                    if i == 1:
                         if "SUCCESS" in text.upper(): pdf.set_text_color(0, 100, 0)
                         elif "FAIL" in text.upper(): pdf.set_text_color(180, 0, 0)
                         else: pdf.set_text_color(0, 0, 0)
                     else:
                         pdf.set_text_color(0, 0, 0)
 
-                    # Draw Cell
                     pdf.rect(current_x, current_y, width, row_height, 'DF' if fill else 'D')
-                    pdf.multi_cell(width, 5, text, border=0, align='L') # 5 is line height inside cell
+                    pdf.multi_cell(width, 5, text, border=0, align='L')
                     
-                    # Move cursor to right for next cell
                     current_x += width
                     pdf.set_xy(current_x, current_y)
                     
                 pdf.ln(row_height)
-                fill = not fill # Toggle color
+                fill = not fill
 
             pdf.output(file_path)
             return True
             
         except Exception as e:
-            print(f"PDF Gen Error: {e}") # Print to console for debugging
+            print(f"PDF Gen Error: {e}")
             messagebox.showerror("PDF Export Error", f"Could not generate PDF.\nError: {e}", parent=self.app)
             return False
 
-    # -------------------------------------------------------------------------
-    # MODIFIED: _create_action_buttons (Centralized & Modern UI)
-    # -------------------------------------------------------------------------
     def _create_action_buttons(self, parent_frame):
-        """Creates Start, Stop, and Reset buttons."""
+        """Creates Start, Stop, Reset AND Retry buttons."""
         outer_wrapper = ctk.CTkFrame(parent_frame, fg_color="transparent")
         inner_container = ctk.CTkFrame(outer_wrapper, fg_color="transparent")
         inner_container.pack(expand=True, anchor="center")
@@ -544,8 +498,14 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.stop_button = ctk.CTkButton(inner_container, text="■ Stop", command=self.stop_automation, state="disabled", width=90, height=32, corner_radius=8, fg_color="#C53030", hover_color="#9B2C2C", font=ctk.CTkFont(size=13, weight="bold"))
         self.stop_button.pack(side="left", padx=(0, 8))
         
+        # --- NEW RETRY BUTTON ---
+        self.retry_btn = ctk.CTkButton(inner_container, text="↻ Retry Failed", command=self.retry_logic_handler, width=110, height=32, corner_radius=8, fg_color="#D97706", hover_color="#B45309", font=ctk.CTkFont(size=13, weight="bold"))
+        self.retry_btn.pack(side="left", padx=(0, 8))
+        self.retry_btn.configure(state="disabled") # Initially disabled
+
         self.reset_button = ctk.CTkButton(inner_container, text="↺ Reset", command=self.reset_ui, width=90, height=32, corner_radius=8, fg_color=("gray70", "#4A4A4A"), hover_color=("gray60", "#3A3A3A"), text_color="white", font=ctk.CTkFont(size=13))
         self.reset_button.pack(side="left")
+        
         return outer_wrapper
 
     def _create_log_and_status_area(self, parent_notebook):
@@ -584,15 +544,12 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.start_button.configure(state="disabled" if running else "normal", text="Running..." if running else "▶ Start")
         self.stop_button.configure(state="normal" if running else "disabled")
         self.reset_button.configure(state="disabled" if running else "normal")
+        if self.retry_btn:
+            self.retry_btn.configure(state="disabled" if running else "normal")
 
     def reset_ui(self):
-        """
-        Default reset behavior. Subclasses should override this 
-        to clear specific input fields.
-        """
         self.update_status("Ready", 0)
         self.app.set_status("Ready")
-        # Optional: Clear logs
         self.log_display.configure(state="normal")
         self.log_display.delete("1.0", tkinter.END)
         self.log_display.configure(state="disabled")
@@ -605,52 +562,123 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.status_label.configure(text=f"Status: {message}")
         if progress is not None:
             self.progress_bar.set(float(progress))
+        # --- FIXED: Update Global App Status ---
+        if hasattr(self.app, 'set_status'):
+            self.app.set_status(message)
+
+    def retry_logic_handler(self):
+        """Override this in child tabs if specific logic is needed, otherwise uses default."""
+        # Child tab should define 'self.input_text_widget' (the textbox with codes/jobcards)
+        if hasattr(self, 'work_codes_text'):
+            self.retry_failed_automation(self.work_codes_text)
+        elif hasattr(self, 'jobcards_text'): # For Demand Tab support
+            self.retry_failed_automation(self.jobcards_text)
+        else:
+            messagebox.showinfo("Info", "Retry logic not configured for this tab.")
+
+    def retry_failed_automation(self, input_widget):
+        """
+        Generic Logic:
+        1. Reads 'Failed' items from Treeview.
+        2. Updates the input box with ONLY failed items.
+        3. Clears the Treeview.
+        4. Auto-starts automation.
+        """
+        failed_items = []
+        all_items = self.results_tree.get_children()
+        
+        if not all_items:
+            messagebox.showinfo("Retry", "No results found to retry.")
+            return
+
+        for item_id in all_items:
+            values = self.results_tree.item(item_id)['values']
+            # Assuming Column 0 is ID (Workcode/Jobcard) and Column 1 is Status
+            code = str(values[0])
+            status = str(values[1]).lower()
+            
+            if "success" not in status:
+                failed_items.append(code)
+        
+        if not failed_items:
+            messagebox.showinfo("Great!", "No failed items found.")
+            return
+
+        # Confirm before action
+        if not messagebox.askyesno("Retry Failed", f"Found {len(failed_items)} failed items.\nDo you want to retry them now?"):
+            return
+
+        # 1. Update Input Widget
+        input_widget.configure(state="normal")
+        input_widget.delete("1.0", tkinter.END)
+        input_widget.insert("1.0", "\n".join(failed_items))
+        input_widget.configure(state="disabled")
+
+        # 2. Clear Previous Results (Optional, but cleaner for retry run)
+        for item in all_items:
+            self.results_tree.delete(item)
+
+        # 3. Auto Start
+        self.app.log_message(self.log_display, f"Retrying {len(failed_items)} failed items...", "info")
+        self.start_automation()
 
     def style_treeview(self, treeview_widget=None):
-        # Agar argument nahi diya (main_app me), toh ye function global style set karega
         style = ttk.Style()
         style.theme_use("clam")
 
-        # 1. Theme Detection
         mode = ctk.get_appearance_mode()
 
         if mode == "Dark":
             # --- DARK MODE COLORS ---
-            bg_color = "#2b2b2b"        # Table Background
-            text_color = "#e5e7eb"      # Text (Light Gray)
-            row_hover = "#3f3f46"       # Row Hover Color (Thoda sa light dark)
-            selected_bg = "#3B82F6"     # Selection (Blue)
+            bg_color = "#333333"
+            text_color = "#e5e7eb"
+            row_hover = "#404040"
+            selected_bg = "#3B82F6"
             
-            header_bg = "#1f2937"       # Header Background (Dark Slate)
-            header_fg = "#ffffff"       # Header Text
-            header_hover = "#374151"    # Header Hover
+            header_bg = "#1f2937"       
+            header_fg = "#ffffff"       
+            header_hover = "#374151"
+            
+            # Tags Colors (Dark Mode)
+            fail_bg = "#5c1e1e"   # Dark Red
+            fail_fg = "#ffffff"
+            skip_bg = "#5c4e1e"   # Dark Yellow/Brown
+            skip_fg = "#ffffff"
+            success_bg = "#14532d" # Dark Green
+            success_fg = "#ffffff"
+            
         else:
             # --- LIGHT MODE COLORS ---
-            bg_color = "#ffffff"        # Table Background
-            text_color = "#374151"      # Text (Dark Gray)
-            row_hover = "#f3f4f6"       # Row Hover Color (Very Light Gray)
-            selected_bg = "#3B82F6"     # Selection (Blue)
+            bg_color = "#ffffff"        
+            text_color = "#111827"
+            row_hover = "#f3f4f6"       
+            selected_bg = "#3B82F6"     
             
-            header_bg = "#f9fafb"       # Header Background (Off-white)
-            header_fg = "#111827"       # Header Text (Almost Black)
-            header_hover = "#e5e7eb"    # Header Hover
+            header_bg = "#f9fafb"       
+            header_fg = "#111827"       
+            header_hover = "#e5e7eb"
+            
+            # Tags Colors (Light Mode)
+            fail_bg = "#fee2e2"   # Light Red
+            fail_fg = "#991b1b"
+            skip_bg = "#fef9c3"   # Light Yellow
+            skip_fg = "#854d0e"
+            success_bg = "#dcfce7" # Light Green
+            success_fg = "#166534" # Dark Green Text
 
-        # 2. Configure Treeview Body
+        # Configure Treeview
         style.configure("Treeview",
                         background=bg_color,
                         foreground=text_color,
                         fieldbackground=bg_color,
-                        rowheight=35,             # Rows thodi spacious
+                        rowheight=35,             
                         font=("Segoe UI", 11),
                         borderwidth=0)
 
-        # 3. Configure Rows (Hover & Selection)
-        # Note: 'selected' pehle check hota hai, isliye hover selected row ka color kharab nahi karega
         style.map("Treeview",
                   background=[('selected', selected_bg), ('active', row_hover)],
                   foreground=[('selected', 'white'), ('active', text_color)])
 
-        # 4. Configure Heading
         style.configure("Treeview.Heading",
                         background=header_bg,
                         foreground=header_fg,
@@ -660,9 +688,13 @@ class BaseAutomationTab(ctk.CTkFrame):
         style.map("Treeview.Heading",
                   background=[('active', header_hover)])
 
-        # 5. Fix for file_management_tab (jahan widget pass hota hai)
+        # Apply Tags
         if treeview_widget:
             treeview_widget.configure(style="Treeview")
+            treeview_widget.tag_configure('failed', background=fail_bg, foreground=fail_fg)
+            treeview_widget.tag_configure('skipped', background=skip_bg, foreground=skip_fg)
+            treeview_widget.tag_configure('success', background=success_bg, foreground=success_fg)
+            treeview_widget.tag_configure('warning', background=skip_bg, foreground=skip_fg)
 
     def _setup_treeview_sorting(self, tree):
         for col in tree["columns"]:
@@ -688,10 +720,6 @@ class BaseAutomationTab(ctk.CTkFrame):
             messagebox.showerror("Export Failed", f"An error occurred while saving the CSV file:\n{e}", parent=self)
 
     def _extract_and_update_workcodes(self, textbox_widget):
-        """
-        Extracts work codes (6-digit) and wagelist IDs.
-        Updated: Allows duplicates (does not filter unique values).
-        """
         try:
             input_content = textbox_widget.get("1.0", tkinter.END)
             if not input_content.strip(): return
@@ -711,18 +739,12 @@ class BaseAutomationTab(ctk.CTkFrame):
                     processed_work_codes.append(last_part)
             
             results = processed_work_codes + [wl.upper() for wl in found_wagelists]
-            
-            # --- CHANGE MADE HERE ---
-            # Previously: final_results = list(dict.fromkeys(results)) (This removed duplicates)
-            # Now: We keep 'results' as is to allow duplicates.
             final_results = results 
-            # ------------------------
 
             if final_results:
                 textbox_widget.configure(state="normal")
                 textbox_widget.delete("1.0", tkinter.END)
                 textbox_widget.insert("1.0", "\n".join(final_results))
-                # Update message to reflect total items found, including duplicates
                 messagebox.showinfo("Extraction Complete", f"Found and extracted {len(final_results)} items.", parent=self)
             else:
                 messagebox.showinfo("No Codes Found", "Could not find any matching work codes or wagelist IDs in the text.", parent=self)

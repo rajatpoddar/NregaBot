@@ -120,22 +120,20 @@ class WagelistGenTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(agency_name_part,))
 
     def run_automation_logic(self, agency_name_part):
+        """Runs the wagelist generation logic (Background Safe)."""
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
         self.app.log_message(self.log_display, f"Starting wagelist generation for: {agency_name_part}")
         self.app.after(0, self.app.set_status, "Running Wagelist Generation...")
         
-        # --- NEW: List to track generated wagelists securely ---
         generated_wagelists = [] 
-        # -------------------------------------------------------
 
         try:
             driver = self.app.get_driver()
             if not driver: return
             wait = WebDriverWait(driver, 20)
             
-            # Setup output directory if saving PDF
             output_dir = None
             if self.save_pdf_var.get() == "on":
                 try:
@@ -144,8 +142,7 @@ class WagelistGenTab(BaseAutomationTab):
                     output_dir = os.path.join(self.app.get_user_downloads_path(), folder_name, datetime.now().strftime('%Y-%m-%d'), safe_agency_name)
                     os.makedirs(output_dir, exist_ok=True)
                     self.app.log_message(self.log_display, f"PDFs will be saved to: {output_dir}", "info")
-                except Exception as e:
-                    self.app.log_message(self.log_display, f"Could not create output directory: {e}. PDF saving will be disabled.", "error")
+                except Exception:
                     self.app.after(0, lambda: self.save_pdf_var.set("off"))
                     output_dir = None
 
@@ -153,7 +150,6 @@ class WagelistGenTab(BaseAutomationTab):
             while not self.app.stop_events[self.automation_key].is_set():
                 status_msg = "Navigating and selecting agency..."
                 self.app.after(0, self.app.set_status, status_msg)
-                self.app.after(0, self.update_status, status_msg, 0.1)
                 
                 driver.get(config.WAGELIST_GEN_CONFIG["base_url"])
                 agency_select_element = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_exe_agency')))
@@ -167,10 +163,13 @@ class WagelistGenTab(BaseAutomationTab):
                 
                 select.select_by_visible_text(match_text)
                 self.app.log_message(self.log_display, f"Selected agency: {match_text}", "success"); time.sleep(1)
-                proceed_button = wait.until(EC.element_to_be_clickable((By.ID, 'ctl00_ContentPlaceHolder1_go')))
-                driver.execute_script("arguments[0].scrollIntoView(true);", proceed_button); proceed_button.click()
+                
+                # --- FIX: JS Click for Proceed Button ---
+                proceed_button = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_go')))
+                driver.execute_script("arguments[0].click();", proceed_button)
+                
                 try:
-                    wagelist_table = wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_wagelist_msr")))
+                    wagelist_table = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_wagelist_msr")))
                     rows = wagelist_table.find_elements(By.XPATH, ".//tr[td]")
                     if not rows or total_errors_to_skip >= len(rows): 
                         self.app.log_message(self.log_display, "No more wagelists to process.", "info")
@@ -180,72 +179,69 @@ class WagelistGenTab(BaseAutomationTab):
                     
                     try: 
                         checkbox = row_to_process.find_element(By.XPATH, ".//input[@type='checkbox']")
+                        # Use innerText for background reading
                         tds = row_to_process.find_elements(By.TAG_NAME, "td")
                         if len(tds) < 3:
-                            self.app.log_message(self.log_display, f"Skipping row {total_errors_to_skip + 1}: Unexpected row format.", "warning")
                             total_errors_to_skip += 1
                             continue
-                        work_code = tds[2].text.strip()
+                        work_code = tds[2].get_attribute("innerText").strip()
                     except NoSuchElementException: 
-                        self.app.log_message(self.log_display, "Row without checkbox found, assuming end.", "info")
                         break
 
                     status_msg = f"Processing {total_errors_to_skip + 1}/{len(rows)}: {work_code}"
-                    progress = (total_errors_to_skip + 1) / len(rows) if len(rows) > 0 else 0
                     self.app.after(0, self.app.set_status, status_msg)
-                    self.app.after(0, self.update_status, status_msg, progress)
-
                     self.app.log_message(self.log_display, f"Processing row {total_errors_to_skip + 1} (Work Code: {work_code})")
-                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", checkbox)
-                    if not checkbox.is_selected(): checkbox.click()
+                    
+                    # --- FIX: JS Click for Checkbox ---
+                    if not checkbox.is_selected(): 
+                        driver.execute_script("arguments[0].click();", checkbox)
                     
                     try:
-                        wait.until(EC.element_to_be_clickable((By.ID, 'ctl00_ContentPlaceHolder1_btn_go'))).click()
+                        # --- FIX: JS Click for Generate Button ---
+                        gen_btn = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_btn_go')))
+                        driver.execute_script("arguments[0].click();", gen_btn)
+                        
                         wait.until(EC.any_of(
                             EC.url_changes(config.WAGELIST_GEN_CONFIG["base_url"]), 
-                            EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_lblmsg"))
+                            EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_lblmsg"))
                         ))
                         
                         if "view_wagelist.aspx" in driver.current_url:
                             parsed_url = urlparse(driver.current_url); query_params = parse_qs(parsed_url.query)
                             wagelist_no = query_params.get('Wage_Listno', ['N/A'])[0]
                             
-                            # --- NEW: Add to our tracking list ---
-                            if wagelist_no != 'N/A':
-                                generated_wagelists.append(wagelist_no)
-                            # -------------------------------------
+                            if wagelist_no != 'N/A': generated_wagelists.append(wagelist_no)
                             
                             pdf_save_detail = ""
                             if output_dir and wagelist_no != 'N/A':
                                 pdf_path = self._save_page_as_pdf(driver, wagelist_no, work_code, output_dir)
-                                if pdf_path:
-                                    pdf_save_detail = f" (Saved as {os.path.basename(pdf_path)})"
-                                else:
-                                    pdf_save_detail = " (PDF Save Failed)"
+                                pdf_save_detail = f" (Saved as PDF)" if pdf_path else " (PDF Failed)"
 
-                            self.app.log_message(self.log_display, f"SUCCESS: Wagelist {wagelist_no} generated for {work_code}.{pdf_save_detail}", "success")
+                            self.app.log_message(self.log_display, f"SUCCESS: Wagelist {wagelist_no} generated.{pdf_save_detail}", "success")
                             self._log_result(work_code, "Success", wagelist_no, "", "")
                         
                         else:
-                            error_text = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_lblmsg").text.strip()
+                            error_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
+                            error_text = error_elem.get_attribute("innerText").strip()
                             self.app.log_message(self.log_display, f"ERROR on {work_code}: {error_text}", "error")
                             
+                            # Handle Unfrozen Accounts check
                             try:
                                 job_cards, applicant_names = [], []
                                 unfrozen_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_GridView1")
                                 for u_row in unfrozen_table.find_elements(By.XPATH, ".//tr[td]"):
                                     u_cells = u_row.find_elements(By.TAG_NAME, "td")
                                     if len(u_cells) > 3: 
-                                        job_cards.append(u_cells[1].text.strip())
-                                        applicant_names.append(u_cells[3].text.strip())
+                                        job_cards.append(u_cells[1].get_attribute("innerText").strip())
+                                        applicant_names.append(u_cells[3].get_attribute("innerText").strip())
                                 self._log_result(work_code, "Unfrozen Account", "N/A", ", ".join(job_cards), ", ".join(applicant_names))
                             except NoSuchElementException: 
-                                self._log_result(work_code, f"Failed ({error_text or 'Unknown Error'})", "N/A", "", "")
+                                self._log_result(work_code, f"Failed ({error_text or 'Unknown'})", "N/A", "", "")
 
                             total_errors_to_skip += 1
 
                     except TimeoutException:
-                        self.app.log_message(self.log_display, f"ERROR on {work_code}: Page timed out after clicking generate. Skipping.", "error")
+                        self.app.log_message(self.log_display, f"ERROR on {work_code}: Timeout. Skipping.", "error")
                         self._log_result(work_code, "Failed (Page Timeout)", "N/A", "", "")
                         total_errors_to_skip += 1
 
@@ -253,42 +249,29 @@ class WagelistGenTab(BaseAutomationTab):
                     self.app.log_message(self.log_display, "No wagelist table found. Assuming process complete.", "info")
                     break
                     
-                if self.app.stop_events[self.automation_key].is_set(): 
-                    self.app.log_message(self.log_display, "Stop signal received.")
-                    break
+                if self.app.stop_events[self.automation_key].is_set(): break
             
             if not self.app.stop_events[self.automation_key].is_set():
                 if output_dir and os.path.exists(output_dir) and any(os.scandir(output_dir)):
-                    if messagebox.askyesno("Automation Complete", "The wagelist generation process has finished.\n\nDo you want to open the output folder?"):
+                    if messagebox.askyesno("Complete", "Wagelist generation finished.\nOpen output folder?"):
                         self.app.open_folder(output_dir)
                 else:
-                    messagebox.showinfo("Automation Complete", "The wagelist generation process has finished.")
+                    messagebox.showinfo("Complete", "Wagelist generation finished.")
 
         except Exception as e: 
             self.app.log_message(self.log_display, f"A critical error occurred: {e}", level="error")
             if config.SENTRY_DSN: sentry_sdk.capture_exception(e)
         finally:
             self.app.after(0, self.set_ui_state, False)
-            self.app.after(0, self.update_status, "Automation Finished.")
             self.app.after(0, self.app.set_status, "Automation Finished")
             
-            # --- FIX: Use the list directly instead of parsing logs ---
             if self.send_to_sender_var.get() == "on" and not self.app.stop_events[self.automation_key].is_set():
                 self.app.after(0, self.app.set_status, "Finished. Sending data to next tab...")
-                
                 def _send_data():
                     if generated_wagelists:
-                        first_wagelist = generated_wagelists[0]
-                        last_wagelist = generated_wagelists[-1]
-                        
-                        self.app.log_message(self.log_display, f"Passing range {first_wagelist}-{last_wagelist} to Send Wagelist tab.")
-                        
-                        # Yeh function ab 'wait loop' wala hai jo main_app.py mein update kiya tha
-                        self.app.send_wagelist_data_and_switch_tab(first_wagelist, last_wagelist)
+                        self.app.send_wagelist_data_and_switch_tab(generated_wagelists[0], generated_wagelists[-1])
                     else:
-                        self.app.log_message(self.log_display, "No generated wagelists found to send.", "warning")
                         self.app.after(3000, lambda: self.app.set_status("Ready")) 
-                
                 self.app.after(100, _send_data)
             else:
                 self.app.after(5000, lambda: self.app.set_status("Ready"))

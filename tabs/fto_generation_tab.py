@@ -83,26 +83,36 @@ class FtoGenerationTab(BaseAutomationTab):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(page_name, fto_number, datetime.now().strftime("%H:%M:%S"))))
 
     def _process_verification_page(self, driver, wait, verification_url, page_identifier):
+        """
+        Processes an FTO verification page (BACKGROUND SAFE).
+        Uses JS clicks and presence checks.
+        """
         try:
             self.app.log_message(self.log_display, f"Navigating to {page_identifier}...")
             driver.get(verification_url)
             
-            # This is now the primary check for being logged in.
-            wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_wage_list_verify")))
+            # Presence check instead of visibility
+            wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_wage_list_verify")))
             self.app.log_message(self.log_display, "Verification page loaded.")
 
+            # Check if any records exist
             if not driver.find_elements(By.XPATH, "//input[contains(@id, '_auth')]"):
                 self.app.log_message(self.log_display, "No records found on this page.", "warning")
                 return "No records"
 
             self.app.log_message(self.log_display, "Accepting all rows...")
+            # JS Script to click all radio buttons (Already good)
             driver.execute_script("document.querySelectorAll('input[id*=\"_auth\"]').forEach(radio => radio.click());")
             
             self.app.log_message(self.log_display, "Clicking 'Submit'...")
-            wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ch_verified"))).click()
+            # JS Click for Submit
+            submit_btn = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ch_verified")))
+            driver.execute_script("arguments[0].click();", submit_btn)
             
             self.app.log_message(self.log_display, "Clicking 'Authorise'...")
-            wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_btn"))).click()
+            # JS Click for Authorise
+            auth_btn = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_btn")))
+            driver.execute_script("arguments[0].click();", auth_btn)
             
             self.app.log_message(self.log_display, "Waiting for confirmation...")
             alert = wait.until(EC.alert_is_present())
@@ -113,9 +123,8 @@ class FtoGenerationTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Captured FTO: {fto_number}", "success")
             self._log_result(page_identifier, fto_number)
             alert.accept()
-            return "Success" # Return a success status
+            return "Success" 
         except TimeoutException:
-            # This will now trigger if the user is not logged in
             self.app.log_message(self.log_display, "Could not find verification table. Are you logged in?", "error")
             return "Login Required"
         except Exception as e:
