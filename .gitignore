@@ -1,0 +1,48 @@
+# Python cache files
+__pycache__/
+*.pyc
+
+# Virtual Environment folders (never commit these)
+venv/
+env/
+.venv/
+.env/
+
+# PyInstaller build artifacts (IMPORTANT)
+dist/
+build/
+*.spec
+
+# VS Code editor settings
+.vscode/
+
+# macOS specific files
+.DS_Store
+
+# Log files
+*.log
+*.log*
+
+# Any file containing sensitive information
+secrets.ini
+.env
+
+# Personal configuration files
+server/
+server 3.0/
+dashboard.py
+experiment/
+dmg/
+updates/
+tabs/__pycache__/
+tabs/__pycache__/about_tab.cpython-312.pyc
+tabs/__pycache__/if_edit_tab.cpython-312.pyc
+tabs/__pycache__/jobcard_verify_tab.cpython-312.pyc
+tabs/__pycache__/mb_entry_tab.cpython-312.pyc
+tabs/__pycache__/msr_tab.cpython-312.pyc
+tabs/__pycache__/musterroll_gen_tab.cpython-312.pyc
+tabs/__pycache__/wagelist_gen_tab.cpython-312.pyc
+tabs/__pycache__/wagelist_send_tab.cpython-312.pyc
+tabs/__pycache__/wc_gen_tab.cpython-312.pyc
+scripts/
+clean_workflows.py

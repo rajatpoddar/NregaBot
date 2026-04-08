@@ -1,0 +1,28 @@
+{
+  "Saga Pesticides": [
+    {
+      "name": "MR7896-Vermi Compost",
+      "rate": "8.65",
+      "qty": "944",
+      "gst": "0"
+    },
+    {
+      "name": "MR7898-Dolomite",
+      "rate": "6.24",
+      "qty": "152",
+      "gst": "5"
+    },
+    {
+      "name": "MR7897-Bone meal",
+      "rate": "29.52",
+      "qty": "56",
+      "gst": "5"
+    },
+    {
+      "name": "MR7899-Neem/Karanj Cake",
+      "rate": "21.43",
+      "qty": "112",
+      "gst": "5"
+    }
+  ]
+}

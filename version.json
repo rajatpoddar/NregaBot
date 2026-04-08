@@ -1,0 +1,73 @@
+{
+  "latest_version": "3.0.0",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.0-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.0-macOS.dmg",
+  "core_update": {
+    "version": "3.0.0",
+    "url": "https://nregabot.com/updates/core_v3.0.0.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.0.0.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.0.zip",
+    "force_full_reinstall": false
+  },
+  "changelog": {
+    "3.0.0": [
+      "✨ **Material Entry Overhaul:** Dynamic material rows (default 2, up to 15) with Add/Remove buttons. No more fixed 5-row limit.",
+      "💾 **Material Profiles:** Save and load material sets (name, rate, qty, GST) as named profiles for instant reuse.",
+      "📊 **Live Totals:** Real-time Amount, GST, and Grand Total calculation updates as you type.",
+      "📤 **Export Results:** Export Material Entry results to CSV directly from the Results tab.",
+      "🔄 **Scroll Support:** Added horizontal and vertical scrollbars to Work Key input, Results, and Logs areas.",
+      "🐞 **Critical Fix (Material Entry):** Resolved 'Stale Element' errors on Work Category and Work Code dropdown after page postbacks.",
+      "🐞 **Critical Fix (Material Entry):** Fixed Work Code not found issue caused by insufficient postback wait time after TAB key.",
+      "🐞 **Critical Fix (Material Entry):** Vendor dropdown now re-fetched fresh after postback to prevent stale reference errors."
+    ],
+    "2.9.9": [
+      "🚀 **New Automation (Material Entry):** Added a new bulk 'Material Entry' tab to automate bill entries. Simply enter Work Keys, Bill Nos, and Material details to auto-fill the portal.",
+      "🚀 **New Automation (Delete Applicant):** Easily delete multiple applicants (Jobcard Deletion) via CSV upload. Features smart auto-village selection based on the jobcard number.",
+      "⚡ **eKYC Optimization:** Moved the eKYC report URL to the central configuration for better stability and faster updates.",
+      "🎨 **UI Improvements:** Fixed grid layout issues ensuring all input boxes (like Panchayat and Vendor Code) remain visible regardless of text length."
+    ],
+    "2.9.8": [
+      "🐞 **FTO Automation Fix:** Resolved the issue where Top-up FTOs were not generating.",
+      "🐞 **Scheme Closing Fix:** Improved stability and fixed logic errors in the Scheme Closing module."
+    ],
+    "2.9.7": [
+      "🚀 **New Automation:** Added new 'Delete Demand' automation feature.",
+      "⚡ **Delete Allocation Upgrade:** Improved logic to prevent getting stuck on blank rows and added support for deleting allocations across multiple dates.",
+      "🦊 **Browser Update:** Added support for older Firefox versions in FTO Generation.",
+      "🐞 **Critical Bug Fix:** Resolved the 'ModuleNotFoundError' (Browser Launch) issue when connecting to an already opened Chrome/Edge browser."
+    ],
+    "2.9.6": [
+      "🚀 **Url Updated to dord.gov.in** Now all automation will work as before it does.",
+      "🐞 **Fix MR Tracking** T0-T8 Reports"
+    ],
+    "2.9.5": [
+      "⚡ **Muster Roll Supercharge:** Integrated automatic **eKYC & ABPS Verification** immediately after MR generation.",
+      "📊 **New Report:** Generates a **Professional Excel Verification Report** highlighting workers with pending eKYC or ABPS status.",
+      "🛠 **Critical Fix (Work Allocation):** Resolved stability issues in the Work Allocation module for seamless labor assignment.",
+      "🧠 **Smart Extraction:** Added 'Smart Table Search' to accurately capture 100% of worker data from multi-page MR prints.",
+      "🧹 **Stability Boost:** Fixed 'Stale Element' errors during work code selection and improved Panchayat name matching logic."
+    ],
+    "2.9.4": [
+      "🚀 **New Power Feature (Macro Manager):** Introduced a centralized 'Macro Manager' to handle bulk tasks. Now supports **Bulk Demand via CSV** and sequential task queuing.",
+      "✨ **Demand Automation Upgrade:** Added a 'Work Code' column. The bot now automatically performs Work Allocation immediately after Demanding labour.",
+      "🎨 **UI Reorganization:** All automation tabs have been reorganized into 7 intuitive categories (e.g., MR & Wage, Smart Tools, Reports) for faster navigation.",
+      "⚡ **Workflow Engine:** Significant improvements to the internal Workflow Manager for better stability during multi-step automations.",
+      "🐞 **Bug Fix (MB Entry):** Resolved the 'Retry Failed' logic issue; it now correctly reloads only the failed measurements."
+    ],
+    "2.9.3": [
+      "✨ **UI Update (FTO Generation):** Added a dedicated 'Delete FTOs' button and optimized layout spacing for a cleaner look.",
+      "⚡ **Optimization (Wagelist):** Enhanced logic for both 'Generate Wagelist' and 'Send Wagelist' automations for smoother execution.",
+      "🐞 **Bug Fix (Workflow):** Fixed data handoff in FTO Generation; Panchayat name now correctly transfers to MR Tracking for ABPS checks.",
+      "🎨 **Dashboard Upgrade:** The Result section has been overhauled to generate Professional Reports.",
+      "🎨 **Visual Enhancement:** Successful entries in result tables are now highlighted in Green for instant status recognition."
+    ],
+    "2.9.2": [
+      "🚀 **New Feature (Background Mode):** All automations are now optimized to run even if the browser window is minimized.",
+      "✨ **Global Update:** Added a 'Retry Failed' button to all automation tabs to quickly re-process failed entries.",
+      "🎨 **MB Entry Upgrade:** Revamped Result section to support Professional Export (Excel & PDF).",
+      "🐞 **Bug Fix (MB Entry):** Resolved a critical issue where the Work Name was not being selected automatically.",
+      "🛠 **Demand Automation:** Improved stability with robust error handling.",
+      "⚡ **MR Generation:** Enhanced logic for smoother processing and reliability."
+    ]
+  }
+}

@@ -1,0 +1,130 @@
+# Guide: Deploying Your License Server on Synology NAS with Docker
+
+This guide will walk you through setting up your Flask license server on your Synology NAS. This gives you full control over your backend.
+
+---
+
+### **Phase 1: Prepare Your Project**
+
+On your main computer, make sure your project folder contains the following three files:
+1.  `license_server.py`
+2.  `requirements.txt` (containing `Flask` and `gunicorn`)
+3.  `docker-compose.yml`
+
+---
+
+### **Phase 2: Set Up Your Synology NAS**
+
+#### **Step 1: Install Container Manager**
+
+1.  Log in to your Synology DSM (the web interface for your NAS).
+2.  Open the **Package Center**.
+3.  Search for **"Container Manager"** (on older DSM versions, this might be called "Docker").
+4.  Click **Install**.
+
+#### **Step 2: Upload Your Project Files**
+
+1.  Open **File Station** on your NAS.
+2.  Create a new shared folder to hold your projects, for example, named `docker`.
+3.  Inside the `docker` folder, create a new subfolder for this specific project, for example, `nrega-license-server`.
+4.  Upload the three files (`license_server.py`, `requirements.txt`, `docker-compose.yml`) from your computer into this new `nrega-license-server` folder.
+
+---
+
+### **Phase 3: Build and Run the Project**
+
+We will now use the Container Manager to build and run your server from the `docker-compose.yml` file. This is the recommended approach.
+
+1.  Open **Container Manager**.
+2.  On the left menu, go to **Project** and then click the **Create** button.
+3.  Configure the project:
+    * **Project Name:** `nrega-server`
+    * **Source:** Select **"Create from docker-compose.yml"**.
+    * **Path:** Click the button to browse your NAS folders and select the `nrega-license-server` folder (the folder containing your `docker-compose.yml` file).
+4.  Click **Next**. The system will read your `docker-compose.yml` file.
+5.  Review the configuration on the next screen (it should be pre-filled based on your file) and click **Done**.
+6.  Container Manager will now build the image and start the container. This might take a minute or two.
+7.  Your project will now be running. You can see its status in the "Project" list.
+
+Your server is now running on your NAS! The next phase is making it accessible from the internet.
+
+---
+
+### **Phase 4: Making Your Server Public (Port Forwarding)**
+
+To allow your customers' apps to reach your server, you must configure your home router to forward internet traffic to your NAS.
+
+#### **Step 1: Find Your NAS's Local IP Address**
+
+1.  On your Synology NAS, go to **Control Panel** > **Network** > **Network Interface**.
+2.  You will see your local IP address, which will look something like `192.168.1.50`. Write this down.
+
+#### **Step 2: Configure Your Router**
+
+1.  Log in to your home router's administration page (e.g., by typing `192.168.1.1` into your browser).
+2.  Find the section named **"Port Forwarding"** or "Virtual Server".
+3.  Create a new rule:
+    * **Application Name:** `NREGA Server` (or any name)
+    * **External Port:** `5000`
+    * **Internal Port:** `5000`
+    * **Device IP / Internal IP:** Enter your NAS's local IP address (e.g., `192.168.1.50`).
+    * **Protocol:** `TCP`
+4.  Save the rule.
+
+#### **Step 3: Find Your Public IP Address**
+
+1.  On any computer on your network, search Google for **"what is my ip"**.
+2.  Google will display your public IP address (e.g., `103.27.10.150`). This is your home's address on the internet.
+
+---
+
+### **Phase 5: Finalize and Distribute Your App**
+
+This is the final and most important step to connect your desktop app to your live server.
+
+#### **Step 1: Update the Server URL in `main_app.py`**
+
+1.  On your **local computer**, open your `main_app.py` file in your code editor.
+2.  Find the `validate_on_server` method.
+3.  Change the `server_url` variable to use your **Public IP Address** that you found in the previous step.
+
+    ```python
+    # In main_app.py
+    def validate_on_server(self, key, is_startup_check=False):
+        # --- CHANGE THIS LINE ---
+        # Replace YOUR_PUBLIC_IP with the address you found on Google.
+        # This tells the app to connect to your NAS over the internet.
+        server_url = "http://YOUR_PUBLIC_IP:5000/validate"
+        
+        try:
+            # ... (the rest of the function remains the same)
+    ```
+
+#### **Step 2: Run Your App Again**
+
+**You do not need to re-package with PyInstaller yet.** First, test it locally:
+1.  Save the change to `main_app.py`.
+2.  Delete the `license.dat` file from your project folder to trigger the activation window.
+3.  Run the app from your terminal: `python3 main_app.py`.
+4.  When the activation window appears, enter a valid key from your admin panel. It should now connect to your NAS and activate successfully.
+
+Once this works, you can re-package the final application with PyInstaller to send to customers.
+
+---
+
+### **Troubleshooting**
+
+**Error: "Connection refused" or `host='127.0.0.1'`**
+* **Cause:** You have not completed Phase 5, Step 1. Your `main_app.py` is still trying to connect to your local machine instead of your NAS.
+* **Solution:** Open `main_app.py` and change the `server_url` to your public IP address or DDNS hostname.
+
+**Important Consideration: Dynamic IP Address**
+* Most home internet connections have a **dynamic public IP**. If your IP changes, your app will stop working.
+* **Permanent Solution (Recommended):** Use Synology's built-in **DDNS** service. Go to **Control Panel** > **External Access** > **DDNS** and set up a free hostname (e.g., `rajat.synology.me`). Then, use this permanent address in your `main_app.py` file: `http://rajat.synology.me:5000/validate`. It will always point to your NAS, even if the IP changes.
+
+
+
+
+
+
+

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>How to Use | NREGA Bot</title>
+    <meta name="description" content="Step-by-step instructions for using all automation features of the NREGA Bot.">
+    <meta name="author" content="Rajat Poddar">
+
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .instruction-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        .instruction-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .dark .instruction-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800 antialiased dark:bg-gray-900 dark:text-gray-200">
+
+    <header
+        class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm sticky top-0 z-50 dark:border-b dark:border-gray-800">
+        <div class="container mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
+            <a href="index.html" class="text-xl font-bold text-gray-900 flex items-center gap-2 dark:text-white">
+                <img src="/logo.png" alt="NREGA Bot Logo" class="h-8 w-8 rounded-full">
+                <span>NREGA Bot</span>
+            </a>
+            <a href="index.html"
+                class="bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">&larr;
+                Back to Main Page</a>
+        </div>
+    </header>
+
+    <main>
+        <section id="how-to-use" class="py-16 lg:py-20">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-16">
+                    <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white">How to Use the App</h1>
+                    <p class="text-lg text-gray-600 dark:text-gray-400 mt-4 max-w-3xl mx-auto">Follow these simple
+                        instructions for each automation feature.</p>
+                </div>
+                <div class="space-y-16 max-w-5xl mx-auto">
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">1. Demand Automation
+                            </h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Prepare a CSV file containing two columns: `Name of Applicant` and `Job card number`.</li>
+                                <li>In the app, select the 'State', 'Panchayat', 'Demand/Work Date', and 'Days'.</li>
+                                <li>(Optional) 'Work Key (Auto-Allocate)' field mein ek work key search key (e.g., 94297) enter karein.</li>
+                                <li>Click "Load Applicants CSV" and select your prepared CSV file.</li>
+                                <li>Select the applicants you want to process.</li>
+                                <li>Click "Start Automation".</li>
+                                <li><b>Workflow:</b> Agar aapne 'Work Key' enter kiya hai, toh demand poora hone ke baad bot automatically 'Work Allocation' tab par switch karega aur uss key ke liye allocation run karega.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2">
+                            <video class="rounded-lg shadow-md border dark:border-gray-700 w-full" 
+                                   controls 
+                                   autoplay 
+                                   muted 
+                                   loop 
+                                   playsinline 
+                                   poster="/assets/Demand_Automation.png">
+                                
+                                <source src="/assets/videos/demand.mp4" type="video/mp4">
+                                
+                                Your browser does not support the video tag.
+                            </video>
+                            
+                        </div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">2. Muster Roll (MR) Generator
+                            </h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter your full Panchayat name (e.g., KASRAYDIH).</li>
+                                <li>Select the 'From' and 'To' dates using the calendar.</li>
+                                <li>Enter the exact Designation and Technical Staff names.</li>
+                                <li>Paste one or more Work Codes into the text box. To run for all available works,
+                                    leave this box empty.</li>
+                                <li>Choose an output action (Save as PDF or Print).</li>
+                                <li>Click "Start Automation".</li>
+                                <li><b>New:</b> After the run, go to the "Results" tab and click "Merge Saved PDFs" to combine all generated muster rolls into one file.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/Muster_Roll_Generator.png"
+                                alt="Muster Roll Generator" class="rounded-lg shadow-md border dark:border-gray-700">
+                        </div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">3. MSR Processor</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>First, manually navigate to the MSR Payment page in the launched browser.</li>
+                                <li>Enter the Panchayat name exactly as it appears on the website.</li>
+                                <li>Paste the list of Work Codes to process.</li>
+                                <li>Click "Start Automation". The results will appear in the "Results" tab.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/MSR_Processor.png" alt="MSR Processor"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">4. Duplicate MR Print</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the Panchayat Name.</li>
+                                <li>Choose an output action (Save or Print).</li>
+                                <li>Paste a list of work code search keys (e.g., 94297) or full workcodes.</li>
+                                <li>Click "Start Automation". The app will find and process all MSRs for each work code.
+                                </li>
+                                <li><b>New:</b> After the run, go to the "Results" tab and click "Merge Saved PDFs" to combine all saved muster rolls into one file.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/Duplicate_MR_Print.png"
+                                alt="Duplicate MR Print" class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">5. Update Estimated Outcome
+                            </h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the desired "Estimated Outcome" value (e.g., 0.20).</li>
+                                <li>Paste a list of full work codes into the text box.</li>
+                                <li>Click "Start Automation".</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Update_Outcome.png"
+                                alt="Update Estimated Outcome" class="rounded-lg shadow-md border dark:border-gray-700">
+                        </div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">6. FTO Generation</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>First, log in to the 1st Signatory account in the launched browser.</li>
+                                <li>Return to the app and click "Start FTO Generation".</li>
+                                <li>The app will automatically visit the 'Aadhaar FTO' and 'Top-Up FTO' verification pages and process all entries.</li>
+                                <li><b>Workflow:</b> After completion, a "Check Pending ABPS Labour" button will appear. Click it to go to the MR Tracking tab and find pending ABPS laborers.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/FTO_Generation.png" alt="FTO Generation"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">7. Wagelist Generator</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Manually navigate to the "Send MSR to PO" page in the browser.</li>
+                                <li>Enter the Agency name (e.g., BURKUNDI) without "Gram Panchayat -".</li>
+                                <li>(Optional) Check "Save generated wagelist page as PDF" to save a PDF copy of each wagelist as it's generated.</li>
+                                <li>(Optional) Check "Send generated wagelist range..." to automatically send the first and last generated wagelist numbers to the 'Send Wagelist' tab.</li>
+                                <li>Click "Start Generation" to process all available items one by one.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Generate_Wagelist.png"
+                                alt="Wagelist Generator" class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">8. Send Wagelist</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Select the Financial Year in the app.</li>
+                                <li>Enter the Start and End Row numbers for the checkboxes you want to select on the
+                                    page.</li>
+                                <li>Click "Start Sending". The app will automatically navigate and process each
+                                    wagelist.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/Send_Wagelist.png" alt="Send Wagelist"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">9. Jobcard Verification & Photo
+                            </h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the Panchayat and Village name.</li>
+                                <li>Click "Select Photo Folder" and choose a folder containing photos named after the
+                                    job card suffix (e.g., `417.jpg` for `.../417`).</li>
+                                <li>If a photo isn't found, the default `jobcard.jpeg` will be used.</li>
+                                <li>Click "Start Verification" to process all job cards for the village.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Jobcard_Verify.png" alt="Jobcard Verification"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">10. eMB Entry</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Fill in all the configuration details like Panchayat, MB No., Page No., etc.</li>
+                                <li>Paste the list of Work Codes to process.</li>
+                                <li>Click "Start Automation" to fill and save the MB Entry form for each work code.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/eMB_entry.png" alt="MB Entry"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">11. eMB Verify</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the Panchayat name.</li>
+                                <li>Paste a list of full Work Codes into the text box.</li>
+                                <li>Click "Start Automation". The bot will verify the eMB for each work code provided.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/eMB_Verify.png" alt="eMB Verify"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">12. Scheme Closing</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the Panchayat name.</li>
+                                <li>Paste a list of full Work Codes of the schemes you want to close.</li>
+                                <li>Click "Start Automation". The bot will process and close each scheme.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/Scheme_Closing.png" alt="Scheme Closing"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">13. Delete Work Allocation</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the Panchayat name.</li>
+                                <li>Paste a list of Muster Roll Numbers (not work codes) to process.</li>
+                                <li>Click "Start Automation". The bot will delete the work allocation for each MSR number.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Del_Work_Alloc.png" alt="Delete Work Allocation"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">14. Verify ABPS</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the Panchayat name.</li>
+                                <li>Optionally, enter a Village name. If you leave this blank, the app will process all
+                                    villages in that Panchayat.</li>
+                                <li>Click "Start Automation". The bot will check every record, page by page, and save
+                                    the results.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/Verify_ABPS.png" alt="Verify ABPS"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">15. Add Activity</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the desired Unit Price and Quantity.</li>
+                                <li>Paste the list of Work Keys (not full work codes) to process.</li>
+                                <li>Click "Start Automation" to add the default activity (ACT105) to each work key.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Add_Activity.png" alt="Add Activity"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">16. Workcode Extractor</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>This is a simple utility tool.</li>
+                                <li>Paste any block of text that contains NREGA work codes into the text area.</li>
+                                <li>Click the "Extract Work Codes" button.</li>
+                                <li>A clean, unique list of work codes will be generated and automatically copied to
+                                    your clipboard.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/Workcode_Extractor.png"
+                                alt="Workcode Extractor" class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div class="instruction-card bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <h3 class="text-2xl font-bold text-gray-900 dark:text-white text-center mb-6">17. Workcode
+                            Generator (Dynamic)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
+                            <div class="space-y-4">
+                                <h4 class="font-semibold text-lg dark:text-white">Instructions</h4>
+                                <ol class="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
+                                    <li>Enter the Panchayat name and click "Load Categories from Website".</li>
+                                    <li>Make your selections for all dropdowns from top to bottom.</li>
+                                    <li>Prepare a CSV file with the 9 required columns (see demo).</li>
+                                    <li>Select your CSV file.</li>
+                                    <li>Click "Start Automation" to generate work codes based on your selections and CSV
+                                        data.</li>
+                                </ol>
+                            </div>
+                            <div class="space-y-4">
+                                <h4 class="font-semibold text-lg dark:text-white">Demo CSV Format</h4>
+                                <pre
+                                    class="bg-gray-100 text-gray-800 p-4 rounded-md text-sm overflow-x-auto dark:bg-gray-900 dark:text-gray-300"><code>priority,work_name,...,total_saplings</code></pre>
+                                <a href="data:text/csv;charset=utf-8,priority%2Cwork_name%2Ckhata_no%2Cplot_no%2Cvillage_name%2Ctotal_plants%2Ccovered_area%2Carea_plantation%2Ctotal_saplings%0AP1%2C%22ABUA%20Awas%20for%20Beneficiary%20One%22%2C101%2C202%2C%22Example%20Village%201%22%2C150%2C1.5%2C%2C%0AP2%2C%22Block%20Plantation%20for%20Beneficiary%20Two%22%2C102%2C203%2C%22Example%20Village%202%22%2C200%2C2.0%2C1.5%2C200"
+                                    download="demo_wc_gen.csv"
+                                    class="inline-block bg-green-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-700 transition-colors dark:bg-green-500 dark:hover:bg-green-600">Download
+                                    Demo CSV</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="instruction-card bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <h3 class="text-2xl font-bold text-gray-900 dark:text-white text-center mb-6">18. IF Editor
+                            (Dynamic)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
+                            <div class="space-y-4">
+                                <h4 class="font-semibold text-lg dark:text-white">Instructions</h4>
+                                <ol class="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
+                                    <li>Prepare a CSV file with 7 columns (see demo). One row for each Activity/Material
+                                        to add.</li>
+                                    <li>In the app, configure the settings for Page 1 and Page 2.</li>
+                                    <li>Use the switch to enable/disable the multi-page (convergence) workflow.</li>
+                                    <li>Select your CSV file.</li>
+                                    <li>Click "Start Automation".</li>
+                                </ol>
+                            </div>
+                            <div class="space-y-4">
+                                <h4 class="font-semibold text-lg dark:text-white">Demo CSV Format</h4>
+                                <pre
+                                    class="bg-gray-100 text-gray-800 p-4 rounded-md text-sm overflow-x-auto dark:bg-gray-900 dark:text-gray-300"><code>work_code,beneficiary_type,...,quantity</code></pre>
+                                <a href="data:text/csv;charset=utf-8,work_code%2Cbeneficiary_type%2Cjob_card%2Citem_type%2Citem_code_or_name%2Cunit_price%2Cquantity%0A34...90%2CSC%2CJH.../01%2CActivity%2CACT102%2C272%2C63%0A34...90%2CSC%2CJH.../01%2CMaterial%2CMisc.%20Material%2C7235%2C1"
+                                    download="demo_if_edit.csv"
+                                    class="inline-block bg-green-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-700 transition-colors dark:bg-green-500 dark:hover:bg-green-600">Download
+                                    Demo CSV</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">19. Cloud Storage Manager</h3>
+                             <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Access your personal cloud storage included with your license.</li>
+                                <li>Upload, download, and manage your important files directly within the app.</li>
+                                <li>Create folders to keep your documents organized.</li>
+                                <li>Generate secure, shareable links for your folders to collaborate with others.</li>
+                                <li>Your files are accessible from any device where you log in to NREGA Bot.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Cloud_Storage.png" alt="Cloud Storage"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">20. MR Fill (Attendance)</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the Panchayat Name (this is required if you are using a Block login).</li>
+                                <li>Enter "Holiday Columns" (e.g., 7, 14) to have the bot automatically mark those days as holidays.</li>
+                                <li>Check "Manual Mode" to pause the bot after it marks holidays. This allows you to manually mark absentees before clicking 'Save' in the browser.</li>
+                                <li>Paste your list of Work Codes (search keys) into the text box.</li>
+                                <li>Click "Start Automation".</li>
+                                <li><b>Workflow:</b> You can also send workcodes and the panchayat name here directly from the 'Dashboard Report' tab.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/MR_Fill.png" alt="MR Fill Automation"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">21. MR Tracking</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Select your State, District, Block, and Panchayat.</li>
+                                <li>Check one of the filters: "Pending for filling", "Pending for ABPS", or "Find T+8 to T+15 (for Zero MR)".</li>
+                                <li>Click "Start Automation".</li>
+                                <li>If "Pending for ABPS" is checked, the bot will find all pending wagelists and then scan each one to find the specific laborers causing the pendency.</li>
+                                <li>Results are shown in the "Results Table" and "ABPS Pendency Results" tabs.</li>
+                                <li><b>Workflow:</b> Depending on your filter, a button will appear. "Run MR Payment" (sends to MSR Processor), "Run eMB Entry" (sends to eMB Entry), or "Forward to Zero MR" (sends to Zero MR tab).</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/MR_Tracking.png" alt="MR Tracking Report"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">22. Dashboard Report</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Select your State, District, Block, and Panchayat.</li>
+                                <li>Choose the "Delay Column" you want to investigate from the dropdown (e.g., "Attendance not filled in T+2 days").</li>
+                                <li>Click "Start Automation".</li>
+                                <li>The bot will navigate the MIS dashboard and pull the detailed report.</li>
+                                <li><b>Workflow:</b> If you selected the "Attendance not filled..." delay column, a "Run MR Fill" button will appear. Click it to send the pending workcodes and panchayat name directly to the 'MR Fill' tab for processing.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/Dashboard_Report.png" alt="Dashboard Report"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+                
+                <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">23. Issued MR Details</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Select your State, District, Block, and Panchayat.</li>
+                                <li>Click "Start Automation".</li>
+                                <li>The bot will navigate to the 'MGNREGS daily status as per e-muster issued' report for your block.</li>
+                                <li>It will find your panchayat and click the link under "No. Of Ongoing Works on which MR Issued".</li>
+                                <li>The bot will scrape all work details from the final page and list them in the "Results Table".</li>
+                                <li><b>Workflow:</b> Go to the "Workcode List" tab and click "Run Duplicate MR Print" to send all extracted workcodes and the panchayat name to the 'Duplicate MR Print' tab.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Issued_MR_Details.png"
+                                alt="Issued MR Details Report" class="rounded-lg shadow-md border dark:border-gray-700">
+                        </div>
+                    </div>
+                    
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">24. PDF Merger</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>This is a standalone utility to combine multiple PDF files.</li>
+                                <li>Click "Select PDF Files..." and choose two or more PDFs.</li>
+                                <li>The files will appear in the list. You can use "Move Up", "Move Down", or "Remove" to set the correct merge order.</li>
+                                <li>Enter a base "Output File Name" (e.g., "Merged_MRs").</li>
+                                <li>Click "Merge Selected PDFs".</li>
+                                <li>The final, combined PDF will be saved in your "Downloads/NregaBot/Merged_Pdf_Output" folder.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/PDF_Merger.png" alt="PDF Merger"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">25. Zero MR</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Select the correct "Financial Year".</li>
+                                <li>Enter the "Panchayat Name" exactly as it appears on the website.</li>
+                                <li>In the "Work List" tab, paste your items. Each line must be in the format: <b>SearchKey,MSRNo</b> (e.g., 58744,32158).</li>
+                                <li><b>Workflow:</b> You can get this data automatically by using the "Find T+8 to T+15" filter in the "MR Tracking" tab and clicking "Forward to Zero MR".</li>
+                                <li>Click "Start Automation". The bot will process each item, select the correct work code and MSR, and save it as a Zero MR.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Zero_MR.png" alt="Zero MR"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">26. Work Allocation</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>(Optional) Agar PO/Block login hai toh "Panchayat Name" enter karein. GP login ke liye yeh zaroori nahi hai.</li>
+                                <li>"Work Category" select karein (default 'Provision of Irrigation...' hai).</li>
+                                <li>"Work Key List" tab mein ek ya zyada Work Keys (search keys, e.g., 94297) paste karein.</li>
+                                <li>Click "Start Automation". Bot har work key ke liye 'Allocate All' karega aur 'Save' par click karega.</li>
+                                <li><b>Note:</b> Yeh automation "Demand" tab se automatically bhi run ho sakta hai (upar dekhein).</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2">
+                            <video class="rounded-lg shadow-md border dark:border-gray-700 w-full" 
+                                   controls 
+                                   autoplay 
+                                   muted 
+                                   loop 
+                                   playsinline 
+                                   poster="/assets/Work_Allocation.png">
+                                
+                                <source src="/assets/videos/demand.mp4" type="video/mp4">
+                                
+                                Your browser does not support the video tag.
+                            </video>
+                            
+                            </div>
+                    </div>
+
+                    <section id="delete-demand" class="mb-12 scroll-mt-24">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 dark:text-white">26. Delete Demand Automation</h3>
+                </div>
+                <div class="p-6 md:p-8">
+                    <div class="grid md:grid-cols-2 gap-8 items-center">
+                        <div class="order-2 md:order-1">
+                            <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Steps to use:</h4>
+                            <ol class="list-decimal list-inside space-y-3 text-gray-600 dark:text-gray-400">
+                                <li>NREGA portal par Data Entry login karein.</li>
+                                <li><strong>Panchayat</strong> select karein.</li>
+                                <li>Agar aapko sirf ek gaon ka demand delete karna hai, toh <strong>Village Name</strong> select karein.</li>
+                                <li>Agar pure panchayat ka delete karna hai, toh village dropdown me <strong>"ALL VILLAGES"</strong> select rehne dein.</li>
+                                <li>"Start Automation" par click karein. Bot automatically check karega aur demand delete karta jayega.</li>
+                                <li><strong>Note:</strong> Yeh process background me portal ke glitches ko bhi handle kar leta hai.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+                    
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-white border-t dark:bg-gray-900 dark:border-gray-800">
+        <div class="container mx-auto px-6 py-10 text-center text-sm text-gray-600 dark:text-gray-400">
+            <p>&copy; 2025 NREGA Bot by Rajat Poddar. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+
+</html>

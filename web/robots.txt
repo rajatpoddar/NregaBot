@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://nregabot.com/sitemap.xml

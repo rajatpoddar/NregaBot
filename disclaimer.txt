@@ -1,0 +1,7 @@
+⚠️ Disclaimer
+
+⚡This tool interacts with a live government website.
+
+🔄 If the portal's structure or element IDs change, some features may break until updated.
+
+🛠️ Use this tool responsibly. The author provides no warranties and is not liable for any data entry errors. Always double-check automated work.

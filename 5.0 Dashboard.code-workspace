@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"name": "5.0 Dashboard",
+			"path": "."
+		},
+		{
+			"name": "server 3.0",
+			"path": "../Nrega-Bot/server 3.0"
+		}
+	],
+	"settings": {
+		"CodeGPT.apiKey": "CodeGPT Plus Beta"
+	}
+}

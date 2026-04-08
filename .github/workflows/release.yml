@@ -1,0 +1,209 @@
+name: Create Application Release
+
+on:
+  push:
+    branches:
+      - main   # Runs automatically on every push to main
+  workflow_dispatch: {} # Allows manual trigger
+
+jobs:
+  # --- 1. Get Release Info ---
+  get-release-info:
+    name: Get Release Information
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      tag: v${{ steps.get_version.outputs.version }}
+      changelog: ${{ steps.get_changelog.outputs.changelog }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Get version from version.json
+        id: get_version
+        run: |
+          VERSION=$(jq -r '.latest_version' version.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get changelog for the version
+        id: get_changelog
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          CHANGELOG_BODY=$(jq -r --arg VERSION "$VERSION" '.changelog[$VERSION] | .[] | "- \(.)"' version.json)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  # --- 2. Build for Windows (Loader EXE + Secure Win Core Zip) ---
+  build-windows:
+      name: Build Windows (Loader & Core)
+      needs: get-release-info
+      runs-on: windows-latest
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+  
+        # Using Python 3.11 for Windows builds (Standard for your EXE)
+        - name: Set up Python 3.11
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.11'
+  
+        - name: Install dependencies
+          run: pip install -r requirements.txt
+  
+        - name: Create .env file
+          run: echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" > .env
+          shell: bash
+  
+        - name: Install Inno Setup
+          run: choco install innosetup --yes
+          shell: powershell
+  
+        # Build the Windows Loader EXE
+        - name: Run Windows build script (Loader)
+          run: |
+            set APP_VERSION=${{ needs.get-release-info.outputs.version }}
+            build_windows.bat
+          shell: cmd
+  
+        # ✅ NEW: Create Secure Windows Core Zip (Compiled .pyc with Python 3.11)
+        - name: Create Secure Core Zip (Windows)
+          shell: python
+          run: |
+            import os, shutil, zipfile, compileall
+            
+            version = '${{ needs.get-release-info.outputs.version }}'
+            zip_name = f'dist/core_win_v{version}.zip'
+            temp_dir = 'dist/core_temp_win'
+            
+            # 1. Clean temp
+            if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
+            
+            # 2. Copy Files (Ignore unwanted: web folder & screenshots)
+            def ignore_func(dir, files):
+                # Basic ignores including 'web'
+                ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', 'installer.iss', '.vscode', 'web']]
+                
+                # Specific ignore for screenshots inside assets
+                if os.path.basename(dir) == 'assets':
+                    if 'screenshots' in files:
+                        ignored.append('screenshots')
+                        
+                return ignored
+            
+            shutil.copytree('.', temp_dir, ignore=ignore_func)
+            
+            # 3. Compile to .pyc (Legacy mode for direct compatibility)
+            print('Compiling Windows Core (Py3.11)...')
+            compileall.compile_dir(temp_dir, force=True, legacy=True)
+            
+            # 4. Zip (Include .pyc and Assets, Exclude .py)
+            with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for root, dirs, files in os.walk(temp_dir):
+                    for file in files:
+                        # SECURITY: Skip Source Code
+                        if file.endswith('.py'): continue
+                        # Skip binaries and build scripts
+                        if file.endswith(('.exe', '.bat', '.sh', '.spec', '.ps1')): continue
+                        
+                        full_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(full_path, temp_dir)
+                        zf.write(full_path, rel_path)
+            
+            shutil.rmtree(temp_dir)
+            print(f'Success: Created {zip_name}')
+
+        - name: Upload Windows Artifacts
+          uses: actions/upload-artifact@v4
+          with:
+            name: windows-builds
+            path: |
+              dist/installer/*.exe
+              dist/core_win_*.zip
+            retention-days: 1
+
+  # --- 3. Build for Linux (Portable Loader) ---
+  build-linux:
+    name: Build Linux Loader
+    needs: get-release-info
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build Loader with PyInstaller
+        run: |
+          pyinstaller --noconfirm --windowed --onefile --name "NREGA Bot" \
+          --icon="assets/app_icon.icns" \
+          --add-data="logo.png:." \
+          --add-data="theme.json:." \
+          --add-data="changelog.json:." \
+          --add-data="assets:assets" \
+          --add-data="jobcard.jpeg:." \
+          --add-data="tabs:tabs" \
+          --collect-all customtkinter \
+          --collect-data fpdf \
+          --hidden-import=selenium \
+          --hidden-import=webdriver_manager \
+          --hidden-import=pandas \
+          --hidden-import=PIL \
+          --hidden-import=requests \
+          --hidden-import=fpdf \
+          --hidden-import=babel.numbers \
+          --hidden-import=tkcalendar \
+          --hidden-import=getmac \
+          --hidden-import=packaging \
+          --hidden-import=main_app \
+          loader.py
+
+      - name: Create portable archive
+        run: |
+          cd dist
+          tar -czvf NREGABot-v${{ needs.get-release-info.outputs.version }}-Linux.tar.gz "NREGA Bot"
+          cd ..
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: dist/NREGABot-v${{ needs.get-release-info.outputs.version }}-Linux.tar.gz
+          retention-days: 1
+
+  # --- 4. Publish Release ---
+  publish-release:
+    name: Publish GitHub Release
+    needs: [get-release-info, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: NREGA Bot v${{ needs.get-release-info.outputs.version }}
+          body: ${{ needs.get-release-info.outputs.changelog }}
+          tag_name: v${{ needs.get-release-info.outputs.version }}
+          files: |
+            artifacts/windows-builds/**/*
+            artifacts/linux-build/*
+            version.json
