@@ -54,7 +54,10 @@ class ServiceManager:
             # UI Update (Safe Threading)
             self.app.after(0, self.app.set_server_status, True)
             
-            data = resp.json()
+            try:
+                data = resp.json()
+            except Exception:
+                raise Exception(f"Server returned an unexpected response (status {resp.status_code})")
             if resp.status_code == 200 and data.get("status") == "valid":
                 self.app.license_info = {**data, 'key': key}
                 

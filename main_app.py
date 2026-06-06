@@ -551,7 +551,11 @@ class NregaBotApp(ctk.CTk):
                 if resp.status_code == 200:
                     messagebox.showinfo("OTP Sent", "Check your email for OTP", parent=win)
                 else:
-                    messagebox.showerror("Error", resp.json().get("reason", "Failed"), parent=win)
+                    try:
+                        reason = resp.json().get("reason", "Failed")
+                    except Exception:
+                        reason = f"Server returned status {resp.status_code}"
+                    messagebox.showerror("Error", reason, parent=win)
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=win)
             finally:
@@ -589,7 +593,10 @@ class NregaBotApp(ctk.CTk):
                         }, 
                         timeout=15
                     )
-                    data = resp.json()
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        raise Exception(f"Server returned an unexpected response (status {resp.status_code}). Please try again.")
                     
                     if resp.status_code == 200 and data.get("status") == "success":
                         save_config('last_used_email', input_val)
@@ -673,7 +680,11 @@ class NregaBotApp(ctk.CTk):
                 if resp.status_code == 200:
                     messagebox.showinfo("OTP Sent", "Check your email for OTP", parent=win)
                 else:
-                    messagebox.showerror("Error", resp.json().get("reason", "Failed"), parent=win)
+                    try:
+                        reason = resp.json().get("reason", "Failed")
+                    except Exception:
+                        reason = f"Server returned status {resp.status_code}"
+                    messagebox.showerror("Error", reason, parent=win)
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=win)
             finally:
@@ -710,7 +721,10 @@ class NregaBotApp(ctk.CTk):
             submit_btn.configure(state="disabled", text="Requesting...")
             try:
                 resp = self.http_session.post(f"{config.LICENSE_SERVER_URL}/api/request-trial", json=data, timeout=15)
-                res = resp.json()
+                try:
+                    res = resp.json()
+                except Exception:
+                    raise Exception(f"Server returned an unexpected response (status {resp.status_code}). Please try again.")
                 if resp.status_code == 200 and res.get("status") == "success":
                     save_config('last_used_email', data['email'])
                     self.license_info = {'key': res.get("key"), 'expires_at': res.get('expires_at'), 'user_name': data['name'], 'key_type': 'trial'}
