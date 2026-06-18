@@ -8,7 +8,7 @@ APP_TAGLINE = "Your NREGA Task Management Companion"
 APP_DESCRIPTION = "A comprehensive tool for managing NREGA tasks efficiently."
 APP_AUTHOR = "Rajat Poddar"
 APP_AUTHOR_EMAIL = "Rajatpoddar@outlook.com"
-APP_VERSION = "3.0.0"
+APP_VERSION = "3.0.1"
 LICENSE_SERVER_URL = "https://license.nregabot.com"
 MAIN_WEBSITE_URL = "https://nregabot.com"
 SUPPORT_EMAIL = "nregabot@gmail.com"
@@ -174,7 +174,7 @@ REJECTED_WL_CONFIG = {
 
 # --- MR Tracking Configuration  ---
 MR_TRACKING_CONFIG = {
-    "url": "https://nregastrep.nic.in/netnrega/dynamic_muster_track.aspx?lflag=eng&state_code=34&fin_year=2025-2026&state_name=JHARKHAND&Digest=FjAL4jfLQiHS1NU1KnbRZg"
+    "url": "https://nregastrep.nic.in/netnrega/dynamic_muster_track.aspx?lflag=eng&state_code=34&fin_year=2026-2027&state_name=JHARKHAND&Digest=J5TMmiE35cAOwcsR6vvJIA"
 }
 
 # --- MIS Reports Configuration ---
@@ -214,6 +214,11 @@ DELETE_APPLICANT_CONFIG = {
 # --- eKYC Report Configuration ---
 EKYC_REPORT_CONFIG = {
     "url": "https://nregade4.dord.gov.in/Netnrega/UID/AppABPSRpt.aspx"
+}
+
+# --- Physical Complete Configuration ---
+PHYSICAL_COMPLETE_CONFIG = {
+    "url": "https://nregade4.dord.gov.in/Netnrega/phycomp_work.aspx"
 }
 
 import os

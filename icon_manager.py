@@ -82,6 +82,7 @@ def load_icons():
     _add("emoji_if_editor", "assets/icons/emojis/if_editor.png", size=(16, 16))
     # FIX: Added Update Estimate icon
     _add("emoji_update_estimate", "assets/icons/emojis/update_estimate.png", size=(16, 16))
+    _add("emoji_physical_complete", "assets/icons/emojis/physical_complete.png", size=(16, 16))
     _add("emoji_scheme_closing", "assets/icons/emojis/scheme_closing.png", size=(16, 16))
     _add("emoji_add_activity", "assets/icons/emojis/add_activity.png", size=(16, 16))
     

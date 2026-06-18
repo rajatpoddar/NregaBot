@@ -45,6 +45,7 @@ def get_tabs_definition(app):
     from tabs.del_demand_tab import DelDemandTab
     from tabs.material_entry_tab import MaterialEntryTab
     from tabs.delete_applicant_tab import DeleteApplicantTab
+    from tabs.physical_complete_tab import PhysicalCompleteTab
 
     return {
         # 1. MR Related
@@ -75,6 +76,7 @@ def get_tabs_definition(app):
             "IF Editor": {"creation_func": IfEditTab, "icon": app.icon_images.get("emoji_if_editor"), "key": "if_editor"},
             # Renamed key to match new file: update_estimate.png
             "Update Estimate": {"creation_func": UpdateEstimateTab, "icon": app.icon_images.get("emoji_update_estimate"), "key": "update_estimate"},
+            "Physical Complete": {"creation_func": PhysicalCompleteTab, "icon": app.icon_images.get("emoji_physical_complete"), "key": "physical_complete"},
             "Scheme Closing": {"creation_func": SchemeClosingTab, "icon": app.icon_images.get("emoji_scheme_closing"), "key": "scheme_closing"},
             "Add Activity": {"creation_func": AddActivityTab, "icon": app.icon_images.get("emoji_add_activity"), "key": "add_activity"},
         },

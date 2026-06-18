@@ -1,15 +1,22 @@
 {
-  "latest_version": "3.0.0",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.0-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.0-macOS.dmg",
+  "latest_version": "3.0.1",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.1-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.1-macOS.dmg",
   "core_update": {
-    "version": "3.0.0",
-    "url": "https://nregabot.com/updates/core_v3.0.0.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.0.0.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.0.zip",
+    "version": "3.0.1",
+    "url": "https://nregabot.com/updates/core_v3.0.1.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.0.1.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.1.zip",
     "force_full_reinstall": false
   },
   "changelog": {
+    "3.0.1": [
+      "🚀 **New Automation (Physical Complete):** Added a new 'Physical Complete' tab to automate physical completion marking for work codes.",
+      "⚡ **Auto-Forward to Scheme Closing:** After successful physical completion, work codes are automatically forwarded to the Scheme Closing tab for seamless workflow.",
+      "🔄 **Batch Processing:** Supports bulk processing of multiple work codes with real-time success/failure tracking and detailed logs.",
+      "📊 **Export Results:** Export Physical Complete results to PDF or CSV directly from the Results tab.",
+      "🕵️ **MR Tracking Update:** Updated MR Tracking URL to financial year 2026-2027 with latest digest."
+    ],
     "3.0.0": [
       "✨ **Material Entry Overhaul:** Dynamic material rows (default 2, up to 15) with Add/Remove buttons. No more fixed 5-row limit.",
       "💾 **Material Profiles:** Save and load material sets (name, rate, qty, GST) as named profiles for instant reuse.",
