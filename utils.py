@@ -18,7 +18,9 @@ def resource_path(relative_path):
     except Exception:
         base_path = os.path.abspath(".")
     
-    return os.path.join(base_path, relative_path)
+    # Normalize path separators for cross-platform compatibility (fixes Windows backslash issues)
+    normalized = os.path.normpath(relative_path)
+    return os.path.join(base_path, normalized)
 
 def get_data_path(filename=""):
     """Get the path to the application's data directory."""

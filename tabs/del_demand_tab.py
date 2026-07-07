@@ -19,7 +19,7 @@ from .autocomplete_widget import AutocompleteEntry
 
 class DelDemandTab(BaseAutomationTab):
     """
-    Tab for automating the deletion of Demands on the NREGA website.
+    Tab for automating the deletion of Demands on the VB-G-RAM-G portal.
     Features:
     - Supports both PO and GP logins (auto-detects Panchayat dropdown).
     - Can process a single village or iterate through ALL villages in a Panchayat.
@@ -166,11 +166,14 @@ class DelDemandTab(BaseAutomationTab):
                         
                 if found_p:
                     self.app.log_message(self.log_display, f"Selecting Panchayat: '{found_p}'...")
-                    body = driver.find_element(By.TAG_NAME, "body")
                     panchayat_dropdown.select_by_visible_text(found_p)
-                    
+
+                    # Wait for village dropdown to populate after panchayat postback
+                    fast_wait = WebDriverWait(driver, 8, poll_frequency=0.3)
                     try:
-                        wait.until(EC.staleness_of(body)) # Wait for postback
+                        fast_wait.until(lambda d: len(Select(
+                            d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
+                        ).options) > 1)
                     except TimeoutException:
                         pass
                 else:
@@ -219,24 +222,68 @@ class DelDemandTab(BaseAutomationTab):
     def _process_village(self, driver, wait, panchayat, village_name):
         try:
             # Re-find dropdown (to avoid stale element after postbacks)
-            village_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"))))
-            
-            body = driver.find_element(By.TAG_NAME, "body")
+            village_dd_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
+            village_dropdown = Select(village_dd_elem)
             village_dropdown.select_by_visible_text(village_name)
             
             self.app.log_message(self.log_display, f"Selected Village: {village_name}. Waiting for data...")
-            
-            # Wait for Postback
+
+            no_data_locator = (By.ID, "ctl00_ContentPlaceHolder1_del_msg")
+            grid_locator    = (By.ID, "ctl00_ContentPlaceHolder1_grd_AppRecord")
+
+            # Wait for AJAX postback to complete.
+            # Strategy: wait until the village dropdown confirms the selection AND
+            # either a message appears or grid appears or a short max-wait elapses.
+            # We use a short fast-poll loop (max 5 sec) instead of full 15 sec timeout.
+            fast_wait = WebDriverWait(driver, 5, poll_frequency=0.3)
+
+            def page_settled(d):
+                # Confirm dropdown selection took effect
+                try:
+                    dd = Select(d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"))
+                    if dd.first_selected_option.text.strip() != village_name:
+                        return False  # AJAX still running, dropdown reset
+                except Exception:
+                    return False
+
+                # Check 1: message element has non-empty text
+                try:
+                    msg = d.find_element(*no_data_locator)
+                    if msg.text.strip():
+                        return True
+                except Exception:
+                    pass
+
+                # Check 2: grid is visible
+                try:
+                    grid_el = d.find_element(*grid_locator)
+                    if grid_el.is_displayed():
+                        return True
+                except Exception:
+                    pass
+
+                # Dropdown is settled but no message/grid — blank response (no demand exists)
+                return True
+
             try:
-                wait.until(EC.staleness_of(body))
+                fast_wait.until(page_settled)
             except TimeoutException:
+                pass  # Proceed anyway after timeout
+
+            # --- Early exit: "no data" / "already deleted" message ---
+            try:
+                msg_elem = driver.find_element(*no_data_locator)
+                msg_text = msg_elem.text.strip()
+                if msg_text:
+                    self.app.log_message(self.log_display, f"   - {village_name}: {msg_text}. Skipping.")
+                    self._log_result(panchayat, village_name, "-", "Skipped", msg_text)
+                    return
+            except NoSuchElementException:
                 pass
-                
-            time.sleep(1) # Small buffer for rendering
 
             # Step A: Check if grid exists
             try:
-                grid = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_grd_AppRecord")
+                grid = driver.find_element(*grid_locator)
             except NoSuchElementException:
                 self._log_result(panchayat, village_name, "-", "Skipped", "No pending demands found in this village.")
                 return

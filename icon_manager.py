@@ -11,7 +11,7 @@ def load_icons():
     
     def _add(name, path, size=(20, 20)):
         try:
-            # Resource path se full path nikalo
+            # resource_path handles OS-native path separators automatically
             full_path = resource_path(path)
             # Image load karke CTkImage banao
             icons[name] = ctk.CTkImage(Image.open(full_path), size=size)

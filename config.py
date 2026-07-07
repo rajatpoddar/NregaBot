@@ -8,7 +8,7 @@ APP_TAGLINE = "Your NREGA Task Management Companion"
 APP_DESCRIPTION = "A comprehensive tool for managing NREGA tasks efficiently."
 APP_AUTHOR = "Rajat Poddar"
 APP_AUTHOR_EMAIL = "Rajatpoddar@outlook.com"
-APP_VERSION = "3.0.1"
+APP_VERSION = "3.0.2"
 LICENSE_SERVER_URL = "https://license.nregabot.com"
 MAIN_WEBSITE_URL = "https://nregabot.com"
 SUPPORT_EMAIL = "nregabot@gmail.com"
@@ -32,7 +32,7 @@ ICONS = {
 AGENCY_PREFIX = "Gram Panchayat -"
 
 MUSTER_ROLL_CONFIG = {
-    "base_url": "https://nregade4.dord.gov.in/Netnrega/preprintmsr.aspx",
+    "base_url": "https://vbgramgde2.dord.gov.in/vbgramg/preprintmsr.aspx",
     "output_folder_name": "NREGABot_MR_Output",
     "pdf_options": {
         'landscape': True, 'displayHeaderFooter': False, 'printBackground': False,
@@ -49,16 +49,16 @@ MUSTER_ROLL_CONFIG = {
 }
 
 MSR_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/msrpayment.aspx",
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/msrpayment.aspx",
     "work_code_index": 1, "muster_roll_index": 1, "min_delay": 2, "max_delay": 6
 }
 
 WAGELIST_GEN_CONFIG = {
-    "base_url": 'https://nregade4.dord.gov.in/Netnrega/SendMSRtoPO.aspx',
+    "base_url": 'https://vbgramgde2.dord.gov.in/vbgramg/SendMSRtoPO.aspx',
 }
 
 WAGELIST_SEND_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/sendforpay.aspx",
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/sendforpay.aspx",
     "defaults": {
         "start_row": "3",
         "end_row": "19"
@@ -66,7 +66,7 @@ WAGELIST_SEND_CONFIG = {
 }
 
 MB_ENTRY_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/mbbook.aspx",
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/mbbook.aspx",
     "defaults": {
         "measurement_book_no": "", "page_no": "", "unit_cost": "282",
         "mate_name": "", "default_pit_count": "112", "je_name": "", "je_designation": "JE"
@@ -75,7 +75,7 @@ MB_ENTRY_CONFIG = {
 
 
 IF_EDIT_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/netnrega/IFEdit.aspx",
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/IFEdit.aspx",
     "page1": {
         "estimated_pd": "0.090", "beneficiaries_count": "1",
         "convergence_scheme_type": "State", "convergence_scheme_name": "ABUA AWAS YOJNA"
@@ -116,12 +116,12 @@ FTO_GEN_CONFIG = {
 }
 
 JOBCARD_VERIFY_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/VerificationJCatPO.aspx",
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/VerificationJCatPO.aspx",
     "default_photo": "jobcard.jpeg"
 }
 # --- Add Activity Configuration ---
 ADD_ACTIVITY_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/IAY_Act_Mat.aspx",
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/IAY_Act_Mat.aspx",
     "defaults": {
         "activity_code": "ACT105",
         "unit_price": "282",
@@ -130,23 +130,23 @@ ADD_ACTIVITY_CONFIG = {
 }
 # --- ABPS Verification Configuration ---
 ABPS_VERIFY_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/UID/VUID_NPCI.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/UID/VUID_NPCI.aspx"
 }
 
 DEL_WORK_ALLOC_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/delWrkAlloc.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/delWrkAlloc.aspx"
 }
 
 # --- Update Estimate Configuration ---
 UPDATE_ESTIMATE_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/Update_proposedstatus.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/Update_proposedstatus.aspx"
 }
 
 # --- ADD THIS NEW DICTIONARY ---
 # Config for state-specific demand URLs and logic
 STATE_DEMAND_CONFIG = {
     "Jharkhand": {
-        "base_url": "https://nregade4.dord.gov.in/netnrega/demand_new.aspx",
+        "base_url": "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx",
         # Logic to parse village code from 'JH-01-001-001-001/123' -> '001'
         "village_code_logic": "jh"
     },
@@ -161,20 +161,20 @@ STATE_DEMAND_CONFIG = {
 
 # --- Duplicate MR Print Configuration ---
 DUPLICATE_MR_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/netnrega/reprintmsr.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/reprintmsr.aspx"
 }
 
 # --- NEW: eMB Verify Configuration ---
 EMB_VERIFY_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/mbookverify.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/mbookverify.aspx"
 }
 REJECTED_WL_CONFIG = {
-    "RESEND_REJECTED_WG": "https://nregade4.dord.gov.in/Netnrega/view_wagelist_rejected.aspx"
+    "RESEND_REJECTED_WG": "https://vbgramgde2.dord.gov.in/vbgramg/view_wagelist_rejected.aspx"
 }
 
 # --- MR Tracking Configuration  ---
 MR_TRACKING_CONFIG = {
-    "url": "https://nregastrep.nic.in/netnrega/dynamic_muster_track.aspx?lflag=eng&state_code=34&fin_year=2026-2027&state_name=JHARKHAND&Digest=J5TMmiE35cAOwcsR6vvJIA"
+    "url": "https://vbgramgrep.dord.gov.in/VBGRAMG/dynamic_muster_track.aspx?lflag=eng&state_code=34&fin_year=2026-2027&state_name=JHARKHAND&Digest=J5TMmiE35cAOwcsR6vvJIA"
 }
 
 # --- MIS Reports Configuration ---
@@ -184,41 +184,41 @@ MIS_REPORTS_CONFIG = {
 
 # --- NEW: MR Fill (Attendance) Configuration ---
 MR_FILL_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/mustrollattend.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/mustrollattend.aspx"
 }
 
 # --- NEW: Zero MR Configuration ---
 ZERO_MR_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/musteraszero.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/musteraszero.aspx"
 }
 
 # ---NEW: Work Allocation Configuration ---
 WORK_ALLOCATION_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/workalloc.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/workalloc.aspx"
 }
 
 DEL_DEMAND_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/deletedemand.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/deletedemand.aspx"
 }
 
 MATERIAL_ENTRY_CONFIG = {
     # Replace with the exact base url used for material entry from your PO login
-    "url": "https://nregade4.dord.gov.in/netnrega/billdetail.aspx" 
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/billdetail.aspx" 
 }
 
 # --- Delete Applicant Configuration ---
 DELETE_APPLICANT_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/netnrega/DelApp.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/DelApp.aspx"
 }
 
 # --- eKYC Report Configuration ---
 EKYC_REPORT_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/UID/AppABPSRpt.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/UID/AppABPSRpt.aspx"
 }
 
 # --- Physical Complete Configuration ---
 PHYSICAL_COMPLETE_CONFIG = {
-    "url": "https://nregade4.dord.gov.in/Netnrega/phycomp_work.aspx"
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/phycomp_work.aspx"
 }
 
 import os

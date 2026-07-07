@@ -89,7 +89,16 @@ class ModernSplashScreen(ctk.CTk):
             font=("Roboto", 24, "bold"), 
             text_color="white"
         )
-        self.title_label.pack(pady=(5, 20))
+        self.title_label.pack(pady=(5, 2))
+
+        # 2b. Portal tagline
+        self.portal_label = ctk.CTkLabel(
+            self.main_frame,
+            text="VB-G-RAM-G Portal Support",
+            font=("Roboto", 11),
+            text_color="#3B82F6"
+        )
+        self.portal_label.pack(pady=(0, 15))
 
         # 3. Status Text
         self.status_label = ctk.CTkLabel(

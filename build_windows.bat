@@ -24,7 +24,7 @@ ECHO.
 REM Hum loader.py ko build kar rahe hain, lekin main_app ki libraries
 REM ko zabardasti pack kar rahe hain (hidden-import) taaki wo andar मौजूद rahein.
 
-pyinstaller --noconfirm --windowed --onefile ^
+pyinstaller --noconfirm --windowed --onedir ^
 --name %APP_NAME% ^
 --icon="assets/app_icon.ico" ^
 --add-data="logo.png;." ^

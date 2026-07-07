@@ -175,7 +175,9 @@ class NregaBotApp(ctk.CTk):
         except Exception: 
             pass
         
-        ctk.CTkLabel(splash, text=f"{config.APP_NAME}\nLoading...", font=("SF Pro Display", 14)).pack()
+        ctk.CTkLabel(splash, text=f"{config.APP_NAME}", font=("SF Pro Display", 16, "bold")).pack()
+        ctk.CTkLabel(splash, text="VB-G-RAM-G Portal Support", font=("SF Pro Display", 11), text_color="#3B82F6").pack(pady=(2, 0))
+        ctk.CTkLabel(splash, text="Loading...", font=("SF Pro Display", 11), text_color="gray").pack(pady=(4, 0))
         splash.lift()
         splash.attributes("-topmost", True)
         return splash
@@ -1818,7 +1820,7 @@ del "%~f0" & exit
         self.play_sound("error")
         messagebox.showwarning(
             "Under Maintenance", 
-            f"The '{feature_name}' automation is currently down due to changes in the NREGA website.\n\n"
+            f"The '{feature_name}' automation is currently down due to changes in the VB-G-RAM-G portal.\n\n"
             "Our team is working on a fix. Please wait for a new update.\n"
             "We will notify you soon."
         )

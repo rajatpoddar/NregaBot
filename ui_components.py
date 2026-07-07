@@ -437,7 +437,7 @@ class OnboardingGuide(ctk.CTkToplevel):
 
         self.steps_data = [
             {"title": "Step 1: Launch a Browser", "desc": "First, click one of the 'Chrome' buttons in the main app to open a special browser. We recommend Chrome.", "icon": self.parent.icon_images.get("onboarding_launch")},
-            {"title": "Step 2: Log In to the Portal", "desc": "In the new browser window, log in to the NREGA portal with your official credentials.", "icon": self.parent.icon_images.get("onboarding_login")},
+            {"title": "Step 2: Log In to the Portal", "desc": "In the new browser window, log in to the VB-G-RAM-G portal (vbgramgde2.dord.gov.in) with your official credentials.", "icon": self.parent.icon_images.get("onboarding_login")},
             {"title": "Step 3: Choose Your Task", "desc": "Once logged in, return to this app and select your desired automation task from the navigation menu on the left.", "icon": self.parent.icon_images.get("onboarding_select")},
             {"title": "You're All Set!", "desc": "Fill in the required details for your chosen task and click 'Start Automation'. For more help, visit our website from the link in the footer.", "icon": self.parent.icon_images.get("onboarding_start")}
         ]

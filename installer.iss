@@ -1,8 +1,8 @@
 ; NREGA Bot Inno Setup Script
-; Version 3.0.1
+; Version 3.0.2
 
 ; The build script will override this version. This is a fallback.
-#define AppVersion "3.0.1"
+#define AppVersion "3.0.2"
 #define AppName "NREGA Bot"
 #define AppPublisher "PoddarSolutions"
 #define AppURL "https://nregabot.com"
@@ -43,9 +43,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}";
 
 [Files]
-Source: "dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-; NOTE: All other data, including the platform-specific 'bin' folder,
-; is bundled into the single .exe by PyInstaller and does not need to be listed here.
+; Main executable
+Source: "dist\NREGA Bot\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; All supporting files from the onedir build (DLLs, assets, etc.)
+Source: "dist\NREGA Bot\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"

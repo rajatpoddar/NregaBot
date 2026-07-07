@@ -113,7 +113,7 @@ class LoginAutomationTab(BaseAutomationTab):
             if not driver:
                 self.update_status("Status: No Browser Found"); return
 
-            url = "https://nregade4.nic.in/netnrega/Login.aspx?&level=HomePO&state_code=34"
+            url = "https://vbgramgde2.dord.gov.in/VBGRAMG/Login.aspx?&level=HomePO&state_code=34"
             driver.get(url)
             wait = WebDriverWait(driver, 25)
             

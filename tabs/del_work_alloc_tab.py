@@ -21,7 +21,7 @@ from .autocomplete_widget import AutocompleteEntry
 
 class DelWorkAllocTab(BaseAutomationTab):
     """
-    A specific tab class for automating the deletion of Work Allocations on the NREGA website.
+    A specific tab class for automating the deletion of Work Allocations on the VB-G-RAM-G portal.
     Features:
     - Robust Page Loading (Handles 'execution context' errors).
     - Search by Panchayat (Case insensitive).

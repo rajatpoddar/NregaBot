@@ -1,15 +1,27 @@
 {
-  "latest_version": "3.0.1",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.1-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.1-macOS.dmg",
+  "latest_version": "3.0.2",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.2-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.2-macOS.dmg",
   "core_update": {
-    "version": "3.0.1",
-    "url": "https://nregabot.com/updates/core_v3.0.1.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.0.1.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.1.zip",
+    "version": "3.0.2",
+    "url": "https://nregabot.com/updates/core_v3.0.2.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.0.2.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.2.zip",
     "force_full_reinstall": false
   },
   "changelog": {
+    "3.0.2": [
+      "🌐 **VB-G-RAM-G Portal Support:** NREGA Bot is now fully compatible with the new government portal — VB-G-RAM-G (vbgramgde2.dord.gov.in). All automations continue to work seamlessly on the renamed portal.",
+      "🔄 **Portal Name Updated:** All in-app references, labels, and messages now correctly display 'VB-G-RAM-G portal' instead of the old name, so users always know which portal is being accessed.",
+      "ℹ️ **Onboarding Updated:** The setup guide now directs users to log in to the VB-G-RAM-G portal for a clearer first-time experience.",
+      "🐞 **Critical Fix (MR & Duplicate MR Print):** Fixed the extra blank page appearing at the end of PDFs generated in Chrome. Footer is now injected via JavaScript instead of using Chrome's CDP header/footer template, which was causing the blank page.",
+      "🐞 **Critical Fix (Delete Demand):** Fixed the automation getting stuck while waiting for the village dropdown to load after selecting a Panchayat. Replaced the old unreliable `staleness_of(body)` wait with a fast-polling check that confirms the village list is populated.",
+      "🗑️ **Delete Demand Smart Skip:** The bot now reads the portal's 'no data' or 'already deleted' message and skips the village instantly instead of timing out, making bulk deletion significantly faster.",
+      "✨ **Demand Tab UI Overhaul:** Completely redesigned applicant selection area. The entire settings panel is now scrollable so no content is ever hidden on small screens.",
+      "⚡ **Quick-Select JC Bar (Demand):** Added a new 'Quick Select' input bar — type multiple Job Card suffixes (e.g. 1/5, 12/44) and press Enter to instantly select them without scrolling through the full list.",
+      "🎨 **Demand Tab Layout:** Select All and Clear buttons are now always visible alongside the file upload buttons. Search box is integrated into the quick-select bar for a cleaner layout.",
+      "🔗 **MR Tracking URL Updated:** MR Tracking report now points to the new VB-G-RAM-G reporting portal (vbgramgrep.dord.gov.in) for up-to-date muster roll status."
+    ],
     "3.0.1": [
       "🚀 **New Automation (Physical Complete):** Added a new 'Physical Complete' tab to automate physical completion marking for work codes.",
       "⚡ **Auto-Forward to Scheme Closing:** After successful physical completion, work codes are automatically forwarded to the Scheme Closing tab for seamless workflow.",

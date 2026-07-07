@@ -205,9 +205,6 @@ class DemandTab(BaseAutomationTab):
         self.config_file = self.app.get_data_path("demand_inputs.json")
 
         self.all_applicants_data = [] # Holds all data from CSV
-        self.displayed_checkboxes = [] # Holds currently visible widgets (checkboxes, labels)
-        self.next_jc_separator_shown = False # Flag for sequential display
-        self.next_jc_separator = None # Placeholder for separator label
         
         self.work_key_list = [] # Store work keys for autocomplete
 
@@ -230,10 +227,18 @@ class DemandTab(BaseAutomationTab):
         self._create_log_and_status_area(notebook)
 
         settings_tab.grid_columnconfigure(0, weight=1)
-        settings_tab.grid_rowconfigure(2, weight=1)
-        
+        settings_tab.grid_rowconfigure(0, weight=1)
+
+        # Wrap ALL settings content in a scrollable frame so nothing gets cut off
+        settings_scroll = ctk.CTkScrollableFrame(settings_tab, fg_color="transparent")
+        settings_scroll.grid(row=0, column=0, sticky="nsew")
+        settings_scroll.grid_columnconfigure(0, weight=1)
+
+        # All content goes into settings_scroll, not settings_tab directly
+        content = settings_scroll  # alias for clarity
+
         # --- Settings Tab Widgets ---
-        controls_frame = ctk.CTkFrame(settings_tab)
+        controls_frame = ctk.CTkFrame(content)
         controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         # 4 columns for compact layout
         controls_frame.grid_columnconfigure((1, 3), weight=1)
@@ -247,9 +252,11 @@ class DemandTab(BaseAutomationTab):
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=2, padx=(0, 5), pady=5, sticky="w")
         self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat"))
         self.panchayat_entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
+        # Ensure clicks inside the scrollable parent propagate correctly to this entry
+        self.panchayat_entry.bind("<Button-1>", lambda e: self.panchayat_entry.focus_set(), add="+")
 
-        # --- Row 1: Demand Date (From) and Override To Date ---
-        ctk.CTkLabel(controls_frame, text="Demand Date:").grid(row=1, column=0, padx=(10, 5), pady=5, sticky="w")
+        # --- Row 1: Demand Date (From) ---
+        ctk.CTkLabel(controls_frame, text="Work Demand From:").grid(row=1, column=0, padx=(10, 5), pady=5, sticky="w")
 
         # Demand Date Frame
         d_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
@@ -258,16 +265,6 @@ class DemandTab(BaseAutomationTab):
         self.demand_date_entry.pack(side="left", fill="x", expand=True)
         ctk.CTkButton(d_date_frame, text="📅", width=30, fg_color=("gray85", "gray25"), text_color=("black", "white"),
                     command=lambda: self.open_date_picker(lambda d: [self.demand_date_entry.delete(0, "end"), self.demand_date_entry.insert(0, d)])).pack(side="right", padx=(5,0))
-
-        ctk.CTkLabel(controls_frame, text="Override To Date:").grid(row=1, column=2, padx=(0, 5), pady=5, sticky="w")
-
-        # Override Date Frame
-        to_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        to_date_frame.grid(row=1, column=3, padx=5, pady=5, sticky="ew")
-        self.demand_to_date_entry = ctk.CTkEntry(to_date_frame, placeholder_text="Optional")
-        self.demand_to_date_entry.pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(to_date_frame, text="📅", width=30, fg_color=("gray85", "gray25"), text_color=("black", "white"),
-                    command=lambda: self.open_date_picker(lambda d: [self.demand_to_date_entry.delete(0, "end"), self.demand_to_date_entry.insert(0, d)])).pack(side="right", padx=(5,0))
 
         # --- Row 2: Days and No. of Labour ---
         
@@ -316,43 +313,81 @@ class DemandTab(BaseAutomationTab):
         # --- END Row 3 ---
 
         # Start/Stop/Reset buttons
-        buttons_frame = ctk.CTkFrame(settings_tab); buttons_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+        buttons_frame = ctk.CTkFrame(content); buttons_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
         buttons_frame.grid_columnconfigure(0, weight=1)
         action_buttons = self._create_action_buttons(buttons_frame); action_buttons.pack(expand=True, fill="x")
 
         # Applicant selection frame
-        applicant_frame = ctk.CTkFrame(settings_tab); applicant_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
-        applicant_frame.grid_columnconfigure(0, weight=1); applicant_frame.grid_rowconfigure(3, weight=1)
+        applicant_frame = ctk.CTkFrame(content)
+        applicant_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 10))
+        applicant_frame.grid_columnconfigure(0, weight=1)
+        applicant_frame.grid_rowconfigure(2, weight=1)
 
-        applicant_header = ctk.CTkFrame(applicant_frame, fg_color="transparent"); applicant_header.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
-        applicant_header.grid_columnconfigure(1, weight=1)
+        # --- Row 0: File buttons + file label ---
+        file_row = ctk.CTkFrame(applicant_frame, fg_color="transparent")
+        file_row.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 2))
+        file_row.grid_columnconfigure(4, weight=1)
 
-        left_buttons_frame = ctk.CTkFrame(applicant_header, fg_color="transparent")
-        left_buttons_frame.grid(row=0, column=0, sticky="w")
+        self.select_csv_button = ctk.CTkButton(file_row, text="Upload from Computer", command=self._select_csv_from_computer)
+        self.select_csv_button.grid(row=0, column=0, padx=(0, 6))
 
-        self.select_csv_button = ctk.CTkButton(left_buttons_frame, text="Upload from Computer", command=self._select_csv_from_computer)
-        self.select_csv_button.pack(side="left", padx=(0, 10), pady=5)
-        
-        self.cloud_csv_button = ctk.CTkButton(left_buttons_frame, text="Select from Cloud", command=self._select_csv_from_cloud, fg_color="teal", hover_color="#00695C")
-        self.cloud_csv_button.pack(side="left", padx=(0, 10), pady=5)
-        
-        self.demo_csv_button = ctk.CTkButton(left_buttons_frame, text="Demo CSV", command=lambda: self.app.save_demo_csv("demand"), fg_color="#2E8B57", hover_color="#257247", width=100)
-        self.demo_csv_button.pack(side="left", padx=(0, 10), pady=5)
+        self.cloud_csv_button = ctk.CTkButton(file_row, text="Select from Cloud", command=self._select_csv_from_cloud, fg_color="teal", hover_color="#00695C")
+        self.cloud_csv_button.grid(row=0, column=1, padx=(0, 6))
 
-        # Select All/Clear buttons are placed here (visibility managed by _update_applicant_display)
-        self.select_all_button = ctk.CTkButton(left_buttons_frame, text="Select All (≤400)", command=self._select_all_applicants)
-        self.clear_selection_button = ctk.CTkButton(left_buttons_frame, text="Clear", command=self._clear_selection, fg_color="gray", hover_color="gray50")
-        
-        self.file_label = ctk.CTkLabel(applicant_header, text="No file loaded.", text_color="gray", anchor="w")
-        self.file_label.grid(row=1, column=0, pady=(5,0), sticky="w")
-        self.selection_summary_label = ctk.CTkLabel(applicant_header, text="0 applicants selected", text_color="gray", anchor="w")
-        self.selection_summary_label.grid(row=2, column=0, columnspan=2, pady=(0, 5), sticky="w")
-        self.search_entry = ctk.CTkEntry(applicant_header, placeholder_text="Load a CSV, then type here to search...")
-        self.search_entry.grid(row=3, column=0, columnspan=2, pady=5, sticky="ew")
-        self.search_entry.bind("<KeyRelease>", self._update_applicant_display)
+        self.demo_csv_button = ctk.CTkButton(file_row, text="Demo CSV", command=lambda: self.app.save_demo_csv("demand"), fg_color="#2E8B57", hover_color="#257247", width=90)
+        self.demo_csv_button.grid(row=0, column=2, padx=(0, 6))
 
-        self.applicant_scroll_frame = ctk.CTkScrollableFrame(applicant_frame, label_text="Select Applicants to Process")
-        self.applicant_scroll_frame.grid(row=4, column=0, sticky="nsew", padx=10, pady=(0,10)) 
+        self.select_all_button = ctk.CTkButton(file_row, text="Select All", command=self._select_all_applicants, width=90)
+        self.select_all_button.grid(row=0, column=3, padx=(0, 6))
+
+        self.clear_selection_button = ctk.CTkButton(file_row, text="Clear", command=self._clear_selection, fg_color="gray", hover_color="gray50", width=60)
+        self.clear_selection_button.grid(row=0, column=4, sticky="w")
+
+        self.file_label = ctk.CTkLabel(file_row, text="No file loaded.", text_color="gray", anchor="w")
+        self.file_label.grid(row=1, column=0, columnspan=5, sticky="w", pady=(2, 0))
+
+        self.selection_summary_label = ctk.CTkLabel(file_row, text="0 applicants selected", text_color="gray", anchor="w")
+        self.selection_summary_label.grid(row=2, column=0, columnspan=5, sticky="w")
+
+        # --- Row 1: Quick-select bar ---
+        qs_frame = ctk.CTkFrame(applicant_frame, fg_color=("gray85", "gray18"), corner_radius=8)
+        qs_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(4, 4))
+        qs_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(qs_frame, text="Quick Select:", font=ctk.CTkFont(weight="bold")).grid(
+            row=0, column=0, padx=(10, 6), pady=6, sticky="w")
+
+        self.quick_select_entry = ctk.CTkEntry(
+            qs_frame,
+            placeholder_text="Type JC suffixes e.g.  1/5, 12/44, 10/150  then press Enter")
+        self.quick_select_entry.grid(row=0, column=1, padx=(0, 6), pady=6, sticky="ew")
+        self.quick_select_entry.bind("<Return>", lambda e: self._quick_select_jcs())
+
+        ctk.CTkButton(qs_frame, text="Add", width=60, command=self._quick_select_jcs).grid(
+            row=0, column=2, padx=(0, 6), pady=6)
+
+        # Search row (below quick-select)
+        self.search_entry = ctk.CTkEntry(qs_frame, placeholder_text="🔍  Search by name or JC number to find & tick individually...")
+        self.search_entry.grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 6), sticky="ew")
+        self.search_entry.bind("<KeyRelease>", self._on_search_change)
+
+        # --- Row 2: Selected-JC summary table + search results panel ---
+        bottom_frame = ctk.CTkFrame(applicant_frame, fg_color="transparent")
+        bottom_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 8))
+        bottom_frame.grid_columnconfigure(0, weight=1)
+        bottom_frame.grid_columnconfigure(1, weight=1)
+
+        # Left: selected JCs summary (fixed height, scrollable internally)
+        self.selected_jc_frame = ctk.CTkScrollableFrame(
+            bottom_frame, label_text="✅ Selected Job Cards", height=220)
+        self.selected_jc_frame.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+        self.selected_jc_frame.grid_columnconfigure(0, weight=1)
+
+        # Right: search results (fixed height, scrollable internally)
+        self.search_results_frame = ctk.CTkScrollableFrame(
+            bottom_frame, label_text="🔍 Search Results", height=220)
+        self.search_results_frame.grid(row=0, column=1, sticky="ew", padx=(4, 0))
+        self.search_results_frame.grid_columnconfigure(0, weight=1)
 
         # --- Results Tab Widgets ---
         # Configure row weights
@@ -399,25 +434,18 @@ class DemandTab(BaseAutomationTab):
         self._setup_results_treeview()
 
     def _select_all_applicants(self):
-        """
-        Selects all valid (not disabled) applicants in the list,
-        up to a hardcoded limit of 400.
-        """
-        if not self.all_applicants_data: return
-        if len(self.all_applicants_data) > 400: # Limit changed to 400
-             messagebox.showinfo("Limit Exceeded", f"Cannot Select All (>400 applicants loaded: {len(self.all_applicants_data)}).")
-             return
+        """Selects all valid (no *) applicants, up to 400."""
+        if not self.all_applicants_data:
+            return
+        if len(self.all_applicants_data) > 400:
+            messagebox.showinfo("Limit Exceeded", f"Cannot Select All — {len(self.all_applicants_data)} applicants loaded (limit 400).")
+            return
         selected_count = 0
-        # Update the master data list
-        for applicant_data in self.all_applicants_data:
-            if "*" not in applicant_data.get('Name of Applicant', ''):
-                applicant_data['_selected'] = True; selected_count += 1
-        # Update the currently visible checkboxes
-        for checkbox in self.displayed_checkboxes:
-             if isinstance(checkbox, ctk.CTkCheckBox):
-                applicant_data = checkbox.applicant_data
-                if "*" not in applicant_data.get('Name of Applicant', ''):
-                    checkbox.select()
+        for app_data in self.all_applicants_data:
+            if "*" not in app_data.get('Name of Applicant', ''):
+                app_data['_selected'] = True
+                selected_count += 1
+        self._refresh_selected_jc_panel()
         self._update_selection_summary()
         self.app.log_message(self.log_display, f"Selected all {selected_count} valid applicants.")
 
@@ -457,16 +485,10 @@ class DemandTab(BaseAutomationTab):
                 applicant_data['_selected'] = True
                 selected_count += 1
             
-        # Update the visible checkboxes
-        for checkbox in self.displayed_checkboxes:
-             if isinstance(checkbox, ctk.CTkCheckBox):
-                if checkbox.applicant_data.get('_selected', False):
-                    checkbox.select()
-                else:
-                    checkbox.deselect()
-
+        self._refresh_selected_jc_panel()
         self._update_selection_summary()
         self.app.log_message(self.log_display, f"Selected first {selected_count} valid applicants.")
+        self._update_jc_header_counters()
 
     def _clear_processed_selection(self):
         """
@@ -501,32 +523,19 @@ class DemandTab(BaseAutomationTab):
                 deselected_count += 1
             # Warna selected rehne do (agar pehle se selected tha)
 
-        # 3. Update Visual Checkboxes
-        for widget in self.displayed_checkboxes:
-            if isinstance(widget, ctk.CTkCheckBox):
-                if not widget.applicant_data.get('_selected', False):
-                    widget.deselect()
-                else:
-                    widget.select() # Ensure failed ones stay selected
-
+        # 3. Refresh panels
+        self._refresh_selected_jc_panel()
+        self._refresh_search_results()
         self._update_selection_summary()
         self.app.log_message(self.log_display, f"Deselected {deselected_count} successful applicants. Failed items remain checked.")
+        self._update_jc_header_counters()
 
     def _select_csv_from_computer(self):
-        """
-        Opens a file dialog to select a local CSV.
-        It then processes the CSV and starts a background upload to the cloud.
-        """
+        """Opens a file dialog to select a local CSV and processes it."""
         path = filedialog.askopenfilename(title="Select Demand CSV", filetypes=[("CSV", "*.csv")])
-        if not path: 
+        if not path:
             return
-        
-        # 1. Process the data immediately
         self._process_csv_data(path)
-        
-        # 2. Start background upload (non-blocking)
-        self.app.log_message(self.log_display, f"Starting background upload for '{os.path.basename(path)}'...", "info")
-        threading.Thread(target=self._upload_file_to_cloud, args=(path,), daemon=True).start()
 
     def _process_csv_data(self, path):
         """
@@ -591,44 +600,6 @@ class DemandTab(BaseAutomationTab):
             self.file_label.configure(text="No file")
             self._update_applicant_display() 
             self._update_selection_summary()
-
-    def _upload_file_to_cloud(self, local_path):
-        """
-        Uploads a local file to the 'Uploads/' folder in cloud storage.
-        This runs in a background thread and does not block the UI.
-        """
-        token = self.app.license_info.get('key')
-        if not token:
-            self.app.log_message(self.log_display, "Cloud Upload Failed: Not licensed.", "warning")
-            return
-
-        headers = {'Authorization': f'Bearer {token}'}
-        filename = os.path.basename(local_path)
-        
-        # We will upload to a root folder named "Uploads"
-        # The API will create it if it doesn't exist
-        data = {'relative_path': f'Uploads/{filename}'}
-        
-        try:
-            with open(local_path, 'rb') as f:
-                files = {'file': (filename, f, 'text/csv')}
-                
-                resp = requests.post(
-                    f"{config.LICENSE_SERVER_URL}/files/api/upload",
-                    headers=headers,
-                    data=data,
-                    files=files,
-                    timeout=30
-                )
-            
-            if resp.status_code == 201:
-                self.app.log_message(self.log_display, f"Successfully uploaded '{filename}' to cloud.", "info")
-            elif resp.status_code == 409: # File already exists
-                 self.app.log_message(self.log_display, f"'{filename}' already exists in cloud.", "info")
-            else:
-                self.app.log_message(self.log_display, f"Cloud upload failed ({resp.status_code}): {resp.text}", "warning")
-        except Exception as e:
-            self.app.log_message(self.log_display, f"Cloud upload thread error: {e}", "warning")
 
     def _select_csv_from_cloud(self):
         """
@@ -794,121 +765,168 @@ class DemandTab(BaseAutomationTab):
                 self.allocation_work_key_entry.suggestions = self.work_key_list
             self.app.after(0, clear_ui_keys)
 
+    # -----------------------------------------------------------------------
+    # APPLICANT SELECTION — new fast approach
+    # -----------------------------------------------------------------------
+
+    def _quick_select_jcs(self):
+        """
+        Parses the quick-select entry (e.g. '1/5, 12/44, 10/150') and selects
+        all valid members of those job cards from the loaded CSV.
+        Supports both 'suffix-only' (12/44) and full JC number matching.
+        """
+        raw = self.quick_select_entry.get().strip()
+        if not raw:
+            return
+        if not self.all_applicants_data:
+            messagebox.showwarning("No Data", "Please load a CSV file first.")
+            return
+
+        tokens = [t.strip() for t in re.split(r'[,\s]+', raw) if t.strip()]
+        matched_jcs = set()
+
+        for token in tokens:
+            token_lower = token.lower()
+            for app_data in self.all_applicants_data:
+                jc = app_data.get('Job card number', '')
+                # Match full JC or suffix after '/'
+                suffix = jc.split('/')[-1] if '/' in jc else jc
+                if token_lower == jc.lower() or token_lower == suffix.lower():
+                    matched_jcs.add(jc)
+
+        if not matched_jcs:
+            self.app.log_message(self.log_display, f"No JCs matched: {raw}", "warning")
+            return
+
+        added = 0
+        for app_data in self.all_applicants_data:
+            if app_data.get('Job card number') in matched_jcs:
+                if "*" not in app_data.get('Name of Applicant', ''):
+                    app_data['_selected'] = True
+                    added += 1
+
+        self.quick_select_entry.delete(0, "end")
+        self._refresh_selected_jc_panel()
+        self._update_selection_summary()
+        self.app.log_message(self.log_display,
+                             f"Quick-selected {added} applicants from {len(matched_jcs)} JC(s).")
+
+    def _on_search_change(self, event=None):
+        """Triggered on every keystroke in the search box."""
+        self._refresh_search_results()
+
+    def _refresh_search_results(self):
+        """
+        Shows matching applicants in the right-hand search results panel.
+        Only activates when 2+ characters are typed.
+        """
+        for w in self.search_results_frame.winfo_children():
+            w.destroy()
+
+        query = self.search_entry.get().strip().lower()
+        if len(query) < 2:
+            return
+
+        matches = [r for r in self.all_applicants_data if
+                   query in r.get('Job card number', '').lower() or
+                   query in r.get('Name of Applicant', '').lower()]
+
+        for row in matches[:80]:
+            name = row.get('Name of Applicant', '')
+            jc   = row.get('Job card number', '')
+            is_disabled = "*" in name
+
+            var = ctk.StringVar(value="on" if row.get('_selected') else "off")
+
+            def _toggle(data=row, v=var):
+                data['_selected'] = (v.get() == "on")
+                self._refresh_selected_jc_panel()
+                self._update_selection_summary()
+
+            cb = ctk.CTkCheckBox(
+                self.search_results_frame,
+                text=f"{jc}  –  {name}",
+                variable=var, onvalue="on", offvalue="off",
+                command=_toggle
+            )
+            if is_disabled:
+                cb.configure(state="disabled", text_color="gray50")
+            cb.pack(anchor="w", padx=6, pady=1, fill="x")
+
+        if len(matches) > 80:
+            ctk.CTkLabel(self.search_results_frame,
+                         text=f"... {len(matches) - 80} more (refine search)",
+                         text_color="gray").pack(anchor="w", padx=6, pady=2)
+
+    def _refresh_selected_jc_panel(self):
+        """
+        Redraws the left panel showing all currently selected JCs
+        with applicant count and a ✕ remove button.
+        Fast — only renders selected JCs, not the whole list.
+        """
+        for w in self.selected_jc_frame.winfo_children():
+            w.destroy()
+
+        # Group selected applicants by JC
+        selected_by_jc = {}
+        for app_data in self.all_applicants_data:
+            if app_data.get('_selected'):
+                jc = app_data.get('Job card number', '')
+                selected_by_jc.setdefault(jc, []).append(app_data)
+
+        if not selected_by_jc:
+            ctk.CTkLabel(self.selected_jc_frame,
+                         text="Nothing selected yet.\nUse Quick Select or Search →",
+                         text_color="gray", justify="left").pack(padx=10, pady=20)
+            return
+
+        for jc, members in selected_by_jc.items():
+            row_frame = ctk.CTkFrame(self.selected_jc_frame,
+                                     fg_color=("gray88", "gray22"), corner_radius=6)
+            row_frame.pack(fill="x", padx=4, pady=2)
+            row_frame.grid_columnconfigure(0, weight=1)
+
+            suffix = jc.split('/')[-1] if '/' in jc else jc
+            names  = ", ".join(m.get('Name of Applicant', '') for m in members)
+            label_text = f"/{suffix}  ({len(members)} person{'s' if len(members)>1 else ''})\n{names}"
+
+            ctk.CTkLabel(row_frame, text=label_text, anchor="w",
+                         justify="left", wraplength=200).grid(
+                row=0, column=0, padx=(8, 4), pady=4, sticky="ew")
+
+            ctk.CTkButton(
+                row_frame, text="✕", width=28, height=28,
+                fg_color="transparent", hover_color=("gray70", "gray40"),
+                text_color=("gray30", "gray80"),
+                command=lambda j=jc: self._deselect_jc(j)
+            ).grid(row=0, column=1, padx=(0, 4), pady=4)
+
+    def _deselect_jc(self, jc):
+        """Removes all selections for a given job card."""
+        for app_data in self.all_applicants_data:
+            if app_data.get('Job card number') == jc:
+                app_data['_selected'] = False
+        self._refresh_selected_jc_panel()
+        self._refresh_search_results()   # keep search results in sync
+        self._update_selection_summary()
+
     def _update_applicant_display(self, event=None):
-        """
-        Updates the applicant checkbox list based on the search query or
-        shows the first 50 if no search.
-        """
-        # 1. Clear existing widgets
-        for widget in self.displayed_checkboxes: widget.destroy()
-        if self.next_jc_separator: self.next_jc_separator.destroy(); self.next_jc_separator = None
-        self.displayed_checkboxes.clear(); self.next_jc_separator_shown = False
+        """Compatibility shim — just refreshes both panels."""
+        self._refresh_selected_jc_panel()
+        self._refresh_search_results()
 
-        # 2. Handle Button Visibility FIRST (So they always appear)
-        loaded_count = len(self.all_applicants_data)
-        
-        # Handle Select All Button (Limit 400)
-        if 0 < loaded_count <= 400: 
-            self.select_all_button.configure(text=f"Select All (≤400)")
-            self.select_all_button.pack(side="left", padx=(0, 10), pady=5)
-        else:
-            self.select_all_button.pack_forget()
+    # kept for set_ui_state / _clear_processed_selection compatibility
+    def _update_jc_header_counters(self):
+        pass  # no longer needed with the new panel
 
-        # Handle Clear Button
-        if loaded_count > 0:
-            self.clear_selection_button.pack(side="left", padx=(0, 10), pady=5)
-        else:
-            self.clear_selection_button.pack_forget()
-
-        # 3. Logic for Displaying the List
-        if not self.all_applicants_data: return
-
-        search = self.search_entry.get().lower().strip()
-        
-        # If search is short, don't filter, just stop rendering list (but buttons are already shown!)
-        if search and len(search) < 3: 
-            return 
-
-        # Determine matches
-        if search:
-             matches = [row for row in self.all_applicants_data if
-                   (search in row.get('Job card number','').lower() or
-                    search in row.get('Name of Applicant','').lower())]
-        else:
-             # If no search, take the first 50 rows (Deleted the 'return' line that caused the bug)
-             matches = self.all_applicants_data[:50]
-
-        limit = 50
-        for row in matches[:limit]: self._create_applicant_checkbox(row)
-        
-        # Add "..." label if there are more items
-        if len(matches) > limit or (not search and len(self.all_applicants_data) > limit):
-             label = ctk.CTkLabel(self.applicant_scroll_frame, text=f"... (showing first {limit} items)", text_color="gray")
-             label.pack(anchor="w", padx=10, pady=2); self.displayed_checkboxes.append(label)
-
-        # Scroll to top
-        try: self.applicant_scroll_frame._parent_canvas.yview_moveto(0)
-        except Exception: pass
-
-    def _create_applicant_checkbox(self, row_data, is_next_jc=False):
-        """
-        Creates a single checkbox widget for an applicant.
-        """
-        text = f"{row_data['Job card number']}  -  {row_data['Name of Applicant']}"
-        var = ctk.StringVar(value="on" if row_data['_selected'] else "off")
-        cmd = lambda data=row_data, state=var: self._on_applicant_select(data, state.get())
-        cb = ctk.CTkCheckBox(self.applicant_scroll_frame, text=text, variable=var, onvalue="on", offvalue="off", command=cmd)
-        cb.applicant_data = row_data
-
-        # Disable checkbox if applicant name has a '*' (e.g., marked as ineligible)
-        if "*" in row_data.get('Name of Applicant', ''): cb.configure(text_color="gray50", state="disabled")
-        # Highlight if it's from a 'next' job card
-        elif is_next_jc: cb.configure(text_color="#a0a0ff")
-
-        cb.pack(anchor="w", padx=10, pady=2, fill="x"); self.displayed_checkboxes.append(cb)
+    def _create_applicant_checkbox(self, row_data, is_next_jc=False, parent_jc_frame=None):
+        pass  # no longer used
 
     def _on_applicant_select(self, applicant_data, new_state):
-        """
-        Handles the event when an applicant's checkbox is clicked.
-        Updates the master data and the selection summary.
-        """
+        """Updates master data and refreshes panels."""
         applicant_data['_selected'] = (new_state == "on")
+        self._refresh_selected_jc_panel()
         self._update_selection_summary()
-        if new_state == "on": self._add_next_jobcards_to_display(applicant_data)
-
-    def _add_next_jobcards_to_display(self, selected_applicant_data):
-        """
-        Intelligently displays applicants from the next few job cards
-        when one is selected, to make selecting families easier.
-        """
-        try:
-            sel_idx = next((i for i, d in enumerate(self.all_applicants_data) if d['original_index'] == selected_applicant_data['original_index']), -1)
-            if sel_idx == -1: return
-
-            sel_jc = selected_applicant_data['Job card number']; next_jcs = set(); apps_to_add = []
-            max_next = 5 # Show applicants from the next 5 job cards
-
-            for i in range(sel_idx + 1, len(self.all_applicants_data)):
-                curr_app = self.all_applicants_data[i]; curr_jc = curr_app['Job card number']
-                if curr_jc == sel_jc: continue # Skip applicants from the *same* JC
-                if curr_jc not in next_jcs:
-                    if len(next_jcs) >= max_next: break
-                    next_jcs.add(curr_jc)
-                if curr_jc in next_jcs: apps_to_add.append(curr_app)
-
-            if not apps_to_add: return
-
-            # Add a separator label if it's not already there
-            if not self.next_jc_separator_shown:
-                self.next_jc_separator = ctk.CTkLabel(self.applicant_scroll_frame, text=f"--- Applicants from Next {max_next} Job Card(s) ---", text_color="gray")
-                self.next_jc_separator.pack(anchor="w", padx=10, pady=(10, 2)); self.displayed_checkboxes.append(self.next_jc_separator); self.next_jc_separator_shown = True
-
-            # Add checkboxes for the newly found applicants
-            displayed_indices = {cb.applicant_data['original_index'] for cb in self.displayed_checkboxes if hasattr(cb, 'applicant_data')}
-            for app_data in apps_to_add:
-                if app_data['original_index'] not in displayed_indices: self._create_applicant_checkbox(app_data, is_next_jc=True)
-
-        except Exception as e: self.app.log_message(self.log_display, f"Error adding next JCs: {e}", "warning")
 
     def _update_selection_summary(self):
         """
@@ -931,8 +949,8 @@ class DemandTab(BaseAutomationTab):
         self.select_csv_button.configure(state=state)
         self.cloud_csv_button.configure(state=state)
         self.search_entry.configure(state=state)
+        self.quick_select_entry.configure(state=state)
         self.demand_date_entry.configure(state=state)
-        self.demand_to_date_entry.configure(state=state)
         self.select_all_button.configure(state=state)
         self.clear_selection_button.configure(state=state)
         self.allocation_work_key_entry.configure(state=state)
@@ -944,11 +962,6 @@ class DemandTab(BaseAutomationTab):
         self.export_format_menu.configure(state=state)
         self.export_filter_menu.configure(state=state)
         if state == "normal": self._on_format_change(self.export_format_menu.get())
-
-        for widget in self.displayed_checkboxes:
-             if isinstance(widget, ctk.CTkCheckBox) and "*" not in widget.cget("text"):
-                 widget.configure(state=state)
-
     def _get_village_code(self, job_card, state_logic_key):
         """
         Extracts the village code from a job card number based on state-specific logic.
@@ -1047,20 +1060,13 @@ class DemandTab(BaseAutomationTab):
         panchayat = self.panchayat_entry.get().strip(); days_str = self.days_entry.get().strip()
         work_key_for_allocation = self.allocation_work_key_entry.get().strip()
         
-        demand_to_date_str = self.demand_to_date_entry.get().strip() # Get override date
+        demand_to_date_str = ""  # Override date feature removed
 
         try: 
             demand_dt_str = self.demand_date_entry.get()
             demand_dt = datetime.strptime(demand_dt_str, '%d/%m/%Y').date() 
             work_start = demand_dt.strftime('%d/%m/%Y') 
         except ValueError: messagebox.showerror("Invalid Date", "Use DD/MM/YYYY."); return
-
-        # Validate Override Date if present
-        if demand_to_date_str:
-            try:
-                 datetime.strptime(demand_to_date_str, '%d/%m/%Y')
-            except ValueError:
-                 messagebox.showerror("Invalid To Date", "Override Date must be DD/MM/YYYY."); return
 
         if demand_dt < datetime.now().date():
             messagebox.showerror("Invalid Date", "Demand/Work Date cannot be in the past. Please select today or a future date.")
@@ -1079,8 +1085,6 @@ class DemandTab(BaseAutomationTab):
         self.app.log_message(self.log_display, f"Starting demand: {len(selected)} applicant(s), State: {state}...")
         if work_key_for_allocation:
             self.app.log_message(self.log_display, f"   -> Auto-allocation is ENABLED for Work Key: {work_key_for_allocation}")
-        if demand_to_date_str:
-            self.app.log_message(self.log_display, f"   -> Demand To Date OVERRIDE is ENABLED: {demand_to_date_str}")
 
         
         # self.app.set_status("Running..."); <-- Handled by app.start_automation_thread
@@ -1093,8 +1097,7 @@ class DemandTab(BaseAutomationTab):
             "panchayat": panchayat, 
             "demand_date": demand_dt_str, 
             "days": days_str, 
-            "work_key_for_allocation": work_key_for_allocation,
-            "demand_to_date": demand_to_date_str
+            "work_key_for_allocation": work_key_for_allocation
         })
 
         # Group selected applicants by Village Code -> Job Card
@@ -1113,7 +1116,7 @@ class DemandTab(BaseAutomationTab):
         # This will play the sound and manage the thread
         args_tuple = (
             state, panchayat, days_int, work_start, 
-            work_start, grouped, url, work_key_for_allocation, demand_to_date_str
+            work_start, grouped, url, work_key_for_allocation
         )
         self.app.start_automation_thread(
             key=self.automation_key,
@@ -1122,28 +1125,31 @@ class DemandTab(BaseAutomationTab):
         )
 
     def reset_ui(self):
-        """
-        Resets all inputs, selections, and logs on the tab.
-        """
+        """Resets all inputs, selections, and logs on the tab."""
         if not messagebox.askokcancel("Reset?", "Clear inputs, selections, logs?"): return
-        self.state_combobox.set(""); self.panchayat_entry.delete(0, 'end'); self.days_entry.delete(0, 'end'); self.search_entry.delete(0, 'end')
+        self.state_combobox.set("")
+        self.panchayat_entry.delete(0, 'end')
+        self.days_entry.delete(0, 'end')
+        self.search_entry.delete(0, 'end')
+        self.quick_select_entry.delete(0, 'end')
         self.allocation_work_key_entry.delete(0, 'end')
-        
-        # --- FIX: Use delete(0, 'end') instead of clear() ---
         self.demand_date_entry.delete(0, 'end')
-        self.demand_to_date_entry.delete(0, 'end')
-        # ----------------------------------------------------
 
-        self.csv_path = None; self.all_applicants_data.clear()
+        self.csv_path = None
+        self.all_applicants_data.clear()
         self.file_label.configure(text="No file loaded.", text_color="gray")
-        self.select_all_button.pack_forget(); self.clear_selection_button.pack_forget()
+
         # Clear work key list
         self.work_key_list.clear()
         self.allocation_work_key_entry.suggestions = self.work_key_list
-        
-        self._update_applicant_display(); self._update_selection_summary()
+
+        self._refresh_selected_jc_panel()
+        self._refresh_search_results()
+        self._update_selection_summary()
         for i in self.results_tree.get_children(): self.results_tree.delete(i)
-        self.app.clear_log(self.log_display); self.app.after(0, self.app.set_status, "Ready"); self.app.log_message(self.log_display, "Form reset.")
+        self.app.clear_log(self.log_display)
+        self.app.after(0, self.app.set_status, "Ready")
+        self.app.log_message(self.log_display, "Form reset.")
 
     def _setup_results_treeview(self):
         """
@@ -1159,7 +1165,7 @@ class DemandTab(BaseAutomationTab):
         self.results_tree.heading("Status", text="Status")
         self.style_treeview(self.results_tree)
 
-    def _process_demand(self, state, panchayat, user_days, demand_from, work_start, grouped, base_url, work_key_for_allocation, demand_to_override):
+    def _process_demand(self, state, panchayat, user_days, demand_from, work_start, grouped, base_url, work_key_for_allocation):
         """
         The main automation function that runs in a thread.
         Updated to handle intelligent handoff (Granular Allocation).
@@ -1243,7 +1249,7 @@ class DemandTab(BaseAutomationTab):
                         # This updates the *main app* status
                         self.app.after(0, self.app.set_status, f"V {proc_v}/{total_v}, JC {proc_jc}/{total_jc}: {jc.split('/')[-1]}") 
                         
-                        self._process_single_job_card(driver, wait, short_wait, jc, apps, user_days, demand_from, work_start, days_worked_ids, j_ids, grid_ids, btn_ids, err_msg_ids, base_url, state, demand_to_override)
+                        self._process_single_job_card(driver, wait, short_wait, jc, apps, user_days, demand_from, work_start, days_worked_ids, j_ids, grid_ids, btn_ids, err_msg_ids, base_url, state)
 
                 except Exception as e: 
                     self.app.after(0, self.app.log_message, self.log_display, f"ERROR Village {vc}: {type(e).__name__} - {e}. Skipping.", "error")
@@ -1352,10 +1358,9 @@ class DemandTab(BaseAutomationTab):
                                  user_days, demand_from, work_start,
                                  days_worked_ids, jc_ids, grid_ids, btn_ids,
                                  err_msg_ids,
-                                 base_url, state, demand_to_override): 
+                                 base_url, state): 
         """
         Handles the selenium logic for processing a single job card.
-        Updated to Fix Demand Date Override Bug.
         """
 
         def get_worked_days_ultra_fast():
@@ -1377,23 +1382,29 @@ class DemandTab(BaseAutomationTab):
                 self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: Grid not found.", "error")
                 return False
 
-            # --- PASS 1: CLEANING ---
-            rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
-            for i, r in enumerate(rows):
-                if i == 0: continue 
-                try:
-                    name_span = r.find_element(By.CSS_SELECTOR, f"span[id*='_job']") 
-                    name_web = name_span.get_attribute("innerText").strip()
-                    is_target = any("".join(tn.lower().split()) in "".join(name_web.lower().split()) for tn in targets)
-                    
-                    if not is_target:
-                        pfx = f"{grid_id}_ctl{i+1:02d}_"
-                        try:
-                            date_fld = r.find_element(By.ID, f"{pfx}dt_app")
-                            if date_fld.get_attribute('value'):
-                                date_fld.clear()
-                        except: pass
-                except: pass
+            # --- PASS 1: CLEANING (clear dates for non-target rows) ---
+            try:
+                rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
+                for i, r in enumerate(rows):
+                    if i == 0: continue
+                    try:
+                        name_span = r.find_element(By.CSS_SELECTOR, f"span[id*='_job']")
+                        name_web = name_span.get_attribute("innerText").strip()
+                        is_target = any("".join(tn.lower().split()) in "".join(name_web.lower().split()) for tn in targets)
+                        if not is_target:
+                            pfx = f"{grid_id}_ctl{i+1:02d}_"
+                            try:
+                                date_fld = driver.find_element(By.ID, f"{pfx}dt_app")
+                                if date_fld.get_attribute('value'):
+                                    date_fld.clear()
+                            except Exception:
+                                pass
+                    except StaleElementReferenceException:
+                        pass  # row went stale, skip cleaning for it
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
             # --- PASS 2: FILLING ---
             for target_name, days_to_fill in days_distribution.items():
@@ -1403,7 +1414,12 @@ class DemandTab(BaseAutomationTab):
                     processed.add(target_name); applicants_not_found.discard(target_name); fill_success = True; continue
                 
                 found = False
-                rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr") 
+                # Always re-fetch rows fresh — page may have refreshed
+                try:
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")))
+                    rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
+                except Exception:
+                    continue
 
                 for i, r in enumerate(rows):
                     if i == 0: continue
@@ -1413,67 +1429,106 @@ class DemandTab(BaseAutomationTab):
                         
                         if "".join(target_name.lower().split()) in "".join(name_web.lower().split()):
                             applicants_not_found.discard(target_name)
-                            pfx = f"{grid_id}_ctl{i+1:02d}_"; ids = {k: pfx+v for k,v in {'from':'dt_app','start':'dt_from','days':'d3','till':'dt_to'}.items()}
-                            
-                            from_in = wait.until(EC.presence_of_element_located((By.ID, ids['from'])))
-                            start_in = wait.until(EC.presence_of_element_located((By.ID, ids['start'])))
+                            pfx = f"{grid_id}_ctl{i+1:02d}_"
+                            ids = {k: pfx+v for k, v in {
+                                'from': 'dt_app', 'start': 'dt_from',
+                                'days': 'd3', 'till': 'dt_to'
+                            }.items()}
 
-                            days_in_val = ""
-                            try: days_in_val = driver.find_element(By.ID, ids['days']).get_attribute('value')
-                            except: pass
+                            # today's date for dt_app (Date of Application — always current date)
+                            today_date = datetime.now().strftime('%d/%m/%Y')
 
-                            needs_upd = True 
-                            if not demand_to_override:
-                                needs_upd = (from_in.get_attribute('value') != demand_from or start_in.get_attribute('value') != work_start or days_in_val != str(days_to_fill))
+                            # Read current values to check if update needed
+                            try:
+                                cur_from  = driver.find_element(By.ID, ids['from']).get_attribute('value')
+                                cur_start = driver.find_element(By.ID, ids['start']).get_attribute('value')
+                                cur_days  = driver.find_element(By.ID, ids['days']).get_attribute('value')
+                            except Exception:
+                                cur_from = cur_start = cur_days = ""
+
+                            needs_upd = (
+                                cur_from  != today_date or
+                                cur_start != demand_from or
+                                cur_days  != str(days_to_fill)
+                            )
 
                             if needs_upd:
-                                self.app.after(0, self.app.log_message, self.log_display, f"   -> Updating: '{name_web}' ({days_to_fill}d)...")
-                                
-                                if from_in.get_attribute('value') != demand_from: 
-                                    from_in.clear(); from_in.send_keys(demand_from + Keys.TAB); time.sleep(0.1)
-                                
-                                start_in = wait.until(EC.presence_of_element_located((By.ID, ids['start']))) 
-                                if start_in.get_attribute('value') != work_start: 
-                                    start_in.clear(); start_in.send_keys(work_start + Keys.TAB); time.sleep(0.3) 
-                                else: 
-                                    start_in.send_keys(Keys.TAB); time.sleep(0.3) 
+                                self.app.after(0, self.app.log_message, self.log_display,
+                                               f"   -> Updating: '{name_web}' ({days_to_fill}d)...")
 
-                                days_in = wait.until(EC.presence_of_element_located((By.ID, ids['days']))) 
-                                days_after = days_in.get_attribute('value')
-                                
-                                if days_after != str(days_to_fill):
-                                    days_in.click(); time.sleep(0.1)
-                                    cvl = len(days_after or "")
-                                    [(days_in.send_keys(Keys.BACKSPACE), time.sleep(0.05)) for _ in range(cvl + 2)]
-                                    days_in.send_keys(str(days_to_fill) + Keys.TAB)
-                                    # Wait for auto-calc
-                                    try: wait.until(lambda d: d.find_element(By.ID, ids['till']).get_attribute("value") != "")
-                                    except: pass 
+                                # ── STEP 1: Date of Application (dt_app) — always today ───
+                                # Click first to focus, then fill, then TAB to trigger postback
+                                from_el = wait.until(EC.element_to_be_clickable((By.ID, ids['from'])))
+                                if from_el.get_attribute('value') != today_date:
+                                    from_el.click()
+                                    time.sleep(0.1)
+                                    from_el.clear()
+                                    from_el.send_keys(today_date)
+                                    time.sleep(0.1)
+                                    from_el.send_keys(Keys.TAB)
+                                    # Page now does a postback — wait for grid to re-render
+                                    time.sleep(0.8)
+                                    wait.until(EC.presence_of_element_located(
+                                        (By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")))
+                                    time.sleep(0.3)
+
+                                # ── STEP 2: Work Demand From (dt_from) — user's demand date
+                                # Must click to focus — cursor may have moved after postback
+                                start_el = wait.until(EC.element_to_be_clickable((By.ID, ids['start'])))
+                                if start_el.get_attribute('value') != demand_from:
+                                    start_el.click()
+                                    time.sleep(0.1)
+                                    start_el.clear()
+                                    start_el.send_keys(demand_from)
+                                    time.sleep(0.1)
+                                    start_el.send_keys(Keys.TAB)
+                                    # May also trigger a postback
+                                    time.sleep(0.6)
+                                    wait.until(EC.presence_of_element_located(
+                                        (By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")))
+                                    time.sleep(0.2)
                                 else:
-                                    days_in.send_keys(Keys.TAB); time.sleep(0.2)
-                            
-                            # --- BUG FIX START: Handle Override Date Correctly ---
-                            if demand_to_override:
-                                try:
-                                    # 1. Give the site a moment to perform auto-calculation from the "Days" change
-                                    time.sleep(0.5) 
-                                    
-                                    till_in = driver.find_element(By.ID, ids['till'])
-                                    current_till = till_in.get_attribute("value")
-                                    
-                                    # 2. Force override if different
-                                    if current_till != demand_to_override:
-                                        # Use JS to clear first to be absolutely sure
-                                        driver.execute_script("arguments[0].value = '';", till_in)
-                                        till_in.click()
-                                        till_in.send_keys(demand_to_override + Keys.TAB)
-                                        time.sleep(0.2)
-                                except Exception as e_date:
-                                     print(f"Date Override Error: {e_date}")
-                            # --- BUG FIX END ---
+                                    # Still need to TAB through to days field
+                                    start_el.click()
+                                    time.sleep(0.1)
+                                    start_el.send_keys(Keys.TAB)
+                                    time.sleep(0.2)
 
-                            filled = True; processed.add(target_name); found = True; fill_success = True; break
-                    except Exception: continue
+                                # ── STEP 3: Days (d3) ────────────────────────────────────
+                                # Click to focus, clear old value, type new value, TAB
+                                # TAB triggers website to auto-fill dt_to
+                                days_el = wait.until(EC.element_to_be_clickable((By.ID, ids['days'])))
+                                days_el.click()
+                                time.sleep(0.1)
+                                cur_d = days_el.get_attribute('value') or ""
+                                # Clear char by char then type
+                                for _ in range(len(cur_d) + 2):
+                                    days_el.send_keys(Keys.BACKSPACE)
+                                days_el.send_keys(str(days_to_fill))
+                                time.sleep(0.1)
+                                days_el.send_keys(Keys.TAB)
+
+                                # ── STEP 4: Wait for dt_to to be auto-filled ─────────────
+                                try:
+                                    wait.until(lambda d: (
+                                        d.find_element(By.ID, ids['till']).get_attribute("value") or ""
+                                    ) != "")
+                                except Exception:
+                                    time.sleep(0.5)
+
+                            filled = True
+                            processed.add(target_name)
+                            found = True
+                            fill_success = True
+                            break
+
+                    except StaleElementReferenceException:
+                        self.app.after(0, self.app.log_message, self.log_display,
+                                       f"   Stale row for '{target_name}', retrying...", "warning")
+                        time.sleep(0.6)
+                        break
+                    except Exception:
+                        continue
 
                 if not found: time.sleep(0.1); continue
 
@@ -1678,16 +1733,11 @@ class DemandTab(BaseAutomationTab):
             except Exception as e:
                 self.app.log_message(self.log_display, f"Error processing item {item_id}: {e}", "error")
 
-        # Update all visible checkboxes to reflect the new selection
-        for widget in self.displayed_checkboxes:
-            if isinstance(widget, ctk.CTkCheckBox):
-                if widget.applicant_data.get('_selected', False):
-                    widget.select()
-                else:
-                    widget.deselect()
-
+        # Refresh panels
+        self._refresh_selected_jc_panel()
         self._update_selection_summary()
         self.app.log_message(self.log_display, f"Re-selected {re_selected_count} failed applicants.")
+        self._update_jc_header_counters()
         messagebox.showinfo("Retry Failed", f"Re-selected {re_selected_count} failed applicants.\n\n"
                                              "Please fix any issues (like un-issued job cards) and then click 'Start Automation' to retry.")
 
@@ -1714,7 +1764,6 @@ class DemandTab(BaseAutomationTab):
         today = datetime.now().strftime('%d/%m/%Y'); date_to_set = today
         days_to_set = self.app.history_manager.get_suggestions("demand_days")[0] if self.app.history_manager.get_suggestions("demand_days") else "14"
         work_key_to_set = ""
-        demand_to_date_set = ""
         
         if os.path.exists(self.config_file):
             try:
@@ -1722,7 +1771,6 @@ class DemandTab(BaseAutomationTab):
                 self.state_combobox.set(data.get('state', '')); self.panchayat_entry.insert(0, data.get('panchayat', ''))
                 days_to_set = data.get('days', days_to_set)
                 work_key_to_set = data.get('work_key_for_allocation', '')
-                demand_to_date_set = data.get('demand_to_date', '')
                 
                 loaded = data.get('demand_date', '');
                 try: datetime.strptime(loaded, '%d/%m/%Y'); date_to_set = loaded
@@ -1732,10 +1780,6 @@ class DemandTab(BaseAutomationTab):
         # --- FIX: Use delete/insert ---
         self.demand_date_entry.delete(0, "end")
         self.demand_date_entry.insert(0, date_to_set)
-        
-        self.demand_to_date_entry.delete(0, "end")
-        if demand_to_date_set:
-             self.demand_to_date_entry.insert(0, demand_to_date_set)
         # ------------------------------
         
         self.days_entry.delete(0, 'end')
@@ -1745,19 +1789,16 @@ class DemandTab(BaseAutomationTab):
         self.allocation_work_key_entry.insert(0, work_key_to_set)
 
     def _clear_selection(self):
-        """
-        Clears the current selection of all applicants.
-        """
-        if not any(a.get('_selected', False) for a in self.all_applicants_data): self.app.log_message(self.log_display, "No selection.", "info"); return
-        # Update master data
-        for a in self.all_applicants_data: a['_selected'] = False
-        # Update visible checkboxes
-        for w in self.displayed_checkboxes:
-             if isinstance(w, ctk.CTkCheckBox) and w.get() == "on": w.deselect()
-        self._update_selection_summary(); self.app.log_message(self.log_display, "Selection cleared.")
-        
-        # Force re-evaluation of button visibility using the main update function
-        self._update_applicant_display()
+        """Clears the current selection of all applicants."""
+        if not any(a.get('_selected', False) for a in self.all_applicants_data):
+            self.app.log_message(self.log_display, "No selection.", "info")
+            return
+        for a in self.all_applicants_data:
+            a['_selected'] = False
+        self._refresh_selected_jc_panel()
+        self._refresh_search_results()
+        self._update_selection_summary()
+        self.app.log_message(self.log_display, "Selection cleared.")
 
 
     def _on_format_change(self, selected_format):

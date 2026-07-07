@@ -124,6 +124,7 @@ class AutocompleteEntry(ctk.CTkEntry):
             self._suggestion_toplevel.wm_geometry(f"{w}x{len(suggestions)*30}+{x}+{y}")
             self._suggestion_toplevel.deiconify()
             self._suggestion_toplevel.lift()
+            self._suggestion_toplevel.attributes("-topmost", True)
         except: return
 
         self._active_suggestion_index = -1

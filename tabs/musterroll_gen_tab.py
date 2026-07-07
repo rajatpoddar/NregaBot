@@ -58,7 +58,7 @@ class MusterrollGenTab(BaseAutomationTab):
         self.panchayat_entry.grid(row=0, column=1, columnspan=3, sticky='ew', padx=15, pady=(15,0))
         self.panchayat_entry.bind("<KeyRelease>", self._on_panchayat_change_debounced, add="+")
         
-        ctk.CTkLabel(controls_frame, text="Note: Must exactly match the name on the NREGA website.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky='w', padx=15, pady=(0,10))
+        ctk.CTkLabel(controls_frame, text="Note: Must exactly match the name on the VB-G-RAM-G portal.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky='w', padx=15, pady=(0,10))
         
         # --- Start Date ---
         ctk.CTkLabel(controls_frame, text="तारीख से (DD/MM/YYYY):").grid(row=2, column=0, sticky='w', padx=15, pady=5)
@@ -956,6 +956,40 @@ class MusterrollGenTab(BaseAutomationTab):
                     "head.appendChild(style);"
                 )
 
+            # --- Fix: Remove blank page caused by website update ---
+            self.app.log_message(self.log_display, "   - Removing blank page elements...")
+            driver.execute_script("""
+                // 1. Inject print CSS to suppress all known blank-page causes
+                var styleTag = document.createElement('style');
+                styleTag.innerHTML = `
+                    @media print {
+                        * { page-break-after: auto !important; page-break-before: auto !important; break-after: auto !important; break-before: auto !important; }
+                        body::after { display: none !important; content: none !important; }
+                    }
+                `;
+                document.head.appendChild(styleTag);
+
+                // 2. Remove trailing empty block elements from body
+                var bodyChildren = Array.from(document.body.children);
+                for (var i = bodyChildren.length - 1; i >= 0; i--) {
+                    var el = bodyChildren[i];
+                    if (el.innerText.trim() === '' && el.querySelectorAll('img, input, table, iframe, canvas, video').length === 0) {
+                        el.parentNode.removeChild(el);
+                    } else {
+                        break; // stop at first non-empty element from the end
+                    }
+                }
+
+                // 3. Force remove page-break-after on ALL elements
+                var allEls = document.querySelectorAll('*');
+                allEls.forEach(function(el) {
+                    el.style.pageBreakAfter = 'auto';
+                    el.style.pageBreakBefore = 'auto';
+                    el.style.breakAfter = 'auto';
+                    el.style.breakBefore = 'auto';
+                });
+            """)
+
             if self.app.active_browser == 'firefox':
                 # Firefox: Inject a fixed div using JavaScript
                 footer_js = """
@@ -979,23 +1013,32 @@ class MusterrollGenTab(BaseAutomationTab):
 
             elif self.app.active_browser == 'chrome':
                 self.app.log_message(self.log_display, "   - Using Chrome's advanced print command (CDP)...")
-                
-                # Chrome: Use Native Footer Template (Best Quality)
-                footer_html = """
-                <div style="font-size: 9px; color: #d3d3d3; margin-right: 30px; margin-left: 30px; width: 100%; text-align: right; font-family: Helvetica, sans-serif;">
-                    NregaBot.com
-                </div>
-                """
-                
+
+                # Inject footer as a fixed-position element (avoids CDP footer causing extra blank page)
+                driver.execute_script("""
+                    var existing = document.getElementById('nregabot-footer');
+                    if (!existing) {
+                        var footer = document.createElement('div');
+                        footer.id = 'nregabot-footer';
+                        footer.innerText = 'NregaBot.com';
+                        footer.style.position = 'fixed';
+                        footer.style.bottom = '6px';
+                        footer.style.right = '10px';
+                        footer.style.fontSize = '9px';
+                        footer.style.color = '#d3d3d3';
+                        footer.style.fontFamily = 'Helvetica, sans-serif';
+                        footer.style.zIndex = '9999';
+                        document.body.appendChild(footer);
+                    }
+                """)
+
                 print_options = {
                     "landscape": is_landscape,
-                    "displayHeaderFooter": True,       # <-- Enable Header/Footer
-                    "headerTemplate": "<div></div>",   # <-- Empty Header
-                    "footerTemplate": footer_html,     # <-- Custom Footer
+                    "displayHeaderFooter": False,      # Disabled - footer injected via JS instead
                     "printBackground": False,
                     "scale": pdf_scale,
-                    "marginTop": 0.4, 
-                    "marginBottom": 0.5,               # <-- Increased slightly to fit footer
+                    "marginTop": 0.4,
+                    "marginBottom": 0.4,
                     "marginLeft": 0.4, "marginRight": 0.4
                 }
                 result = driver.execute_cdp_cmd("Page.printToPDF", print_options)

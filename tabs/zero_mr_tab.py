@@ -42,7 +42,7 @@ class ZeroMrTab(BaseAutomationTab):
                                                  app_instance=self.app,
                                                  history_key="panchayat_name")
         self.panchayat_entry.grid(row=1, column=1, columnspan=3, sticky='ew', padx=15, pady=5)
-        ctk.CTkLabel(controls_frame, text="Note: Must exactly match the name on the NREGA website.", text_color="gray50").grid(row=2, column=1, columnspan=3, sticky='w', padx=15, pady=(0,10))
+        ctk.CTkLabel(controls_frame, text="Note: Must exactly match the name on the VB-G-RAM-G portal.", text_color="gray50").grid(row=2, column=1, columnspan=3, sticky='w', padx=15, pady=(0,10))
 
         # --- Row 3: Action Buttons ---
         action_frame = self._create_action_buttons(parent_frame=controls_frame)
