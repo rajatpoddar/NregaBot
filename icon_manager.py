@@ -105,6 +105,8 @@ def load_icons():
     _add("emoji_issued_mr_report", "assets/icons/emojis/issued_mr_report.png", size=(16, 16))
     _add("emoji_ekyc_report", "assets/icons/emojis/ekyc_report.png", size=(16, 16))
     _add("emoji_social_audit", "assets/icons/emojis/social_audit.png", size=(16, 16))
+    # NMMS Attendance — reuse mis_reports icon (no dedicated icon file yet)
+    _add("emoji_nmms_attendance", "assets/icons/emojis/mis_reports.png", size=(16, 16))
     
     # 6. Smart Tools
     # FIX: Added Macro Manager Tool icon

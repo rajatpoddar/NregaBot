@@ -48,6 +48,13 @@ MUSTER_ROLL_CONFIG = {
     }
 }
 
+# Mate/Mistri (Skilled/Semi-Skilled) MR generation uses the same base URL
+# but selects the Skilled worker category checkbox and fills workers_per_mr.
+MATE_MR_CONFIG = {
+    "base_url": "https://vbgramgde2.dord.gov.in/vbgramg/preprintmsr.aspx",
+    "output_folder_name": "NREGABot_MateMR_Output",
+}
+
 MSR_CONFIG = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/msrpayment.aspx",
     "work_code_index": 1, "muster_roll_index": 1, "min_delay": 2, "max_delay": 6
@@ -175,6 +182,11 @@ REJECTED_WL_CONFIG = {
 # --- MR Tracking Configuration  ---
 MR_TRACKING_CONFIG = {
     "url": "https://vbgramgrep.dord.gov.in/VBGRAMG/dynamic_muster_track.aspx?lflag=eng&state_code=34&fin_year=2026-2027&state_name=JHARKHAND&Digest=J5TMmiE35cAOwcsR6vvJIA"
+}
+
+# --- NMMS Daily Attendance Configuration ---
+NMMS_ATTENDANCE_CONFIG = {
+    "base_url": "https://vbgramgrep.dord.gov.in/vbgramg/NMMS_DailyAttendance.aspx"
 }
 
 # --- MIS Reports Configuration ---

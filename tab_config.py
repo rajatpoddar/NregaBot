@@ -46,6 +46,8 @@ def get_tabs_definition(app):
     from tabs.material_entry_tab import MaterialEntryTab
     from tabs.delete_applicant_tab import DeleteApplicantTab
     from tabs.physical_complete_tab import PhysicalCompleteTab
+    from tabs.mate_mr_gen_tab import MateMrGenTab
+    from tabs.nmms_attendance_tab import NmmsAttendanceTab
 
     return {
         # 1. MR Related
@@ -54,6 +56,7 @@ def get_tabs_definition(app):
             # Ensure 'work_allocation.png' exists in assets/icons/emojis/
             "Work Allocation": {"creation_func": WorkAllocationTab, "icon": app.icon_images.get("emoji_work_allocation"), "key": "work_allocation"},
             "Muster Roll Gen": {"creation_func": MusterrollGenTab, "icon": app.icon_images.get("emoji_mr_gen"), "key": "mr_gen"},
+            "Mate/Mistri MR": {"creation_func": MateMrGenTab, "icon": app.icon_images.get("emoji_mr_gen"), "key": "mate_mr"},
             "MR Fill": {"creation_func": MrFillTab, "icon": app.icon_images.get("emoji_mr_fill"), "key": "mr_fill"},
             "MR Payment": {"creation_func": MsrTab, "icon": app.icon_images.get("emoji_mr_payment"), "key": "msr_payment"},
             "Gen Wagelist": {"creation_func": WagelistGenTab, "icon": app.icon_images.get("emoji_gen_wagelist"), "key": "wagelist_gen"},
@@ -102,6 +105,7 @@ def get_tabs_definition(app):
             "Issued MR Details": {"creation_func": IssuedMrReportTab, "icon": app.icon_images.get("emoji_issued_mr_report"), "key": "issued_mr_report"},
             "eKYC Report": {"creation_func": EKycReportTab, "icon": app.icon_images.get("emoji_ekyc_report"), "key": "ekyc_report"},
             "Social Audit Report": {"creation_func": SAReportTab, "icon": app.icon_images.get("emoji_social_audit"), "key": "social_audit_respond"},
+            "NMMS Attendance": {"creation_func": NmmsAttendanceTab, "icon": app.icon_images.get("emoji_nmms_attendance"), "key": "nmms_attendance"},
         },
 
         # 6. Smart Tool
