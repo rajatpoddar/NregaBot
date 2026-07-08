@@ -1,8 +1,8 @@
 ; NREGA Bot Inno Setup Script
-; Version 3.0.2
+; Version 3.0.3
 
 ; The build script will override this version. This is a fallback.
-#define AppVersion "3.0.2"
+#define AppVersion "3.0.3"
 #define AppName "NREGA Bot"
 #define AppPublisher "PoddarSolutions"
 #define AppURL "https://nregabot.com"

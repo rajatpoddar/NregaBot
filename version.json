@@ -1,15 +1,27 @@
 {
-  "latest_version": "3.0.2",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.2-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.2-macOS.dmg",
+  "latest_version": "3.0.3",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.3-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.3-macOS.dmg",
   "core_update": {
-    "version": "3.0.2",
-    "url": "https://nregabot.com/updates/core_v3.0.2.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.0.2.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.2.zip",
+    "version": "3.0.3",
+    "url": "https://nregabot.com/updates/core_v3.0.3.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.0.3.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.3.zip",
     "force_full_reinstall": false
   },
   "changelog": {
+    "3.0.3": [
+      "🚀 **New Feature (NMMS Daily Attendance):** Added a brand-new 'NMMS Attendance' tab under Reports. Automatically scrapes daily attendance data from the NMMS portal — including MR details, worker list, group photos, timestamps, and geo-coordinates.",
+      "📊 **NMMS Professional Excel Report:** Generates a multi-sheet Excel report with MR Summary, Workers Detail, and Block Overview — complete with header styling, zebra striping, and auto-sized columns.",
+      "📷 **NMMS Group Photo Download:** Automatically downloads Group Photo-1 and Photo-2 for each muster roll by clicking the 'large image' link on the portal. Photos are saved to a dated folder.",
+      "🔍 **NMMS Smart Scraping:** Scrapes the current browser page for panchayat list — no URL navigation needed. The portal is accessed entirely through browser clicks to avoid 'Access Denied' errors.",
+      "☑️ **NMMS Select All Panchayats:** Added a prominent 'Select All' button alongside 'Clear All' to instantly select or deselect all panchayats before starting.",
+      "🗑️ **NMMS Removed 'Open NMMS Page' Button:** The direct URL navigation button has been removed. Users now open the portal manually in their browser and navigate to the panchayat list before scraping.",
+      "📜 **NMMS Full Scroll Layout:** The entire NMMS tab is now wrapped in a scrollable frame so that reports, summary tables, and logs are always accessible regardless of window size.",
+      "🐞 **NMMS Fix — Header Row Skipped:** Fixed the '1 2 3 4 5' column-number row appearing in Block Overview and MR list. Rows where the panchayat or work code field is a plain digit are now filtered out.",
+      "🐞 **NMMS Fix — Timestamp Parsing:** Fixed Taken, Uploaded, Geo Co-ordinates, Taken By, and Designation not appearing in the Excel report. The previous parser was misidentifying timestamp colons (e.g. 09:00:47) as label separators. Replaced with a whitelist-based label parser that correctly handles multi-line cell text.",
+      "🐞 **NMMS Fix — Navigation:** Fixed browser navigation to use click-based flow throughout (no driver.get URL calls). Back button is used to return between pages, preventing 'Access Denied' on the government portal."
+    ],
     "3.0.2": [
       "🌐 **VB-G-RAM-G Portal Support:** NREGA Bot is now fully compatible with the new government portal — VB-G-RAM-G (vbgramgde2.dord.gov.in). All automations continue to work seamlessly on the renamed portal.",
       "🔄 **Portal Name Updated:** All in-app references, labels, and messages now correctly display 'VB-G-RAM-G portal' instead of the old name, so users always know which portal is being accessed.",

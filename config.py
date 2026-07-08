@@ -215,7 +215,7 @@ DEL_DEMAND_CONFIG = {
 
 MATERIAL_ENTRY_CONFIG = {
     # Replace with the exact base url used for material entry from your PO login
-    "url": "https://vbgramgde2.dord.gov.in/vbgramg/billdetail.aspx" 
+    "url": "https://nregade4.dord.gov.in/Netnrega/billdetail.aspx" 
 }
 
 # --- Delete Applicant Configuration ---

@@ -7,7 +7,6 @@ from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import time, os, re, json, requests, threading
 from datetime import datetime
-from urllib.parse import urlencode, urlparse, parse_qs
 
 import pandas as pd  # type: ignore
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side  # type: ignore
@@ -21,19 +20,18 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 from .base_tab import BaseAutomationTab
 
 # ---------------------------------------------------------------------------
-NMMS_BASE_URL = "https://vbgramgrep.dord.gov.in/vbgramg/NMMS_DailyAttendance.aspx"
+NMMS_BASE_URL = "https://vbgramgrep.dord.gov.in/vbgramg/NMMS_DailyAttendance.aspx"  # kept for photo URL resolution
 
 
 class NmmsAttendanceTab(BaseAutomationTab):
     """
     NMMS Daily Attendance scraper.
     Flow:
-      1. 'Open NMMS Page' → opens portal in connected browser
-      2. User selects State/Date/Block in browser → panchayat list appears
-      3. 'Scrape Current Page' → reads the panchayat table already on screen
-      4. User selects panchayats → Start
-      5. For each panchayat: click MR link → scrape MR list → scrape each MR detail
-      6. Export professional Excel report
+      1. User manually opens NMMS portal in browser, selects State/Date/Block → panchayat list appears
+      2. 'Scrape Current Page' → reads the panchayat table already on screen
+      3. User selects panchayats → Start
+      4. For each panchayat: click MR link → scrape MR list → click each MR link → scrape detail
+      5. Export professional Excel report
     """
 
     SUMMARY_HEADERS = [
@@ -54,7 +52,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
         super().__init__(parent, app_instance, automation_key="nmms_attendance")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)   # full tab is the scrollable area
         self._panchayat_data: list = []
         self._config_file = self.app.get_data_path("nmms_inputs.json")
         self._create_widgets()
@@ -64,16 +62,23 @@ class NmmsAttendanceTab(BaseAutomationTab):
     # UI
     # -----------------------------------------------------------------------
     def _create_widgets(self):
-        top = ctk.CTkFrame(self)
+        # ── Outer scrollable wrapper so the entire tab scrolls ──────────────
+        outer_scroll = ctk.CTkScrollableFrame(self)
+        outer_scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        outer_scroll.grid_columnconfigure(0, weight=1)
+        # Make rows expand so the notebook fills remaining space
+        outer_scroll.grid_rowconfigure(1, weight=1)
+
+        top = ctk.CTkFrame(outer_scroll)
         top.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         top.grid_columnconfigure(0, weight=1)
 
         # Instructions
         instr = (
-            "STEPS:  1. Click 'Open NMMS Page' — portal opens in your browser.  "
-            "2. In browser: select State, Attendance Date, Block and click Go.  "
-            "3. Come back here and click 'Scrape Current Page'.  "
-            "4. Select panchayats and click ▶ Start."
+            "STEPS:  1. In browser: manually open the NMMS portal, select State, "
+            "Attendance Date, Block and click Go.  "
+            "2. Come back here and click 'Scrape Current Page'.  "
+            "3. Select panchayats and click ▶ Start."
         )
         ctk.CTkLabel(top, text=instr, justify="left", wraplength=950,
                      fg_color=("gray90", "#2A2A2A"), corner_radius=8,
@@ -82,11 +87,6 @@ class NmmsAttendanceTab(BaseAutomationTab):
         # Button row
         btn_row = ctk.CTkFrame(top, fg_color="transparent")
         btn_row.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 4))
-
-        self._open_btn = ctk.CTkButton(
-            btn_row, text="🌐 Open NMMS Page", width=175,
-            fg_color="#1565C0", hover_color="#0D47A1", command=self._open_nmms_page)
-        self._open_btn.pack(side="left", padx=(0, 8))
 
         self._scrape_btn = ctk.CTkButton(
             btn_row, text="🔍 Scrape Current Page", width=190,
@@ -105,7 +105,9 @@ class NmmsAttendanceTab(BaseAutomationTab):
         pan_hdr = ctk.CTkFrame(pan_outer, fg_color="transparent")
         pan_hdr.grid(row=0, column=0, sticky="ew")
         ctk.CTkLabel(pan_hdr, text="Select Panchayats:", font=ctk.CTkFont(weight="bold")).pack(side="left")
-        ctk.CTkButton(pan_hdr, text="Select All", width=90, command=self._select_all).pack(side="right", padx=(4, 0))
+        ctk.CTkButton(pan_hdr, text="Select All", width=100,
+                      fg_color="#1565C0", hover_color="#0D47A1",
+                      command=self._select_all).pack(side="right", padx=(4, 0))
         ctk.CTkButton(pan_hdr, text="Clear All", width=90, command=self._clear_all).pack(side="right")
 
         self._pan_scroll = ctk.CTkScrollableFrame(pan_outer, height=120)
@@ -114,14 +116,14 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         self._pan_info_lbl = ctk.CTkLabel(
             pan_outer, text_color="gray50", justify="left", wraplength=950,
-            text="No panchayats loaded. Open the NMMS page, navigate to panchayat list, then click 'Scrape Current Page'.")
+            text="No panchayats loaded. Navigate to panchayat list in browser, then click 'Scrape Current Page'.")
         self._pan_info_lbl.grid(row=2, column=0, sticky="w", pady=(2, 2))
 
         # Start / Stop / Retry / Reset buttons
         self._create_action_buttons(parent_frame=top).grid(row=3, column=0, pady=(8, 10))
 
-        # Bottom notebook
-        nb = ctk.CTkTabview(self)
+        # Bottom notebook — placed inside the scrollable wrapper
+        nb = ctk.CTkTabview(outer_scroll)
         nb.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self._build_summary_tab(nb.add("MR Summary"))
         self._build_workers_tab(nb.add("Workers Detail"))
@@ -214,7 +216,6 @@ class NmmsAttendanceTab(BaseAutomationTab):
     def set_ui_state(self, running: bool):
         self.set_common_ui_state(running)
         s = "disabled" if running else "normal"
-        self._open_btn.configure(state=s)
         self._scrape_btn.configure(state=s)
 
     def reset_ui(self):
@@ -229,24 +230,6 @@ class NmmsAttendanceTab(BaseAutomationTab):
                 "Browser Not Connected",
                 "No browser found.\n\nPlease launch Chrome/Edge from the app and log in to NREGA portal first.")
         return driver
-
-    # -----------------------------------------------------------------------
-    # PHASE 1 — OPEN PAGE
-    # -----------------------------------------------------------------------
-    def _open_nmms_page(self):
-        driver = self._get_driver()
-        if not driver:
-            return
-        try:
-            driver.get(NMMS_BASE_URL)
-            self.app.log_message(
-                self.log_display,
-                "NMMS page opened in browser.\n"
-                "Please select State, Attendance Date and Block, then click Go.\n"
-                "Once the panchayat list appears, come back and click 'Scrape Current Page'.",
-                "info")
-        except WebDriverException as e:
-            messagebox.showerror("Browser Error", f"Could not open NMMS page:\n{e}")
 
     # -----------------------------------------------------------------------
     # PHASE 2 — SCRAPE CURRENT PAGE
@@ -286,7 +269,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     if not sno.isdigit():
                         continue
                     pan = cells[1].text.strip()
-                    if not pan or pan.lower() == "total":
+                    # Skip if panchayat cell is empty, "total", or is just a number (column-number header row)
+                    if not pan or pan.lower() == "total" or pan.isdigit():
                         continue
                     no_works   = cells[2].text.strip() if len(cells) > 2 else ""
                     no_mr      = cells[3].text.strip() if len(cells) > 3 else ""
@@ -374,23 +358,29 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     self.app.log_message(self.log_display, f"  ⚠ No data for '{pan_name}'", "warning")
                     continue
 
-                # Return to page 1 if needed
-                if driver.current_url != page1_url:
-                    driver.get(page1_url)
-                    time.sleep(2)
-
                 mr_rows = self._click_and_scrape_mr_list(pan_info, driver, pan_name)
                 if not mr_rows:
                     self.app.log_message(self.log_display, f"  No MRs found for {pan_name}.", "warning")
+                    # Go back to panchayat list if we navigated away
+                    if driver.current_url != page1_url:
+                        driver.back()
+                        time.sleep(2)
                     continue
 
                 self.app.log_message(self.log_display, f"  {len(mr_rows)} MR(s) found.")
+                # At this point driver is on MR list page for this panchayat
+                mr_list_url = driver.current_url
 
                 for mr_info in mr_rows:
                     if self.app.stop_events[self.automation_key].is_set():
                         break
                     summary_sno += 1
+                    # Ensure we're on MR list page before clicking MR detail
+                    if driver.current_url != mr_list_url:
+                        driver.get(mr_list_url)
+                        time.sleep(2)
                     detail = self._scrape_mr_detail(mr_info, driver, pan_name, photos_dir)
+                    # _scrape_mr_detail does driver.back() → returns to MR list page
 
                     srow = (summary_sno, pan_name,
                             mr_info.get("work_code",""), mr_info.get("msr_no",""),
@@ -411,6 +401,11 @@ class NmmsAttendanceTab(BaseAutomationTab):
                                 w.get("gender",""), w.get("date",""), w.get("status",""))
                         self.app.after(0, lambda r=wrow: self.workers_tree.insert("", "end", values=r))
 
+                # After all MRs for this panchayat: go back to panchayat list
+                if driver.current_url != page1_url:
+                    driver.back()
+                    time.sleep(2)
+
             self.app.after(0, self.update_status, "Completed!", 1.0)
             self.app.log_message(self.log_display, f"Done! {summary_sno} MR(s) scraped.", "success")
             cnt = summary_sno
@@ -428,20 +423,23 @@ class NmmsAttendanceTab(BaseAutomationTab):
     # SCRAPING HELPERS
     # -----------------------------------------------------------------------
     def _click_and_scrape_mr_list(self, pan_info: dict, driver, pan_name: str) -> list:
-        """Navigate to MR list page using saved href, scrape MR rows."""
+        """Navigate to MR list page by clicking the link (not via URL), then scrape MR rows."""
         mr_rows = []
         try:
-            href = pan_info.get("mr_href", "")
-            if href:
-                self.app.log_message(self.log_display, f"  MR list: {href[:80]}")
-                driver.get(href)
-            else:
-                # Fallback: find link by panchayat name on current page
-                self.app.log_message(self.log_display, f"  No href, searching link for '{pan_name}'...", "warning")
+            # Always click the link on the current page — never use driver.get(href)
+            self.app.log_message(self.log_display, f"  Clicking MR link for '{pan_name}'...")
+            try:
+                link = driver.find_element(
+                    By.XPATH,
+                    f"//tr[td[normalize-space()='{pan_name}']]//td[4]//a"
+                )
+                link.click()
+            except NoSuchElementException:
+                # Fallback: find any link in a row containing pan_name
                 try:
                     link = driver.find_element(
                         By.XPATH,
-                        f"//tr[td[normalize-space()='{pan_name}']]//td[4]//a"
+                        f"//tr[td[contains(normalize-space(),'{pan_name}')]]//a"
                     )
                     link.click()
                 except NoSuchElementException:
@@ -462,11 +460,18 @@ class NmmsAttendanceTab(BaseAutomationTab):
                 if len(cells) < 6:
                     continue
                 try:
-                    if not cells[0].text.strip().isdigit():
+                    sno_text = cells[0].text.strip()
+                    if not sno_text.isdigit():
                         continue
                     work_code  = cells[4].text.strip()
                     msr_cell   = cells[5]
                     msr_no     = msr_cell.text.strip()
+                    # Skip column-number header rows (work_code is a plain digit like "5")
+                    if work_code.isdigit() and not msr_no or msr_no.isdigit() and len(msr_no) <= 2:
+                        continue
+                    # Skip if work_code looks like a column number (single digit, no slash)
+                    if work_code.isdigit() and "/" not in work_code:
+                        continue
                     persondays = cells[6].text.strip() if len(cells) > 6 else ""
                     detail_href = ""
                     try:
@@ -482,7 +487,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         return mr_rows
 
     def _scrape_mr_detail(self, mr_info: dict, driver, pan_name: str, photos_dir: str) -> dict:
-        """Navigate to MR detail page, scrape photo info + worker table."""
+        """Navigate to MR detail page by clicking the link, scrape photo info + worker table."""
         detail = {
             "work_name": "",
             "photo1_taken": "", "photo1_uploaded": "", "photo1_geo": "",
@@ -491,43 +496,84 @@ class NmmsAttendanceTab(BaseAutomationTab):
             "worker_count": "0", "workers": [],
             "photo1_saved": "No", "photo2_saved": "No",
         }
-        href = mr_info.get("detail_href", "")
-        if not href:
-            self.app.log_message(self.log_display,
-                f"    ⚠ No detail href for MR {mr_info.get('msr_no','?')}", "warning")
+        msr_no = mr_info.get("msr_no", "")
+        if not msr_no:
+            self.app.log_message(self.log_display, "    ⚠ No MSR no for this row.", "warning")
             return detail
 
         try:
             self.app.log_message(self.log_display,
-                f"    MR {mr_info['msr_no']} | {mr_info['work_code']}")
-            driver.get(href)
+                f"    MR {msr_no} | {mr_info.get('work_code','')}")
+            # Click the link instead of navigating via URL
+            try:
+                link = driver.find_element(
+                    By.XPATH,
+                    f"//a[normalize-space()='{msr_no}']"
+                )
+                link.click()
+            except NoSuchElementException:
+                # Fallback: find link in row containing this msr_no
+                try:
+                    link = driver.find_element(
+                        By.XPATH,
+                        f"//tr[td[normalize-space()='{msr_no}']]//a"
+                    )
+                    link.click()
+                except NoSuchElementException:
+                    self.app.log_message(self.log_display,
+                        f"    ⚠ Could not find clickable link for MR {msr_no}.", "warning")
+                    return detail
             time.sleep(2)
             page_src = driver.page_source
 
-            # Work Name
+            # Work Name — from the page heading area
             try:
-                wn = driver.find_element(By.XPATH,
-                    "//*[contains(translate(text(),'WORKNAME ','workname '),'work name')]/following::td[1]")
-                detail["work_name"] = wn.text.strip()
+                # The page shows "Work Name : <name>" in a dedicated paragraph/td
+                wn_el = driver.find_element(
+                    By.XPATH,
+                    "//p[contains(.,'Work Name')] | //td[contains(.,'Work Name') and not(contains(.,'Work Code'))]"
+                )
+                wn_text = wn_el.text
+                detail["work_name"] = self._extract_field(wn_text, ["Work Name"])
             except NoSuchElementException:
-                detail["work_name"] = self._re(page_src, r"Work Name[^:]*:\s*([^\n<]{3,100})")
+                detail["work_name"] = self._extract_field(page_src, ["Work Name"])
+
+            if not detail["work_name"]:
+                # Try regex directly on page source
+                m = re.search(
+                    r'Work\s+Name\s*:?\s*<[^>]*>\s*([^<\r\n]{5,})',
+                    page_src, re.IGNORECASE
+                )
+                if m:
+                    detail["work_name"] = m.group(1).strip()
 
             # Photo info blocks
             self._extract_photo_info(driver, page_src, 1, detail)
             self._extract_photo_info(driver, page_src, 2, detail)
+            
+            # Log photo info extraction status
+            p1_ok = bool(detail.get("photo1_taken") or detail.get("photo1_uploaded"))
+            p2_ok = bool(detail.get("photo2_taken") or detail.get("photo2_uploaded"))
+            if p1_ok:
+                self.app.log_message(self.log_display, 
+                    f"      Photo-1: {detail.get('photo1_taken','')} | By: {detail.get('taken_by','')}")
+            else:
+                self.app.log_message(self.log_display, "      ⚠ Photo-1 info not found", "warning")
+            if p2_ok:
+                self.app.log_message(self.log_display, 
+                    f"      Photo-2: {detail.get('photo2_taken','')}")
 
             # Photos download
             if self._save_photos_var.get():
                 detail["photo1_saved"] = self._download_photo(1, pan_name, mr_info, photos_dir, driver)
                 detail["photo2_saved"] = self._download_photo(2, pan_name, mr_info, photos_dir, driver)
 
-            # Worker table
+            # Worker table — HTML uses <th> headers: S.No, Job Card No, Worker Name(Gender), Attendance Date, Present/Absent
             workers = []
-            # Try table with Job Card header first
             w_rows = driver.find_elements(By.XPATH,
-                "//table[.//th[contains(text(),'Job Card')] or "
-                ".//td[contains(text(),'Job Card No')]]//tr[position()>1]")
+                "//table[.//th[contains(normalize-space(),'Job Card')]]//tr[td]")
             if not w_rows:
+                # Fallback: any table row with 5+ tds and first cell is a number
                 w_rows = driver.find_elements(By.XPATH, "//table//tr[count(td)>=5]")
 
             for wr in w_rows:
@@ -549,49 +595,221 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
             detail["workers"]      = workers
             detail["worker_count"] = str(len(workers))
+            
+            if workers:
+                self.app.log_message(self.log_display, f"      Workers: {len(workers)}")
+            else:
+                self.app.log_message(self.log_display, "      ⚠ No workers found!", "warning")
+
+            # Go back to MR list page via browser back button
+            driver.back()
+            time.sleep(1.5)
 
         except Exception as e:
             self.app.log_message(self.log_display, f"    Detail error: {e}", "error")
+            try:
+                driver.back()
+                time.sleep(1.5)
+            except Exception:
+                pass
         return detail
 
     def _extract_photo_info(self, driver, page_src: str, photo_no: int, detail: dict):
-        """Extract timestamp / geo / taken-by for a photo block. Writes into detail dict."""
-        pkey = f"photo{photo_no}_"
-        try:
-            block = driver.find_element(By.XPATH,
-                f"//td[contains(.,'Timestamp for Photo-{photo_no}')]"
-                f"/ancestor::table[1]")
-            detail[f"{pkey}taken"]    = self._field(block, ["Taken"])
-            detail[f"{pkey}uploaded"] = self._field(block, ["Uploaded"])
-            detail[f"{pkey}geo"]      = self._field(block, ["Geo Co-ordinates", "Geo"])
-            if photo_no == 1:
-                detail["taken_by"]    = self._field(block, ["Taken by", "Taken By"])
-                detail["designation"] = self._field(block, ["Designation"])
-        except NoSuchElementException:
-            if photo_no == 1:
-                detail[f"{pkey}taken"]    = self._re(page_src, r"Taken\s*:\s*([^\|<\n]{5,45})")
-                detail[f"{pkey}uploaded"] = self._re(page_src, r"Uploaded\s*:\s*([^\|<\n]{5,45})")
-                detail[f"{pkey}geo"]      = self._re(page_src, r"Geo Co-ordinates\s*:\s*([\d.,\- ]+)")
-                detail["taken_by"]        = self._re(page_src, r"Taken by\s*:\s*([A-Za-z ]{3,50})")
-                detail["designation"]     = self._re(page_src, r"Designation\s*:\s*([^\n<]{3,60})")
-            # Photo 2 not uploaded is normal — no warning
+        """
+        Extract timestamp / geo / taken-by for a photo block.
 
-    def _field(self, block_elem, labels: list) -> str:
-        """Extract a labelled field value from a table block element."""
+        NMMS page layout has two side-by-side <td> blocks per photo:
+          Left td  → "Uploaded Group Photo-N" (image)
+          Right td → "Timestamp for Photo-N"
+                       Taken : <date>
+                       Uploaded : <date>
+                       Geo Co-ordinates: <lat,lng>
+                       Taken by: <name>
+                       Designation: <desig>
+
+        Strategy (most-to-least reliable):
+          1. Find the td that contains "Timestamp for Photo-N" and collect ALL
+             label/value tr rows inside it (sibling tds in the same timestamp table).
+          2. If that fails, look for individual label cells anywhere on the page.
+          3. Fall back to regex on raw HTML source.
+        """
+        pkey = f"photo{photo_no}_"
+
+        # ── Strategy 1: find the timestamp block container ──────────────────
+        # The page wraps "Timestamp for Photo-N" + all its rows in one <td>.
+        # We collect all text rows from that container.
+        block_text = ""
         try:
-            tds = block_elem.find_elements(By.TAG_NAME, "td")
-            for i, td in enumerate(tds):
-                txt = td.text.strip()
-                if any(lb.lower() in txt.lower() for lb in labels):
-                    if i + 1 < len(tds):
-                        val = tds[i + 1].text.strip()
-                        if val and not any(lb.lower() in val.lower()
-                                           for lb in ["taken", "uploaded", "geo", "designation"]):
-                            return val
-                    if ":" in txt:
-                        return txt.split(":", 1)[1].strip()
-        except Exception:
+            # The container td has "Timestamp for Photo-N" as a heading inside it
+            ts_td = driver.find_element(
+                By.XPATH,
+                f"//td[.//text()[contains(normalize-space(.), 'Timestamp for Photo-{photo_no}')]]"
+            )
+            block_text = ts_td.get_attribute("innerText") or ts_td.text
+        except NoSuchElementException:
             pass
+
+        # ── Strategy 2: try individual label cells (when each row is a <tr>) ─
+        if not block_text:
+            try:
+                # Build block text by collecting rows after "Timestamp for Photo-N" heading
+                rows = driver.find_elements(
+                    By.XPATH,
+                    f"//tr[.//td[contains(normalize-space(.), 'Timestamp for Photo-{photo_no}')]]"
+                    f"/following-sibling::tr[position()<=6]"
+                )
+                parts = []
+                for r in rows:
+                    parts.append(r.text)
+                if parts:
+                    block_text = "\n".join(parts)
+            except Exception:
+                pass
+
+        # ── Strategy 3: regex carve-out from raw HTML ───────────────────────
+        if not block_text:
+            m = re.search(
+                rf"Timestamp for Photo-{photo_no}(.{{0,1500}}?)"
+                rf"(?:Timestamp for Photo-\d|S\.No|Job Card|Last Updated|$)",
+                page_src, re.IGNORECASE | re.DOTALL
+            )
+            if m:
+                block_text = re.sub(r'<[^>]+>', ' ', m.group(0))
+                block_text = re.sub(r'&nbsp;', ' ', block_text)
+                block_text = re.sub(r'\s{2,}', ' ', block_text)
+
+        if not block_text:
+            # Photo 2 may legitimately be absent — mark accordingly
+            if photo_no == 2:
+                detail["photo2_taken"]    = "Not Uploaded"
+                detail["photo2_uploaded"] = "Not Uploaded"
+                detail["photo2_geo"]      = ""
+            return
+
+        # ── Parse collected text block ───────────────────────────────────────
+        fields = self._parse_label_value_block(block_text)
+
+        detail[f"{pkey}taken"]    = fields.get("taken", "")
+        detail[f"{pkey}uploaded"] = fields.get("uploaded", "")
+        detail[f"{pkey}geo"]      = (fields.get("geo co-ordinates")
+                                     or fields.get("geo coordinates")
+                                     or fields.get("geo", ""))
+        if photo_no == 1:
+            detail["taken_by"]    = fields.get("taken by", "")
+            detail["designation"] = fields.get("designation", "")
+
+        # If we got a block but parsing returned nothing, do a direct line scan
+        if not any([detail[f"{pkey}taken"], detail[f"{pkey}uploaded"], detail[f"{pkey}geo"]]):
+            self._extract_photo_info_direct(block_text, photo_no, detail)
+
+    def _extract_photo_info_direct(self, block_text: str, photo_no: int, detail: dict):
+        """
+        Fallback direct-scan parser: searches each known pattern directly with regex.
+        Used when _parse_label_value_block returns nothing useful.
+        """
+        pkey = f"photo{photo_no}_"
+        text = block_text
+
+        # Taken timestamp: "Taken : 07 Jul 2026 05:32:34:000"
+        m = re.search(r'Taken\s*:\s*([^\n\r]+)', text, re.IGNORECASE)
+        if m:
+            val = m.group(1).strip()
+            # Avoid matching "Taken by"
+            if not re.match(r'by', val, re.IGNORECASE):
+                detail[f"{pkey}taken"] = val
+
+        # Uploaded timestamp
+        m = re.search(r'Uploaded\s*:\s*([^\n\r]+)', text, re.IGNORECASE)
+        if m:
+            detail[f"{pkey}uploaded"] = m.group(1).strip()
+
+        # Geo Coordinates
+        m = re.search(r'Geo[\s\w-]*:\s*([-\d.,\s]+)', text, re.IGNORECASE)
+        if m:
+            detail[f"{pkey}geo"] = m.group(1).strip().rstrip(",")
+
+        if photo_no == 1:
+            # Taken by
+            m = re.search(r'Taken\s+[Bb]y\s*:\s*([^\n\r]+)', text, re.IGNORECASE)
+            if m:
+                detail["taken_by"] = m.group(1).strip()
+            # Designation
+            m = re.search(r'Designation\s*:\s*([^\n\r]+)', text, re.IGNORECASE)
+            if m:
+                detail["designation"] = m.group(1).strip()
+
+    def _parse_label_value_block(self, text: str) -> dict:
+        """
+        Parse a block of text with 'Label : value' or 'Label :\nvalue' patterns.
+        Returns a dict of {lowercased_label: value}.
+
+        Uses a whitelist of known labels to avoid misinterpreting timestamp colons
+        (e.g., '09:00:47:000') as label-value separators.
+
+        IMPORTANT: More-specific labels (e.g. 'taken by') must come before
+        less-specific ones ('taken') so the longer match wins.
+        """
+        KNOWN_LABELS = [
+            'timestamp for photo-1', 'timestamp for photo-2',
+            'taken by',      # ← must come BEFORE 'taken'
+            'taken',
+            'uploaded',
+            'geo co-ordinates', 'geo coordinates', 'geo',
+            'designation', 'work name', 'work code', 'msr no',
+        ]
+
+        def is_label_line(line):
+            """Return the matched label or None."""
+            line_lower = line.lower().strip()
+            for lbl in KNOWN_LABELS:
+                if re.match(rf'^{re.escape(lbl)}\s*:?\s*', line_lower):
+                    return lbl
+            return None
+
+        result = {}
+        lines = [ln.strip() for ln in text.replace('\t', ' ').splitlines()]
+        lines = [ln for ln in lines if ln]  # remove empty
+
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            lbl = is_label_line(line)
+            if lbl is not None:
+                # Extract value from same line after colon
+                m = re.match(rf'^{re.escape(lbl)}\s*:+\s*(.*)', line, re.IGNORECASE)
+                value = m.group(1).strip() if m else ''
+
+                # If value empty, check next line
+                if not value and i + 1 < len(lines):
+                    next_lbl = is_label_line(lines[i + 1])
+                    if next_lbl is None:  # next line is value, not label
+                        value = lines[i + 1].strip()
+                        i += 1  # consume the value line
+
+                if value:
+                    result[lbl] = value
+            i += 1
+
+        return result
+
+    def _extract_field(self, text: str, labels: list) -> str:
+        """Simple regex field extractor — used for Work Name and other single fields."""
+        for label in labels:
+            escaped = re.escape(label.rstrip(": "))
+            # Same line: "Label : value" or "Label: value"
+            m = re.search(rf"{escaped}\s*:+\s*(.+)", text, re.IGNORECASE)
+            if m:
+                val = re.sub(r'<[^>]+>', '', m.group(1)).strip()
+                val = re.sub(r'\s+', ' ', val)
+                if val:
+                    return val
+            # Next line: "Label :\nvalue"
+            m = re.search(rf"{escaped}\s*:+\s*[\r\n]+\s*(.+)", text, re.IGNORECASE)
+            if m:
+                val = re.sub(r'<[^>]+>', '', m.group(1)).strip()
+                val = re.sub(r'\s+', ' ', val)
+                if val:
+                    return val
         return ""
 
     def _re(self, html: str, pattern: str) -> str:
@@ -600,46 +818,71 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
     def _download_photo(self, photo_no: int, pan_name: str,
                         mr_info: dict, photos_dir: str, driver) -> str:
-        """Download a group photo using the browser's session cookies."""
+        """
+        Download a group photo via the 'Click here for large image' link.
+        HTML structure: <a href="ShowImage.aspx?...">Click here for large image</a>
+        This link is inside "Uploaded Group Photo-{N}" section.
+        """
         try:
-            # Find img by id pattern
-            imgs = driver.find_elements(By.XPATH,
-                f"//img[contains(@id,'Photo{photo_no}') or contains(@id,'photo{photo_no}') "
-                f"or contains(@id,'Img{photo_no}') or contains(@id,'img{photo_no}')]")
-            if not imgs:
-                all_imgs = driver.find_elements(By.TAG_NAME, "img")
-                cands = [i for i in all_imgs
-                         if any(k in (i.get_attribute("src") or "").lower()
-                                for k in ("photo", "grp", "group", "attendance"))]
-                if photo_no <= len(cands):
-                    imgs = [cands[photo_no - 1]]
-                else:
-                    return "Not Uploaded"
+            photo_src = ""
 
-            src = imgs[0].get_attribute("src") if imgs else ""
-            if not src or any(s in src.lower() for s in ("spacer", "blank", "1x1")):
+            # Find all "Click here for large image" anchors on the page
+            anchors = driver.find_elements(
+                By.XPATH,
+                "//a[contains(normalize-space(.),'large image') or contains(normalize-space(.),'Large Image') or contains(normalize-space(.),'large Image')]"
+            )
+            if len(anchors) >= photo_no:
+                href = anchors[photo_no - 1].get_attribute("href") or ""
+                if href and not href.startswith("javascript"):
+                    photo_src = href
+
+            # Fallback: any anchor whose href contains ShowImage or photo keyword
+            if not photo_src:
+                all_anchors = driver.find_elements(By.TAG_NAME, "a")
+                photo_anchors = [
+                    a for a in all_anchors
+                    if any(k in (a.get_attribute("href") or "").lower()
+                           for k in ("showimage", "photo", "grpphoto", "nmmsphoto"))
+                ]
+                if len(photo_anchors) >= photo_no:
+                    photo_src = photo_anchors[photo_no - 1].get_attribute("href") or ""
+
+            if not photo_src:
                 return "Not Uploaded"
 
-            # Ensure absolute URL
-            if src.startswith("//"):
-                src = "https:" + src
-            elif not src.startswith("http"):
-                src = NMMS_BASE_URL.rsplit("/", 1)[0] + "/" + src.lstrip("/")
+            # Resolve relative URLs
+            if photo_src.startswith("//"):
+                photo_src = "https:" + photo_src
+            elif not photo_src.startswith("http"):
+                base = NMMS_BASE_URL.rsplit("/", 1)[0]
+                photo_src = base + "/" + photo_src.lstrip("/")
 
+            # Build filename and download
             safe_pan = re.sub(r'[\\/*?:"<>|]', "_", pan_name)
             safe_wc  = re.sub(r'[\\/*?:"<>|/]', "_", mr_info.get("work_code", "WC"))
-            fname    = f"{safe_pan}_MR{mr_info.get('msr_no','0')}_{safe_wc}_Photo{photo_no}.jpg"
-            path     = os.path.join(photos_dir, fname)
+            ext      = os.path.splitext(photo_src.split("?")[0])[-1]
+            if not ext or len(ext) > 5:
+                ext = ".jpg"
+            fname = f"{safe_pan}_MR{mr_info.get('msr_no','0')}_{safe_wc}_Photo{photo_no}{ext}"
+            path  = os.path.join(photos_dir, fname)
 
-            cookies  = {c["name"]: c["value"] for c in driver.get_cookies()}
-            resp     = requests.get(src, headers={"User-Agent": "Mozilla/5.0"},
-                                    cookies=cookies, timeout=20)
+            cookies = {c["name"]: c["value"] for c in driver.get_cookies()}
+            resp    = requests.get(
+                photo_src,
+                headers={"User-Agent": "Mozilla/5.0",
+                         "Referer": driver.current_url},
+                cookies=cookies, timeout=30)
+
             if resp.status_code == 200 and len(resp.content) > 500:
                 with open(path, "wb") as f:
                     f.write(resp.content)
                 self.app.log_message(self.log_display, f"    📷 Photo {photo_no}: {fname}")
                 return "Yes"
+
+            self.app.log_message(self.log_display,
+                f"    Photo {photo_no}: HTTP {resp.status_code} ({len(resp.content)} bytes)", "warning")
             return "No"
+
         except Exception as e:
             self.app.log_message(self.log_display, f"    Photo {photo_no} failed: {e}", "warning")
             return "Error"
