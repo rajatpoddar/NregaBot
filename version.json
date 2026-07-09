@@ -1,15 +1,19 @@
 {
-  "latest_version": "3.0.3",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.3-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.3-macOS.dmg",
+  "latest_version": "3.0.4",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.4-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.4-macOS.dmg",
   "core_update": {
-    "version": "3.0.3",
-    "url": "https://nregabot.com/updates/core_v3.0.3.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.0.3.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.3.zip",
+    "version": "3.0.4",
+    "url": "https://nregabot.com/updates/core_v3.0.4.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.0.4.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.4.zip",
     "force_full_reinstall": false
   },
   "changelog": {
+    "3.0.4": [
+      "🐞 **Critical Fix (Mate/Mistri MR Generation):** Fixed the Mate/Mistri MR generation automation that was not working. The portal interaction flow has been corrected for reliable muster roll generation.",
+      "🐞 **Critical Fix (NMMS Attendance):** Fixed the NMMS Daily Attendance automation that was failing to complete. Resolved navigation and scraping issues causing the process to stop midway."
+    ],
     "3.0.3": [
       "🚀 **New Feature (NMMS Daily Attendance):** Added a brand-new 'NMMS Attendance' tab under Reports. Automatically scrapes daily attendance data from the NMMS portal — including MR details, worker list, group photos, timestamps, and geo-coordinates.",
       "📊 **NMMS Professional Excel Report:** Generates a multi-sheet Excel report with MR Summary, Workers Detail, and Block Overview — complete with header styling, zebra striping, and auto-sized columns.",

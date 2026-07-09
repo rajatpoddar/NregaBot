@@ -318,11 +318,18 @@ class MateMrGenTab(BaseAutomationTab):
             'work_codes_raw': self.work_codes_text.get("1.0", tkinter.END).strip(),
         }
 
-        required = ['panchayat', 'start_date', 'end_date', 'workers_per_mr']
+        required = ['start_date', 'end_date', 'workers_per_mr']
         if not all(inputs[k] for k in required):
             messagebox.showwarning(
                 "Input Error",
-                "Panchayat, Dates, and Workers per MR Form are required.")
+                "Dates and Workers per MR Form are required.")
+            return
+
+        # Work codes box must not be empty (auto mode is not allowed without work codes)
+        if not inputs['work_codes_raw'].strip():
+            messagebox.showwarning(
+                "Input Error",
+                "Work Search Keys box is empty.\nPlease enter at least one work code or search key.")
             return
 
         if not inputs['workers_per_mr'].isdigit():
@@ -412,10 +419,10 @@ class MateMrGenTab(BaseAutomationTab):
         self.app.clear_log(self.log_display)
         self.app.log_message(
             self.log_display,
-            f"Starting Mate/Mistri MR generation for: {inputs['panchayat']}")
+            f"Starting Mate/Mistri MR generation for: {inputs['panchayat'] or '(Panchayat not specified)'}")
         self.app.after(0, self.app.set_status, "Running Mate/Mistri MR Generation...")
 
-        self.output_dir = self._get_output_dir(inputs['panchayat'])
+        self.output_dir = self._get_output_dir(inputs['panchayat'] or "MateMistri")
         if not self.output_dir:
             self.app.log_message(self.log_display, "Failed to create output directory. Aborting.", "error")
             self.app.after(0, self.set_ui_state, False)
@@ -485,6 +492,10 @@ class MateMrGenTab(BaseAutomationTab):
     #  Panchayat validation                                               #
     # ------------------------------------------------------------------ #
     def _validate_panchayat(self, driver, wait, panchayat_name):
+        """If panchayat_name is empty, skip validation and return True."""
+        if not panchayat_name:
+            self.app.log_message(self.log_display, "Panchayat not provided — skipping validation.")
+            return True
         try:
             self.app.log_message(self.log_display, "Validating Panchayat name...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
@@ -604,12 +615,17 @@ class MateMrGenTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "   - Navigating to MR page...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
 
-            # 1. Select Panchayat
+            # 1. Select Panchayat (optional — skip if not provided)
             self.app.log_message(self.log_display, "   - Selecting Panchayat...")
-            panchayat_dropdown = wait.until(
-                EC.presence_of_element_located((By.ID, "exe_agency")))
-            Select(panchayat_dropdown).select_by_visible_text(
-                config.AGENCY_PREFIX + inputs['panchayat'])
+            if inputs['panchayat']:
+                panchayat_dropdown = wait.until(
+                    EC.presence_of_element_located((By.ID, "exe_agency")))
+                Select(panchayat_dropdown).select_by_visible_text(
+                    config.AGENCY_PREFIX + inputs['panchayat'])
+            else:
+                self.app.log_message(
+                    self.log_display,
+                    "   - Panchayat not provided, skipping selection.")
 
             # 2. Select Skilled/Semi-Skilled worker category
             self.app.log_message(
@@ -636,29 +652,37 @@ class MateMrGenTab(BaseAutomationTab):
             # 5. Fill number of muster rolls to be printed (optional field)
             if inputs.get('num_mr'):
                 try:
-                    num_mr_field = driver.find_element(By.ID, "txtnoofmsr")
+                    num_mr_field = wait.until(
+                        EC.presence_of_element_located((By.ID, "txtnoofmsr")))
                     driver.execute_script(
-                        "arguments[0].value = arguments[1];",
-                        num_mr_field, inputs['num_mr'])
+                        "arguments[0].value = arguments[1]; "
+                        "arguments[0].dispatchEvent(new Event('change', {bubbles:true}));",
+                        num_mr_field, str(inputs['num_mr']))
                     self.app.log_message(
                         self.log_display,
                         f"   - Set No. of MRs to print: {inputs['num_mr']}")
-                except NoSuchElementException:
+                except (NoSuchElementException, TimeoutException):
                     self.app.log_message(
                         self.log_display,
                         "   - Warning: 'No. of MRs' field not found, skipping.", "warning")
 
-            # 6. Fill number of workers per MR form
+            # 6. Fill number of workers per MR form (field ID: txtMsrPage)
             self.app.log_message(
                 self.log_display,
                 f"   - Setting workers per MR: {inputs['workers_per_mr']}...")
             try:
                 workers_field = wait.until(
-                    EC.presence_of_element_located((By.ID, "txtnoofworker")))
+                    EC.presence_of_element_located((By.ID, "txtMsrPage")))
                 driver.execute_script(
-                    "arguments[0].value = arguments[1];",
-                    workers_field, inputs['workers_per_mr'])
-            except TimeoutException:
+                    "arguments[0].removeAttribute('disabled'); "
+                    "arguments[0].removeAttribute('readonly'); "
+                    "arguments[0].value = arguments[1]; "
+                    "arguments[0].dispatchEvent(new Event('change', {bubbles:true}));",
+                    workers_field, str(inputs['workers_per_mr']))
+                self.app.log_message(
+                    self.log_display,
+                    f"   - Set Workers per MR: {inputs['workers_per_mr']}")
+            except (TimeoutException, NoSuchElementException):
                 self.app.log_message(
                     self.log_display,
                     "   - Warning: 'Workers per MR' field not found, skipping.", "warning")
@@ -723,6 +747,8 @@ class MateMrGenTab(BaseAutomationTab):
     # ------------------------------------------------------------------ #
     def _check_for_page_errors(self, driver) -> str | None:
         src = driver.page_source.lower()
+        if "skill semiskilled muster roll cannot be generated before unskilled" in src:
+            return "Skipped: Unskilled MR not generated yet for this work code"
         if "geotag is not received" in src:
             return "Skipped: Geotag not received"
         if "greater than allowed limit" in src:

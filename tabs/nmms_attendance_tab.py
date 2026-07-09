@@ -11,6 +11,7 @@ from datetime import datetime
 import pandas as pd  # type: ignore
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side  # type: ignore
 from openpyxl.utils import get_column_letter  # type: ignore
+from openpyxl.drawing.image import Image as XLImage  # type: ignore
 
 from selenium.webdriver.common.by import By  # type: ignore
 from selenium.webdriver.support.ui import WebDriverWait  # type: ignore
@@ -55,6 +56,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         self.grid_rowconfigure(0, weight=1)   # full tab is the scrollable area
         self._panchayat_data: list = []
         self._config_file = self.app.get_data_path("nmms_inputs.json")
+        self._photo_paths_map: dict = {}  # row_index → (photo1_path, photo2_path)
         self._create_widgets()
         self._load_inputs()
 
@@ -211,6 +213,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
     def _clear_results(self):
         for i in self.results_tree.get_children(): self.results_tree.delete(i)
         for i in self.workers_tree.get_children(): self.workers_tree.delete(i)
+        self._photo_paths_map.clear()
         self.update_status("Cleared.", 0)
 
     def set_ui_state(self, running: bool):
@@ -343,6 +346,10 @@ class NmmsAttendanceTab(BaseAutomationTab):
         summary_sno = len(self.results_tree.get_children())
         worker_sno  = len(self.workers_tree.get_children())
         total = len(selected_panchayats)
+        # photo_paths_map: maps treeview item iid → (photo1_path, photo2_path)
+        if not hasattr(self, "_photo_paths_map"):
+            self._photo_paths_map: dict = {}
+        # Don't clear existing entries — append so re-runs accumulate
 
         try:
             for p_idx, pan_name in enumerate(selected_panchayats):
@@ -392,6 +399,13 @@ class NmmsAttendanceTab(BaseAutomationTab):
                             detail.get("photo2_geo",""),
                             detail.get("photo1_saved","N/A"), detail.get("photo2_saved","N/A"))
                     self.app.after(0, lambda r=srow: self.results_tree.insert("", "end", values=r))
+
+                    # Store photo paths for Excel embedding (keyed by sequential index)
+                    row_key = summary_sno  # int key at time of insertion
+                    p1_path = detail.get("photo1_path", "")
+                    p2_path = detail.get("photo2_path", "")
+                    if p1_path or p2_path:
+                        self._photo_paths_map[row_key] = (p1_path, p2_path)
 
                     for w in detail.get("workers", []):
                         worker_sno += 1
@@ -495,6 +509,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
             "taken_by": "", "designation": "",
             "worker_count": "0", "workers": [],
             "photo1_saved": "No", "photo2_saved": "No",
+            "photo1_path": "", "photo2_path": "",  # actual file paths for Excel embedding
         }
         msr_no = mr_info.get("msr_no", "")
         if not msr_no:
@@ -565,8 +580,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
             # Photos download
             if self._save_photos_var.get():
-                detail["photo1_saved"] = self._download_photo(1, pan_name, mr_info, photos_dir, driver)
-                detail["photo2_saved"] = self._download_photo(2, pan_name, mr_info, photos_dir, driver)
+                detail["photo1_saved"], detail["photo1_path"] = self._download_photo(1, pan_name, mr_info, photos_dir, driver)
+                detail["photo2_saved"], detail["photo2_path"] = self._download_photo(2, pan_name, mr_info, photos_dir, driver)
 
             # Worker table — HTML uses <th> headers: S.No, Job Card No, Worker Name(Gender), Attendance Date, Present/Absent
             workers = []
@@ -618,29 +633,73 @@ class NmmsAttendanceTab(BaseAutomationTab):
         """
         Extract timestamp / geo / taken-by for a photo block.
 
-        NMMS page layout has two side-by-side <td> blocks per photo:
-          Left td  → "Uploaded Group Photo-N" (image)
-          Right td → "Timestamp for Photo-N"
-                       Taken : <date>
-                       Uploaded : <date>
-                       Geo Co-ordinates: <lat,lng>
-                       Taken by: <name>
-                       Designation: <desig>
-
-        Strategy (most-to-least reliable):
-          1. Find the td that contains "Timestamp for Photo-N" and collect ALL
-             label/value tr rows inside it (sibling tds in the same timestamp table).
-          2. If that fails, look for individual label cells anywhere on the page.
-          3. Fall back to regex on raw HTML source.
+        Priority order:
+          1. Read span elements by their known ContentPlaceHolder IDs directly.
+          2. Find the td that contains "Timestamp for Photo-N" and parse its text.
+          3. Sibling <tr> approach.
+          4. Regex carve-out from raw HTML source.
         """
         pkey = f"photo{photo_no}_"
 
+        # ── Strategy 0: read known span IDs directly (most reliable) ─────────
+        # The page has spans like:
+        #   ContentPlaceHolder1_lbl_Taken_by / lbl_SecondTaken_by (not present; same span for both)
+        #   ContentPlaceHolder1_lbl_PhotoUploadTime  (photo 1 upload timestamp)
+        #   ContentPlaceHolder1_lbl_SecondPhotoUploadTime (photo 2)
+        #   ContentPlaceHolder1_lbl_cordinates       (photo 1 geo)
+        #   ContentPlaceHolder1_lbl_SecondCordinates (photo 2 geo)
+        #   ContentPlaceHolder1_lbl_Designation
+        # NOTE: "Taken" timestamp (when photo was captured) may only appear as upload time;
+        #       treat PhotoUploadTime as "Uploaded" and look for a separate taken span if present.
+        def _span(span_id: str) -> str:
+            """Return innerText of a span by its ID, empty string if not found."""
+            try:
+                el = driver.find_element(By.ID, span_id)
+                return (el.get_attribute("innerText") or el.text or "").strip()
+            except NoSuchElementException:
+                return ""
+
+        if photo_no == 1:
+            # Photo-1 spans
+            taken_val    = _span("ContentPlaceHolder1_lbl_PhotoTakenTime")   # may not exist on all portals
+            uploaded_val = _span("ContentPlaceHolder1_lbl_PhotoUploadTime")
+            geo_val      = _span("ContentPlaceHolder1_lbl_cordinates")
+            taken_by_val = _span("ContentPlaceHolder1_lbl_Taken_by")
+            desig_val    = _span("ContentPlaceHolder1_lbl_Designation")
+
+            # If no separate "taken" span, fall back to upload time for "Taken" column too
+            if not taken_val:
+                taken_val = uploaded_val
+
+            if uploaded_val:
+                detail[f"{pkey}taken"]    = taken_val
+                detail[f"{pkey}uploaded"] = uploaded_val
+                detail[f"{pkey}geo"]      = geo_val
+            if taken_by_val:
+                detail["taken_by"]    = taken_by_val
+            if desig_val:
+                detail["designation"] = desig_val
+
+        else:  # photo_no == 2
+            taken_val    = _span("ContentPlaceHolder1_lbl_SecondPhotoTakenTime")
+            uploaded_val = _span("ContentPlaceHolder1_lbl_SecondPhotoUploadTime")
+            geo_val      = _span("ContentPlaceHolder1_lbl_SecondCordinates")
+
+            if not taken_val:
+                taken_val = uploaded_val
+
+            if uploaded_val:
+                detail[f"{pkey}taken"]    = taken_val
+                detail[f"{pkey}uploaded"] = uploaded_val
+                detail[f"{pkey}geo"]      = geo_val
+
+        # If span-based extraction succeeded, return early
+        if detail.get(f"{pkey}uploaded"):
+            return
+
         # ── Strategy 1: find the timestamp block container ──────────────────
-        # The page wraps "Timestamp for Photo-N" + all its rows in one <td>.
-        # We collect all text rows from that container.
         block_text = ""
         try:
-            # The container td has "Timestamp for Photo-N" as a heading inside it
             ts_td = driver.find_element(
                 By.XPATH,
                 f"//td[.//text()[contains(normalize-space(.), 'Timestamp for Photo-{photo_no}')]]"
@@ -652,7 +711,6 @@ class NmmsAttendanceTab(BaseAutomationTab):
         # ── Strategy 2: try individual label cells (when each row is a <tr>) ─
         if not block_text:
             try:
-                # Build block text by collecting rows after "Timestamp for Photo-N" heading
                 rows = driver.find_elements(
                     By.XPATH,
                     f"//tr[.//td[contains(normalize-space(.), 'Timestamp for Photo-{photo_no}')]]"
@@ -679,7 +737,6 @@ class NmmsAttendanceTab(BaseAutomationTab):
                 block_text = re.sub(r'\s{2,}', ' ', block_text)
 
         if not block_text:
-            # Photo 2 may legitimately be absent — mark accordingly
             if photo_no == 2:
                 detail["photo2_taken"]    = "Not Uploaded"
                 detail["photo2_uploaded"] = "Not Uploaded"
@@ -698,7 +755,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
             detail["taken_by"]    = fields.get("taken by", "")
             detail["designation"] = fields.get("designation", "")
 
-        # If we got a block but parsing returned nothing, do a direct line scan
+        # If still nothing, do a direct line scan
         if not any([detail[f"{pkey}taken"], detail[f"{pkey}uploaded"], detail[f"{pkey}geo"]]):
             self._extract_photo_info_direct(block_text, photo_no, detail)
 
@@ -817,11 +874,13 @@ class NmmsAttendanceTab(BaseAutomationTab):
         return m.group(1).strip() if m else ""
 
     def _download_photo(self, photo_no: int, pan_name: str,
-                        mr_info: dict, photos_dir: str, driver) -> str:
+                        mr_info: dict, photos_dir: str, driver) -> tuple:
         """
         Download a group photo via the 'Click here for large image' link.
         HTML structure: <a href="ShowImage.aspx?...">Click here for large image</a>
         This link is inside "Uploaded Group Photo-{N}" section.
+        
+        Returns: (status_str, file_path) where status is "Yes"/"No"/"Not Uploaded"/"Error"
         """
         try:
             photo_src = ""
@@ -848,7 +907,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     photo_src = photo_anchors[photo_no - 1].get_attribute("href") or ""
 
             if not photo_src:
-                return "Not Uploaded"
+                return ("Not Uploaded", "")
 
             # Resolve relative URLs
             if photo_src.startswith("//"):
@@ -877,15 +936,15 @@ class NmmsAttendanceTab(BaseAutomationTab):
                 with open(path, "wb") as f:
                     f.write(resp.content)
                 self.app.log_message(self.log_display, f"    📷 Photo {photo_no}: {fname}")
-                return "Yes"
+                return ("Yes", path)
 
             self.app.log_message(self.log_display,
                 f"    Photo {photo_no}: HTTP {resp.status_code} ({len(resp.content)} bytes)", "warning")
-            return "No"
+            return ("No", "")
 
         except Exception as e:
             self.app.log_message(self.log_display, f"    Photo {photo_no} failed: {e}", "warning")
-            return "Error"
+            return ("Error", "")
 
     # -----------------------------------------------------------------------
     # EXCEL EXPORT
@@ -925,10 +984,14 @@ class NmmsAttendanceTab(BaseAutomationTab):
             # Sheet 1 — MR Summary
             pd.DataFrame(summary_data, columns=self.SUMMARY_HEADERS).to_excel(
                 writer, sheet_name="MR Summary", index=False, startrow=4)
-            self._style_sheet(writer.sheets["MR Summary"],
+            ws_summary = writer.sheets["MR Summary"]
+            self._style_sheet(ws_summary,
                 len(summary_data), self.SUMMARY_HEADERS,
                 f"NMMS Daily Attendance — MR Summary",
                 f"Date: {date_str}  |  Generated by NregaBot", "1565C0")
+
+            # Embed photos into Photo-1 Saved / Photo-2 Saved columns
+            self._embed_photos_in_sheet(ws_summary, summary_data)
 
             # Sheet 2 — Workers Detail
             pd.DataFrame(worker_data, columns=self.WORKER_HEADERS).to_excel(
@@ -948,6 +1011,70 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     len(pan_rows), self.PAN_OVERVIEW_HEADERS,
                     "NMMS Block Overview — Panchayat Summary",
                     f"Date: {date_str}  |  Generated by NregaBot", "6A1B9A")
+
+    def _embed_photos_in_sheet(self, ws, summary_data: list):
+        """
+        For each data row that has a saved photo, embed the image in the
+        'Photo-1 Saved' and/or 'Photo-2 Saved' cell and clear the text label.
+
+        Photo paths are stored in self._photo_paths_map keyed by 1-based row index
+        (matching summary_sno order used during scraping).
+        """
+        # Column indices (1-based) for the saved-photo columns
+        try:
+            p1_col = self.SUMMARY_HEADERS.index("Photo-1 Saved") + 1
+            p2_col = self.SUMMARY_HEADERS.index("Photo-2 Saved") + 1
+        except ValueError:
+            return  # headers changed — skip silently
+
+        # Photo display size in the cell (pixels at 96 dpi)
+        IMG_W, IMG_H = 120, 90
+
+        # Data starts at Excel row 6 (rows 1-3 header/subtitle/generated-by, row 4 blank, row 5 col headers)
+        DATA_START_ROW = 6
+
+        # Build a sorted list of (row_key, paths) so we can walk in order
+        # row_key is summary_sno which starts at whatever was in the treeview before this run.
+        # The simplest mapping: use the order of self._photo_paths_map entries.
+        # But we stored them by summary_sno (1-based cumulative).
+        # Map them to the order of summary_data rows by matching S No. in column 0.
+        sno_to_paths: dict = {}
+        for k, v in self._photo_paths_map.items():
+            sno_to_paths[k] = v  # k is summary_sno int
+
+        for row_idx, row_vals in enumerate(summary_data):
+            excel_row = DATA_START_ROW + row_idx
+            try:
+                sno_val = int(row_vals[0])
+            except (ValueError, IndexError):
+                continue
+
+            paths = sno_to_paths.get(sno_val)
+            if not paths:
+                continue
+
+            p1_path, p2_path = paths
+
+            for col_idx, img_path in [(p1_col, p1_path), (p2_col, p2_path)]:
+                if not img_path or not os.path.isfile(img_path):
+                    continue
+                try:
+                    img = XLImage(img_path)
+                    img.width  = IMG_W
+                    img.height = IMG_H
+
+                    # Anchor the image to the target cell
+                    cell_addr = f"{get_column_letter(col_idx)}{excel_row}"
+                    img.anchor = cell_addr
+
+                    # Clear text in that cell and size the row/col to fit the image
+                    ws[cell_addr].value = ""
+                    ws.row_dimensions[excel_row].height = IMG_H * 0.75  # pt ≈ px * 0.75
+                    ws.column_dimensions[get_column_letter(col_idx)].width = IMG_W / 7  # approx chars
+
+                    ws.add_image(img)
+                except Exception:
+                    pass  # leave text value as-is if image fails
 
     def _style_sheet(self, ws, n_data_rows: int, headers: list,
                      title: str, subtitle: str, hdr_color: str):

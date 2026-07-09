@@ -5,7 +5,7 @@
 # <div align="center">NREGA Bot</div>
 
 <p align="center">
-  <b>v3.0.3 | NMMS Daily Attendance Automation Live!</b><br />
+  <b>v3.0.4 | NMMS Daily Attendance Automation Live!</b><br />
   <a href="https://nregabot.com/#downloads"><strong>Download Now »</strong></a><br /><br />
   <a href="https://nregabot.com/how-to-use.html">View Instructions</a> ·
   <a href="https://nregabot.com/contact.html">Report Bug</a> ·
@@ -22,7 +22,7 @@ The application works by securely controlling a web browser on your computer, al
 
 ---
 
-## 🆕 What's New in v3.0.3
+## 🆕 What's New in v3.0.4
 
 - 🚀 **New: NMMS Daily Attendance** — Fully automated attendance scraping from the NMMS portal. Scrapes panchayat list, MR details, worker attendance, group photos, timestamps, and geo-coordinates.
 - 📊 **NMMS Professional Excel Report** — Multi-sheet report with MR Summary, Workers Detail, and Block Overview with styled headers and auto-sized columns.
@@ -117,8 +117,8 @@ You only need to have a supported web browser installed on your system:
 Download the latest version from the official website:
 
 - Website: [nregabot.com/#downloads](https://nregabot.com/#downloads)
-- **For Windows**: `NREGABot-v3.0.3-Setup.exe`
-- **For macOS**: `NREGABot-v3.0.3-macOS.dmg`
+- **For Windows**: `NREGABot-v3.0.4-Setup.exe`
+- **For macOS**: `NREGABot-v3.0.4-macOS.dmg`
 
 ### 2️⃣ First-Time Launch & Trial
 
@@ -154,7 +154,7 @@ Download the app and get your 30-day free trial by registering on our website. A
 
 ## 📜 Changelog
 
-### v3.0.3
+### v3.0.4
 - 🚀 New NMMS Daily Attendance tab with full scraping, photo download, and Excel report export
 - ☑️ Select All / Clear All panchayat selection
 - 🐞 Fixed header row appearing in Block Overview and MR list
@@ -304,8 +304,8 @@ You only need to have a supported web browser installed on your system:
 Download the latest version from the official website:
 
 - Website: [nregabot.com/#downloads](https://nregabot.com/#downloads)
-- **For Windows**: `NREGABot-v3.0.3-Setup.exe`
-- **For macOS**: `NREGABot-v3.0.3-macOS.dmg`
+- **For Windows**: `NREGABot-v3.0.4-Setup.exe`
+- **For macOS**: `NREGABot-v3.0.4-macOS.dmg`
 
 ### 2️⃣ First-Time Launch & Trial
 
