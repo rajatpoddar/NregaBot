@@ -1,15 +1,18 @@
 {
-  "latest_version": "3.0.4",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.4-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.4-macOS.dmg",
+  "latest_version": "3.0.5",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.5-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.5-macOS.dmg",
   "core_update": {
-    "version": "3.0.4",
-    "url": "https://nregabot.com/updates/core_v3.0.4.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.0.4.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.4.zip",
+    "version": "3.0.5",
+    "url": "https://nregabot.com/updates/core_v3.0.5.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.0.5.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.5.zip",
     "force_full_reinstall": false
   },
   "changelog": {
+    "3.0.5": [
+      "🐞 **Critical Fix (Physical Complete):** Fixed the Physical Complete automation pointing to the wrong portal URL (nregade4.dord.gov.in). It now correctly uses the VB-G-RAM-G portal (vbgramgde2.dord.gov.in), consistent with all other automations."
+    ],
     "3.0.4": [
       "🐞 **Critical Fix (Mate/Mistri MR Generation):** Fixed the Mate/Mistri MR generation automation that was not working. The portal interaction flow has been corrected for reliable muster roll generation.",
       "🐞 **Critical Fix (NMMS Attendance):** Fixed the NMMS Daily Attendance automation that was failing to complete. Resolved navigation and scraping issues causing the process to stop midway."

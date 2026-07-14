@@ -260,7 +260,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
     def _process_single_work_code(self, driver, inputs, work_code):
         wait = WebDriverWait(driver, 20)
-        url = "https://nregade4.dord.gov.in/Netnrega/phycomp_work.aspx"
+        url = config.PHYSICAL_COMPLETE_CONFIG["url"]
         
         try:
             driver.get(url)
