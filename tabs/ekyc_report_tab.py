@@ -69,15 +69,7 @@ class EKycReportTab(BaseAutomationTab):
                                          command=self.apply_filter_visuals)
         self.filter_cb.grid(row=0, column=5, padx=5, pady=10)
 
-        # --- NEW: ABPS Pending Checkbox ---
-        self.abps_check_var = ctk.BooleanVar(value=False)
-        self.abps_check = ctk.CTkCheckBox(input_frame, text="Include ABPS Pending (Override)", 
-                                          variable=self.abps_check_var, 
-                                          command=self.apply_filter_visuals,
-                                          font=("Arial", 11, "bold"), text_color="orange")
-        self.abps_check.grid(row=1, column=0, columnspan=3, padx=10, pady=(5, 10), sticky="w")
-
-        note_label = ctk.CTkLabel(self, text="ℹ️ Note: Leave Panchayat empty for ALL panchayats. Check 'Include ABPS Pending' to show rows with ABPS 'No' even if eKYC is 'Yes'.", 
+        note_label = ctk.CTkLabel(self, text="ℹ️ Note: Leave Panchayat empty for ALL panchayats to scan all.", 
                                   text_color=("gray40", "gray70"), font=("Arial", 11, "italic"))
         note_label.pack(anchor="w", padx=20, pady=(0, 5))
 
@@ -422,27 +414,17 @@ class EKycReportTab(BaseAutomationTab):
                 break
 
     def _should_show_record(self, record):
-        """Combined Logic for Filters + ABPS Checkbox"""
+        """Filter logic based on eKYC status only"""
         filter_mode = self.filter_var.get()
-        include_abps_pending = self.abps_check_var.get()
-        
         ekyc_yes = "yes" in record['ekyc'].lower()
-        abps_no = "no" in record['abps'].lower()
-        
-        # 1. Base Filter Logic
-        show = False
+
         if filter_mode == "All": 
-            show = True
+            return True
         elif filter_mode == "Verified (Yes)" and ekyc_yes: 
-            show = True
+            return True
         elif filter_mode == "Not Verified (No)" and not ekyc_yes: 
-            show = True
-            
-        # 2. Override Logic: Include ABPS Pending?
-        if include_abps_pending and abps_no:
-            show = True
-            
-        return show
+            return True
+        return False
 
     def check_and_insert_to_tree(self, record):
         if self._should_show_record(record):
@@ -695,7 +677,6 @@ class EKycReportTab(BaseAutomationTab):
             "panchayat": self.panchayat_entry.get().strip(),
             "village": self.village_entry.get().strip(),
             "filter": self.filter_var.get(),
-            "abps_check": self.abps_check_var.get()
         }
         try:
             config_file = self.app.get_data_path("ekyc_inputs.json")
@@ -710,5 +691,4 @@ class EKycReportTab(BaseAutomationTab):
                 self.panchayat_entry.delete(0, "end"); self.panchayat_entry.insert(0, data.get("panchayat", ""))
                 self.village_entry.delete(0, "end"); self.village_entry.insert(0, data.get("village", ""))
                 if data.get("filter"): self.filter_var.set(data.get("filter"))
-                if data.get("abps_check"): self.abps_check_var.set(data.get("abps_check"))
             except: pass

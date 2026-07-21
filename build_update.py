@@ -43,19 +43,26 @@ def create_source_zip():
             ]]
 
             for file in files:
-                # Sirf ye extensions allow karein
-                if file.endswith(('.py', '.json', '.txt', '.html', '.css', '.js', '.bat', '.sh', '.md', '.env')):
+                # --- INCLUDE: Text files aur Asset files dono ---
+                # Ab .png (icons), .ico (app icon), .wav (sounds), .ttf (fonts),
+                # .bmp (wizard images), .jpeg/.jpg (logo etc.) bhi include honge
+                allowed_extensions = (
+                    '.py', '.json', '.txt', '.html', '.css', '.js', '.bat', '.sh', '.md', '.env',
+                    '.png', '.ico', '.wav', '.ttf', '.bmp', '.jpeg', '.jpg'
+                )
+                if not file.endswith(allowed_extensions):
+                    continue
                     
-                    # Khud script, loader, aur dusre zips ko ignore karein
-                    if file == os.path.basename(__file__) or file == "loader.py" or file.endswith(".zip") or file.endswith(".dmg"):
-                        continue
-                    
-                    # Full path aur Archive name
-                    file_path = os.path.join(root, file)
-                    arcname = os.path.relpath(file_path, ".")
-                    
-                    print(f"  + Adding: {arcname}")
-                    zipf.write(file_path, arcname)
+                # Khud script, loader, aur dusre zips ko ignore karein
+                if file == os.path.basename(__file__) or file == "loader.py" or file.endswith(".zip") or file.endswith(".dmg"):
+                    continue
+
+                # Full path aur Archive name
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, ".")
+
+                print(f"  + Adding: {arcname}")
+                zipf.write(file_path, arcname)
     
     print(f"\n✅ Success! Update file ready: {OUTPUT_PATH}")
     print(f"👉 Upload this file to your server for v{APP_VERSION} ({PLAT_TAG}) update.")

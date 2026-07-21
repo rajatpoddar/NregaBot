@@ -169,7 +169,7 @@ class DelDemandTab(BaseAutomationTab):
                     panchayat_dropdown.select_by_visible_text(found_p)
 
                     # Wait for village dropdown to populate after panchayat postback
-                    fast_wait = WebDriverWait(driver, 8, poll_frequency=0.3)
+                    fast_wait = WebDriverWait(driver, 20, poll_frequency=0.3)
                     try:
                         fast_wait.until(lambda d: len(Select(
                             d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
@@ -207,16 +207,35 @@ class DelDemandTab(BaseAutomationTab):
                     
                 self.app.after(0, self.update_status, f"Processing {i+1}/{total_v}: {v_name}", (i+1)/total_v)
                 
-                # After first village, delete postback refreshes the page, so re-navigate
-                # and re-select panchayat to restore page state for next village
+                # After first village, re-navigate and RESET page state completely
                 if i > 0:
                     self.app.log_message(self.log_display, f"Re-navigating to page for next village...")
+                    
+                    # ⬇️ FIX: Navigate to blank page FIRST to clear ASP.NET session/viewstate
+                    try:
+                        driver.get("about:blank")
+                        WebDriverWait(driver, 10).until(
+                            lambda d: d.execute_script("return document.readyState") == "complete"
+                        )
+                    except Exception:
+                        pass
+                    time.sleep(0.5)
+                    
                     driver.get(url)
-                    # Wait for page to fully load before interacting
+                    try:
+                        WebDriverWait(driver, 20).until(
+                            lambda d: d.execute_script("return document.readyState") == "complete"
+                        )
+                    except Exception:
+                        pass
+                    time.sleep(1.5)  # Extra buffer for ASP.NET initialization
+                    
                     try:
                         wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")))
                     except TimeoutException:
-                        pass
+                        self.app.log_message(self.log_display, f"   ⚠️ Panchayat dropdown not found after re-navigation!", "warning")
+                        continue  # Skip this village instead of crashing
+                    
                     try:
                         panchayat_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")
                         panchayat_dropdown = Select(panchayat_dd_elem)
@@ -228,15 +247,16 @@ class DelDemandTab(BaseAutomationTab):
                                 break
                         if found_p:
                             panchayat_dropdown.select_by_visible_text(found_p)
-                            fast_wait = WebDriverWait(driver, 8, poll_frequency=0.3)
+                            time.sleep(0.5)  # Wait for postback to begin
+                            fast_wait = WebDriverWait(driver, 20, poll_frequency=0.3)
                             try:
                                 fast_wait.until(lambda d: len(Select(
                                     d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
                                 ).options) > 1)
                             except TimeoutException:
-                                pass
+                                self.app.log_message(self.log_display, f"   ⚠️ Village dropdown didn't populate after panchayat re-select.", "warning")
                     except NoSuchElementException:
-                        pass
+                        self.app.log_message(self.log_display, f"   ⚠️ Panchayat dropdown not found (GP Login?).", "info")
                 
                 self._process_village(driver, wait, target_panchayat, v_name)
 
@@ -260,22 +280,18 @@ class DelDemandTab(BaseAutomationTab):
             # Verify the village option exists before selecting
             village_texts = [opt.text.strip() for opt in village_dropdown.options]
             if village_name not in village_texts:
-                self.app.log_message(self.log_display, f"Village '{village_name}' not in dropdown options. Skipping.", "warning")
+                self.app.log_message(self.log_display, f"   ⚠️ Village '{village_name}' not in dropdown options. Skipping.", "warning")
                 self._log_result(panchayat, village_name, "-", "Skipped", "Village not found in dropdown after navigation.")
                 return
             
             village_dropdown.select_by_visible_text(village_name)
-            
-            self.app.log_message(self.log_display, f"Selected Village: {village_name}. Waiting for data...")
+            self.app.log_message(self.log_display, f"📍 Selected: {village_name}. Waiting for data...")
 
-            no_data_locator = (By.ID, "ctl00_ContentPlaceHolder1_del_msg")
+            no_data_locator = (By.ID, "ctl00_ContentPlaceHolder1_nodata_msg")
             grid_locator    = (By.ID, "ctl00_ContentPlaceHolder1_grd_AppRecord")
 
-            # Wait for AJAX postback to complete.
-            # Strategy: wait until the village dropdown confirms the selection AND
-            # either a message appears or grid appears or a short max-wait elapses.
-            # We use a short fast-poll loop (max 5 sec) instead of full 15 sec timeout.
-            fast_wait = WebDriverWait(driver, 5, poll_frequency=0.3)
+            # Wait for AJAX postback to complete (slower server = longer wait)
+            fast_wait = WebDriverWait(driver, 20, poll_frequency=0.3)
 
             def page_settled(d):
                 # Confirm dropdown selection took effect
@@ -286,7 +302,7 @@ class DelDemandTab(BaseAutomationTab):
                 except Exception:
                     return False
 
-                # Check 1: message element has non-empty text
+                # Check 1: message element has non-empty text (no-data / already deleted)
                 try:
                     msg = d.find_element(*no_data_locator)
                     if msg.text.strip():
@@ -294,28 +310,30 @@ class DelDemandTab(BaseAutomationTab):
                 except Exception:
                     pass
 
-                # Check 2: grid is visible
+                # Check 2: grid is visible and has data rows (demands loaded)
                 try:
                     grid_el = d.find_element(*grid_locator)
                     if grid_el.is_displayed():
-                        return True
+                        rows = grid_el.find_elements(By.XPATH, ".//tr[position()>1]")
+                        if rows:
+                            return True  # Grid with data rows = page settled
                 except Exception:
                     pass
 
-                # Dropdown is settled but no message/grid — blank response (no demand exists)
-                return True
+                # Neither message nor grid with data found yet — KEEP WAITING!
+                return False
 
             try:
                 fast_wait.until(page_settled)
             except TimeoutException:
-                pass  # Proceed anyway after timeout
+                self.app.log_message(self.log_display, f"   ⏱ Village {village_name}: AJAX postback timed out, proceeding anyway...", "warning")
 
             # --- Early exit: "no data" / "already deleted" message ---
             try:
                 msg_elem = driver.find_element(*no_data_locator)
                 msg_text = msg_elem.text.strip()
                 if msg_text:
-                    self.app.log_message(self.log_display, f"   - {village_name}: {msg_text}. Skipping.")
+                    self.app.log_message(self.log_display, f"   ℹ️ {village_name}: {msg_text}. Skipping.")
                     self._log_result(panchayat, village_name, "-", "Skipped", msg_text)
                     return
             except NoSuchElementException:
@@ -324,7 +342,12 @@ class DelDemandTab(BaseAutomationTab):
             # Step A: Check if grid exists
             try:
                 grid = driver.find_element(*grid_locator)
+                if not grid.is_displayed():
+                    self.app.log_message(self.log_display, f"   ℹ️ {village_name}: Grid hidden. No pending demands.", "info")
+                    self._log_result(panchayat, village_name, "-", "Skipped", "Grid not visible - no data.")
+                    return
             except NoSuchElementException:
+                self.app.log_message(self.log_display, f"   ℹ️ {village_name}: No grid found. No pending demands.", "info")
                 self._log_result(panchayat, village_name, "-", "Skipped", "No pending demands found in this village.")
                 return
 
@@ -341,22 +364,45 @@ class DelDemandTab(BaseAutomationTab):
                         jobcards_in_village.append(f"{jc_no} | {app_name}")
             
             if not jobcards_in_village:
+                self.app.log_message(self.log_display, f"   ℹ️ {village_name}: No valid data rows in grid.", "info")
                 self._log_result(panchayat, village_name, "-", "Skipped", "No valid data rows found in grid.")
                 return
 
-            self.app.log_message(self.log_display, f"Found {len(jobcards_in_village)} demands to delete.")
+            self.app.log_message(self.log_display, f"   ✅ Found {len(jobcards_in_village)} demand(s) to delete in {village_name}.")
 
             # Step C: Smart Checkbox Toggle (User's Logic)
             try:
                 check_all_box = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_chkdel")
-                if check_all_box.is_selected():
-                    # Agar pehle se checked hai, toh uncheck karke firse check karenge
-                    check_all_box.click() 
-                    time.sleep(0.2)
                 
-                # Check the box to trigger CheckAll() Javascript
-                check_all_box.click()
+                # ⬇️ FIX: Scroll into view + JavaScript click (works even if tab is in background)
+                driver.execute_script("arguments[0].scrollIntoView(true);", check_all_box)
+                time.sleep(0.3)
+                
+                if check_all_box.is_selected():
+                    self.app.log_message(self.log_display, f"   🔄 Checkbox was already checked, toggling...")
+                    driver.execute_script("arguments[0].click();", check_all_box)
+                    time.sleep(0.3)
+                
+                # JavaScript click — works reliably even when tab is not focused
+                driver.execute_script("arguments[0].click();", check_all_box)
+                time.sleep(0.5)
+                
+                # Verify checkbox state — retry once if not checked
+                if not check_all_box.is_selected():
+                    self.app.log_message(self.log_display, f"   🔄 First JS click didn't register, retrying...")
+                    driver.execute_script("arguments[0].click();", check_all_box)
+                    time.sleep(0.3)
+                
+                checked = check_all_box.is_selected()
+                if checked:
+                    self.app.log_message(self.log_display, f"   ☑️ Select All checkbox ticked successfully!")
+                else:
+                    self.app.log_message(self.log_display, f"   ❌ Could not tick the select-all checkbox!", "error")
+                    self._log_result(panchayat, village_name, "-", "Failed", "Could not tick select-all checkbox.")
+                    return
+                    
             except NoSuchElementException:
+                self.app.log_message(self.log_display, f"   ❌ {village_name}: Check ALL box not found!", "error")
                 self._log_result(panchayat, village_name, "-", "Failed", "Check ALL box not found.")
                 return
 
@@ -364,38 +410,42 @@ class DelDemandTab(BaseAutomationTab):
             try:
                 delete_btn = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btndel")
                 delete_btn.click()
+                self.app.log_message(self.log_display, f"   🗑️ Delete button clicked, handling confirmation...")
                 
                 # Handle JS Alert
                 try:
                     alert = wait.until(EC.alert_is_present())
+                    alert_text = alert.text
+                    self.app.log_message(self.log_display, f"   ⚠️ Alert: '{alert_text}' → Accepting...")
                     alert.accept()
+                    time.sleep(0.5)  # Brief wait for postback to begin
                 except TimeoutException:
-                    pass
+                    self.app.log_message(self.log_display, f"   ℹ️ No JS alert appeared, proceeding...", "info")
                 
                 # Step E: Wait for Success Message and Log Results
                 success_msg_locator = (By.ID, "ctl00_ContentPlaceHolder1_del_msg")
                 try:
                     msg_elem = wait.until(EC.presence_of_element_located(success_msg_locator))
                     server_msg = msg_elem.text.strip()
+                    self.app.log_message(self.log_display, f"   ✅ {village_name}: Server response: '{server_msg}'")
                     
                     # Log each deleted jobcard individually
                     for info in jobcards_in_village:
                         self._log_result(panchayat, village_name, info, "Success", server_msg)
                         
                 except TimeoutException:
-                    # Agar success message na aaye, toh bulk mein fail mark karega
+                    self.app.log_message(self.log_display, f"   ⚠️ {village_name}: Could not verify success message (timeout).", "warning")
                     for info in jobcards_in_village:
                         self._log_result(panchayat, village_name, info, "Failed", "Could not verify success message.")
 
             except NoSuchElementException:
+                self.app.log_message(self.log_display, f"   ❌ {village_name}: Delete button not found!", "error")
                 self._log_result(panchayat, village_name, "-", "Failed", "Delete button not found.")
 
-        except Exception as e:
+        except (StaleElementReferenceException, Exception) as e:
             error_msg = str(e).split('\n')[0]
-            self.app.log_message(self.log_display, f"Failed on village {village_name}: {error_msg}", "error")
+            self.app.log_message(self.log_display, f"   ❌ Error on {village_name}: {error_msg}", "error")
             self._log_result(panchayat, village_name, "-", "Error", error_msg)
-            # NOTE: Page recovery (re-navigation + panchayat re-select) is handled by the
-            # main loop in run_automation_logic() before the next village iteration.
 
     def _log_result(self, panchayat, village, applicant_info, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")

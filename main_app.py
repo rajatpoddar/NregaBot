@@ -1198,38 +1198,385 @@ class NregaBotApp(ctk.CTk):
         self.nav_scroll_frame.update_idletasks()
 
     def show_history_window(self):
+        """Modern Activity Log window with stats, search, and filtered treeview."""
+        # --- FIX: Single instance guard ---
+        if hasattr(self, '_history_window') and self._history_window and self._history_window.winfo_exists():
+            self._history_window.lift()
+            self._history_window.focus_force()
+            return
+
         win = ctk.CTkToplevel(self)
-        win.title("Activity Log - Recent Tasks")
-        win.geometry("700x500")
-        
+        win.title("📋 Activity Log - Recent Tasks")
+        win.geometry("900x650")
+        win.minsize(700, 500)
+
+        # --- FIX: Bring window to front ---
+        win.transient(self)
+        win.lift()
+        win.focus_force()
+        win.attributes("-topmost", True)
+        win.after(100, lambda: safe_attr(win, "-topmost", False))
+
+        def safe_attr(w, attr, val):
+            try:
+                if w.winfo_exists():
+                    w.attributes(attr, val)
+            except:
+                pass
+
         win.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - (700 // 2)
-        y = self.winfo_y() + (self.winfo_height() // 2) - (500 // 2)
+        x = self.winfo_x() + (self.winfo_width() // 2) - (900 // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (650 // 2)
         win.geometry(f"+{x}+{y}")
 
+        # --- FIX: Track this window globally ---
+        self._history_window = win
+        def on_close():
+            self._history_window = None
+            try:
+                win.destroy()
+            except:
+                pass
+        win.protocol("WM_DELETE_WINDOW", on_close)
+
         win.grid_columnconfigure(0, weight=1)
-        win.grid_rowconfigure(1, weight=1)
+        win.grid_rowconfigure(3, weight=1)
 
-        header = ctk.CTkFrame(win, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=20, pady=15)
-        ctk.CTkLabel(header, text="Recent Activity Log (Last 50 Items)", font=ctk.CTkFont(size=18, weight="bold")).pack(side="left")
-        ctk.CTkButton(header, text="Refresh", width=80, height=25, command=lambda: [win.destroy(), self.show_history_window()]).pack(side="right")
+        # ---------- 1. HEADER ----------
+        header = ctk.CTkFrame(win, fg_color="transparent", height=50)
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 5))
+        header.grid_columnconfigure(1, weight=1)
 
-        log_box = ctk.CTkTextbox(win, font=("Consolas", 12))
-        log_box.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
-        
-        logs = self.history_manager.get_recent_activity(50)
-        
-        if not logs:
-            log_box.insert("0.0", "No recent activity found. Start working to see logs here!")
-        else:
-            for timestamp, type_, desc in logs:
-                icon = "✅" if type_ == "SUCCESS" else "⚠️" if type_ == "WARNING" else "❌"
-                line = f"{timestamp} | {icon} {desc}\n"
-                log_box.insert("end", line)
-                log_box.insert("end", "-"*80 + "\n")
-        
-        log_box.configure(state="disabled")
+        ctk.CTkLabel(
+            header, text="📋", font=ctk.CTkFont(size=24)
+        ).grid(row=0, column=0, padx=(0, 10))
+
+        title_frame = ctk.CTkFrame(header, fg_color="transparent")
+        title_frame.grid(row=0, column=1, sticky="w")
+        ctk.CTkLabel(
+            title_frame, text="Activity Log", font=ctk.CTkFont(size=18, weight="bold")
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            title_frame, text="Track all your automation activities",
+            font=ctk.CTkFont(size=11), text_color=("gray50", "gray60")
+        ).pack(anchor="w")
+
+        # ---------- 2. STATS CARDS (Optimized) ----------
+        stats_frame = ctk.CTkFrame(win, fg_color="transparent")
+        stats_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(5, 10))
+        stats_frame.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="stats")
+
+        # Fetch logs to compute stats
+        all_logs = self.history_manager.get_recent_activity(200)
+        total = len(all_logs)
+        success_count = sum(1 for _, t, _ in all_logs if t == "SUCCESS")
+        warning_count = sum(1 for _, t, _ in all_logs if t == "WARNING")
+        error_count = sum(1 for _, t, _ in all_logs if t == "ERROR")
+
+        def create_stat_card(parent, col, label, count, icon, bg_color, text_color, hover_bg):
+            card = ctk.CTkFrame(parent, fg_color=bg_color, corner_radius=12, height=85,
+                                border_width=1, border_color=("white", "#333333"))
+            card.grid(row=0, column=col, sticky="nsew", padx=4)
+            card.grid_propagate(False)
+
+            # Hover effect
+            def on_enter(e):
+                card.configure(fg_color=hover_bg)
+            def on_leave(e):
+                card.configure(fg_color=bg_color)
+            card.bind("<Enter>", on_enter)
+            card.bind("<Leave>", on_leave)
+
+            inner = ctk.CTkFrame(card, fg_color="transparent")
+            inner.place(relx=0.5, rely=0.5, anchor="center")
+
+            ctk.CTkLabel(inner, text=icon, font=ctk.CTkFont(size=24)).pack()
+            ctk.CTkLabel(
+                inner, text=str(count), font=ctk.CTkFont(size=22, weight="bold"),
+                text_color=text_color
+            ).pack()
+            ctk.CTkLabel(
+                inner, text=label, font=ctk.CTkFont(size=11),
+                text_color=("gray20", "gray80")
+            ).pack()
+
+        create_stat_card(stats_frame, 0, "Total Actions", total, "📊",
+                         ("#F0F4FF", "#1E293B"), ("#3B82F6", "#60A5FA"),
+                         ("#DBEAFE", "#0F172A"))
+        create_stat_card(stats_frame, 1, "Success", success_count, "✅",
+                         ("#F0FDF4", "#14532D"), ("#16A34A", "#4ADE80"),
+                         ("#DCFCE7", "#052E16"))
+        create_stat_card(stats_frame, 2, "Warnings", warning_count, "⚠️",
+                         ("#FFFBEB", "#451A03"), ("#D97706", "#FBBF24"),
+                         ("#FEF3C7", "#292524"))
+        create_stat_card(stats_frame, 3, "Errors", error_count, "❌",
+                         ("#FEF2F2", "#450A0A"), ("#DC2626", "#F87171"),
+                         ("#FEE2E2", "#7F1D1D"))
+
+        # ---------- 3. SEARCH & FILTER + ACTION BUTTONS ----------
+        controls_frame = ctk.CTkFrame(win, fg_color="transparent")
+        controls_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 10))
+        controls_frame.grid_columnconfigure(0, weight=1)
+
+        # Left: Search + Filter
+        left_controls = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        left_controls.pack(side="left", fill="x", expand=True)
+
+        search_var = tkinter.StringVar()
+        search_entry = ctk.CTkEntry(
+            left_controls, placeholder_text="🔍 Search activity...",
+            width=250, height=32,
+            font=ctk.CTkFont(size=12)
+        )
+        search_entry.pack(side="left", padx=(0, 10))
+
+        filter_var = tkinter.StringVar(value="All")
+        filter_menu = ctk.CTkOptionMenu(
+            left_controls, values=["All", "✅ Success", "⚠️ Warning", "❌ Error"],
+            variable=filter_var, width=130, height=32,
+            font=ctk.CTkFont(size=12),
+            dropdown_font=ctk.CTkFont(size=12)
+        )
+        filter_menu.pack(side="left")
+
+        # Right: Action Buttons
+        right_controls = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        right_controls.pack(side="right")
+
+        def refresh_log():
+            on_close()
+            self.show_history_window()
+
+        def clear_log():
+            if messagebox.askyesno("Clear Activity Log?",
+                                   "This will permanently delete all activity logs.\nAre you sure?",
+                                   parent=win):
+                try:
+                    conn = self.history_manager._get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM activity_log")
+                    conn.commit()
+                    conn.close()
+                    refresh_log()
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to clear logs: {e}", parent=win)
+
+        def export_log():
+            if not all_logs:
+                messagebox.showinfo("No Data", "No logs to export.", parent=win)
+                return
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text File", "*.txt"), ("CSV File", "*.csv")],
+                initialfile=f"activity_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                parent=win
+            )
+            if not file_path:
+                return
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    if file_path.endswith(".csv"):
+                        f.write("Timestamp,Type,Description\n")
+                        for ts, tp, desc in all_logs:
+                            safe_desc = desc.replace('"', '""')
+                            f.write(f'"{ts}","{tp}","{safe_desc}"\n')
+                    else:
+                        f.write("=" * 80 + "\n")
+                        f.write(f"  ACTIVITY LOG - {datetime.now().strftime('%d-%b-%Y %I:%M %p')}\n")
+                        f.write(f"  Total: {total} | Success: {success_count} | Warnings: {warning_count} | Errors: {error_count}\n")
+                        f.write("=" * 80 + "\n\n")
+                        for ts, tp, desc in all_logs:
+                            icon = {"SUCCESS": "✅", "WARNING": "⚠️", "ERROR": "❌"}.get(tp, "📌")
+                            f.write(f"{ts} | {icon} [{tp}] {desc}\n")
+                messagebox.showinfo("Exported", f"Log saved to:\n{file_path}", parent=win)
+            except Exception as e:
+                messagebox.showerror("Error", f"Export failed: {e}", parent=win)
+
+        ctk.CTkButton(
+            right_controls, text="🔄 Refresh", width=90, height=32,
+            command=refresh_log,
+            font=ctk.CTkFont(size=12),
+            fg_color=("#E2E8F0", "#334155"),
+            text_color=("#1E293B", "#F1F5F9"),
+            hover_color=("#CBD5E1", "#475569")
+        ).pack(side="left", padx=2)
+        ctk.CTkButton(
+            right_controls, text="🗑️ Clear", width=80, height=32,
+            command=clear_log,
+            font=ctk.CTkFont(size=12),
+            fg_color=("#FEE2E2", "#450A0A"),
+            text_color=("#DC2626", "#F87171"),
+            hover_color=("#FECACA", "#7F1D1D")
+        ).pack(side="left", padx=2)
+        ctk.CTkButton(
+            right_controls, text="📥 Export", width=90, height=32,
+            command=export_log,
+            font=ctk.CTkFont(size=12),
+            fg_color=("#DBEAFE", "#1E3A5F"),
+            text_color=("#1D4ED8", "#60A5FA"),
+            hover_color=("#BFDBFE", "#1E40AF")
+        ).pack(side="left", padx=2)
+
+        # ---------- 4. LOG ENTRIES (No Text Cropping!) ----------
+        log_container = ctk.CTkFrame(win, fg_color="transparent")
+        log_container.grid(row=3, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        log_container.grid_rowconfigure(0, weight=1)
+        log_container.grid_columnconfigure(0, weight=1)
+
+        log_scroll = ctk.CTkScrollableFrame(
+            log_container, fg_color="transparent", corner_radius=10,
+            scrollbar_button_color=("gray70", "gray40"),
+            scrollbar_button_hover_color=("gray60", "gray30")
+        )
+        log_scroll.grid(row=0, column=0, sticky="nsew")
+        log_scroll.grid_columnconfigure(0, weight=1)
+
+        # Track description labels for dynamic wraplength
+        desc_labels = []
+
+        def apply_filter():
+            nonlocal desc_labels
+            # Clear existing rows
+            for widget in log_scroll.winfo_children():
+                widget.destroy()
+            desc_labels.clear()
+
+            search_text = search_var.get().strip().lower()
+            filter_text = filter_var.get()
+
+            filtered = []
+            for ts, tp, desc in all_logs:
+                # Type filter
+                if filter_text == "✅ Success" and tp != "SUCCESS":
+                    continue
+                elif filter_text == "⚠️ Warning" and tp != "WARNING":
+                    continue
+                elif filter_text == "❌ Error" and tp != "ERROR":
+                    continue
+
+                # Search filter
+                if search_text and search_text not in ts.lower() and search_text not in desc.lower():
+                    continue
+
+                filtered.append((ts, tp, desc))
+
+            for ts, tp, desc in filtered:
+                # Colors based on type
+                if tp == "SUCCESS":
+                    row_bg = ("#F0FDF4", "#0A2E1A")
+                    badge_bg = ("#16A34A", "#4ADE80")
+                    bar_color = "#16A34A"
+                    hover_bg = ("#DCFCE7", "#14532D")
+                elif tp == "WARNING":
+                    row_bg = ("#FFFBEB", "#2A1F04")
+                    badge_bg = ("#D97706", "#FBBF24")
+                    bar_color = "#D97706"
+                    hover_bg = ("#FEF3C7", "#451A03")
+                elif tp == "ERROR":
+                    row_bg = ("#FEF2F2", "#2A0A0A")
+                    badge_bg = ("#DC2626", "#F87171")
+                    bar_color = "#DC2626"
+                    hover_bg = ("#FEE2E2", "#7F1D1D")
+                else:
+                    row_bg = ("#F8FAFC", "#1E293B")
+                    badge_bg = ("#64748B", "#94A3B8")
+                    bar_color = "#64748B"
+                    hover_bg = ("#F1F5F9", "#334155")
+
+                # Row frame
+                row_frame = ctk.CTkFrame(log_scroll, fg_color=row_bg, corner_radius=8)
+                row_frame.pack(fill="x", pady=2, padx=2)
+
+                # Colored left bar (type indicator)
+                ctk.CTkFrame(row_frame, width=4, fg_color=bar_color,
+                             corner_radius=2).pack(side="left", fill="y", padx=(0, 8), pady=6)
+
+                # Content
+                content = ctk.CTkFrame(row_frame, fg_color="transparent")
+                content.pack(side="left", fill="both", expand=True, padx=(0, 10), pady=6)
+                content.grid_columnconfigure(1, weight=1)
+
+                # Top row: icon + timestamp + badge
+                top = ctk.CTkFrame(content, fg_color="transparent")
+                top.pack(fill="x")
+
+                type_icon = {"SUCCESS": "✅", "WARNING": "⚠️", "ERROR": "❌"}.get(tp, "📌")
+                ctk.CTkLabel(top, text=type_icon, font=ctk.CTkFont(size=12)
+                             ).pack(side="left", padx=(0, 4))
+                ctk.CTkLabel(top, text=ts, font=ctk.CTkFont(size=10),
+                             text_color=("gray50", "gray60")
+                             ).pack(side="left")
+
+                badge = ctk.CTkFrame(top, fg_color=badge_bg, corner_radius=4)
+                badge.pack(side="left", padx=(8, 0))
+                ctk.CTkLabel(badge, text=tp.title(), font=ctk.CTkFont(size=9, weight="bold"),
+                             text_color="#FFFFFF").pack(padx=6, pady=1)
+
+                # Description (FULL text, no cropping!)
+                desc_label = ctk.CTkLabel(
+                    content, text=desc, font=ctk.CTkFont(size=12),
+                    text_color=("gray20", "gray90"),
+                    anchor="w", justify="left",
+                    wraplength=600
+                )
+                desc_label.pack(fill="x", pady=(3, 0))
+                desc_labels.append(desc_label)
+
+                # Hover effect
+                def bind_hover(frame, orig, hover):
+                    def on_enter(e):
+                        frame.configure(fg_color=hover)
+                    def on_leave(e):
+                        frame.configure(fg_color=orig)
+                    frame.bind("<Enter>", on_enter, add="+")
+                    frame.bind("<Leave>", on_leave, add="+")
+
+                bind_hover(row_frame, row_bg, hover_bg)
+
+            # Update footer
+            shown = len(filtered)
+            text = f"Showing {shown} of {len(all_logs)} total records"
+            if shown != len(all_logs):
+                text += " (filtered)"
+            footer_label.configure(text=text)
+
+        # Dynamic wraplength on resize
+        def update_wraplengths(event=None):
+            avail = log_scroll.winfo_width() - 40
+            if avail > 100:
+                for lbl in desc_labels:
+                    try:
+                        lbl.configure(wraplength=avail)
+                    except:
+                        pass
+
+        log_scroll.bind("<Configure>", update_wraplengths)
+
+        # ---------- 5. FOOTER (Created BEFORE apply_filter to avoid NameError) ----------
+        footer_frame = ctk.CTkFrame(win, fg_color="transparent", height=30)
+        footer_frame.grid(row=4, column=0, sticky="ew", padx=20, pady=(0, 10))
+
+        footer_label = ctk.CTkLabel(
+            footer_frame,
+            text="",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray50", "gray60")
+        )
+        footer_label.pack(side="left")
+        ctk.CTkLabel(
+            footer_frame,
+            text="Refreshes on re-open | Auto-cleanup keeps latest 1000",
+            font=ctk.CTkFont(size=10),
+            text_color=("gray60", "gray70")
+        ).pack(side="right")
+
+        # Wire up search and filter
+        search_var.trace_add("write", lambda *args: apply_filter())
+        filter_var.trace_add("write", lambda *args: apply_filter())
+
+        # Populate initial data
+        apply_filter()
+        win.after(50, lambda: update_wraplengths())
 
     # ============================================================================
     # 5. DATA HANDOFF METHODS (INTER-TAB COMMUNICATION)

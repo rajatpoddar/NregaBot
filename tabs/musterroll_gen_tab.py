@@ -2,7 +2,7 @@
 import tkinter
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
-import os, json, time, base64, sys, subprocess, requests, re, threading
+import os, json, time, base64, sys, subprocess, requests, threading
 from datetime import datetime
 from pypdf import PdfWriter 
 from selenium.webdriver.common.by import By
@@ -14,9 +14,6 @@ from selenium.common.exceptions import (
     StaleElementReferenceException, 
     UnexpectedAlertPresentException
 )
-import openpyxl
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
@@ -33,9 +30,6 @@ class MusterrollGenTab(BaseAutomationTab):
         self.skipped_count = 0
         self.output_dir = ""
         self.current_session_files = []
-        
-        # --- NEW: Data collection for eKYC ---
-        self.collected_mr_data = [] 
         
         self.panchayat_after_id = None 
         self._load_mapping_data() 
@@ -114,18 +108,6 @@ class MusterrollGenTab(BaseAutomationTab):
         self.scale_slider.grid(row=0, column=0, sticky="ew")
         self.scale_label = ctk.CTkLabel(scale_frame, text="75%", width=40)
         self.scale_label.grid(row=0, column=1, padx=(10, 0))
-        
-        # --- NEW: eKYC Checkbox ---
-        self.run_ekyc_var = ctk.BooleanVar(value=False)
-        self.run_ekyc_checkbox = ctk.CTkCheckBox(
-            controls_frame, 
-            text="Run eKYC Verification after Completion", 
-            variable=self.run_ekyc_var,
-            text_color="orange",
-            font=("Arial", 11, "bold")
-        )
-        self.run_ekyc_checkbox.grid(row=6, column=0, columnspan=2, sticky='w', padx=15, pady=10)
-
         ctk.CTkLabel(controls_frame, text="ℹ️ Generated MRs are saved in 'Downloads/NregaBot/MR_Output'.", text_color="gray50").grid(row=6, column=2, columnspan=2, sticky='e', padx=15, pady=(10,15))
         
         action_frame_container = ctk.CTkFrame(self)
@@ -204,7 +186,6 @@ class MusterrollGenTab(BaseAutomationTab):
         self.output_action_combobox.configure(state=state)
         self.work_codes_text.configure(state=state)
         self.save_to_cloud_checkbox.configure(state=state)
-        self.run_ekyc_checkbox.configure(state=state) 
         
         self.export_button.configure(state=state)
         self.export_format_menu.configure(state=state)
@@ -248,7 +229,6 @@ class MusterrollGenTab(BaseAutomationTab):
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         self.success_count, self.skipped_count = 0, 0
         self.current_session_files = [] 
-        self.collected_mr_data = [] 
         self.success_label.configure(text="Success: 0")
         self.skipped_label.configure(text="Skipped/Failed: 0")
         
@@ -262,8 +242,7 @@ class MusterrollGenTab(BaseAutomationTab):
             'scale': self.scale_slider.get(),
             'output_action': self.output_action_combobox.get(), 
             'work_codes_raw': self.work_codes_text.get("1.0", tkinter.END).strip(),
-            'save_to_cloud': self.save_to_cloud_var.get(),
-            'run_ekyc': self.run_ekyc_var.get()
+            'save_to_cloud': self.save_to_cloud_var.get()
         }
 
         if not all(inputs[k] for k in ['panchayat', 'start_date', 'end_date', 'designation', 'staff']):
@@ -344,7 +323,6 @@ class MusterrollGenTab(BaseAutomationTab):
                 self.scale_slider.set(data.get('scale', 75)); self._update_scale_label(self.scale_slider.get())
                 self.output_action_combobox.set(data.get('output_action', 'Save as PDF'))
                 self.save_to_cloud_var.set(data.get('save_to_cloud', True))
-                if data.get("run_ekyc"): self.run_ekyc_var.set(data.get("run_ekyc"))
         except Exception as e: print(f"Error loading inputs: {e}")
 
     def _print_file(self, file_path):
@@ -414,15 +392,6 @@ class MusterrollGenTab(BaseAutomationTab):
                 self.app.after(0, self.update_status, f"Processing {item}", (index+1)/total_items)
                 
                 self._process_single_item(driver, wait, inputs, item, self.output_dir, session_skip_list)
-            
-            # --- START eKYC LOGIC HERE ---
-            if inputs.get('run_ekyc') and not self.app.stop_events[self.automation_key].is_set():
-                if self.collected_mr_data:
-                    self.app.log_message(self.log_display, f"\n--- Starting eKYC Verification ({len(self.collected_mr_data)} workers collected) ---", "info")
-                    self.run_post_mr_ekyc_check(driver, wait, inputs['panchayat'])
-                else:
-                    self.app.log_message(self.log_display, "Warning: No worker data was collected during MR generation. Skipping eKYC.", "warning")
-            # -----------------------------
 
         except Exception as e:
             self.app.log_message(self.log_display, f"A critical error occurred: {e}", "error")
@@ -541,16 +510,6 @@ class MusterrollGenTab(BaseAutomationTab):
                 self._log_result(item, "Skipped", error_reason)
                 session_skip_list.add(full_work_code_text)
                 return
-            
-            # --- UPDATED: Pass extracted code to function ---
-            if inputs.get('run_ekyc'):
-                try:
-                    # Pass the correct work code directly
-                    self._extract_html_data_for_ekyc(driver, full_work_code_text)
-                except Exception as e:
-                    self.app.log_message(self.log_display, f"   - Warning: Failed to extract data for eKYC: {e}", "warning")
-            # --------------------------------------------
-
             self.app.log_message(self.log_display, "   - Muster Roll is valid. Generating output...")
             pdf_path = self._save_mr_as_pdf(driver, full_work_code_text, output_dir, inputs['orientation'], inputs['scale'])
             
@@ -578,352 +537,6 @@ class MusterrollGenTab(BaseAutomationTab):
             error_msg = str(e).splitlines()[0] if str(e) else "Unknown Error"
             self.app.log_message(self.log_display, f"Error on '{item}': {error_msg}", "error")
             self._log_result(item, "Failed", error_msg)
-
-    # --- NEW: HTML Data Extraction Logic (Smart Search) ---
-    def _extract_html_data_for_ekyc(self, driver, known_work_code):
-        """Extracts data and uses the KNOWN Work Code to avoid regex errors."""
-        panchayat_name = "Unknown"
-        work_name = "Unknown"
-        
-        # 1. Header Extraction
-        try:
-            body_text = driver.find_element(By.TAG_NAME, "body").text
-            
-            # Panchayat Name Cleanup
-            p_match = re.search(r"(?:Panchayat|पंचायत)\s*[:\-]\s*([^\n\r]+)", body_text, re.IGNORECASE)
-            if p_match:
-                raw_name = p_match.group(1).strip()
-                # Clean extra text like "Financial Year"
-                separators = ["Financial", "वित्तीय", "Janpad", "जनपद", "District", "Zila", "जिला", "Block", "खंड"]
-                for sep in separators:
-                    if sep.lower() in raw_name.lower():
-                        idx = raw_name.lower().find(sep.lower())
-                        raw_name = raw_name[:idx].strip()
-                panchayat_name = raw_name.rstrip(":-").strip()
-
-            # Work Name Parsing (Work Name is usually safe to extract)
-            wn_match = re.search(r"(?:Work Name|कार्य का नाम)\s*[:\-]\s*([^\n\r]+)", body_text, re.IGNORECASE)
-            if wn_match:
-                work_name = wn_match.group(1).strip()
-                
-        except Exception as e:
-            print(f"Header extraction warning: {e}")
-
-        # 2. Find ALL Worker Tables
-        target_tables = []
-        all_tables = driver.find_elements(By.TAG_NAME, "table")
-        
-        for tbl in all_tables:
-            if "Applicant Name" in tbl.text or "आवेदक का नाम" in tbl.text:
-                target_tables.append(tbl)
-        
-        if not target_tables:
-            self.app.log_message(self.log_display, "   - eKYC Extraction: Could not find any worker table.", "warning")
-            return
-
-        extracted_count = 0
-        
-        for table in target_tables:
-            rows = table.find_elements(By.TAG_NAME, "tr")
-            for row in rows:
-                cols = row.find_elements(By.TAG_NAME, "td")
-                if len(cols) > 4:
-                    try:
-                        col1_text = cols[0].text.strip()
-                        if "S.No" in col1_text or "क्र.सं." in col1_text: continue
-
-                        raw_jc_text = cols[1].text.strip() 
-                        applicant_name = cols[3].text.strip()
-                        village = cols[4].text.strip()
-                        
-                        if applicant_name and village and "Applicant" not in applicant_name:
-                            self.collected_mr_data.append({
-                                'panchayat': panchayat_name,
-                                'work_code': known_work_code, # Use the correct passed code
-                                'work_name': work_name,
-                                'village': village,
-                                'jobcard': raw_jc_text, 
-                                'name': applicant_name
-                            })
-                            extracted_count += 1
-                    except: continue
-        
-        if extracted_count > 0:
-            self.app.log_message(self.log_display, f"   - eKYC Data: Captured {extracted_count} workers (Panchayat: {panchayat_name}).", "info")
-        else:
-            self.app.log_message(self.log_display, "   - eKYC Data: Tables found but no workers extracted.", "warning")
-
-    # --- NEW: eKYC Execution Logic ---
-    def run_post_mr_ekyc_check(self, driver, wait, input_panchayat_name):
-        self.update_status("Starting eKYC Check...", 0)
-        
-        if not self.collected_mr_data: return
-
-        # Determine best Panchayat Name
-        target_panchayat_name = input_panchayat_name
-        for rec in self.collected_mr_data:
-            if rec.get('panchayat') and rec.get('panchayat') != "Unknown":
-                target_panchayat_name = rec['panchayat']
-                break
-        
-        self.app.log_message(self.log_display, f"Using Panchayat name for eKYC: '{target_panchayat_name}'")
-
-        unique_villages = list(set(item['village'] for item in self.collected_mr_data if item['village']))
-        self.app.log_message(self.log_display, f"Found {len(unique_villages)} unique villages to check.", "info")
-        
-        if not unique_villages: return
-
-        # Open eKYC Page
-        driver.get("https://nregade4.nic.in/Netnrega/UID/AppABPSRpt.aspx")
-        
-        # Uncheck Pending
-        try:
-            chk = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_chbx_freshCase")))
-            if driver.execute_script("return arguments[0].checked;", chk):
-                driver.execute_script("arguments[0].click();", chk)
-                try: wait.until(EC.staleness_of(chk))
-                except: time.sleep(2)
-        except: pass
-
-        # Select Panchayat
-        try:
-            self.app.log_message(self.log_display, f"Selecting Panchayat...")
-            panchayat_elem = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
-            old_html = driver.find_element(By.TAG_NAME, "html")
-            
-            select = Select(panchayat_elem)
-            try:
-                select.select_by_visible_text(target_panchayat_name)
-            except NoSuchElementException:
-                self.app.log_message(self.log_display, "Exact name match failed, trying case-insensitive...", "warning")
-                found_opt = False
-                for opt in select.options:
-                    if opt.text.lower() == target_panchayat_name.lower():
-                        select.select_by_visible_text(opt.text)
-                        found_opt = True
-                        break
-                if not found_opt: raise Exception(f"Panchayat '{target_panchayat_name}' not found.")
-
-            try: wait.until(EC.staleness_of(old_html))
-            except: time.sleep(3)
-        except Exception as e:
-            self.app.log_message(self.log_display, f"eKYC: Panchayat selection failed: {e}", "error")
-            return
-
-        # Scan Villages
-        scraped_ekyc_data = {} 
-        
-        for idx, v_name in enumerate(unique_villages, 1):
-            if self.app.stop_events[self.automation_key].is_set(): break
-            
-            self.update_status(f"eKYC Checking Village {idx}/{len(unique_villages)}: {v_name}")
-            self.app.log_message(self.log_display, f"Scanning Village: {v_name}", "info")
-            
-            try:
-                old_html = driver.find_element(By.TAG_NAME, "html")
-                v_dd_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
-                Select(v_dd_elem).select_by_visible_text(v_name)
-                try: wait.until(EC.staleness_of(old_html))
-                except: time.sleep(2)
-            except:
-                self.app.log_message(self.log_display, f"Skipping {v_name} (Selection Failed)", "error")
-                continue
-
-            # Force Reset to Page 1
-            try:
-                page_one_links = driver.find_elements(By.XPATH, "//a[contains(@href,'Page$1')]")
-                if page_one_links:
-                    old_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_gvData")
-                    driver.execute_script("arguments[0].click();", page_one_links[0])
-                    try: wait.until(EC.staleness_of(old_table))
-                    except: time.sleep(2)
-            except: pass
-
-            current_page = 1
-            while True:
-                try:
-                    table = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_gvData")))
-                    rows = table.find_elements(By.TAG_NAME, "tr")
-                    
-                    if len(rows) > 1:
-                        for row in rows[1:]:
-                            cols = row.find_elements(By.TAG_NAME, "td")
-                            if len(cols) < 5: continue
-                            try:
-                                jc_text = cols[1].text.strip()
-                                
-                                # --- UPDATE: Capture ABPS Status ---
-                                abps_stat = cols[-2].text.strip() # 2nd Last Column
-                                ekyc_stat = cols[-1].text.strip() # Last Column
-                                
-                                clean_jc = "".join(jc_text.split()).lower()
-                                key = (v_name, clean_jc)
-                                
-                                # Store both statuses
-                                scraped_ekyc_data[key] = {
-                                    'ekyc': ekyc_stat,
-                                    'abps': abps_stat
-                                }
-                            except: continue
-                    
-                    next_btns = driver.find_elements(By.XPATH, f"//a[contains(@href, 'Page${current_page + 1}')]")
-                    if next_btns:
-                        self.update_status(f"Scanning {v_name} - Page {current_page + 1}...")
-                        driver.execute_script("arguments[0].click();", next_btns[0])
-                        time.sleep(2)
-                        current_page += 1
-                    else: break
-                except: break
-
-        self._generate_ekyc_verification_report(scraped_ekyc_data)
-
-    def _generate_ekyc_verification_report(self, scraped_data):
-        self.app.log_message(self.log_display, "Generating Professional Verification Report...", "info")
-        
-        failed_ekyc_records = []
-        
-        for record in self.collected_mr_data:
-            v_name = record['village']
-            raw_jc = record['jobcard']
-            
-            clean_mr_jc = "".join(raw_jc.split()).lower()
-            
-            # Default Status
-            ekyc_status = "Not Found"
-            abps_status = "Not Found"
-            
-            found = False
-            for (sk_village, sk_jc), stats in scraped_data.items():
-                if sk_village == v_name and (clean_mr_jc in sk_jc or sk_jc in clean_mr_jc):
-                    ekyc_status = stats.get('ekyc', 'Unknown')
-                    abps_status = stats.get('abps', 'Unknown')
-                    found = True
-                    break
-            
-            # --- LOGIC UPDATE: Add if eKYC is NO *OR* ABPS is NO ---
-            is_ekyc_bad = "no" in ekyc_status.lower() or "not found" in ekyc_status.lower()
-            is_abps_bad = "no" in abps_status.lower()
-            
-            if is_ekyc_bad or is_abps_bad:
-                full_wc = record['work_code']
-                short_wc = full_wc[-6:] if len(full_wc) >= 6 else full_wc
-                
-                failed_ekyc_records.append([
-                    short_wc,
-                    record['work_name'],
-                    record['panchayat'],
-                    record['village'],
-                    record['jobcard'],
-                    record['name'],
-                    abps_status, # New Column Data
-                    ekyc_status
-                ])
-
-        if not failed_ekyc_records:
-            self.app.log_message(self.log_display, "Verification Complete: All laborers have eKYC & ABPS Verified.", "success")
-            return
-
-        # Save Professional Excel
-        try:
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "Verification Report"
-            
-            # --- STYLES ---
-            header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid") # Dark Blue
-            header_font = Font(bold=True, color="FFFFFF", size=11)
-            
-            title_font = Font(size=16, bold=True, color="1F497D")
-            subtitle_font = Font(size=10, italic=True, color="555555")
-            
-            border = Border(
-                left=Side(style='thin'), right=Side(style='thin'), 
-                top=Side(style='thin'), bottom=Side(style='thin')
-            )
-            
-            center_align = Alignment(horizontal="center", vertical="center")
-            left_align = Alignment(horizontal="left", vertical="center")
-
-            # --- HEADER SECTION ---
-            # Title
-            ws.merge_cells('A1:H1')
-            ws['A1'] = f"ABPS & eKYC VERIFICATION REPORT: {self.panchayat_entry.get().upper()}"
-            ws['A1'].font = title_font
-            ws['A1'].alignment = center_align
-            
-            # Subtitle (Promotion & Date)
-            ws.merge_cells('A2:H2')
-            ws['A2'] = f"Generated by NregaBot.com | Date: {datetime.now().strftime('%d-%b-%Y %I:%M %p')}"
-            ws['A2'].font = subtitle_font
-            ws['A2'].alignment = center_align
-
-            # --- TABLE HEADERS ---
-            headers = [
-                "Work Code (Last 6)", "Work Name", "Panchayat", "Village", 
-                "Job Card No", "Applicant Name", "ABPS/ NPCI", "eKYC Status"
-            ]
-            
-            # Row 4 is for headers
-            for col_num, header in enumerate(headers, 1):
-                cell = ws.cell(row=4, column=col_num, value=header)
-                cell.font = header_font
-                cell.fill = header_fill
-                cell.alignment = center_align
-                cell.border = border
-
-            # --- DATA ROWS ---
-            start_row = 5
-            for idx, row_data in enumerate(failed_ekyc_records, start=start_row):
-                # (wc, work_name, panchayat, village, jc, name, abps, ekyc)
-                
-                # Standard Columns
-                ws.cell(row=idx, column=1, value=row_data[0]).alignment = center_align
-                ws.cell(row=idx, column=2, value=row_data[1]).alignment = left_align # Work Name Left
-                ws.cell(row=idx, column=3, value=row_data[2]).alignment = center_align
-                ws.cell(row=idx, column=4, value=row_data[3]).alignment = center_align
-                ws.cell(row=idx, column=5, value=row_data[4]).alignment = center_align
-                ws.cell(row=idx, column=6, value=row_data[5]).alignment = left_align # Name Left
-                
-                # Status Columns with Conditional Formatting (Red text if NO)
-                abps_cell = ws.cell(row=idx, column=7, value=row_data[6])
-                abps_cell.alignment = center_align
-                if "no" in str(row_data[6]).lower():
-                    abps_cell.font = Font(color="FF0000", bold=True)
-                else:
-                    abps_cell.font = Font(color="008000", bold=True) # Green for Yes
-
-                ekyc_cell = ws.cell(row=idx, column=8, value=row_data[7])
-                ekyc_cell.alignment = center_align
-                if "no" in str(row_data[7]).lower() or "not" in str(row_data[7]).lower():
-                    ekyc_cell.font = Font(color="FF0000", bold=True)
-                else:
-                    ekyc_cell.font = Font(color="008000", bold=True)
-
-                # Apply Borders to all cells in row
-                for col in range(1, 9):
-                    ws.cell(row=idx, column=col).border = border
-
-            # --- COLUMN WIDTHS ---
-            ws.column_dimensions['A'].width = 15
-            ws.column_dimensions['B'].width = 40 # Work Name wider
-            ws.column_dimensions['C'].width = 15
-            ws.column_dimensions['D'].width = 15
-            ws.column_dimensions['E'].width = 22
-            ws.column_dimensions['F'].width = 25
-            ws.column_dimensions['G'].width = 15
-            ws.column_dimensions['H'].width = 15
-            
-            # Save Path
-            filename = f"Verification_Report_{self.panchayat_entry.get()}_{datetime.now().strftime('%d%m%Y_%H%M')}.xlsx"
-            save_path = os.path.join(self.output_dir, filename)
-            
-            wb.save(save_path)
-            self.app.log_message(self.log_display, f"Report Saved: {save_path}", "success")
-            
-            # Note: Popup is handled by caller function (the completion dialog will open folder)
-                
-        except Exception as e:
-            self.app.log_message(self.log_display, f"Failed to save verification report: {e}", "error")
 
     def _save_mr_as_pdf(self, driver, full_work_code, output_dir, orientation, scale):
         try:
