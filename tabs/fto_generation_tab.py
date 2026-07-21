@@ -5,16 +5,17 @@ import customtkinter as ctk
 import time, json, os, re
 import threading
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait, Select
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoAlertPresentException, StaleElementReferenceException
 
 import config
 from .base_tab import BaseAutomationTab
 
 class FtoGenerationTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait, Select
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoAlertPresentException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="fto_gen")
         self.automation_has_run = False 
         self.stored_location_data = {} 
@@ -31,6 +32,19 @@ class FtoGenerationTab(BaseAutomationTab):
         self._load_saved_path()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         # Main container
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", pady=(0, 2)) 
@@ -125,6 +139,18 @@ class FtoGenerationTab(BaseAutomationTab):
     # ============================================================================
 
     def _browse_firefox(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         path = filedialog.askopenfilename(
             title="Select Old Firefox Executable",
             filetypes=[("Executable Files", "*.exe")]
@@ -175,6 +201,18 @@ class FtoGenerationTab(BaseAutomationTab):
         threading.Thread(target=_thread, daemon=True).start()
 
     def _save_path(self, path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.app.update_history("old_firefox_path", path)
 
     def _load_saved_path(self):
@@ -208,6 +246,18 @@ class FtoGenerationTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_generation_logic)
 
     def start_delete_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         if not messagebox.askyesno("Confirm Delete", "This will delete the FIRST FTO in the dropdown.\n\nEnsure you want to proceed."):
             return
         self.app.start_automation_thread(self.automation_key + "_del", self.run_delete_logic)
@@ -220,6 +270,18 @@ class FtoGenerationTab(BaseAutomationTab):
     # ============================================================================
 
     def run_generation_logic(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
@@ -249,6 +311,18 @@ class FtoGenerationTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def _process_verification_page(self, driver, wait, url, name):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             self.app.log_message(self.log_display, f"Navigating to {name}...")
             driver.get(url)
@@ -286,11 +360,35 @@ class FtoGenerationTab(BaseAutomationTab):
             self._log_result(name, "Error", str(e))
 
     def _scrape_location_from_page(self, driver):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Helper to scrape District, Block, Panchayat from TABLE CELLS (Not IDs)."""
         try:
             self.app.log_message(self.log_display, "Capturing location info...")
             
             def get_text_by_xpath(label):
+                # ---- Lazy imports ----
+                from selenium.webdriver.common.by import By
+                from selenium.webdriver.support.ui import Select, WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+                from selenium.common.exceptions import NoAlertPresentException
+                from selenium import webdriver
+                import openpyxl
+                from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+                from openpyxl.utils import get_column_letter
+                from openpyxl.worksheet.page import PageMargins
+                from openpyxl.drawing.image import Image as XLImage
                 try:
                     # Finds <td> containing "District" and gets text
                     elem = driver.find_element(By.XPATH, f"//td[contains(text(), '{label}')]")
@@ -327,6 +425,18 @@ class FtoGenerationTab(BaseAutomationTab):
     # ============================================================================
     
     def run_delete_logic(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.update_status("Starting Deletion...", 0)
@@ -353,6 +463,18 @@ class FtoGenerationTab(BaseAutomationTab):
             self.app.after(0, self.update_status, "Ready", 1.0)
 
     def _process_deletion_page(self, driver, wait, url, log_name):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             self.app.log_message(self.log_display, f"Navigating to {log_name}...")
             driver.get(url)
@@ -375,11 +497,21 @@ class FtoGenerationTab(BaseAutomationTab):
             select.select_by_index(1)
 
             self.app.log_message(self.log_display, "Waiting for reload...")
-            time.sleep(3) 
+            try:
+                WebDriverWait(driver, 10).until(
+                    lambda d: d.execute_script('return document.readyState') == 'complete'
+                )
+            except TimeoutException:
+                pass
             
             self.app.log_message(self.log_display, "Scrolling to bottom...")
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(1)
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                )
+            except (TimeoutException, NoSuchElementException):
+                pass
 
             max_retries = 3
             radio_found = False
@@ -387,21 +519,41 @@ class FtoGenerationTab(BaseAutomationTab):
                 try:
                     no_radio = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_rb_chkfto_n")))
                     driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", no_radio)
-                    time.sleep(1)
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
                     driver.execute_script("arguments[0].click();", no_radio)
                     self.app.log_message(self.log_display, "Selected 'No'.")
                     radio_found = True
                     break
                 except StaleElementReferenceException:
-                    time.sleep(2)
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
                 except Exception:
-                    time.sleep(1)
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
 
             if not radio_found:
                 self.app.log_message(self.log_display, "Could not find 'No' radio button (Check filters or scroll).", "error")
                 return
 
-            time.sleep(2)
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                )
+            except (TimeoutException, NoSuchElementException):
+                pass
             try:
                 sign_btn = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btn")
                 driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", sign_btn)

@@ -19,12 +19,31 @@ OS_SYSTEM = platform.system()
 
 # --- Centralized Style and Icon Configuration fix---
 ICONS = {
-    "MR Gen": "📄", "MR Payment": "💳", "FTO Generation": "📤",
-    "Gen Wagelist": "📋", "Send Wagelist": "➡️", "Verify Jobcard": "✅",
-    "eMB Entry": "✏️", "eMB Verify": "🔍", "WC Gen (Abua)": "🏗️", "IF Editor (Abua)": "🔧",
-    "Add Activity": "🪄","Verify ABPS": "💳",  "Workcode Extractor": "✂️", "Scheme Closing": "🏁", "Material Entry": "🧱", "Delete Applicant": "🗑️",
-    "Update Outcome": "📊", "Duplicate MR Print": "📠", "Feedback": "💬","File Manager": "📁", "Resend Rejected WG": "🔁", "Demand": "📝", "Sarkar Aapke Dwar": "⛺", "MR Tracking": "🕵️",# <-- ADD THIS LINE
-    "About": "ℹ️", "Theme": {"light": "🌙", "dark": "☀️"}
+    # MR & Wage Management
+    "Demand": "📝", "Work Allocation": "📋", "Muster Roll Gen": "📄",
+    "Mate/Mistri MR": "👥", "MR Fill": "✍️", "MR Payment": "💳",
+    "Gen Wagelist": "📋", "Send Wagelist": "➡️", "FTO Generation": "📤",
+    "Duplicate MR Print": "📠", "Material Entry": "🧱",
+    # JE & AE Approval
+    "eMB Entry": "✏️", "eMB Verify": "🔍",
+    # Schemes Related
+    "Work Code Gen": "🏗️", "IF Editor": "🔧", "Update Estimate": "📊",
+    "Physical Complete": "✅", "Scheme Closing": "🏁", "Add Activity": "🪄",
+    # Verification & Utility
+    "Job Card Verify": "✅", "Verify ABPS": "💳", "Del Work Alloc": "🗑️",
+    "Delete Demand": "📝", "Delete Applicant": "🗑️", "Zero MR": "0️⃣",
+    "Resend Rejected WG": "🔁", "Sarkar Aapke Dwar": "⛺", "SAD Update Status": "📊",
+    # Reports & Tracking
+    "MR Tracking": "🕵️", "Dashboard Report": "📈", "MIS Reports": "📊",
+    "Issued MR Details": "📋", "eKYC Report": "🆔", "Social Audit Report": "📝",
+    "NMMS Attendance": "📋",
+    # Smart Tools
+    "Macro Manager": "⚙️", "Login Automation": "🤖", "PDF Merger": "📑",
+    "Workcode Extractor": "✂️", "File Manager": "📁",
+    # About & Help
+    "Feedback": "💬", "About": "ℹ️",
+    # Theme
+    "Theme": {"light": "🌙", "dark": "☀️"}
 }
 
 # --- Automation Configurations --- 

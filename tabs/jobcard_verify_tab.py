@@ -4,10 +4,6 @@ from tkinter import messagebox, filedialog
 import customtkinter as ctk
 import time, os, sys, json
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
@@ -19,6 +15,14 @@ def resource_path(relative_path):
 
 class JobcardVerifyTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import NoSuchElementException, TimeoutException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import NoSuchElementException, TimeoutException
         super().__init__(parent, app_instance, automation_key="jc_verify")
         self.photo_folder_path = ""
         self.pref_file = os.path.join(os.path.abspath("."), "jc_verify_prefs.json") 
@@ -27,6 +31,13 @@ class JobcardVerifyTab(BaseAutomationTab):
         self._load_saved_preferences()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         controls_frame.grid_columnconfigure(1, weight=1)
@@ -119,6 +130,12 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.village_entry.configure(state="normal")
 
     def select_photo_folder(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         path = filedialog.askdirectory(title="Select Folder Containing Photos")
         if path:
             self.photo_folder_path = path
@@ -126,6 +143,12 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Selected photo folder: {self.photo_folder_path}")
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure?"):
             self.panchayat_entry.delete(0, tkinter.END)
             self.village_entry.delete(0, tkinter.END)
@@ -178,6 +201,12 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Error finding photo for {jobcard_no}: {e}", "error"); return None
 
     def run_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.log_message(self.log_display, "🚀 Starting Jobcard Verification...")
@@ -251,6 +280,12 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
     
     def _process_jobcards_for_current_page(self, driver, wait, verify_account_only):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         row_index = 2 
         while not self.app.stop_events[self.automation_key].is_set():
             row_id_base = f"ctl00_ContentPlaceHolder1_grdData_ctl{row_index:02d}"
@@ -327,7 +362,7 @@ class JobcardVerifyTab(BaseAutomationTab):
                 self.app.log_message(self.log_display, f"     - Saved: {final_alert.text}", "success")
                 final_alert.accept()
                 
-                time.sleep(1)
+                # Element wait handled by WebDriverWait below
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch")))
                 row_index = 2
             except Exception as e:
@@ -335,6 +370,12 @@ class JobcardVerifyTab(BaseAutomationTab):
                 row_index += 1
 
     def _handle_pagination(self, driver, wait, current_page_num):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         """Attempts to find and click the next page button using Link Text (Numbers) or '...'"""
         try:
             # IMPORTANT: Disable implicit wait for this check so we don't wait 20s if page not found

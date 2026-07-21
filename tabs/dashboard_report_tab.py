@@ -6,15 +6,8 @@ import time, os, re, json, subprocess
 from datetime import datetime
 
 # --- EXCEL IMPORT ---
-import openpyxl
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.utils import get_column_letter
 
 # Selenium Imports
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 # PDF & Image Imports
 from fpdf import FPDF
@@ -26,6 +19,26 @@ import config
 
 class DashboardReportTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException
         super().__init__(parent, app_instance, automation_key="dashboard_report")
         
         self.grid_columnconfigure(0, weight=1)
@@ -40,6 +53,18 @@ class DashboardReportTab(BaseAutomationTab):
         self.load_inputs()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="new", padx=10, pady=10)
         controls_frame.grid_columnconfigure(1, weight=1)
@@ -149,6 +174,17 @@ class DashboardReportTab(BaseAutomationTab):
         pass
         
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.run_mr_fill_button.pack_forget()
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         self._update_workcode_textbox("") 
@@ -173,6 +209,17 @@ class DashboardReportTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def _solve_captcha(self, driver, wait):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.app.log_message(self.log_display, "Attempting to solve CAPTCHA...")
         try:
             captcha_element = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lblStopSpam")))
@@ -183,7 +230,7 @@ class DashboardReportTab(BaseAutomationTab):
             result = num1 + num2 if operator == '+' else (num1 - num2 if operator == '-' else num1 * num2)
             driver.find_element(By.ID, "ContentPlaceHolder1_txtCaptcha").send_keys(str(result))
             driver.find_element(By.ID, "ContentPlaceHolder1_btnLogin").click()
-            time.sleep(1)
+            time.sleep(1.0)  # Short wait after click
             if "Invalid Captcha Code" in driver.page_source: raise ValueError("CAPTCHA failed.")
             return True
         except TimeoutException:
@@ -194,6 +241,17 @@ class DashboardReportTab(BaseAutomationTab):
             raise
 
     def run_automation_logic(self, inputs, retries=1):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Starting Dashboard Report...") 
         self.app.after(0, self.update_status, "Initializing...", 0.0) 
@@ -328,6 +386,17 @@ class DashboardReportTab(BaseAutomationTab):
     # =========================================================================
 
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "No results to export.")
             return
@@ -393,6 +462,17 @@ class DashboardReportTab(BaseAutomationTab):
                     messagebox.showinfo("Success", f"PNG report saved:\n{file_path}")
 
     def _save_to_excel(self, data, headers, title, subtitle, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             wb = openpyxl.Workbook(); ws = wb.active
             ws.title = "Report"
@@ -462,6 +542,17 @@ class DashboardReportTab(BaseAutomationTab):
             messagebox.showerror("Export Error", f"{e}"); return False
 
     def generate_report_pdf(self, data, headers, col_widths, title, subtitle, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         class ProPDF(FPDF):
             def footer(self):
                 self.set_y(-15); self.set_font('Arial', 'I', 8)
@@ -563,6 +654,17 @@ class DashboardReportTab(BaseAutomationTab):
             messagebox.showerror("PDF Error", f"{e}"); return False
 
     def _save_to_png(self, data, headers, title, subtitle, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             # Font Setup
             try:

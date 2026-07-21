@@ -39,6 +39,14 @@ class DelWorkAllocTab(BaseAutomationTab):
         self._create_widgets()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         """Initializes and packs the UI components."""
         
         # --- Section 1: Input Controls ---
@@ -164,6 +172,14 @@ class DelWorkAllocTab(BaseAutomationTab):
         self.jobcards_text.configure(state=state)
 
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         """Validates inputs and spawns the automation thread."""
         panchayat = self.panchayat_entry.get().strip()
         from_dates_raw = self.from_date_entry.get().strip()
@@ -191,6 +207,14 @@ class DelWorkAllocTab(BaseAutomationTab):
         )
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         """Resets the form to default state."""
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self.panchayat_entry.delete(0, tkinter.END)
@@ -204,6 +228,14 @@ class DelWorkAllocTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def _safe_load_page(self, driver, url):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         """
         Robustly loads a page with retries, specifically handling
         'frame does not have execution context' errors.
@@ -234,6 +266,14 @@ class DelWorkAllocTab(BaseAutomationTab):
         return False
 
     def run_automation_logic(self, panchayat, jobcard_list, target_dates):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         """
         The main worker function.
         """
@@ -342,6 +382,14 @@ class DelWorkAllocTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _process_single_id(self, driver, wait, panchayat, item_id, is_auto_mode, filter_dates):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         """
         Processes a single Jobcard/Reg ID.
         """
@@ -355,7 +403,7 @@ class DelWorkAllocTab(BaseAutomationTab):
                 search_box.send_keys(Keys.TAB)
                 
                 # Wait for dropdown update
-                time.sleep(1.5) 
+                # Element wait handled by WebDriverWait below
 
             reg_id_dropdown_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
             reg_id_dropdown = Select(reg_id_dropdown_element)

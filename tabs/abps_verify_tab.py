@@ -6,10 +6,6 @@ import time
 import os
 import re
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException
 
 import config
 from .base_tab import BaseAutomationTab
@@ -17,12 +13,27 @@ from .autocomplete_widget import AutocompleteEntry
 
 class AbpsVerifyTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="abps_verify")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+
         # --- Controls Frame ---
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
@@ -87,6 +98,12 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
 
     def set_ui_state(self, running: bool):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.panchayat_entry.configure(state=state)
@@ -103,6 +120,12 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(panchayat, village))
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self.panchayat_entry.delete(0, tkinter.END)
             self.village_entry.delete(0, tkinter.END)
@@ -114,6 +137,12 @@ class AbpsVerifyTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def run_automation_logic(self, panchayat, village):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
@@ -149,7 +178,12 @@ class AbpsVerifyTab(BaseAutomationTab):
                     # Fallback locator
                     panchayat_select = driver.find_element(By.NAME, "ctl00$ContentPlaceHolder1$DDL_panchayat")
                     Select(panchayat_select).select_by_visible_text(panchayat)
-                    time.sleep(1)
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'DDL_Village'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
                  except:
                      raise Exception("Could not find Panchayat dropdown.")
 
@@ -302,6 +336,12 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(job_card, app_name, status, timestamp), tags=tags))
 
     def export_to_pdf(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         """Exports the current Treeview results to a Professional PDF using base_tab utility."""
         
         # 1. Check if there is data

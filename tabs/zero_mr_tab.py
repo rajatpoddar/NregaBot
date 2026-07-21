@@ -5,16 +5,20 @@ import customtkinter as ctk
 import json
 import os, sys, subprocess, time
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException, StaleElementReferenceException
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 
 class ZeroMrTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException, StaleElementReferenceException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="zero_mr")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -22,6 +26,15 @@ class ZeroMrTab(BaseAutomationTab):
         self.load_inputs()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+
         # Frame for all user input controls
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
@@ -119,6 +132,14 @@ class ZeroMrTab(BaseAutomationTab):
         if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         self.panchayat_entry.delete(0, tkinter.END)
         self.work_list_text.delete("1.0", tkinter.END)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
@@ -128,6 +149,14 @@ class ZeroMrTab(BaseAutomationTab):
         self.app.after(0, self.app.set_status, "Ready")
 
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         self.app.clear_log(self.log_display)
 
@@ -171,6 +200,14 @@ class ZeroMrTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Starting Zero MR...")
         self.app.log_message(self.log_display, "Starting Zero MR automation...")
@@ -205,7 +242,12 @@ class ZeroMrTab(BaseAutomationTab):
             if fin_year_select.first_selected_option.text != inputs['fin_year']:
                 fin_year_select.select_by_visible_text(inputs['fin_year'])
                 self.app.log_message(self.log_display, "Waiting for Fin Year postback...")
-                time.sleep(2) # Wait for postback
+                try:
+                    WebDriverWait(driver, 10).until(
+                        lambda d: d.execute_script('return document.readyState') == 'complete'
+                    )
+                except TimeoutException:
+                    pass
 
             self.app.after(0, self.app.set_status, "Setting Panchayat...")
             self.app.log_message(self.log_display, f"Selecting Panchayat: {inputs['panchayat_name']}")
@@ -217,7 +259,12 @@ class ZeroMrTab(BaseAutomationTab):
             if panchayat_select.first_selected_option.text != match:
                 panchayat_select.select_by_visible_text(match)
                 self.app.log_message(self.log_display, "Waiting for Panchayat postback...")
-                time.sleep(2) # Wait for postback
+                try:
+                    WebDriverWait(driver, 10).until(
+                        lambda d: d.execute_script('return document.readyState') == 'complete'
+                    )
+                except TimeoutException:
+                    pass
             
             self.app.log_message(self.log_display, "Setup complete. Starting item processing...", "success")
             
@@ -249,6 +296,14 @@ class ZeroMrTab(BaseAutomationTab):
             self.app.after(100, lambda: messagebox.showinfo("Complete", f"{final_status}. Check results."))
 
     def _process_single_item(self, driver, wait, work_key, msr_no):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         try:
             self.app.log_message(self.log_display, f"   - Processing Key: {work_key}, MSR: {msr_no}")
             
@@ -274,6 +329,14 @@ class ZeroMrTab(BaseAutomationTab):
             # Instead of just waiting for *any* options, we wait until an option 
             # containing our 'work_key' actually appears. This prevents reading stale data.
             def work_code_option_present(d):
+                # ---- Lazy imports ----
+                from selenium.webdriver.common.by import By
+                from selenium.webdriver.support.ui import Select, WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+                from selenium.webdriver.common.keys import Keys
+                from selenium.common.exceptions import NoAlertPresentException
+                from selenium import webdriver
                 try:
                     select_elem = d.find_element(By.ID, "ddlworkcode")
                     # Get all options. Using find_elements is safer/faster than Select.options loop for simple text check
@@ -344,6 +407,14 @@ class ZeroMrTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "   - Waiting for result message...")
             
             def message_or_error_visible(d):
+                # ---- Lazy imports ----
+                from selenium.webdriver.common.by import By
+                from selenium.webdriver.support.ui import Select, WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+                from selenium.webdriver.common.keys import Keys
+                from selenium.common.exceptions import NoAlertPresentException
+                from selenium import webdriver
                 msg = d.find_elements(By.ID, "lblmsg")
                 err = d.find_elements(By.ID, "ValidationSummary1")
                 if msg and msg[0].is_displayed() and msg[0].text.strip(): return msg[0]
@@ -375,6 +446,14 @@ class ZeroMrTab(BaseAutomationTab):
             self._log_result(work_key, msr_no, "Failed", error_msg)
 
     def retry_logic_handler(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         """
         Custom Retry Logic for Work Allocation.
         Extracts failed Work Keys from the results tree and restarts automation
@@ -437,6 +516,14 @@ class ZeroMrTab(BaseAutomationTab):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
 
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         export_format = self.export_format_menu.get()
         panchayat_name = self.panchayat_entry.get().strip()
 
@@ -458,6 +545,14 @@ class ZeroMrTab(BaseAutomationTab):
             self._handle_pdf_export(data, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         all_items = self.results_tree.get_children()
         if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
         
@@ -482,6 +577,14 @@ class ZeroMrTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         try:
             headers = self.results_tree['columns']
             col_widths = [40, 40, 40, 130, 40] # Adjusted widths for A4 Landscape

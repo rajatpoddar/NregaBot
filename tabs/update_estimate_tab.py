@@ -3,22 +3,39 @@ import tkinter
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import time, csv, sys, os, subprocess, re  # <-- ADD 're'
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException
 from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
 
 class UpdateEstimateTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException
         super().__init__(parent, app_instance, automation_key="update_estimate")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         """Creates the UI elements for the tab, inspired by the MSR Tab layout."""
         # --- Top Controls Frame ---
         controls_frame = ctk.CTkFrame(self)
@@ -110,6 +127,18 @@ class UpdateEstimateTab(BaseAutomationTab):
         self.app.start_automation_thread(key=self.automation_key, target=self.run_automation_logic)
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Resets the UI to its initial state."""
         if messagebox.askokcancel("Reset Form?", "This will clear all inputs, results, and logs. Continue?"):
             self.estimated_outcome_entry.delete(0, tkinter.END)
@@ -121,6 +150,18 @@ class UpdateEstimateTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "Form has been reset.")
 
     def run_automation_logic(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """The core logic for the Update Estimate automation."""
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Running: Update Estimate")
@@ -163,10 +204,22 @@ class UpdateEstimateTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def _process_single_task(self, driver, wait, work_code, outcome):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Processes a single work code and outcome value."""
         try:
             # Add a 1-second delay before starting to avoid race conditions
-            time.sleep(1)
+            # Element wait handled by WebDriverWait below
 
             search_box = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_txtwrksearchkey")))
             search_box.clear()
@@ -250,6 +303,18 @@ class UpdateEstimateTab(BaseAutomationTab):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_code, outcome, status.upper(), details, timestamp), tags=tags))
     
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Exports the data from the results tree to the selected format."""
         export_format = self.export_format_menu.get()
         

@@ -6,11 +6,6 @@ import os, csv, time, pyperclip, sys, threading, json, webbrowser, requests
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 from collections import defaultdict
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementNotInteractableException
 import config
 from .base_tab import BaseAutomationTab
 from .date_entry_widget import DateEntry
@@ -19,6 +14,11 @@ from .demand_tab import CloudFilePicker
 
 class WcGenTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementNotInteractableException
         super().__init__(parent, app_instance, automation_key="wc_gen")
         self.csv_path = None
         self.undertaking_pdf_path = None 
@@ -35,6 +35,20 @@ class WcGenTab(BaseAutomationTab):
         self._load_profiles_from_file()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         notebook = ctk.CTkTabview(self)
         notebook.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
@@ -165,6 +179,19 @@ class WcGenTab(BaseAutomationTab):
         self._create_log_and_status_area(notebook)
 
     def _select_undertaking_pdf(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             path = filedialog.askopenfilename(
                 parent=self, 
@@ -224,7 +251,7 @@ class WcGenTab(BaseAutomationTab):
         temp_path = self.app.get_data_path(f"cloud_download_wc_gen_{filename}")
         
         try:
-            with requests.get(url, headers=headers, stream=True, timeout=30) as r:
+            with self.app.http_session.get(url, headers=headers, stream=True, timeout=30) as r:
                 r.raise_for_status() 
                 with open(temp_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192): 
@@ -269,6 +296,19 @@ class WcGenTab(BaseAutomationTab):
             messagebox.showerror("Export Error", f"An error occurred while exporting:\n{e}")
 
     def _create_field(self, parent, key, text, row, is_dropdown=False):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         ctk.CTkLabel(parent, text=text).grid(row=row, column=0, sticky="w", padx=15, pady=5)
         if is_dropdown:
             widget = ctk.CTkComboBox(parent, values=[], state="disabled", command=lambda choice, k=key: self._on_dropdown_select(k, choice))
@@ -384,6 +424,19 @@ class WcGenTab(BaseAutomationTab):
         self.app.log_message(self.log_display, f"Profile '{profile_name}' loaded. Click 'Load Categories' to continue.")
 
     def _delete_profile(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         profile_name = self.profile_combobox.get()
         if not profile_name or profile_name not in self.profiles or profile_name == "Last Used Config":
             messagebox.showwarning("Selection Error", "Please select a valid, user-saved profile to delete.")
@@ -407,6 +460,19 @@ class WcGenTab(BaseAutomationTab):
             messagebox.showerror("Error", f"Failed to delete profile: {e}")
 
     def _start_category_loading_thread(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         panchayat = self.panchayat_entry.get().strip()
         if not panchayat:
             messagebox.showwarning("Input Required", "Please enter a Panchayat Name first.")
@@ -416,6 +482,19 @@ class WcGenTab(BaseAutomationTab):
         threading.Thread(target=self._load_initial_categories, daemon=True).start()
 
     def _load_initial_categories(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             driver = self.app.get_driver()
             if not driver:
@@ -459,6 +538,19 @@ class WcGenTab(BaseAutomationTab):
 
     def _update_ui_after_load(self, master_cat_options, agency_options):
         # Optimized: Single pass to enable fields
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         for child in self.step2_frame.winfo_children():
              if isinstance(child, (ctk.CTkEntry, ctk.CTkComboBox, DateEntry)):
                 child.configure(state="normal")
@@ -490,12 +582,38 @@ class WcGenTab(BaseAutomationTab):
                     field.insert(0, val)
 
     def _on_dropdown_select(self, dropdown_key, selection):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         if not selection:
             return
         self.app.log_message(self.log_display, f"Selected {dropdown_key}: '{selection}'. Fetching next options...")
         threading.Thread(target=self._update_dependent_dropdown, args=(dropdown_key, selection), daemon=True).start()
     
     def _update_dependent_dropdown(self, dropdown_key, selection):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         dependency_map = {
             'master_category': {'next': 'work_category', 'id': 'ContentPlaceHolder1_ddlMastercategory', 'next_id': 'ContentPlaceHolder1_ddlproposed_work_category'},
             'work_category': {'next': 'beneficiary_type', 'id': 'ContentPlaceHolder1_ddlproposed_work_category', 'next_id': 'ContentPlaceHolder1_ddlbeneficiary_type'},
@@ -541,6 +659,19 @@ class WcGenTab(BaseAutomationTab):
             self.app.after(0, lambda msg=error_message: self.app.log_message(self.log_display, f"Error updating dropdown: {msg}", "error"))
 
     def _update_next_combobox(self, next_key, options, all_keys):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.ui_fields[next_key].configure(values=options, state="normal")
         
         saved_value = self.saved_config.get(next_key)
@@ -568,10 +699,36 @@ class WcGenTab(BaseAutomationTab):
                 start_resetting = True
     
     def _get_options(self, driver, element_id):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         select_element = Select(driver.find_element(By.ID, element_id))
         return [option.text for option in select_element.options if option.get_attribute("value") not in ["00", "0", ""]]
 
     def _process_single_row(self, driver, form_config, row_data):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             (priority, work_name, khata_no, plot_no, village_name, total_plants, covered_area, area_plantation, total_saplings, job_card, beneficiary_type_for_if_edit) = row_data
         except ValueError:
@@ -582,6 +739,19 @@ class WcGenTab(BaseAutomationTab):
         wait = WebDriverWait(driver, 25)
 
         def select_and_wait(element_id, value):
+            # ---- Lazy imports ----
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import Select, WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+            from selenium.webdriver.common.keys import Keys
+            from selenium.common.exceptions import ElementNotInteractableException
+            from selenium import webdriver
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.utils import get_column_letter
+            from openpyxl.worksheet.page import PageMargins
+            from openpyxl.drawing.image import Image as XLImage
             self.app.log_message(self.log_display, f"  > Selecting '{value}'...")
             html_element = driver.find_element(By.TAG_NAME, 'html')
             Select(wait.until(EC.presence_of_element_located((By.ID, element_id)))).select_by_visible_text(value)
@@ -633,6 +803,19 @@ class WcGenTab(BaseAutomationTab):
         Select(ridge_select).select_by_value(config.WC_GEN_CONFIG["defaults"]["ridge_type"])
         
         def set_val(eid, val):
+            # ---- Lazy imports ----
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import Select, WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+            from selenium.webdriver.common.keys import Keys
+            from selenium.common.exceptions import ElementNotInteractableException
+            from selenium import webdriver
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.utils import get_column_letter
+            from openpyxl.worksheet.page import PageMargins
+            from openpyxl.drawing.image import Image as XLImage
             try:
                 el = driver.find_element(By.ID, eid)
                 driver.execute_script("arguments[0].value = arguments[1];", el, val)
@@ -690,6 +873,19 @@ class WcGenTab(BaseAutomationTab):
         return None
         
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         if not self.csv_path: messagebox.showwarning("Missing File", "Please select a CSV data file first."); return
         form_config = {key: field.get() for key, field in self.ui_fields.items()}
         form_config["panchayat_name"] = self.panchayat_entry.get().strip()
@@ -746,10 +942,36 @@ class WcGenTab(BaseAutomationTab):
                 self.app.after(0, self.app.switch_to_if_edit_with_data, self.successful_wcs_data)
             
     def select_csv_file(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         path = filedialog.askopenfilename(title="Select your CSV data file", filetypes=[("CSV files", "*.csv")])
         if path: self.csv_path = path; self.file_label.configure(text=os.path.basename(path))
         
     def set_ui_state(self, running: bool, force_disable_form=False):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         state = "disabled" if running else "normal"
         self.start_button.configure(state=state)
         self.stop_button.configure(state="normal" if running else "disabled")
@@ -775,6 +997,19 @@ class WcGenTab(BaseAutomationTab):
                     if isinstance(child, (ctk.CTkEntry, ctk.CTkComboBox, DateEntry)): child.configure(state="normal")
                         
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         if messagebox.askokcancel("Reset Form?", "Are you sure?"):
             self.panchayat_entry.delete(0, tkinter.END)
             self.file_label.configure(text="No file selected")

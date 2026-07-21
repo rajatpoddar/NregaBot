@@ -16,6 +16,7 @@ import logging
 import socket
 import shutil
 import re
+import gc
 from datetime import datetime
 from urllib.parse import urlencode
 
@@ -36,12 +37,12 @@ if config.OS_SYSTEM == "Windows":
 # --- Local Modules / UI Components ---
 from ui_components import (
     CollapsibleFrame, OnboardingStep, SkeletonLoader, MarqueeLabel, 
-    ToastNotification, OnboardingGuide, ComingSoonTab
+    ToastNotification, OnboardingGuide, ComingSoonTab, PerformanceMonitor
 )
 from browser_manager import BrowserManager
 from services import ServiceManager
 from tab_config import get_tabs_definition
-from icon_manager import load_icons
+from icon_manager import create_icon_manager
 from sound_manager import SoundManager
 from workflow_manager import WorkflowManager
 from location_data import STATE_DISTRICT_MAP
@@ -52,7 +53,7 @@ from utils import (
     get_config, save_config
 )
 
-# Note: Heavy libraries (Selenium, Pygame, Sentry) are imported inside 
+# Note: Heavy libraries (Selenium) are imported inside 
 # functions to speed up startup time.
 
 # ============================================================================
@@ -135,7 +136,7 @@ class NregaBotApp(ctk.CTk):
         
         # --- User Preferences (Reactive Variables) ---
         self.sound_switch_var = tkinter.BooleanVar(value=get_config('sound_enabled', True))
-        self.minimize_var = tkinter.BooleanVar(value=True) 
+        self.minimize_var = tkinter.BooleanVar(value=True)
 
         # --- UI Placeholders ---
         self.status_label = None
@@ -145,14 +146,18 @@ class NregaBotApp(ctk.CTk):
         self.splash = None
         self.expiry_alert_message = None
 
+        # --- GC Tuning: Reduce memory fragmentation for long-running GUI app ---
+        gc.set_threshold(700, 10, 5)
+        gc.freeze()
+
         # --- STARTUP SEQUENCE ---
         
         # 1. Show Splash Screen
         self.splash = self._create_splash_screen()
         self.splash.update() 
 
-        # 2. Load Icons (Must be on Main Thread)
-        self.icon_images = load_icons() 
+        # 2. Initialize Lazy Icon Manager (definitions only, no image loading yet)
+        self.icon_images = create_icon_manager()
 
         # 3. Start Background Initialization (Heavy Tasks)
         threading.Thread(target=self._background_initialization, daemon=True).start()
@@ -161,57 +166,82 @@ class NregaBotApp(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def _create_splash_screen(self):
-        """Creates a borderless splash window centered on screen."""
+        """Creates a professional borderless splash window with loading animation."""
         splash = ctk.CTkToplevel(self)
         splash.overrideredirect(True)
-        w, h = 300, 200
+        w, h = 380, 260
         sw, sh = splash.winfo_screenwidth(), splash.winfo_screenheight()
-        x, y = (sw/2) - (w/2), (sh/2) - (h/2)
+        x, y = (sw // 2) - (w // 2), (sh // 2) - (h // 2)
         splash.geometry(f'{w}x{h}+{int(x)}+{int(y)}')
-        
+        splash.configure(fg_color=("#F3F4F6", "#212325"))
+
+        # Outer frame (matches app theme)
+        outer = ctk.CTkFrame(
+            splash, fg_color=("#FFFFFF", "#2B2B2B"), corner_radius=16,
+            border_width=2, border_color=("#D1D5DB", "#565B5E")
+        )
+        outer.pack(fill="both", expand=True, padx=4, pady=4)
+
+        inner = ctk.CTkFrame(outer, fg_color="transparent")
+        inner.pack(expand=True, fill="both", padx=25, pady=20)
+
         try:
-            logo = ctk.CTkImage(Image.open(resource_path("logo.png")), size=(80, 80))
-            ctk.CTkLabel(splash, image=logo, text="").pack(pady=(20, 10))
-        except Exception: 
+            logo = ctk.CTkImage(Image.open(resource_path("logo.png")), size=(64, 64))
+            ctk.CTkLabel(inner, image=logo, text="").pack(pady=(5, 8))
+        except Exception:
             pass
-        
-        ctk.CTkLabel(splash, text=f"{config.APP_NAME}", font=("SF Pro Display", 16, "bold")).pack()
-        ctk.CTkLabel(splash, text="VB-G-RAM-G Portal Support", font=("SF Pro Display", 11), text_color="#3B82F6").pack(pady=(2, 0))
-        ctk.CTkLabel(splash, text="Loading...", font=("SF Pro Display", 11), text_color="gray").pack(pady=(4, 0))
+
+        ctk.CTkLabel(
+            inner, text=f"{config.APP_NAME}",
+            font=ctk.CTkFont(family="Helvetica Neue", size=22, weight="bold"),
+            text_color=("#111827", "#DCE4EE")
+        ).pack()
+
+        ctk.CTkLabel(
+            inner, text="VB-G-RAM-G Portal Support",
+            font=ctk.CTkFont(family="Helvetica Neue", size=12),
+            text_color=("#2563EB", "#1F6AA5")
+        ).pack(pady=(2, 15))
+
+        # Animated dots
+        self._splash_dots = 0
+        splash.dots_label = ctk.CTkLabel(
+            inner, text="Initializing",
+            font=ctk.CTkFont(family="Helvetica Neue", size=12),
+            text_color=("#6B7280", "#9D9D9D")
+        )
+        splash.dots_label.pack(pady=(0, 0))
+
+        # Animate dots
+        def _splash_animate():
+            try:
+                if splash.winfo_exists():
+                    self._splash_dots += 1
+                    d = "." * (self._splash_dots % 4)
+                    splash.dots_label.configure(text=f"Loading{d}")
+                    splash.after(120, _splash_animate)
+            except Exception:
+                pass
+        _splash_animate()
+
+        ctk.CTkLabel(
+            inner, text=f"v{config.APP_VERSION}",
+            font=ctk.CTkFont(family="Helvetica Neue", size=10),
+            text_color=("#D1D5DB", "#565B5E")
+        ).pack(side="bottom", pady=(0, 5))
+
         splash.lift()
         splash.attributes("-topmost", True)
         return splash
 
     def _background_initialization(self):
         """Loads heavy libraries and assets in background to keep UI responsive."""
-        # 1. Initialize Pygame (Audio)
-        try:
-            import pygame
-            pygame.mixer.init()
-        except Exception as e:
-            print(f"Warning: Could not initialize audio mixer: {e}")
-
-        # 2. Initialize Sentry (Network Monitoring)
-        try:
-            SENTRY_DSN = os.getenv("SENTRY_DSN")
-            if SENTRY_DSN:
-                import sentry_sdk
-                sentry_sdk.init(
-                    dsn=SENTRY_DSN,
-                    release=f"{config.APP_NAME}@{config.APP_VERSION}",
-                    traces_sample_rate=1.0,
-                )
-                sentry_sdk.set_user({"id": self.machine_id})
-                sentry_sdk.set_tag("os.name", config.OS_SYSTEM)
-        except Exception: 
-            pass
-
-        # 3. Apply Patches to Messagebox
+        # 1. Apply Patches to Messagebox
         messagebox.showinfo = self._custom_showinfo
         messagebox.showwarning = self._custom_showwarning
         messagebox.showerror = self._custom_showerror
 
-        # 4. Trigger UI Setup on Main Thread
+        # 2. Trigger UI Setup on Main Thread
         self.after(10, self._finish_startup)
 
     def _finish_startup(self):
@@ -254,7 +284,7 @@ class NregaBotApp(ctk.CTk):
             try:
                 if splash.winfo_exists():
                     splash.attributes("-alpha", 1.0 - (step / 5))
-                    self.after(20, lambda: self._fade_out_splash(splash, step + 1))
+                    self.after(30, lambda: self._fade_out_splash(splash, step + 1))
                 else:
                     self._fade_in_main_window()
             except Exception:
@@ -353,10 +383,19 @@ class NregaBotApp(ctk.CTk):
     def on_closing(self, force=False):
         """Handles application shutdown gracefully and cleans up browsers."""
         if force or messagebox.askokcancel("Quit", "Quit application?", parent=self):
+            # Stop performance monitor updates
+            try:
+                if hasattr(self, 'performance_monitor'):
+                    self.performance_monitor.stop()
+            except: pass
+            
             try:
                 self.play_sound("shutdown")
                 self.attributes("-alpha", 0.0) # Hide window immediately
             except: pass
+            
+            # Force garbage collection before exit
+            gc.collect()
             
             # Cleanup zombie browser process
             try:
@@ -952,6 +991,10 @@ class NregaBotApp(ctk.CTk):
         )
         self.nav_scroll_frame.grid(row=1, column=0, sticky="nsew")
         
+        # Performance Monitor at bottom of sidebar
+        self.performance_monitor = PerformanceMonitor(self.sidebar_container, self)
+        self.performance_monitor.grid(row=2, column=0, sticky="ew", padx=2, pady=(4, 2))
+
         self._create_nav_buttons(self.sidebar_header, self.nav_scroll_frame)
         
         self.content_area = ctk.CTkFrame(self.main_layout_frame)
@@ -1159,22 +1202,25 @@ class NregaBotApp(ctk.CTk):
             current_text = btn.cget("text")
             
             if "⚠️" in current_text or "🔒" in current_text:
-                continue 
+                continue
+
+            btn_image = self.tab_icon_map.get(name)
 
             if name == page_name:
                 btn.configure(
                     fg_color=("#E3F2FD", "#374151"),  
                     text_color=("#1565C0", "#60A5FA"), 
                     font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-                    image=self.tab_icon_map.get(name)  
+                    image=btn_image
                 )
             else:
                 btn.configure(
                     fg_color="transparent",
                     text_color=("gray30", "gray80"),
                     font=ctk.CTkFont(family="Segoe UI", size=13, weight="normal"),
-                    image=self.tab_icon_map.get(name)
+                    image=btn_image
                 )
+
 
     def _on_category_filter_change(self, selected_category: str):
         self.play_sound("select")
@@ -1417,35 +1463,96 @@ class NregaBotApp(ctk.CTk):
             hover_color=("#BFDBFE", "#1E40AF")
         ).pack(side="left", padx=2)
 
-        # ---------- 4. LOG ENTRIES (No Text Cropping!) ----------
+        # ---------- 4. LOG ENTRIES (Treeview List) ----------
         log_container = ctk.CTkFrame(win, fg_color="transparent")
-        log_container.grid(row=3, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        log_container.grid(row=3, column=0, sticky="nsew", padx=20, pady=(0, 10))
         log_container.grid_rowconfigure(0, weight=1)
         log_container.grid_columnconfigure(0, weight=1)
 
-        log_scroll = ctk.CTkScrollableFrame(
-            log_container, fg_color="transparent", corner_radius=10,
-            scrollbar_button_color=("gray70", "gray40"),
-            scrollbar_button_hover_color=("gray60", "gray30")
-        )
-        log_scroll.grid(row=0, column=0, sticky="nsew")
-        log_scroll.grid_columnconfigure(0, weight=1)
+        # Treeview frame
+        tree_frame = ctk.CTkFrame(log_container, fg_color="transparent")
+        tree_frame.grid(row=0, column=0, sticky="nsew")
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
 
-        # Track description labels for dynamic wraplength
-        desc_labels = []
+        # Style the treeview for dark/light mode
+        mode = ctk.get_appearance_mode()
+        if mode == "Dark":
+            tv_bg = "#2b2b2b"
+            tv_fg = "#e5e7eb"
+            tv_hover = "#3f3f46"
+            tv_sel = "#3B82F6"
+            tv_header_bg = "#1f2937"
+            tv_header_fg = "#ffffff"
+        else:
+            tv_bg = "#ffffff"
+            tv_fg = "#374151"
+            tv_hover = "#f3f4f6"
+            tv_sel = "#3B82F6"
+            tv_header_bg = "#f9fafb"
+            tv_header_fg = "#111827"
 
-        def apply_filter():
-            nonlocal desc_labels
-            # Clear existing rows
-            for widget in log_scroll.winfo_children():
-                widget.destroy()
-            desc_labels.clear()
+        tree_style = ttk.Style()
+        tree_style.theme_use("clam")
+        tree_style.configure("ActivityLog.Treeview",
+                             background=tv_bg,
+                             foreground=tv_fg,
+                             fieldbackground=tv_bg,
+                             rowheight=28,
+                             font=("Segoe UI", 11),
+                             borderwidth=0)
+        tree_style.map("ActivityLog.Treeview",
+                       background=[('selected', tv_sel), ('active', tv_hover)],
+                       foreground=[('selected', 'white'), ('active', tv_fg)])
+        tree_style.configure("ActivityLog.Treeview.Heading",
+                             background=tv_header_bg,
+                             foreground=tv_header_fg,
+                             relief="flat",
+                             font=("Segoe UI", 11, "bold"))
+        tree_style.map("ActivityLog.Treeview.Heading",
+                       background=[('active', tv_hover)])
 
-            search_text = search_var.get().strip().lower()
-            filter_text = filter_var.get()
+        # Treeview widget
+        columns = ("type", "timestamp", "description")
+        log_tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
+                                style="ActivityLog.Treeview", selectmode="browse", height=8)
+
+        log_tree.heading("type", text="Type", anchor="w")
+        log_tree.heading("timestamp", text="Timestamp", anchor="w")
+        log_tree.heading("description", text="Description", anchor="w")
+
+        log_tree.column("type", width=115, minwidth=90, anchor="w", stretch=False)
+        log_tree.column("timestamp", width=165, minwidth=120, anchor="w", stretch=False)
+        log_tree.column("description", width=400, minwidth=200, anchor="w", stretch=True)
+
+        log_tree.grid(row=0, column=0, sticky="nsew")
+
+        # Vertical scrollbar
+        v_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=log_tree.yview)
+        v_scroll.grid(row=0, column=1, sticky="ns")
+        log_tree.configure(yscrollcommand=v_scroll.set)
+
+        # Horizontal scrollbar
+        h_scroll = ttk.Scrollbar(tree_frame, orient="horizontal", command=log_tree.xview)
+        h_scroll.grid(row=1, column=0, sticky="ew")
+        log_tree.configure(xscrollcommand=h_scroll.set)
+
+        # Tag colors
+        log_tree.tag_configure('success_tag', foreground='#16A34A' if mode == 'Light' else '#4ADE80')
+        log_tree.tag_configure('warning_tag', foreground='#D97706' if mode == 'Light' else '#FBBF24')
+        log_tree.tag_configure('error_tag', foreground='#DC2626' if mode == 'Light' else '#F87171')
+        log_tree.tag_configure('default_tag', foreground=tv_fg)
+
+        # Internal storage for current data
+        _all_data = list(all_logs)  # copy so we can re-filter
+
+        def populate_tree(data_rows, search_text="", filter_text="All"):
+            """Clears and fills the treeview with filtered rows."""
+            for item in log_tree.get_children():
+                log_tree.delete(item)
 
             filtered = []
-            for ts, tp, desc in all_logs:
+            for ts, tp, desc in data_rows:
                 # Type filter
                 if filter_text == "✅ Success" and tp != "SUCCESS":
                     continue
@@ -1453,108 +1560,44 @@ class NregaBotApp(ctk.CTk):
                     continue
                 elif filter_text == "❌ Error" and tp != "ERROR":
                     continue
-
                 # Search filter
                 if search_text and search_text not in ts.lower() and search_text not in desc.lower():
                     continue
-
                 filtered.append((ts, tp, desc))
 
+            # Insert rows
             for ts, tp, desc in filtered:
-                # Colors based on type
-                if tp == "SUCCESS":
-                    row_bg = ("#F0FDF4", "#0A2E1A")
-                    badge_bg = ("#16A34A", "#4ADE80")
-                    bar_color = "#16A34A"
-                    hover_bg = ("#DCFCE7", "#14532D")
-                elif tp == "WARNING":
-                    row_bg = ("#FFFBEB", "#2A1F04")
-                    badge_bg = ("#D97706", "#FBBF24")
-                    bar_color = "#D97706"
-                    hover_bg = ("#FEF3C7", "#451A03")
-                elif tp == "ERROR":
-                    row_bg = ("#FEF2F2", "#2A0A0A")
-                    badge_bg = ("#DC2626", "#F87171")
-                    bar_color = "#DC2626"
-                    hover_bg = ("#FEE2E2", "#7F1D1D")
-                else:
-                    row_bg = ("#F8FAFC", "#1E293B")
-                    badge_bg = ("#64748B", "#94A3B8")
-                    bar_color = "#64748B"
-                    hover_bg = ("#F1F5F9", "#334155")
-
-                # Row frame
-                row_frame = ctk.CTkFrame(log_scroll, fg_color=row_bg, corner_radius=8)
-                row_frame.pack(fill="x", pady=2, padx=2)
-
-                # Colored left bar (type indicator)
-                ctk.CTkFrame(row_frame, width=4, fg_color=bar_color,
-                             corner_radius=2).pack(side="left", fill="y", padx=(0, 8), pady=6)
-
-                # Content
-                content = ctk.CTkFrame(row_frame, fg_color="transparent")
-                content.pack(side="left", fill="both", expand=True, padx=(0, 10), pady=6)
-                content.grid_columnconfigure(1, weight=1)
-
-                # Top row: icon + timestamp + badge
-                top = ctk.CTkFrame(content, fg_color="transparent")
-                top.pack(fill="x")
-
-                type_icon = {"SUCCESS": "✅", "WARNING": "⚠️", "ERROR": "❌"}.get(tp, "📌")
-                ctk.CTkLabel(top, text=type_icon, font=ctk.CTkFont(size=12)
-                             ).pack(side="left", padx=(0, 4))
-                ctk.CTkLabel(top, text=ts, font=ctk.CTkFont(size=10),
-                             text_color=("gray50", "gray60")
-                             ).pack(side="left")
-
-                badge = ctk.CTkFrame(top, fg_color=badge_bg, corner_radius=4)
-                badge.pack(side="left", padx=(8, 0))
-                ctk.CTkLabel(badge, text=tp.title(), font=ctk.CTkFont(size=9, weight="bold"),
-                             text_color="#FFFFFF").pack(padx=6, pady=1)
-
-                # Description (FULL text, no cropping!)
-                desc_label = ctk.CTkLabel(
-                    content, text=desc, font=ctk.CTkFont(size=12),
-                    text_color=("gray20", "gray90"),
-                    anchor="w", justify="left",
-                    wraplength=600
-                )
-                desc_label.pack(fill="x", pady=(3, 0))
-                desc_labels.append(desc_label)
-
-                # Hover effect
-                def bind_hover(frame, orig, hover):
-                    def on_enter(e):
-                        frame.configure(fg_color=hover)
-                    def on_leave(e):
-                        frame.configure(fg_color=orig)
-                    frame.bind("<Enter>", on_enter, add="+")
-                    frame.bind("<Leave>", on_leave, add="+")
-
-                bind_hover(row_frame, row_bg, hover_bg)
+                type_icon = {"SUCCESS": "✅ SUCCESS", "WARNING": "⚠️ WARNING", "ERROR": "❌ ERROR"}.get(tp, "📌")
+                tag = {'SUCCESS': 'success_tag', 'WARNING': 'warning_tag', 'ERROR': 'error_tag'}.get(tp, 'default_tag')
+                log_tree.insert("", "end", values=(type_icon, ts, desc), tags=(tag,))
 
             # Update footer
             shown = len(filtered)
-            text = f"Showing {shown} of {len(all_logs)} total records"
-            if shown != len(all_logs):
+            text = f"Showing {shown} of {len(data_rows)} total records"
+            if shown != len(data_rows):
                 text += " (filtered)"
             footer_label.configure(text=text)
 
-        # Dynamic wraplength on resize
-        def update_wraplengths(event=None):
-            avail = log_scroll.winfo_width() - 40
-            if avail > 100:
-                for lbl in desc_labels:
-                    try:
-                        lbl.configure(wraplength=avail)
-                    except:
-                        pass
+        # Sorting
+        def sort_tree(col_key, reverse):
+            items = [(log_tree.set(k, col_key), k) for k in log_tree.get_children('')]
+            try:
+                items.sort(key=lambda t: float(t[0]) if t[0] else 0, reverse=reverse)
+            except (ValueError, TypeError):
+                items.sort(reverse=reverse)
+            for index, (_, k) in enumerate(items):
+                log_tree.move(k, '', index)
+            # Toggle header command
+            new_reverse = not reverse
+            log_tree.heading(col_key, command=lambda c=col_key: sort_tree(c, new_reverse))
 
-        log_scroll.bind("<Configure>", update_wraplengths)
+        log_tree.heading("type", command=lambda: sort_tree("type", False))
+        log_tree.heading("timestamp", command=lambda: sort_tree("timestamp", True))
+        log_tree.heading("description", command=lambda: sort_tree("description", False))
 
-        # ---------- 5. FOOTER (Created BEFORE apply_filter to avoid NameError) ----------
-        footer_frame = ctk.CTkFrame(win, fg_color="transparent", height=30)
-        footer_frame.grid(row=4, column=0, sticky="ew", padx=20, pady=(0, 10))
+        # ---------- 5. FOOTER (Created BEFORE initial populate to avoid NameError) ----------
+        footer_frame = ctk.CTkFrame(win, fg_color="transparent", height=26)
+        footer_frame.grid(row=4, column=0, sticky="ew", padx=20, pady=(0, 15))
 
         footer_label = ctk.CTkLabel(
             footer_frame,
@@ -1565,18 +1608,22 @@ class NregaBotApp(ctk.CTk):
         footer_label.pack(side="left")
         ctk.CTkLabel(
             footer_frame,
-            text="Refreshes on re-open | Auto-cleanup keeps latest 1000",
+            text="Click column headers to sort | Cleanup keeps latest 1000",
             font=ctk.CTkFont(size=10),
             text_color=("gray60", "gray70")
         ).pack(side="right")
 
-        # Wire up search and filter
-        search_var.trace_add("write", lambda *args: apply_filter())
-        filter_var.trace_add("write", lambda *args: apply_filter())
+        # Initial population (AFTER footer_label exists)
+        populate_tree(_all_data)
 
-        # Populate initial data
-        apply_filter()
-        win.after(50, lambda: update_wraplengths())
+        # Wire up search & filter
+        def on_filter_change(*args):
+            s = search_var.get().strip().lower()
+            f = filter_var.get()
+            populate_tree(_all_data, search_text=s, filter_text=f)
+
+        search_var.trace_add("write", on_filter_change)
+        filter_var.trace_add("write", on_filter_change)
 
     # ============================================================================
     # 5. DATA HANDOFF METHODS (INTER-TAB COMMUNICATION)

@@ -8,20 +8,26 @@ import subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 
 # Excel Imports
-import openpyxl
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry 
 
 class EKycReportTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         super().__init__(parent, app_instance, "ekyc_report")
         
         if self.automation_key not in self.app.stop_events:
@@ -33,6 +39,18 @@ class EKycReportTab(BaseAutomationTab):
         self.load_inputs()
 
     def _setup_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         # --- 1. Input Section ---
         input_frame = ctk.CTkFrame(self)
         input_frame.pack(fill="x", padx=10, pady=10)
@@ -125,6 +143,17 @@ class EKycReportTab(BaseAutomationTab):
         sb.pack(side="right", fill="y")
 
     def update_status(self, text, progress=None):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.status_label.configure(text=f"Status: {text}")
         if progress is not None: self.progress_bar.set(progress)
         try: self.app.set_status(f"eKYC Bot: {text}")
@@ -179,6 +208,17 @@ class EKycReportTab(BaseAutomationTab):
         self.stats_text.configure(text="\n".join(lines))
 
     def run_process(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             panchayat_target = self.panchayat_entry.get().strip()
             village_target = self.village_entry.get().strip()
@@ -327,6 +367,17 @@ class EKycReportTab(BaseAutomationTab):
             self.update_status("Ready")
 
     def scrape_current_table(self, driver, panchayat_name, village_name):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         current_page_num = 1
         
         # Reset to Page 1
@@ -437,6 +488,17 @@ class EKycReportTab(BaseAutomationTab):
         for r in self.all_scraped_data: self.check_and_insert_to_tree(r)
 
     def export_professional_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         if not self.all_scraped_data: return
 
         # --- 1. Stats Calculation (per-Panchayat) ---

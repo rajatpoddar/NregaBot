@@ -67,6 +67,15 @@ class MbEntryTab(BaseAutomationTab):
         self._toggle_mb_no_entry() 
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         """Creates and places all UI elements for this tab."""
         
         # --- Top Frame for Configuration ---
@@ -287,6 +296,15 @@ class MbEntryTab(BaseAutomationTab):
             self.mb_no_entry.configure(state="disabled")
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self._load_inputs()
             self.config_vars['panchayat_name'].set("") 
@@ -449,6 +467,15 @@ class MbEntryTab(BaseAutomationTab):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
 
     def _process_single_work_code(self, driver, work_code, cfg, mate_names_list):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         wait = WebDriverWait(driver, 25) 
         extracted_work_name = "-"; extracted_mr_no = "-"; extracted_mr_period = "-"
         
@@ -507,7 +534,7 @@ class MbEntryTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "🔘 Clicking Radio Button...")
             radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rddist_0")))
             driver.execute_script("arguments[0].click();", radio_btn)
-            time.sleep(1) 
+            time.sleep(1.0)  # Short wait after click
 
             self.app.log_message(self.log_display, "⏳ Waiting for Period Dropdown...")
             period_dropdown_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod")))
@@ -567,6 +594,15 @@ class MbEntryTab(BaseAutomationTab):
             self._log_result(cfg, work_code, "Failed", "Script Error", extracted_work_name, extracted_mr_no, extracted_mr_period)
 
     def _process_all_works_from_dropdown(self, driver, cfg, mate_names_list):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         """
         Processes ALL available works from the 'Select Work' dropdown.
         Used when user does NOT provide specific work codes.
@@ -692,7 +728,7 @@ class MbEntryTab(BaseAutomationTab):
                 # Click Radio Button (district = first option)
                 radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rddist_0")))
                 driver.execute_script("arguments[0].click();", radio_btn)
-                time.sleep(1)
+                time.sleep(1.0)  # Short wait after click
 
                 # Wait for Period Dropdown
                 period_dropdown_elem = wait.until(
@@ -780,6 +816,15 @@ class MbEntryTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "✅ All dropdown works processed.")
 
     def _find_activity_prefix(self, driver):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         self.app.log_message(self.log_display, "Searching for 'Earth work' activity...")
         for i in range(1, 61): 
             try:
@@ -794,6 +839,15 @@ class MbEntryTab(BaseAutomationTab):
         return "ctl00$ContentPlaceHolder1$activity$ctl01"
     
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         """Routes the export request to the correct handler."""
         export_format = self.export_format_menu.get()
         
@@ -805,6 +859,15 @@ class MbEntryTab(BaseAutomationTab):
             self.export_professional_pdf()
 
     def export_professional_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         """Generates a professional Excel report similar to eKYC Report."""
         all_items = self.results_tree.get_children()
         if not all_items:
@@ -970,6 +1033,15 @@ class MbEntryTab(BaseAutomationTab):
             messagebox.showerror("Export Error", f"Failed to save Excel: {e}")
 
     def export_professional_pdf(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         """Generates a professional PDF report with Hindi font support."""
         # --- Check if Library Exists ---
         if not HAS_REPORTLAB:

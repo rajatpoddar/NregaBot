@@ -229,7 +229,7 @@ class FileManagementTab(ctk.CTkFrame):
 
         def _fetch():
             try:
-                response = requests.get(url, headers=headers, timeout=15)
+                response = self.app.http_session.get(url, headers=headers, timeout=15)
                 if response.status_code == 200:
                     data = response.json()
                     self.app.after(0, self.update_ui_with_data, data)
@@ -392,7 +392,7 @@ class FileManagementTab(ctk.CTkFrame):
             encoder = MultipartEncoder(fields=fields)
             monitor = MultipartEncoderMonitor(encoder, create_callback(encoder))
 
-            response = requests.post(
+            response = self.app.http_session.post(
                 f"{config.LICENSE_SERVER_URL}/files/api/upload",
                 headers={**headers, 'Content-Type': monitor.content_type},
                 data=monitor,
@@ -419,7 +419,7 @@ class FileManagementTab(ctk.CTkFrame):
         def _create():
             try:
                 # --- FIX: Corrected the API endpoint URL ---
-                response = requests.post(f"{config.LICENSE_SERVER_URL}/files/api/create-folder", headers=headers, json=data, timeout=30)
+                response = self.app.http_session.post(f"{config.LICENSE_SERVER_URL}/files/api/create-folder", headers=headers, json=data, timeout=30)
                 if response.status_code == 201:
                     self.app.after(0, lambda: self.refresh_files(self.current_folder_id, add_to_history=False))
                 else:
@@ -453,7 +453,7 @@ class FileManagementTab(ctk.CTkFrame):
 
         def _share():
             try:
-                response = requests.post(f"{config.LICENSE_SERVER_URL}/files/api/share-folder/{item_data['id']}", headers=headers, timeout=15)
+                response = self.app.http_session.post(f"{config.LICENSE_SERVER_URL}/files/api/share-folder/{item_data['id']}", headers=headers, timeout=15)
 
                 if response.status_code == 200:
                     try:
@@ -504,7 +504,7 @@ class FileManagementTab(ctk.CTkFrame):
 
         def _download():
             try:
-                with requests.get(f"{config.LICENSE_SERVER_URL}/files/api/download/{item_data['id']}", headers=headers, stream=True, timeout=300) as r:
+                with self.app.http_session.get(f"{config.LICENSE_SERVER_URL}/files/api/download/{item_data['id']}", headers=headers, stream=True, timeout=300) as r:
                     r.raise_for_status()
                     total_size = int(r.headers.get('content-length', 0))
                     bytes_downloaded = 0
@@ -543,7 +543,7 @@ class FileManagementTab(ctk.CTkFrame):
             def get_all_files(folder_id, current_path):
                 url = f"{config.LICENSE_SERVER_URL}/files/api/list/{folder_id}"
                 try:
-                    response = requests.get(url, headers=headers, timeout=15)
+                    response = self.app.http_session.get(url, headers=headers, timeout=15)
                     response.raise_for_status()
                     items = response.json().get('files', [])
                     for item in items:
@@ -572,7 +572,7 @@ class FileManagementTab(ctk.CTkFrame):
                 os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
                 try:
-                    with requests.get(f"{config.LICENSE_SERVER_URL}/files/api/download/{file_info['id']}", headers=headers, stream=True, timeout=300) as r:
+                    with self.app.http_session.get(f"{config.LICENSE_SERVER_URL}/files/api/download/{file_info['id']}", headers=headers, stream=True, timeout=300) as r:
                         r.raise_for_status()
                         with open(local_path, 'wb') as f:
                             for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
@@ -602,7 +602,7 @@ class FileManagementTab(ctk.CTkFrame):
 
         def _delete():
             try:
-                response = requests.delete(f"{config.LICENSE_SERVER_URL}/files/api/delete/{item_data['id']}", headers=headers, timeout=30)
+                response = self.app.http_session.delete(f"{config.LICENSE_SERVER_URL}/files/api/delete/{item_data['id']}", headers=headers, timeout=30)
                 if response.status_code == 200:
                     self.app.after(0, lambda: self.refresh_files(self.current_folder_id, add_to_history=False))
                 else:

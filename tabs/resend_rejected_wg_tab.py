@@ -4,10 +4,6 @@ from tkinter import ttk, messagebox
 import customtkinter as ctk
 import time
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 import config
 from .base_tab import BaseAutomationTab
@@ -15,6 +11,14 @@ from .autocomplete_widget import AutocompleteEntry
 
 class ResendRejectedWgTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException
         super().__init__(parent, app_instance, automation_key="resend_wg")
         
         self.grid_columnconfigure(0, weight=1)
@@ -23,6 +27,13 @@ class ResendRejectedWgTab(BaseAutomationTab):
         self._create_widgets()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+
         # Frame for user controls
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
@@ -96,6 +107,12 @@ class ResendRejectedWgTab(BaseAutomationTab):
              self.panchayat_entry.configure(state="disabled")
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "This will clear all inputs and results."):
             self.panchayat_entry.delete(0, tkinter.END)
             self.process_all_var.set(False)
@@ -124,6 +141,12 @@ class ResendRejectedWgTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Running Resend Rejected WG...")
         self.app.log_message(self.log_display, "🚀 Starting Rejected Wagelist Automation...")
@@ -179,6 +202,12 @@ class ResendRejectedWgTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
     
     def _process_single_panchayat(self, driver, wait, panchayat_name):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         try:
             html_element = driver.find_element(By.TAG_NAME, 'html')
             panchayat_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanch"))))
@@ -220,7 +249,12 @@ class ResendRejectedWgTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"   - Result: {result_text}", "success" if status == "Success" else "info")
             self._log_result(panchayat_name, status, result_text)
             
-            time.sleep(1)
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                )
+            except (TimeoutException, NoSuchElementException):
+                pass
 
         except Exception as e:
             error_msg = f"An unexpected error occurred: {str(e).splitlines()[0]}"

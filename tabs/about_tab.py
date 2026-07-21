@@ -456,7 +456,7 @@ class AboutTab(ctk.CTkFrame):
 
                 headers = {'Authorization': f'Bearer {license_key}'}
                 payload = {'machine_id': machine_id}
-                response = requests.post(
+                response = self.app.http_session.post(
                     f"{config.LICENSE_SERVER_URL}/api/request-deactivation",
                     json=payload, headers=headers, timeout=15
                 )
@@ -598,7 +598,7 @@ class AboutTab(ctk.CTkFrame):
                 payload = {'machine_id': machine_id, 'name': new_name}
                 
                 # Use the *same* endpoint as the web page
-                response = requests.post(
+                response = self.app.http_session.post(
                     f"{config.LICENSE_SERVER_URL}/api/set-device-name",
                     json=payload, headers=headers, timeout=15
                 )

@@ -87,6 +87,16 @@ class MaterialEntryTab(BaseAutomationTab):
         messagebox.showinfo("Saved", f"Profile '{name}' saved successfully.", parent=self)
 
     def _load_selected_profile(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         name = self.profile_var.get()
         if not name or name not in self._profiles:
             messagebox.showwarning("No Profile", "Select a valid profile to load.", parent=self)
@@ -113,6 +123,16 @@ class MaterialEntryTab(BaseAutomationTab):
             self.materials_ui[i]["gst"].set("0")
 
     def _delete_selected_profile(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         name = self.profile_var.get()
         if not name or name not in self._profiles:
             messagebox.showwarning("No Profile", "Select a valid profile to delete.", parent=self)
@@ -134,6 +154,16 @@ class MaterialEntryTab(BaseAutomationTab):
 
     def _create_widgets(self):
         # Outer scrollable container
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         outer = ctk.CTkScrollableFrame(self, fg_color="transparent")
         outer.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         outer.grid_columnconfigure(0, weight=1)
@@ -334,6 +364,16 @@ class MaterialEntryTab(BaseAutomationTab):
     # =========================================================================
 
     def _add_material_row(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         if len(self.materials_ui) >= MAX_MATERIAL_ROWS:
             messagebox.showwarning("Limit Reached", f"Maximum {MAX_MATERIAL_ROWS} rows allowed.", parent=self)
             return
@@ -366,6 +406,16 @@ class MaterialEntryTab(BaseAutomationTab):
         self._recalculate_totals()
 
     def _remove_material_row(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         if len(self.materials_ui) <= 1:
             messagebox.showwarning("Cannot Remove", "At least one material row must remain.", parent=self)
             return
@@ -443,6 +493,16 @@ class MaterialEntryTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium.common.exceptions import ElementNotInteractableException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
         self.app.after(0, self.set_common_ui_state, True)
         self.app.clear_log(self.log_display)
 
@@ -471,7 +531,12 @@ class MaterialEntryTab(BaseAutomationTab):
                     driver.get(config.MATERIAL_ENTRY_CONFIG["url"])
                     # Wait for page to fully load before interacting
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
-                    time.sleep(1.5)
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
 
                     # 1. Panchayat (Block Login)
                     if inputs['panchayat']:
@@ -479,7 +544,12 @@ class MaterialEntryTab(BaseAutomationTab):
                             panchayat_dd = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
                             Select(panchayat_dd).select_by_visible_text(inputs['panchayat'])
                             self.app.log_message(self.log_display, f"✓ Panchayat selected: {inputs['panchayat']}")
-                            time.sleep(2)  # postback wait
+                            try:
+                                WebDriverWait(driver, 10).until(
+                                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                                )
+                            except (TimeoutException, NoSuchElementException):
+                                pass
                         except TimeoutException:
                             self.app.log_message(self.log_display, "ℹ Panchayat dropdown not found (GP login assumed)")
 
@@ -495,8 +565,18 @@ class MaterialEntryTab(BaseAutomationTab):
                         except StaleElementReferenceException:
                             if attempt == 2:
                                 raise
-                            time.sleep(1)
-                    time.sleep(2)  # postback wait
+                            try:
+                                WebDriverWait(driver, 10).until(
+                                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                                )
+                            except (TimeoutException, NoSuchElementException):
+                                pass
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
 
                     # 3. Work Code Search
                     self.app.log_message(self.log_display, f"▶ Searching Work Key: {work_key}...")
@@ -510,8 +590,18 @@ class MaterialEntryTab(BaseAutomationTab):
                         except StaleElementReferenceException:
                             if attempt == 2:
                                 raise
-                            time.sleep(1)
-                    time.sleep(2.5)  # wait for postback to populate dropdown
+                            try:
+                                WebDriverWait(driver, 10).until(
+                                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                                )
+                            except (TimeoutException, NoSuchElementException):
+                                pass
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
 
                     # Re-fetch dropdown fresh after postback
                     found_wc = False
@@ -535,7 +625,12 @@ class MaterialEntryTab(BaseAutomationTab):
                         self._log_result(work_key, bill_no, "Failed", "Work code not found in dropdown")
                         fail_count += 1
                         continue
-                    time.sleep(2)  # postback after work code selection
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
 
                     # 4. Vendor Code
                     self.app.log_message(self.log_display, f"▶ Searching Vendor: {inputs['vendor_code']}...")
@@ -549,8 +644,18 @@ class MaterialEntryTab(BaseAutomationTab):
                         except StaleElementReferenceException:
                             if attempt == 2:
                                 raise
-                            time.sleep(1)
-                    time.sleep(2.5)
+                            try:
+                                WebDriverWait(driver, 10).until(
+                                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                                )
+                            except (TimeoutException, NoSuchElementException):
+                                pass
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
 
                     vendor_found = False
                     for attempt in range(3):
@@ -564,12 +669,22 @@ class MaterialEntryTab(BaseAutomationTab):
                         except StaleElementReferenceException:
                             if attempt == 2:
                                 raise
-                            time.sleep(1)
+                            try:
+                                WebDriverWait(driver, 10).until(
+                                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                                )
+                            except (TimeoutException, NoSuchElementException):
+                                pass
                     if not vendor_found:
                         self._log_result(work_key, bill_no, "Failed", "Vendor not found after search")
                         fail_count += 1
                         continue
-                    time.sleep(1)
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
 
                     # 5. Bill Details
                     self.app.log_message(self.log_display, "▶ Entering Bill Details...")
@@ -582,7 +697,12 @@ class MaterialEntryTab(BaseAutomationTab):
                     date_input.send_keys(inputs['bill_date'])
                     date_input.send_keys(Keys.TAB)
                     self.app.log_message(self.log_display, f"✓ Bill No: {bill_no}, Date: {inputs['bill_date']}")
-                    time.sleep(1)
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
 
                     # 6. Fill Materials
                     self.app.log_message(self.log_display, "▶ Filling Materials...")
@@ -617,7 +737,12 @@ class MaterialEntryTab(BaseAutomationTab):
                         fail_count += 1
                         continue
 
-                    time.sleep(1.5)
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
 
                     # 7. Checkbox & Submit
                     self.app.log_message(self.log_display, "▶ Confirming and Saving...")
@@ -627,7 +752,7 @@ class MaterialEntryTab(BaseAutomationTab):
 
                     submit_btn = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_cmdProceed")
                     driver.execute_script("arguments[0].click();", submit_btn)
-                    time.sleep(2)
+                    time.sleep(2.0)  # Short wait after click
 
                     # 8. Handle Alerts
                     try:

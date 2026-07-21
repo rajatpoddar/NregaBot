@@ -65,7 +65,7 @@ class FeedbackTab(ctk.CTkFrame):
         error_reason = "An unknown error occurred."
         try:
             headers = {'Authorization': f'Bearer {self.app.license_info.get("key")}'}
-            response = requests.post(f"{config.LICENSE_SERVER_URL}/api/feedback/send_message", json=message_data, headers=headers, timeout=15)
+            response = self.app.http_session.post(f"{config.LICENSE_SERVER_URL}/api/feedback/send_message", json=message_data, headers=headers, timeout=15)
             
             if response.status_code == 201:
                 success = True
@@ -105,7 +105,7 @@ class FeedbackTab(ctk.CTkFrame):
     def _load_conversation_worker(self):
         try:
             headers = {'Authorization': f'Bearer {self.app.license_info.get("key")}'}
-            response = requests.get(f"{config.LICENSE_SERVER_URL}/api/feedback/thread", headers=headers, timeout=15)
+            response = self.app.http_session.get(f"{config.LICENSE_SERVER_URL}/api/feedback/thread", headers=headers, timeout=15)
             if response.status_code == 200:
                 data = response.json()
                 self.app.after(0, self._display_conversation, data.get("conversation", []))

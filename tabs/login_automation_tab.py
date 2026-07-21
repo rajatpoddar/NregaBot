@@ -5,15 +5,15 @@ import time
 import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import StaleElementReferenceException
 from .base_tab import BaseAutomationTab
 
 class LoginAutomationTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import StaleElementReferenceException
         super().__init__(parent, app_instance, "login_automation")
         
         # --- Main Layout ---
@@ -69,6 +69,18 @@ class LoginAutomationTab(BaseAutomationTab):
         self.load_credentials()
 
     def get_creds_path(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         if hasattr(self.app, 'get_data_path'): return self.app.get_data_path('user_location_pref.json')
         return 'user_location_pref.json'
 
@@ -99,6 +111,17 @@ class LoginAutomationTab(BaseAutomationTab):
         t.start()
 
     def run_login_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         fin_year = self.fin_year_input.get()
         district = self.district_input.get().strip()
         block = self.block_input.get().strip()
@@ -130,7 +153,12 @@ class LoginAutomationTab(BaseAutomationTab):
             # --- Wait for Page Refresh ---
             self.update_status("Status: Waiting for page refresh...")
             # Block select karne ke baad page reload hota hai, uska wait karein
-            time.sleep(3) 
+            try:
+                WebDriverWait(driver, 10).until(
+                    lambda d: d.execute_script('return document.readyState') == 'complete'
+                )
+            except TimeoutException:
+                pass
 
             # --- Process Complete ---
             # Yahan se Maine Toast Notifications hata diye hain taaki koi crash na ho.
@@ -142,6 +170,17 @@ class LoginAutomationTab(BaseAutomationTab):
             messagebox.showerror("Automation Error", f"Error: {str(e)}")
 
     def _safe_select(self, wait, xpath, text, wait_for_options=False):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         for _ in range(3):
             try:
                 elem = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))

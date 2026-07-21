@@ -4,6 +4,9 @@ import tkinter as tk
 import webbrowser
 import os
 import re
+import platform
+import subprocess
+import threading
 from PIL import Image
 from utils import resource_path
 
@@ -187,7 +190,7 @@ class SkeletonLoader(ctk.CTkFrame):
                     p.configure(fg_color=final_color)
             except: pass
             
-        self.after(600, self._animate) # Thoda fast animation (600ms)
+        self.after(1000, self._animate) # Slower animation to save CPU
 
     def stop(self):
         self.animating = False
@@ -195,7 +198,7 @@ class SkeletonLoader(ctk.CTkFrame):
 
 # --- 4. MARQUEE LABEL (Running Text) ---
 class MarqueeLabel(ctk.CTkFrame):
-    def __init__(self, parent, text, speed=1, **kwargs):
+    def __init__(self, parent, text, speed=3, **kwargs):
         super().__init__(parent, fg_color="transparent", **kwargs)
         self.speed = speed
         self.raw_text = text
@@ -326,7 +329,7 @@ class MarqueeLabel(ctk.CTkFrame):
             last_coords = self.canvas.coords(last_item['id'])
             
             if not last_coords: 
-                self.after(20, self._animate)
+                self.after(80, self._animate)
                 return
 
             if last_coords[0] + last_item['width'] < 0:
@@ -339,7 +342,7 @@ class MarqueeLabel(ctk.CTkFrame):
                 for item in self.items:
                     self.canvas.move(item['id'], -self.speed, 0)
 
-            self.after(20, self._animate)
+            self.after(80, self._animate)
         except Exception:
             self.is_running = False
 
@@ -402,13 +405,13 @@ class ToastNotification(ctk.CTkToplevel):
         if step <= 10:
             alpha = step / 10
             self.attributes("-alpha", alpha)
-            self.after(20, lambda: self._animate_in(step+1))
+            self.after(30, lambda: self._animate_in(step+1))
             
     def _animate_out(self, step=10):
         if step >= 0:
             alpha = step / 10
             self.attributes("-alpha", alpha)
-            self.after(20, lambda: self._animate_out(step-1))
+            self.after(30, lambda: self._animate_out(step-1))
         else:
             self.destroy()
 
@@ -499,3 +502,134 @@ class ComingSoonTab(ctk.CTkFrame):
         ctk.CTkLabel(container, text="Coming Soon", font=ctk.CTkFont(size=28, weight="bold")).pack()
         ctk.CTkLabel(container, text="Sarkar Aapke Dwar Automation is under development.", 
                      font=ctk.CTkFont(size=14), text_color="gray60").pack(pady=(10, 0))
+
+
+# --- 8. PERFORMANCE MONITOR (Sidebar Bottom) ---
+class PerformanceMonitor(ctk.CTkFrame):
+    """
+    Lightweight system resource monitor for the sidebar footer.
+    Shows RAM, CPU usage and active thread count.
+    Updates every 3 seconds via self.after() — zero additional dependencies.
+    """
+    def __init__(self, parent, app_instance):
+        super().__init__(parent, fg_color="transparent", corner_radius=0)
+        self.app = app_instance
+        self._running = True
+
+        # ---- Separator ----
+        ctk.CTkFrame(self, height=1, fg_color=("gray85", "gray35")).pack(fill="x", padx=10, pady=(4, 6))
+
+        # ---- Title ----
+        title_row = ctk.CTkFrame(self, fg_color="transparent")
+        title_row.pack(fill="x", padx=12, pady=(0, 4))
+        ctk.CTkLabel(
+            title_row, text="⚡ Performance", 
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color=("gray50", "gray60")
+        ).pack(side="left")
+
+        # ---- Metric rows ----
+        row_height = 18
+        font_style = ctk.CTkFont(size=12, weight="bold")
+
+        self.ram_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.ram_frame.pack(fill="x", padx=12, pady=0)
+        ctk.CTkLabel(self.ram_frame, text="RAM", font=ctk.CTkFont(size=10),
+                     text_color=("gray50", "gray60")).pack(side="left")
+        self.ram_label = ctk.CTkLabel(self.ram_frame, text="—", font=font_style,
+                                      text_color=("#2563EB", "#60A5FA"))
+        self.ram_label.pack(side="right")
+
+        self.cpu_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.cpu_frame.pack(fill="x", padx=12, pady=0)
+        ctk.CTkLabel(self.cpu_frame, text="CPU", font=ctk.CTkFont(size=10),
+                     text_color=("gray50", "gray60")).pack(side="left")
+        self.cpu_label = ctk.CTkLabel(self.cpu_frame, text="—", font=font_style,
+                                      text_color=("#059669", "#34D399"))
+        self.cpu_label.pack(side="right")
+
+        self.thread_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.thread_frame.pack(fill="x", padx=12, pady=(0, 6))
+        ctk.CTkLabel(self.thread_frame, text="Threads", font=ctk.CTkFont(size=10),
+                     text_color=("gray50", "gray60")).pack(side="left")
+        self.thread_label = ctk.CTkLabel(self.thread_frame, text="—", font=font_style,
+                                         text_color=("#D97706", "#FBBF24"))
+        self.thread_label.pack(side="right")
+
+        # ---- Start periodic update ----
+        self._cached_ram = None
+        self._cached_cpu = None
+        self._update()
+
+    def _get_process_info(self):
+        """Get RAM (RSS in MB), CPU %, and active Python thread count.
+        Uses separate ps commands (each handles failure independently) and
+        threading.active_count() for threads (works on all platforms)."""
+        pid = os.getpid()
+        ram_mb = None
+        cpu_pct = None
+        thread_count = threading.active_count()
+
+        try:
+            system = platform.system()
+            if system == "Windows":
+                out = subprocess.check_output(
+                    ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                    timeout=2, stderr=subprocess.DEVNULL
+                ).decode("utf-8", errors="replace")
+                parts = out.strip().strip('"').split('","')
+                if len(parts) >= 5:
+                    mem_str = parts[5].replace(",", "").replace(" K", "").strip()
+                    if mem_str.isdigit():
+                        ram_mb = round(int(mem_str) / 1024, 1)
+            else:
+                # macOS / Linux — single ps call for both RSS and CPU
+                try:
+                    out = subprocess.check_output(
+                        ["ps", "-o", "rss=,%cpu=", "-p", str(pid)],
+                        timeout=0.5, stderr=subprocess.DEVNULL
+                    ).decode("utf-8", errors="replace").strip()
+                    if out:
+                        parts = out.split()
+                        if len(parts) >= 1:
+                            ram_mb = round(int(parts[0]) / 1024, 1)
+                        if len(parts) >= 2:
+                            cpu_pct = float(parts[1])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        return ram_mb, cpu_pct, thread_count
+
+    def _update(self):
+        if not self._running:
+            return
+        try:
+            if not self.winfo_exists():
+                self._running = False
+                return
+        except Exception:
+            self._running = False
+            return
+
+        ram, cpu, threads = self._get_process_info()
+
+        # Only update label text when value actually changes (rounded to avoid
+        # tiny fluctuations like 245.1→245.2 causing unnecessary UI re-renders)
+        if ram is not None and round(ram, 0) != round(self._cached_ram or 0, 0):
+            self.ram_label.configure(text=f"{ram:.0f} MB")
+            self._cached_ram = ram
+        if cpu is not None and round(cpu, 1) != round(self._cached_cpu or 0, 1):
+            self.cpu_label.configure(text=f"{cpu:.1f}%")
+            self._cached_cpu = cpu
+        if threads is not None:
+            self.thread_label.configure(text=str(threads))
+
+        try:
+            self.after(5000, self._update)
+        except Exception:
+            self._running = False
+
+    def stop(self):
+        self._running = False

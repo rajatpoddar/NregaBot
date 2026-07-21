@@ -9,11 +9,6 @@ import json
 import time
 import re
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException
 
 import config
 from .base_tab import BaseAutomationTab
@@ -21,6 +16,11 @@ from .autocomplete_widget import AutocompleteEntry
 
 class SchemeClosingTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException
         super().__init__(parent, app_instance, automation_key="scheme_closing")
         
         self.grid_columnconfigure(0, weight=1)
@@ -32,6 +32,15 @@ class SchemeClosingTab(BaseAutomationTab):
         self._load_saved_inputs()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+
         main_container = ctk.CTkFrame(self, fg_color="transparent")
         main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         main_container.grid_columnconfigure(0, weight=1)
@@ -252,6 +261,14 @@ class SchemeClosingTab(BaseAutomationTab):
             print(f"Error loading inputs: {e}")
 
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         inputs = self._get_inputs()
         
         required_fields = ["panchayat", "work_category", "area", "measured_by", "measured_name", "cert_no_start", "completion_date", "work_codes"]
@@ -275,6 +292,14 @@ class SchemeClosingTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
@@ -336,6 +361,14 @@ class SchemeClosingTab(BaseAutomationTab):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, work_code, status, details), tags=tags))
 
     def _process_single_work_code(self, driver, inputs, work_code, cert_no):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         wait = WebDriverWait(driver, 20)
         long_wait = WebDriverWait(driver, 35)
         url = "https://nregade4.dord.gov.in/netnrega/compwork.aspx"
@@ -355,7 +388,12 @@ class SchemeClosingTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "   - Page 1: Searching for Work Code...")
             wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
 
-            time.sleep(1)
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                )
+            except (TimeoutException, NoSuchElementException):
+                pass
 
             wc_input.send_keys(work_code)
             wc_input.send_keys(Keys.TAB)
@@ -454,6 +492,14 @@ class SchemeClosingTab(BaseAutomationTab):
             return "Failed", f"An unexpected error occurred: {error_message}"
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure? This will clear all inputs."):
             self.panchayat_entry.delete(0, "end")
             self.work_category_var.set("Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers")
@@ -490,6 +536,14 @@ class SchemeClosingTab(BaseAutomationTab):
         if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         export_format = self.export_format_menu.get()
         if "CSV" in export_format:
             self.export_treeview_to_csv(self.results_tree, "scheme_closing_results.csv")
@@ -506,6 +560,14 @@ class SchemeClosingTab(BaseAutomationTab):
             self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         if not self.results_tree.get_children(): messagebox.showinfo("No Data", "No results to export."); return None, None
         panchayat_name = self.panchayat_entry.get().strip()
         if not panchayat_name: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
@@ -528,6 +590,14 @@ class SchemeClosingTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
         title = f"Scheme Closing Report: {self.panchayat_entry.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)

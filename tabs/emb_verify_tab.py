@@ -6,10 +6,6 @@ from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import time
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, UnexpectedAlertPresentException
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
@@ -19,12 +15,28 @@ class EmbVerifyTab(BaseAutomationTab):
     A tab for automating the e-Measurement Book (eMB) verification process.
     """
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, UnexpectedAlertPresentException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, UnexpectedAlertPresentException
         super().__init__(parent, app_instance, automation_key="emb_verify")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1) 
         self._create_widgets()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+
         """Creates the user interface elements for the tab."""
         # --- Top Frame for Configuration ---
         config_frame = ctk.CTkFrame(self)
@@ -120,6 +132,13 @@ class EmbVerifyTab(BaseAutomationTab):
         if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         """Resets the UI to its initial state."""
         if messagebox.askokcancel("Reset Form?", "This will clear all inputs and results. Continue?"):
             self.panchayat_entry.delete(0, tkinter.END)
@@ -134,6 +153,13 @@ class EmbVerifyTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         """Validates inputs and starts the automation thread."""
         panchayat = self.panchayat_entry.get().strip()
         verify_amount = self.verify_amount_entry.get().strip()
@@ -157,6 +183,13 @@ class EmbVerifyTab(BaseAutomationTab):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_code, status, details, timestamp), tags=tags))
 
     def run_automation_logic(self, panchayat, verify_amount, work_codes_from_ui):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         """The main logic for the eMB verification automation."""
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
@@ -177,7 +210,12 @@ class EmbVerifyTab(BaseAutomationTab):
             
             self.app.log_message(self.log_display, "Waiting for page to reload...")
             wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
-            time.sleep(1) 
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                )
+            except (TimeoutException, NoSuchElementException):
+                pass
             self.app.log_message(self.log_display, "Page reloaded successfully.")
             
             work_codes_to_process = []
@@ -209,7 +247,12 @@ class EmbVerifyTab(BaseAutomationTab):
                     panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
                     panchayat_select.select_by_visible_text(panchayat)
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
-                    time.sleep(1)
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
 
             final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
             self.app.after(0, self.update_status, final_msg, 1.0)
@@ -224,6 +267,13 @@ class EmbVerifyTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _process_single_work_code(self, driver, wait, work_code, use_search, verify_amount):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         """Handles the logic for a single work code verification."""
         try:
             self.app.log_message(self.log_display, f"Selecting work code: {work_code}")
@@ -240,7 +290,12 @@ class EmbVerifyTab(BaseAutomationTab):
                 raise NoSuchElementException(f"Work code containing '{work_code}' not found in dropdown.")
             
             self.app.log_message(self.log_display, "Work selected. Pausing for page to update...")
-            time.sleep(2) 
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                )
+            except (TimeoutException, NoSuchElementException):
+                pass
 
             self.app.log_message(self.log_display, "Selecting 'Musterroll Period Wise'.")
             period_radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rbl_mustrolltype_0")))
@@ -248,7 +303,12 @@ class EmbVerifyTab(BaseAutomationTab):
             
             self.app.log_message(self.log_display, "Waiting for measurement periods to load...")
             period_dropdown_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddl_mperiod")))
-            time.sleep(2) 
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                )
+            except (TimeoutException, NoSuchElementException):
+                pass
 
             period_select = Select(period_dropdown_element)
             if len(period_select.options) <= 1:
@@ -297,6 +357,13 @@ class EmbVerifyTab(BaseAutomationTab):
             self._log_result(work_code, "Error", f"An unexpected error occurred: {e}")
 
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         export_format = self.export_format_menu.get()
         if "CSV" in export_format:
             self.export_treeview_to_csv(self.results_tree, "emb_verify_results.csv")
@@ -312,6 +379,13 @@ class EmbVerifyTab(BaseAutomationTab):
             self._handle_pdf_export(data, headers, col_widths, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         if not self.results_tree.get_children(): messagebox.showinfo("No Data", "No results to export."); return None, None
         panchayat_name = self.panchayat_entry.get().strip()
         if not panchayat_name: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
@@ -334,6 +408,13 @@ class EmbVerifyTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         title = f"eMB Verification Report: {self.panchayat_entry.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)

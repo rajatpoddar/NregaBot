@@ -41,6 +41,14 @@ class MusterrollGenTab(BaseAutomationTab):
 
     def _create_widgets(self):
         # This frame holds all the user input fields
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10,0))
         controls_frame.grid_columnconfigure((1,3), weight=1)
@@ -174,6 +182,14 @@ class MusterrollGenTab(BaseAutomationTab):
         self.scale_label.configure(text=f"{int(value)}%")
 
     def set_ui_state(self, running: bool):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.panchayat_entry.configure(state=state)
@@ -226,6 +242,14 @@ class MusterrollGenTab(BaseAutomationTab):
                 self.staff_entry.insert(0, saved_staff)
         
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         self.success_count, self.skipped_count = 0, 0
         self.current_session_files = [] 
@@ -255,6 +279,14 @@ class MusterrollGenTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def retry_logic_handler(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         failed_items = []
         for item_id in self.results_tree.get_children():
             values = self.results_tree.item(item_id)['values']
@@ -284,6 +316,14 @@ class MusterrollGenTab(BaseAutomationTab):
         self.start_automation()
         
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self.panchayat_entry.delete(0, tkinter.END)
             self.start_date_entry.clear(); self.end_date_entry.clear()
@@ -311,6 +351,14 @@ class MusterrollGenTab(BaseAutomationTab):
         except Exception as e: print(f"Error saving inputs: {e}")
         
     def load_inputs(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r') as f: data = json.load(f)
@@ -353,6 +401,14 @@ class MusterrollGenTab(BaseAutomationTab):
             return None
 
     def run_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.log_message(self.log_display, f"Starting MR generation for: {inputs['panchayat']}")
@@ -417,6 +473,14 @@ class MusterrollGenTab(BaseAutomationTab):
             messagebox.showinfo("Task Finished", summary)
 
     def _validate_panchayat(self, driver, wait, panchayat_name):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         try:
             self.app.log_message(self.log_display, "Validating Panchayat name...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
@@ -436,6 +500,14 @@ class MusterrollGenTab(BaseAutomationTab):
             return False
 
     def _get_items_to_process(self, driver, wait, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         if inputs['auto_mode']:
             self.app.log_message(self.log_display, "Auto Mode: Fetching available work codes...")
             try:
@@ -452,6 +524,14 @@ class MusterrollGenTab(BaseAutomationTab):
             return inputs['work_codes']
 
     def _process_single_item(self, driver, wait, inputs, item, output_dir, session_skip_list):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         full_work_code_text = ""
         try:
             self.app.log_message(self.log_display, "   - Navigating to MR page...")
@@ -539,6 +619,14 @@ class MusterrollGenTab(BaseAutomationTab):
             self._log_result(item, "Failed", error_msg)
 
     def _save_mr_as_pdf(self, driver, full_work_code, output_dir, orientation, scale):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         try:
             safe_work_code = full_work_code.split('/')[-1][-6:]
             base_filename = safe_work_code
@@ -671,6 +759,14 @@ class MusterrollGenTab(BaseAutomationTab):
             return None
 
     def _select_work_code(self, driver, wait, item, is_auto_mode):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         """
         Selects the work code with Retry Logic to handle StaleElementExceptions.
         """
@@ -774,6 +870,14 @@ class MusterrollGenTab(BaseAutomationTab):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
 
     def _upload_to_cloud(self, file_path, panchayat_name):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         """Uploads a given file to the user's cloud storage via the API."""
         if not self.app.license_info.get('key'):
             self.app.log_message(self.log_display, "   - Cloud Upload Skipped: No license key found.", "warning")
@@ -797,7 +901,7 @@ class MusterrollGenTab(BaseAutomationTab):
                     'relative_path': relative_path
                 }
                 
-                response = requests.post(url, headers=headers, files=files, data=data, timeout=120)
+                response = self.app.http_session.post(url, headers=headers, files=files, data=data, timeout=120)
 
             if response.status_code == 201:
                 return True
@@ -812,6 +916,14 @@ class MusterrollGenTab(BaseAutomationTab):
             return False
 
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         export_format = self.export_format_menu.get()
         if "CSV" in export_format:
             self.export_treeview_to_csv(self.results_tree, "muster_roll_gen_results.csv")
@@ -828,6 +940,14 @@ class MusterrollGenTab(BaseAutomationTab):
             self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         if not self.results_tree.get_children(): messagebox.showinfo("No Data", "No results to export."); return None, None
         panchayat_name = self.panchayat_entry.get().strip()
         if not panchayat_name: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
@@ -850,6 +970,14 @@ class MusterrollGenTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         title = f"Muster Roll Generation Report: {self.panchayat_entry.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
@@ -859,6 +987,14 @@ class MusterrollGenTab(BaseAutomationTab):
 
     # --- NEW MERGE PDFS METHOD ---
     def merge_saved_pdfs(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         self.app.log_message(self.log_display, "Starting PDF merge...")
         
         # Use ONLY the files generated in the current session
@@ -905,6 +1041,14 @@ class MusterrollGenTab(BaseAutomationTab):
         )
 
     def _run_merge_logic(self, file_list, output_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
         """The actual PDF merging logic that runs in a thread."""
         self.app.after(0, self.set_ui_state, True)
         self.app.log_message(self.log_display, f"Merging {len(file_list)} files...")

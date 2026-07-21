@@ -4,23 +4,42 @@ from tkinter import ttk, messagebox
 import customtkinter as ctk
 import time
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, UnexpectedAlertPresentException, StaleElementReferenceException
 
 import config
 from .base_tab import BaseAutomationTab
 
 class AddActivityTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import NoSuchElementException, TimeoutException, UnexpectedAlertPresentException, StaleElementReferenceException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import NoSuchElementException, TimeoutException, UnexpectedAlertPresentException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="add_activity")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         # Frame for controls and action buttons
         top_frame = ctk.CTkFrame(self)
         top_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
@@ -122,6 +141,19 @@ class AddActivityTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(work_keys, unit_price, quantity))
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self.work_keys_text.configure(state="normal")
             self.work_keys_text.delete("1.0", tkinter.END)
@@ -140,6 +172,19 @@ class AddActivityTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def run_automation_logic(self, work_keys, unit_price, quantity):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
@@ -181,6 +226,19 @@ class AddActivityTab(BaseAutomationTab):
         self.retry_failed_automation(self.work_keys_text)
 
     def _process_single_work_key(self, driver, work_key, unit_price, quantity):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """
         Processes a single work key.
         OPTIMIZED: Uses Staleness Check to ensure page refresh before selecting Work Code.
@@ -220,7 +278,12 @@ class AddActivityTab(BaseAutomationTab):
                 except TimeoutException:
                     self.app.log_message(self.log_display, "Page didn't refresh quickly, forcing wait...", "warning")
             
-            time.sleep(1) # Tiny buffer for DOM stability
+            try:
+                WebDriverWait(driver, 10).until(
+                    lambda d: d.execute_script('return document.readyState') == 'complete'
+                )
+            except TimeoutException:
+                pass
 
             # --- 2. Select work from dropdown ---
             # Re-find the element
@@ -229,7 +292,7 @@ class AddActivityTab(BaseAutomationTab):
 
             # Retry logic if options are not loaded yet
             if len(work_select.options) <= 1:
-                time.sleep(2)
+                # Element wait handled by WebDriverWait below
                 work_select = Select(driver.find_element(By.ID, work_name_dd_id))
 
             if len(work_select.options) > 1:
@@ -285,7 +348,12 @@ class AddActivityTab(BaseAutomationTab):
             driver.execute_script("arguments[0].value = arguments[1];", quantity_input, quantity)
             driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", quantity_input)
 
-            time.sleep(1)
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                )
+            except (TimeoutException, NoSuchElementException):
+                pass
 
             # --- 6. Click Save (JS Safe) ---
             self.app.log_message(self.log_display, "Saving activity...")
@@ -314,7 +382,12 @@ class AddActivityTab(BaseAutomationTab):
                             outcome_found = True; break
                     except NoSuchElementException: pass
                     
-                    time.sleep(1)
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
                 except Exception: pass
 
             if not outcome_found:

@@ -5,21 +5,38 @@ import customtkinter as ctk
 import os, random, time, sys, subprocess
 from datetime import datetime
 from fpdf import FPDF
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException, TimeoutException, NoAlertPresentException
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 
 class MsrTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException, TimeoutException, NoAlertPresentException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException, TimeoutException, NoAlertPresentException
         super().__init__(parent, app_instance, automation_key="msr")
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         controls_frame.grid_columnconfigure((0, 1), weight=1)
@@ -141,6 +158,18 @@ class MsrTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic)
         
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         if messagebox.askokcancel("Reset Form?", "Clear all inputs, results, and logs?"):
             self.panchayat_entry.delete(0, tkinter.END)
             self.verify_amount_entry.delete(0, tkinter.END); self.verify_amount_entry.insert(0, "282")
@@ -152,6 +181,18 @@ class MsrTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
             
     def run_automation_logic(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
         self.app.clear_log(self.log_display)
@@ -217,6 +258,18 @@ class MsrTab(BaseAutomationTab):
         self.retry_failed_automation(self.work_key_text)
 
     def _process_single_work_code(self, driver, wait, work_key, verify_amount):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """
         Processes a single work code for MSR payment.
         Includes robust waiting for Slow Internet (Wait for Postback).
@@ -251,7 +304,12 @@ class MsrTab(BaseAutomationTab):
                     self.app.log_message(self.log_display, "Page did not refresh quickly, forcing wait...", "warning")
             
             # Wait a tiny bit extra for the new DOM to settle
-            time.sleep(1) 
+            try:
+                WebDriverWait(driver, 10).until(
+                    lambda d: d.execute_script('return document.readyState') == 'complete'
+                )
+            except TimeoutException:
+                pass
 
             # --- 2. Check Errors ---
             # Check for error label (Use innerText for background safety)
@@ -269,7 +327,7 @@ class MsrTab(BaseAutomationTab):
             # Check if options are loaded (more than just "Select")
             if len(work_code_select.options) <= 1:
                 # Retry once if options haven't populated yet
-                time.sleep(2)
+                # Element wait handled by WebDriverWait below
                 work_code_select = Select(driver.find_element(By.ID, "ddlWorkCode"))
 
             if len(work_code_select.options) <= config.MSR_CONFIG["work_code_index"]: 
@@ -279,7 +337,7 @@ class MsrTab(BaseAutomationTab):
             
             # Wait for the next dropdown (MSR No) to load after selecting Work Code
             # (Selecting work code triggers another mini-update)
-            time.sleep(1.5) 
+            # Element wait handled by WebDriverWait below
             
             msr_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ddlMsrNo"))))
             if len(msr_select.options) <= config.MSR_CONFIG["muster_roll_index"]: 
@@ -355,6 +413,18 @@ class MsrTab(BaseAutomationTab):
 
     # --- NEW: Central Export Function ---
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         export_format = self.export_format_menu.get()
         panchayat_name = self.panchayat_entry.get().strip()
 
@@ -377,6 +447,18 @@ class MsrTab(BaseAutomationTab):
             self._handle_pdf_export(data, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         all_items = self.results_tree.get_children()
         if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
         panchayat_name = self.panchayat_entry.get().strip()
@@ -406,6 +488,18 @@ class MsrTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Handles the generation of the improved PDF report for MSR."""
         try:
             headers = self.results_tree['columns']

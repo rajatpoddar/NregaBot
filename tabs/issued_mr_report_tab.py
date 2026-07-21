@@ -4,21 +4,10 @@ from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import time, os, re, json
 from datetime import datetime
-import pandas as pd
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.utils import get_column_letter
 
 # --- Imports ---
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
 # --- End Imports ---
 
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont 
@@ -29,6 +18,23 @@ import config
 
 class IssuedMrReportTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        import pandas as pd
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        import pandas as pd
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="issued_mr_report")
         
         self.grid_columnconfigure(0, weight=1)
@@ -51,6 +57,21 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.load_inputs()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        import pandas as pd
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+
         # Frame for all user input controls
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="new", padx=10, pady=10)
@@ -191,6 +212,21 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.abps_export_button.configure(state=state)
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.state_entry.delete(0, tkinter.END)
         self.district_entry.delete(0, tkinter.END)
         self.block_entry.delete(0, tkinter.END)
@@ -204,6 +240,21 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.update_status("Ready", 0.0)
         
     def _get_new_driver(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Creates a new HEADLESS Chrome driver."""
         self.app.log_message(self.log_display, "Naya Headless Chrome browser shuru kar raha hoon...", "info")
         try:
@@ -224,6 +275,21 @@ class IssuedMrReportTab(BaseAutomationTab):
             return None
 
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Standard Issued MR Report Automation (Specific Panchayat)"""
         self.run_dup_mr_button.pack_forget()
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
@@ -276,6 +342,21 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_abps_automation_logic, args=(inputs,))
 
     def _solve_captcha(self, driver, wait):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.app.log_message(self.log_display, "Attempting to solve CAPTCHA...")
         captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
         try:
@@ -291,7 +372,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Solved: {captcha_text.strip()} = {result}")
             driver.find_element(By.ID, captcha_textbox_id).send_keys(str(result))
             driver.find_element(By.ID, verify_button_id).click()
-            time.sleep(1)
+            time.sleep(1.0)  # Short wait after click
             if "Invalid Captcha Code" in driver.page_source:
                 raise ValueError("CAPTCHA verification failed.")
             return True
@@ -304,6 +385,21 @@ class IssuedMrReportTab(BaseAutomationTab):
 
     def run_automation_logic(self, inputs, retries=1):
         # Standard Issued MR Report Logic (Panchayat Specific)
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.app.set_status, "Starting Issued MR Report...") 
         self.app.after(0, self.update_status, "Initializing...", 0.0)
         self.app.clear_log(self.log_display)
@@ -402,6 +498,21 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def run_abps_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """New Logic for scanning the whole block for ABPS Pending workers."""
         self.app.after(0, self.app.set_status, "Scanning Block for ABPS Pending...") 
         self.app.after(0, self.update_status, "Initializing...", 0.0)
@@ -593,6 +704,21 @@ class IssuedMrReportTab(BaseAutomationTab):
 
     def export_abps_report(self):
         # --- NEW PROFESSIONAL EXCEL EXPORT LOGIC ---
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         if not self.abps_tree.get_children():
             messagebox.showinfo("No Data", "There are no ABPS results to export.")
             return
@@ -715,6 +841,21 @@ class IssuedMrReportTab(BaseAutomationTab):
             messagebox.showerror("Export Error", f"Failed to save Excel report:\n{e}")
 
     def _generic_export(self, export_format, safe_name, year, date_str, data, headers, title, date_text, prefix):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         downloads_path = self.app.get_user_downloads_path()
         target_dir = os.path.join(downloads_path, f"Reports {year}", safe_name)
         try: os.makedirs(target_dir, exist_ok=True)
@@ -749,6 +890,21 @@ class IssuedMrReportTab(BaseAutomationTab):
                 messagebox.showinfo("Success", f"Saved to:\n{fpath}")
 
     def _save_to_excel(self, data, headers, title, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             df = pd.DataFrame(data, columns=headers)
             with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
@@ -778,12 +934,42 @@ class IssuedMrReportTab(BaseAutomationTab):
             return False
 
     def generate_report_pdf(self, data, headers, col_widths, title, date_str, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         return super().generate_report_pdf(data, headers, col_widths, title, date_str, file_path)
 
     def _save_to_png(self, data, headers, title, date_str, file_path):
         # Reusing the logic from base class but ensuring context fits
         # We need specific column width ratios for this report type
         # SNo, Pan, WC, Name, Cat, Type, Agency
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         base_col_widths = [0.05, 0.10, 0.20, 0.30, 0.15, 0.15, 0.05]
         
         try:

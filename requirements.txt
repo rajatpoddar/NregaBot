@@ -6,7 +6,6 @@ appdirs
 getmac
 fpdf2
 pyinstaller
-sentry-sdk
 ttkbootstrap
 darkdetect
 python-dotenv
@@ -18,6 +17,5 @@ requests-toolbelt
 openpyxl
 pandas
 lxml
-pygame
 pypdf
 reportlab

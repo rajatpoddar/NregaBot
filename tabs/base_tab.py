@@ -9,9 +9,6 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont 
 from fpdf import FPDF 
 
-# Import Selenium Exceptions for Error Handling
-from selenium.common.exceptions import NoSuchWindowException, WebDriverException
-
 from utils import resource_path
 
 # --- REUSABLE DATE PICKER CLASS ---
@@ -179,11 +176,25 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.retry_btn = None # Placeholder for retry button
         
     def open_date_picker(self, callback):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium.common.exceptions import NoSuchWindowException
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+
         """Opens the reusable DatePickerPopup."""
         DatePickerPopup(self, callback)
 
     def handle_error(self, e):
         """Centralized error handler."""
+        from selenium.common.exceptions import NoSuchWindowException, WebDriverException
         error_msg = str(e).lower()
         if "no such window" in error_msg or "target window already closed" in error_msg or "web view not found" in error_msg:
             self.app.log_message(self.log_display, "Automation Stopped: Browser tab/window was closed.", "error")
@@ -215,6 +226,18 @@ class BaseAutomationTab(ctk.CTkFrame):
         
     def generate_report_image(self, data, headers, title, date_str, output_path):
         # ... (No changes here)
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             try:
                 font_path_regular = resource_path("assets/fonts/NotoSansDevanagari-Regular.ttf")
@@ -404,6 +427,18 @@ class BaseAutomationTab(ctk.CTkFrame):
 
     def generate_report_pdf(self, data, headers, col_widths, title, date_str, file_path):
         # ... (No changes here)
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             pdf = ProfessionalPDF(title, date_str, orientation='L', unit='mm', format='A4')
             pdf.alias_nb_pages()
@@ -487,6 +522,18 @@ class BaseAutomationTab(ctk.CTkFrame):
             return False
 
     def _create_action_buttons(self, parent_frame):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Creates Start, Stop, Reset AND Retry buttons."""
         outer_wrapper = ctk.CTkFrame(parent_frame, fg_color="transparent")
         inner_container = ctk.CTkFrame(outer_wrapper, fg_color="transparent")
@@ -548,6 +595,18 @@ class BaseAutomationTab(ctk.CTkFrame):
             self.retry_btn.configure(state="disabled" if running else "normal")
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.update_status("Ready", 0)
         self.app.set_status("Ready")
         self.log_display.configure(state="normal")
@@ -577,6 +636,18 @@ class BaseAutomationTab(ctk.CTkFrame):
             messagebox.showinfo("Info", "Retry logic not configured for this tab.")
 
     def retry_failed_automation(self, input_widget):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """
         Generic Logic:
         1. Reads 'Failed' items from Treeview.

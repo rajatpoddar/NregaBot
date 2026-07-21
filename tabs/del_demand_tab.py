@@ -4,15 +4,6 @@ from tkinter import ttk, messagebox
 import customtkinter as ctk
 import time
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import (
-    TimeoutException, 
-    NoSuchElementException, 
-    StaleElementReferenceException
-)
-
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
@@ -37,6 +28,12 @@ class DelDemandTab(BaseAutomationTab):
 
     def _create_widgets(self):
         # --- Section 1: Input Controls ---
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         controls_frame.grid_columnconfigure(1, weight=1)
@@ -114,6 +111,12 @@ class DelDemandTab(BaseAutomationTab):
         self.village_entry.configure(state=state)
 
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         panchayat = self.panchayat_entry.get().strip()
         village = self.village_entry.get().strip()
 
@@ -135,6 +138,12 @@ class DelDemandTab(BaseAutomationTab):
         )
 
     def run_automation_logic(self, target_panchayat, target_village):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         
@@ -228,7 +237,12 @@ class DelDemandTab(BaseAutomationTab):
                         )
                     except Exception:
                         pass
-                    time.sleep(1.5)  # Extra buffer for ASP.NET initialization
+                    try:
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                        )
+                    except (TimeoutException, NoSuchElementException):
+                        pass
                     
                     try:
                         wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")))
@@ -272,6 +286,12 @@ class DelDemandTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def _process_village(self, driver, wait, panchayat, village_name):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         try:
             # Re-find dropdown (to avoid stale element after postbacks)
             village_dd_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
@@ -295,6 +315,12 @@ class DelDemandTab(BaseAutomationTab):
 
             def page_settled(d):
                 # Confirm dropdown selection took effect
+                # ---- Lazy imports ----
+                from selenium.webdriver.common.by import By
+                from selenium.webdriver.support.ui import Select, WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+                from selenium import webdriver
                 try:
                     dd = Select(d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"))
                     if dd.first_selected_option.text.strip() != village_name:

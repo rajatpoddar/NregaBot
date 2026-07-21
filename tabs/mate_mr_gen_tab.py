@@ -45,6 +45,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  UI Construction                                                     #
     # ------------------------------------------------------------------ #
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
         controls_frame.grid_columnconfigure((1, 3), weight=1)
@@ -231,6 +238,13 @@ class MateMrGenTab(BaseAutomationTab):
         self.scale_label.configure(text=f"{int(value)}%")
 
     def set_ui_state(self, running: bool):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         for widget in (
@@ -258,6 +272,13 @@ class MateMrGenTab(BaseAutomationTab):
             print(f"Error saving inputs: {e}")
 
     def load_inputs(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r') as f:
@@ -299,6 +320,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  Automation entry point                                             #
     # ------------------------------------------------------------------ #
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
         self.success_count, self.skipped_count = 0, 0
@@ -349,6 +377,13 @@ class MateMrGenTab(BaseAutomationTab):
             self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def retry_logic_handler(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         failed_items = []
         for item_id in self.results_tree.get_children():
             values = self.results_tree.item(item_id)['values']
@@ -372,6 +407,13 @@ class MateMrGenTab(BaseAutomationTab):
         self.start_automation()
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self.panchayat_entry.delete(0, tkinter.END)
             self.start_date_entry.delete(0, "end")
@@ -415,6 +457,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  Automation logic (runs in thread)                                  #
     # ------------------------------------------------------------------ #
     def run_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.log_message(
@@ -492,6 +541,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  Panchayat validation                                               #
     # ------------------------------------------------------------------ #
     def _validate_panchayat(self, driver, wait, panchayat_name):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         """If panchayat_name is empty, skip validation and return True."""
         if not panchayat_name:
             self.app.log_message(self.log_display, "Panchayat not provided — skipping validation.")
@@ -521,6 +577,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  Items to process                                                    #
     # ------------------------------------------------------------------ #
     def _get_items_to_process(self, driver, wait, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         """
         Auto mode  – click Skilled/Semi-Skilled checkbox, select panchayat,
                      then read all available work codes from ddlWorkCode.
@@ -562,6 +625,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  Skilled/Semi-Skilled checkbox helper                               #
     # ------------------------------------------------------------------ #
     def _select_skilled_checkbox(self, driver, wait):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         """
         Ensures the 'Skilled/Semi-Skilled' radio/checkbox is selected.
         The page shows two Worker Category options: Unskilled (default) and
@@ -610,6 +680,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  Single item processing                                             #
     # ------------------------------------------------------------------ #
     def _process_single_item(self, driver, wait, inputs, item, output_dir, session_skip_list):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         full_work_code_text = ""
         try:
             self.app.log_message(self.log_display, "   - Navigating to MR page...")
@@ -765,6 +842,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  Work code selection (manual / auto, with stale-element retry)     #
     # ------------------------------------------------------------------ #
     def _select_work_code(self, driver, wait, item, is_auto_mode):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         work_code_locator = (By.ID, "ddlWorkCode")
         for attempt in range(3):
             try:
@@ -824,6 +908,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  PDF save (identical to regular MR gen)                            #
     # ------------------------------------------------------------------ #
     def _save_mr_as_pdf(self, driver, full_work_code, output_dir, orientation, scale):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         try:
             safe_code = full_work_code.split('/')[-1][-6:]
             base_filename = safe_code
@@ -943,6 +1034,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  Export report                                                      #
     # ------------------------------------------------------------------ #
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         export_format = self.export_format_menu.get()
         if "CSV" in export_format:
             self.export_treeview_to_csv(self.results_tree, "mate_mr_gen_results.csv")
@@ -960,6 +1058,13 @@ class MateMrGenTab(BaseAutomationTab):
             self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "No results to export.")
             return None, None
@@ -1000,6 +1105,13 @@ class MateMrGenTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
 
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         title = f"Mate/Mistri MR Report: {self.panchayat_entry.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
@@ -1014,6 +1126,13 @@ class MateMrGenTab(BaseAutomationTab):
     #  Merge saved PDFs                                                   #
     # ------------------------------------------------------------------ #
     def merge_saved_pdfs(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         self.app.log_message(self.log_display, "Starting PDF merge...")
         pdf_files = self.current_session_files
         if not pdf_files:
@@ -1057,6 +1176,13 @@ class MateMrGenTab(BaseAutomationTab):
             "pdf_merger_mate_mr", self._run_merge_logic, args=(pdf_files, output_path))
 
     def _run_merge_logic(self, file_list, output_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.log_message(self.log_display, f"Merging {len(file_list)} files...")
         self.app.after(0, self.app.set_status, "Merging PDFs...")

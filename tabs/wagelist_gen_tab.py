@@ -7,23 +7,40 @@ import re
 import base64 
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from selenium.webdriver.common.print_page_options import PrintOptions
-import sentry_sdk 
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 
 class WagelistGenTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException
+        from selenium.webdriver.common.print_page_options import PrintOptions
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException
+        from selenium.webdriver.common.print_page_options import PrintOptions
         super().__init__(parent, app_instance, automation_key="gen")
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.print_page_options import PrintOptions
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         # Configure Main Grid (Full Expansion)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -126,6 +143,18 @@ class WagelistGenTab(BaseAutomationTab):
         else: self.export_filter_menu.configure(state="normal")
 
     def set_ui_state(self, running: bool):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.print_page_options import PrintOptions
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.agency_entry.configure(state=state)
@@ -137,6 +166,18 @@ class WagelistGenTab(BaseAutomationTab):
         if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.print_page_options import PrintOptions
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         if messagebox.askokcancel("Reset Form?", "Are you sure?"):
             self.agency_entry.delete(0, tkinter.END)
             self.save_pdf_var.set("off") 
@@ -148,7 +189,18 @@ class WagelistGenTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def start_automation(self):
-        # Simplified Logic: No Batch Queue, just the entry field
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.print_page_options import PrintOptions
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         agency = self.agency_entry.get().strip()
         
         if not agency:
@@ -171,6 +223,18 @@ class WagelistGenTab(BaseAutomationTab):
             self.start_automation()
 
     def run_automation_logic(self, agency_input):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.print_page_options import PrintOptions
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """
         Logic: Processes the provided agency/panchayat.
         agency_input: Can be a single string or a list of strings.
@@ -290,6 +354,18 @@ class WagelistGenTab(BaseAutomationTab):
                         # G. Wait for Outcome
                         try:
                             def check_outcome(d):
+                                # ---- Lazy imports ----
+                                from selenium.webdriver.common.by import By
+                                from selenium.webdriver.support.ui import Select, WebDriverWait
+                                from selenium.webdriver.support import expected_conditions as EC
+                                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+                                from selenium.webdriver.common.print_page_options import PrintOptions
+                                from selenium import webdriver
+                                import openpyxl
+                                from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+                                from openpyxl.utils import get_column_letter
+                                from openpyxl.worksheet.page import PageMargins
+                                from openpyxl.drawing.image import Image as XLImage
                                 if "view_wagelist.aspx" in d.current_url: return True
                                 try:
                                     msg = d.find_element(By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
@@ -349,7 +425,6 @@ class WagelistGenTab(BaseAutomationTab):
 
         except Exception as e: 
             self.app.log_message(self.log_display, f"Critical Error: {e}", level="error")
-            if getattr(config, 'SENTRY_DSN', None): sentry_sdk.capture_exception(e)
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Finished", 1.0)
@@ -375,6 +450,18 @@ class WagelistGenTab(BaseAutomationTab):
 
     # --- NEW METHOD: Save Page as PDF ---
     def _save_page_as_pdf(self, driver, wagelist_no, work_code, output_dir):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.print_page_options import PrintOptions
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Saves the current page as a PDF."""
         try:
             # Create a safe filename
@@ -430,6 +517,18 @@ class WagelistGenTab(BaseAutomationTab):
             return None
 
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.print_page_options import PrintOptions
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         export_format = self.export_format_menu.get()
         if "CSV" in export_format:
             # For CSV, we export all columns as is
@@ -446,6 +545,18 @@ class WagelistGenTab(BaseAutomationTab):
             self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.print_page_options import PrintOptions
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         all_items = self.results_tree.get_children()
         if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
         agency_name = self.agency_entry.get().strip()
@@ -483,6 +594,18 @@ class WagelistGenTab(BaseAutomationTab):
 
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.print_page_options import PrintOptions
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         title = f"Wagelist Generation Report: {self.agency_entry.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)

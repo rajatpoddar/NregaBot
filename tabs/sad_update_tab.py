@@ -5,16 +5,18 @@ import customtkinter as ctk
 import json
 import os, time, csv, re
 import threading
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException, StaleElementReferenceException
 from .base_tab import BaseAutomationTab
 
 # --- NAME CHANGED HERE (SADUpdateStatusTab -> SadUpdateTab) ---
 class SadUpdateTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        import openpyxl
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="sad_update_status")
         self.config_file = self.app.get_data_path("sad_update_inputs.json")
         
@@ -29,6 +31,20 @@ class SadUpdateTab(BaseAutomationTab):
         self.load_inputs()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementClickInterceptedException
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         # --- Top Frame: Title & Action Selection ---
         top_frame = ctk.CTkFrame(self.main_scroll, fg_color="transparent")
         top_frame.pack(fill="x", padx=10, pady=10)
@@ -193,6 +209,19 @@ class SadUpdateTab(BaseAutomationTab):
         return None
 
     def _scan_file_for_ack_numbers(self, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementClickInterceptedException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         ack_list = []
         file_ext = os.path.splitext(file_path)[1].lower()
         pattern = re.compile(r'\d+/\d+/\d+/\d+')
@@ -200,7 +229,6 @@ class SadUpdateTab(BaseAutomationTab):
         try:
             rows_to_scan = []
             if file_ext == '.xlsx':
-                import openpyxl
                 wb = openpyxl.load_workbook(file_path, data_only=True)
                 sheet = wb.active
                 for row in sheet.iter_rows(values_only=True): rows_to_scan.append(row)
@@ -282,6 +310,19 @@ class SadUpdateTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import ElementClickInterceptedException
+        from selenium import webdriver
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         items = inputs['items']
         action_val = inputs['action_val']
         total = len(items)

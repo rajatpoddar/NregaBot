@@ -4,10 +4,6 @@ from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import time, os, sys, re
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 
 from fpdf import FPDF
 from utils import resource_path
@@ -16,12 +12,23 @@ from .autocomplete_widget import AutocompleteEntry
 
 class SAReportTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="social_audit_respond")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+
         # Frame for all user input controls
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="new", padx=10, pady=10)
@@ -101,6 +108,12 @@ class SAReportTab(BaseAutomationTab):
             self.results_tree.delete(item)
 
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         inputs = {'panchayat': self.panchayat_entry.get().strip(), 'year': self.year_entry.get().strip(), 'status': self.status_entry.get().strip()}
         if not all(inputs.values()): messagebox.showwarning("Input Error", "All fields are required."); return
@@ -109,6 +122,12 @@ class SAReportTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True); self.app.clear_log(self.log_display); self.app.log_message(self.log_display, "Starting SA View/Respond Issue automation...")
         try:
             driver = self.app.get_driver();
@@ -160,6 +179,12 @@ class SAReportTab(BaseAutomationTab):
             self.app.after(5000, lambda: self.update_status("Ready", 0.0))
 
     def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "There are no results to export.")
             return
@@ -230,6 +255,12 @@ class SAReportTab(BaseAutomationTab):
                 messagebox.showinfo("Success", f"PDF report saved successfully to:\n{file_path}")
         
     def generate_report_pdf(self, data, headers, col_widths, title, date_str, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         """
         Overrides base method to use Unicode font, add footer, adjust formatting, 
         and correctly handle row wrapping and page breaks.

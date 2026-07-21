@@ -8,15 +8,7 @@ import customtkinter as ctk
 import time, os, re, json, requests, threading
 from datetime import datetime
 
-import pandas as pd  # type: ignore
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side  # type: ignore
-from openpyxl.utils import get_column_letter  # type: ignore
-from openpyxl.drawing.image import Image as XLImage  # type: ignore
 
-from selenium.webdriver.common.by import By  # type: ignore
-from selenium.webdriver.support.ui import WebDriverWait  # type: ignore
-from selenium.webdriver.support import expected_conditions as EC  # type: ignore
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException  # type: ignore
 
 from .base_tab import BaseAutomationTab
 
@@ -51,6 +43,14 @@ class NmmsAttendanceTab(BaseAutomationTab):
     ]
 
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side  # type: ignore
+        from openpyxl.utils import get_column_letter  # type: ignore
+        from openpyxl.drawing.image import Image as XLImage  # type: ignore
+        from selenium.webdriver.common.by import By  # type: ignore
+        from selenium.webdriver.support.ui import WebDriverWait  # type: ignore
+        from selenium.webdriver.support import expected_conditions as EC  # type: ignore
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException  # type: ignore
         super().__init__(parent, app_instance, automation_key="nmms_attendance")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)   # full tab is the scrollable area
@@ -64,6 +64,20 @@ class NmmsAttendanceTab(BaseAutomationTab):
     # UI
     # -----------------------------------------------------------------------
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        import pandas as pd
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
+        import openpyxl
+        from selenium import webdriver
+
         # ── Outer scrollable wrapper so the entire tab scrolls ──────────────
         outer_scroll = ctk.CTkScrollableFrame(self)
         outer_scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
@@ -132,6 +146,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
         self._create_log_and_status_area(parent_notebook=nb)
 
     def _build_summary_tab(self, tab):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         tab.grid_columnconfigure(0, weight=1)
         tab.grid_rowconfigure(1, weight=1)
 
@@ -211,6 +238,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
         for v in self._pan_checkboxes.values(): v.set(False)
 
     def _clear_results(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         for i in self.results_tree.get_children(): self.results_tree.delete(i)
         for i in self.workers_tree.get_children(): self.workers_tree.delete(i)
         self._photo_paths_map.clear()
@@ -222,6 +262,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
         self._scrape_btn.configure(state=s)
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self._clear_results()
         self.update_status("Ready", 0)
         self.app.log_message(self.log_display, "Reset complete.")
@@ -245,6 +298,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
         threading.Thread(target=self._scrape_current_page_logic, args=(driver,), daemon=True).start()
 
     def _scrape_current_page_logic(self, driver):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         try:
             self.app.log_message(self.log_display, "Reading panchayat table from current browser page...", "info")
             self.app.log_message(self.log_display, f"  Current URL: {driver.current_url}")
@@ -298,6 +364,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
             self.app.after(0, lambda: self._scrape_btn.configure(state="normal", text="🔍 Scrape Current Page"))
 
     def _populate_panchayat_checkboxes(self, data: list):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         for w in self._pan_scroll.winfo_children(): w.destroy()
         self._pan_checkboxes.clear()
         self._panchayat_data = data
@@ -321,6 +400,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
     # PHASE 3 — START AUTOMATION
     # -----------------------------------------------------------------------
     def start_automation(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         selected = [n for n, v in self._pan_checkboxes.items() if v.get()]
         if not selected:
             messagebox.showwarning("No Selection", "Please select at least one panchayat.")
@@ -330,6 +422,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self._run_scrape_logic, args=(selected,))
 
     def _run_scrape_logic(self, selected_panchayats: list):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.update_status, "Initializing...", 0.0)
 
@@ -437,6 +542,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
     # SCRAPING HELPERS
     # -----------------------------------------------------------------------
     def _click_and_scrape_mr_list(self, pan_info: dict, driver, pan_name: str) -> list:
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Navigate to MR list page by clicking the link (not via URL), then scrape MR rows."""
         mr_rows = []
         try:
@@ -501,6 +619,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
         return mr_rows
 
     def _scrape_mr_detail(self, mr_info: dict, driver, pan_name: str, photos_dir: str) -> dict:
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Navigate to MR detail page by clicking the link, scrape photo info + worker table."""
         detail = {
             "work_name": "",
@@ -630,6 +761,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
         return detail
 
     def _extract_photo_info(self, driver, page_src: str, photo_no: int, detail: dict):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """
         Extract timestamp / geo / taken-by for a photo block.
 
@@ -652,6 +796,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
         # NOTE: "Taken" timestamp (when photo was captured) may only appear as upload time;
         #       treat PhotoUploadTime as "Uploaded" and look for a separate taken span if present.
         def _span(span_id: str) -> str:
+            # ---- Lazy imports ----
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import Select, WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+            from selenium.common.exceptions import WebDriverException
+            from selenium import webdriver
+            import pandas as pd
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.utils import get_column_letter
+            from openpyxl.worksheet.page import PageMargins
+            from openpyxl.drawing.image import Image as XLImage
             """Return innerText of a span by its ID, empty string if not found."""
             try:
                 el = driver.find_element(By.ID, span_id)
@@ -875,6 +1032,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
     def _download_photo(self, photo_no: int, pan_name: str,
                         mr_info: dict, photos_dir: str, driver) -> tuple:
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """
         Download a group photo via the 'Click here for large image' link.
         HTML structure: <a href="ShowImage.aspx?...">Click here for large image</a>
@@ -926,7 +1096,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
             path  = os.path.join(photos_dir, fname)
 
             cookies = {c["name"]: c["value"] for c in driver.get_cookies()}
-            resp    = requests.get(
+            resp    = self.app.http_session.get(
                 photo_src,
                 headers={"User-Agent": "Mozilla/5.0",
                          "Referer": driver.current_url},
@@ -977,6 +1147,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
             messagebox.showerror("Export Error", f"Could not save report:\n{e}")
 
     def _write_excel(self, path: str, date_str: str):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         summary_data = [self.results_tree.item(i, "values") for i in self.results_tree.get_children()]
         worker_data  = [self.workers_tree.item(i, "values")  for i in self.workers_tree.get_children()]
 
@@ -1013,6 +1196,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     f"Date: {date_str}  |  Generated by NregaBot", "6A1B9A")
 
     def _embed_photos_in_sheet(self, ws, summary_data: list):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """
         For each data row that has a saved photo, embed the image in the
         'Photo-1 Saved' and/or 'Photo-2 Saved' cell and clear the text label.
@@ -1078,6 +1274,19 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
     def _style_sheet(self, ws, n_data_rows: int, headers: list,
                      title: str, subtitle: str, hdr_color: str):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.common.exceptions import WebDriverException
+        from selenium import webdriver
+        import pandas as pd
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.page import PageMargins
+        from openpyxl.drawing.image import Image as XLImage
         """Apply title, subtitle, generated-by, header styling, and zebra striping."""
         n = len(headers)
         WHITE = "FFFFFF"

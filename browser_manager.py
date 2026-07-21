@@ -10,18 +10,7 @@ import config
 from utils import resource_path
 
 # Selenium Imports (Lazy loading handled inside methods where possible to speed up start)
-from selenium import webdriver
-import selenium.webdriver.chrome.webdriver
-import selenium.webdriver.edge.webdriver
-import selenium.webdriver.firefox.webdriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.edge.options import Options as EdgeOptions
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from selenium.webdriver.firefox.service import Service as FirefoxService
-from selenium.common.exceptions import WebDriverException
-from webdriver_manager.firefox import GeckoDriverManager
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service as ChromeService
+
 
 class BrowserManager:
     def __init__(self, app):
@@ -29,13 +18,20 @@ class BrowserManager:
         self.driver = None
         self.active_browser = None
         
+        # Suppress verbose WDM (WebDriver Manager) INFO logs from terminal
+        os.environ['WDM_LOG'] = '0'
+        
         # Background me Webdriver Manager initialize karo
         threading.Thread(target=self._initialize_webdriver_manager, daemon=True).start()
 
     def _initialize_webdriver_manager(self):
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        from webdriver_manager.chrome import ChromeDriverManager
         try:
             ChromeService(ChromeDriverManager().install())
         except: pass
+        from selenium.webdriver.firefox.service import Service as FirefoxService
+        from webdriver_manager.firefox import GeckoDriverManager
         try:
             FirefoxService(GeckoDriverManager().install())
         except: pass
@@ -132,6 +128,11 @@ class BrowserManager:
             messagebox.showerror("Error", f"Failed to launch Edge:\n{e}")
 
     def launch_firefox_managed(self):
+        from selenium import webdriver
+        from selenium.webdriver.firefox.options import Options as FirefoxOptions
+        from selenium.webdriver.firefox.service import Service as FirefoxService
+        from webdriver_manager.firefox import GeckoDriverManager
+
         if self.driver and messagebox.askyesno("Browser Running", "Close existing Firefox and start new?"): 
             try: self.driver.quit()
             except: pass
@@ -240,6 +241,8 @@ class BrowserManager:
             return self.driver
             
         elif selected_browser == "chrome":
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options as ChromeOptions
             try:
                 opts = ChromeOptions()
                 opts.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
@@ -253,6 +256,8 @@ class BrowserManager:
                 return None
                 
         elif selected_browser == "edge":
+            from selenium import webdriver
+            from selenium.webdriver.edge.options import Options as EdgeOptions
             try:
                 opts = EdgeOptions()
                 opts.add_experimental_option("debuggerAddress", "127.0.0.1:9223")

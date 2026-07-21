@@ -10,14 +10,28 @@ class HistoryManager:
         self.db_file = data_path_func('nrega_local_db.sqlite')
         self.old_json_file = data_path_func('autocomplete_history.json')
         self.lock = threading.Lock()
+        self._conn = None  # Persistent connection (lazy init)
         
         self._init_db()
         self._migrate_from_json_if_needed()
 
     def _get_connection(self):
-        """Creates a database connection."""
-        conn = sqlite3.connect(self.db_file, check_same_thread=False)
-        return conn
+        """Returns the persistent connection, creating it on first call with WAL mode."""
+        if self._conn is None:
+            self._conn = sqlite3.connect(self.db_file, check_same_thread=False)
+            self._conn.execute("PRAGMA journal_mode=WAL")  # Better concurrent read/write
+            self._conn.execute("PRAGMA busy_timeout=5000")  # Wait up to 5s if locked
+        return self._conn
+
+    def close(self):
+        """Closes the persistent database connection."""
+        with self.lock:
+            try:
+                if self._conn:
+                    self._conn.close()
+                    self._conn = None
+            except Exception:
+                pass
 
     def _init_db(self):
         """Tables create karta hai."""
@@ -54,71 +68,78 @@ class HistoryManager:
                 ''')
                 
                 conn.commit()
-                conn.close()
             except Exception as e:
                 print(f"Database Init Error: {e}")
 
     # --- Migration aur Suggestions ke purane functions (Same as before) ---
     def _migrate_from_json_if_needed(self):
         if os.path.exists(self.old_json_file):
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT count(*) FROM suggestions")
-            if cursor.fetchone()[0] == 0:
+            with self.lock:
                 try:
-                    with open(self.old_json_file, 'r') as f: data = json.load(f)
-                    for k, v in data.items():
-                        if k == "_usage_stats": continue
-                        if isinstance(v, list):
-                            for val in v: cursor.execute("INSERT OR IGNORE INTO suggestions VALUES (?, ?)", (k, val))
-                    if "_usage_stats" in data:
-                        for k, v in data["_usage_stats"].items():
-                            cursor.execute("INSERT OR IGNORE INTO usage_stats VALUES (?, ?)", (k, v))
-                    conn.commit()
+                    conn = self._get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT count(*) FROM suggestions")
+                    if cursor.fetchone()[0] == 0:
+                        with open(self.old_json_file, 'r') as f: data = json.load(f)
+                        for k, v in data.items():
+                            if k == "_usage_stats": continue
+                            if isinstance(v, list):
+                                for val in v: cursor.execute("INSERT OR IGNORE INTO suggestions VALUES (?, ?)", (k, val))
+                        if "_usage_stats" in data:
+                            for k, v in data["_usage_stats"].items():
+                                cursor.execute("INSERT OR IGNORE INTO usage_stats VALUES (?, ?)", (k, v))
+                        conn.commit()
                 except Exception: pass
-            conn.close()
 
     def get_suggestions(self, field_key: str) -> list:
-        try:
-            conn = self._get_connection(); cursor = conn.cursor()
-            cursor.execute("SELECT value FROM suggestions WHERE field_key = ? ORDER BY value ASC", (field_key,))
-            rows = cursor.fetchall(); conn.close()
-            return [row[0] for row in rows]
-        except: return []
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT value FROM suggestions WHERE field_key = ? ORDER BY value ASC", (field_key,))
+                rows = cursor.fetchall()
+                return [row[0] for row in rows]
+            except: return []
 
     def save_entry(self, field_key: str, value: str):
         if not value or not field_key: return 
         with self.lock:
             try:
-                conn = self._get_connection(); cursor = conn.cursor()
+                conn = self._get_connection()
+                cursor = conn.cursor()
                 cursor.execute("INSERT OR IGNORE INTO suggestions VALUES (?, ?)", (field_key, value))
-                conn.commit(); conn.close()
+                conn.commit()
             except: pass
 
     def remove_entry(self, field_key: str, value: str):
         if not value: return
         with self.lock:
             try:
-                conn = self._get_connection(); cursor = conn.cursor()
+                conn = self._get_connection()
+                cursor = conn.cursor()
                 cursor.execute("DELETE FROM suggestions WHERE field_key = ? AND value = ?", (field_key, value))
-                conn.commit(); conn.close()
+                conn.commit()
             except: pass
 
     def increment_usage(self, automation_key: str):
         with self.lock:
             try:
-                conn = self._get_connection(); cursor = conn.cursor()
+                conn = self._get_connection()
+                cursor = conn.cursor()
                 cursor.execute("INSERT INTO usage_stats (automation_key, count) VALUES (?, 1) ON CONFLICT(automation_key) DO UPDATE SET count = count + 1", (automation_key,))
-                conn.commit(); conn.close()
+                conn.commit()
             except: pass
 
     def get_most_used_keys(self, count: int = 5) -> list:
-        try:
-            conn = self._get_connection(); cursor = conn.cursor()
-            cursor.execute("SELECT automation_key FROM usage_stats ORDER BY count DESC LIMIT ?", (count,))
-            rows = cursor.fetchall(); conn.close()
-            return [row[0] for row in rows]
-        except: return []
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT automation_key FROM usage_stats ORDER BY count DESC LIMIT ?", (count,))
+                rows = cursor.fetchall()
+                return [row[0] for row in rows]
+            except:
+                return []
 
     # --- NEW: Logging Functions (Magic starts here) ---
     def log_activity(self, activity_type: str, description: str):
@@ -136,17 +157,16 @@ class HistoryManager:
                 cursor.execute("DELETE FROM activity_log WHERE id NOT IN (SELECT id FROM activity_log ORDER BY id DESC LIMIT 1000)")
                 
                 conn.commit()
-                conn.close()
             except Exception as e:
                 print(f"Log Error: {e}")
 
     def get_recent_activity(self, limit: int = 50) -> list:
-        """UI me dikhane ke liye recent data lata hai."""
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT timestamp, activity_type, description FROM activity_log ORDER BY id DESC LIMIT ?", (limit,))
-            rows = cursor.fetchall()
-            conn.close()
-            return rows
-        except: return []
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT timestamp, activity_type, description FROM activity_log ORDER BY id DESC LIMIT ?", (limit,))
+                rows = cursor.fetchall()
+                return rows
+            except:
+                return []

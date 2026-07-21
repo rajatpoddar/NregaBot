@@ -4,15 +4,20 @@ from tkinter import ttk, messagebox
 import customtkinter as ctk
 import time
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select, WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
 import config
 from .base_tab import BaseAutomationTab
 
 class WagelistSendTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
+        # Lazy imports
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import NoSuchElementException, TimeoutException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import NoSuchElementException, TimeoutException
         super().__init__(parent, app_instance, automation_key="send")
         
         self.grid_columnconfigure(0, weight=1)
@@ -21,6 +26,13 @@ class WagelistSendTab(BaseAutomationTab):
         self._create_widgets()
 
     def _create_widgets(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
+
         settings_container = ctk.CTkFrame(self)
         settings_container.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         settings_container.grid_columnconfigure(1, weight=1)
@@ -86,6 +98,12 @@ class WagelistSendTab(BaseAutomationTab):
         self.end_wagelist_entry.configure(state=state)
 
     def reset_ui(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure?"):
             self.start_wagelist_entry.delete(0, tkinter.END)
             self.end_wagelist_entry.delete(0, tkinter.END)
@@ -131,6 +149,12 @@ class WagelistSendTab(BaseAutomationTab):
             self.start_automation()
 
     def run_automation_logic(self, fin_year, start_wl, end_wl):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
         self.app.clear_log(self.log_display)
@@ -152,7 +176,7 @@ class WagelistSendTab(BaseAutomationTab):
             
             self.app.log_message(self.log_display, "Waiting for wagelists to load...")
             wait.until(EC.element_to_be_clickable((By.XPATH, "//select[@id='ctl00_ContentPlaceHolder1_ddl_sel']/option[position()>1]")))
-            time.sleep(1)
+            # Element wait handled by WebDriverWait below
 
             all_wagelists = [o.get_attribute("value") for o in Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddl_sel")).options if o.get_attribute("value") != "select"]
             if not all_wagelists:
@@ -229,6 +253,12 @@ class WagelistSendTab(BaseAutomationTab):
             self.app.after(5000, lambda: self.update_status("Ready", 0.0))
 
     def _process_single_wagelist(self, driver, wait, wagelist, fin_year):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium import webdriver
         """Processes a single wagelist (Background Safe)."""
         for attempt in range(2):
             if self.app.stop_events[self.automation_key].is_set(): return False
