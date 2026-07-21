@@ -506,19 +506,11 @@
                             </div>
                     </div>
 
-                    <section id="delete-demand" class="mb-12 scroll-mt-24">
-            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-lg">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </div>
-                    <h3 class="text-2xl font-bold text-gray-900 dark:text-white">26. Delete Demand Automation</h3>
-                </div>
-                <div class="p-6 md:p-8">
-                    <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
                         <div class="order-2 md:order-1">
-                            <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Steps to use:</h4>
-                            <ol class="list-decimal list-inside space-y-3 text-gray-600 dark:text-gray-400">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">27. Delete Demand</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
                                 <li>NREGA portal par Data Entry login karein.</li>
                                 <li><strong>Panchayat</strong> select karein.</li>
                                 <li>Agar aapko sirf ek gaon ka demand delete karna hai, toh <strong>Village Name</strong> select karein.</li>
@@ -527,9 +519,238 @@
                                 <li><strong>Note:</strong> Yeh process background me portal ke glitches ko bhi handle kar leta hai.</li>
                             </ol>
                         </div>
+                        <div class="order-1 md:order-2">
+                            <img src="/assets/Delete_Demand.png" alt="Delete Demand"
+                                class="rounded-lg shadow-md border dark:border-gray-700">
+                        </div>
                     </div>
-                </div>
-            </div>
+                    <!-- ===== NEW AUTOMATIONS ADDED v3.0.5 ===== -->
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">28. Mate/Mistri MR Generation</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the Panchayat name.</li>
+                                <li>Select the 'From' and 'To' dates.</li>
+                                <li>Paste the list of Work Codes you want to process.</li>
+                                <li>Choose output action (Save as PDF or Print).</li>
+                                <li>Click "Start Automation" to generate Mate/Mistri formatted muster rolls.</li>
+                                <li><b>Note:</b> This is specifically designed for Mate/Mistri MR formats and is fully compatible with the VB-G-RAM-G portal.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Mate_MR_Gen.png" alt="Mate/Mistri MR"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">29. Physical Complete</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>In the browser, navigate to the Physical Complete page for the scheme.</li>
+                                <li>Enter the Panchayat name in the app.</li>
+                                <li>Paste the list of Work Codes to process.</li>
+                                <li>Click "Start Automation".</li>
+                                <li><b>Workflow:</b> After Physical Complete is done, the bot will auto-forward to the Scheme Closing tab for seamless processing.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/Physical_Complete.png" alt="Physical Complete"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">30. Resend Rejected Wagelist</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>In the browser, log in and navigate to the Rejected Wagelist page.</li>
+                                <li>Enter the Agency (Panchayat) name.</li>
+                                <li>Click "Fetch List" to load all rejected wagelists.</li>
+                                <li>Select the wagelists you want to resend.</li>
+                                <li>Click "Resend Selected" to process them for payment again.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Resend_WG.png" alt="Resend Rejected Wagelist"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">31. Login Automation</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Go to the 'Login Automation' tab in the app.</li>
+                                <li>Enter your NREGA portal credentials (Username, Password, and PIN).</li>
+                                <li>Click "Save Credentials" to store them securely.</li>
+                                <li>Whenever you need to log in, simply click "Auto Login" and the bot will log you into the portal with a single click.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/Login_Automation.png" alt="Login Automation"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">32. Macro Manager</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>The ultimate automation hub to queue multiple tasks in sequence.</li>
+                                <li>Add tasks like 'Bulk Demand via CSV', 'Work Allocation', 'MR Fill', and more.</li>
+                                <li>Configure each task with its required parameters.</li>
+                                <li>Arrange the order of tasks as needed.</li>
+                                <li>Click "Run All" to execute the entire workflow automatically.</li>
+                                <li><b>Note:</b> Supports Bulk Demand via CSV for processing large datasets.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Macro_Manager.png" alt="Macro Manager"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">33. Material Entry</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter Work Keys (search keys) in the input field.</li>
+                                <li>Enter Bill Numbers for each work.</li>
+                                <li>Fill in Material details like item description and quantity.</li>
+                                <li>Click "Start Automation" to auto-fill the portal's material bill entry page seamlessly.</li>
+                                <li>The bot will handle the entire entry process work by work.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/Material_Entry.png" alt="Material Entry"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">34. Delete Applicant</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Prepare a CSV file containing job card numbers of applicants to delete.</li>
+                                <li>In the app, click "Load CSV" and select your prepared file.</li>
+                                <li>The bot will automatically detect the village from job card numbers and select the correct panchayat.</li>
+                                <li>Click "Start Automation" to delete the listed applicants from the portal.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/Delete_Applicant.png" alt="Delete Applicant"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">35. MIS Reports</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Select the Report Type (e.g., Work Progress, Expenditure, etc.).</li>
+                                <li>Select State, District, Block, and Panchayat as needed.</li>
+                                <li>Choose the Financial Year and Time Period.</li>
+                                <li>Click "Start Automation" to fetch and generate the MIS report.</li>
+                                <li>Results are displayed in the app and can be exported for further analysis.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/MIS_Reports.png" alt="MIS Reports"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">36. eKYC Report</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Select State, District, Block, and Panchayat.</li>
+                                <li>(Optional) Enter a specific Village name to filter results.</li>
+                                <li>Click "Start Automation" to fetch eKYC verification status for all job card holders.</li>
+                                <li>The bot will scrape the eKYC report page by page and display results.</li>
+                                <li>Export the data for offline record-keeping or further processing.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/eKYC_Report.png" alt="eKYC Report"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">37. Social Audit Report</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Log in to the PO (Block) account in the browser.</li>
+                                <li>Navigate to D23 > Social Audit View page.</li>
+                                <li>Select the Financial Year and Panchayat.</li>
+                                <li>Click "Start Automation" in the app.</li>
+                                <li>The bot will fetch all Social Audit issues and their status.</li>
+                                <li>Use the interface to view issues and respond to them directly from the app.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/SA_Report.png" alt="Social Audit Report"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">38. NMMS Daily Attendance</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Enter the District, Block, and select the date for attendance.</li>
+                                <li>Click "Start Automation" to scrape NMMS daily attendance data.</li>
+                                <li>The bot will navigate the NMMS portal and fetch attendance for all schools.</li>
+                                <li>Results are organized by school with attendance status.</li>
+                                <li>Export the complete report for monitoring and record purposes.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/NMMS_Attendance.png" alt="NMMS Attendance"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">39. Sarkar Aapke Dwar (AYASAD)</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Select the Camp/Event details and Scheme name.</li>
+                                <li>Prepare a CSV file with applicant details as per the camp format.</li>
+                                <li>Load the CSV file in the app.</li>
+                                <li>Click "Start Automation" to enter bulk data for the Sarkar Aapke Dwar camp.</li>
+                                <li>The bot will fill all application entries automatically in the portal.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/SAD.png" alt="Sarkar Aapke Dwar"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-1">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">40. SAD Update Status</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Select the Camp details and date.</li>
+                                <li>Paste or load the list of application reference numbers.</li>
+                                <li>Click "Start Automation".</li>
+                                <li>The bot will check the current status of each application submitted during Sarkar Aapke Dwar camps.</li>
+                                <li>It will automatically update the status records in the system.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-2"><img src="/assets/SAD_Update.png" alt="SAD Update Status"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
+                    <div
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        <div class="order-2 md:order-2">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">41. File Manager</h3>
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>Open the File Manager tab in the app.</li>
+                                <li>Browse your local files and folders directly within the app interface.</li>
+                                <li>Organize downloaded reports, PDFs, and CSV files into folders.</li>
+                                <li>Use the built-in preview to view files without leaving the app.</li>
+                                <li>Easily locate and manage all your NREGA-related documents in one place.</li>
+                            </ol>
+                        </div>
+                        <div class="order-1 md:order-1"><img src="/assets/File_Manager.png" alt="File Manager"
+                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                    </div>
+
         </section>
                     
                 </div>

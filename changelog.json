@@ -1,4 +1,8 @@
 {
+  "3.0.6": [
+      "🚀 **Delete Applicant Overhaul:** Complete rewrite of the Delete Applicant automation. Now accepts eKYC Report Excel files directly — no more CSV uploads.",
+      "🚀 **MB Entry Auto-Process All Works:** When no work codes are provided, MB Entry now processes ALL available works from the 'Select Work' dropdown one by one."
+    ],
   "3.0.5": [
       "🐞 **Critical Fix (Physical Complete):** Fixed the Physical Complete automation pointing to the wrong portal URL (nregade4.dord.gov.in). It now correctly uses the VB-G-RAM-G portal (vbgramgde2.dord.gov.in), consistent with all other automations."
     ],

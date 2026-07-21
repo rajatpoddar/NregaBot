@@ -206,6 +206,38 @@ class DelDemandTab(BaseAutomationTab):
                     break
                     
                 self.app.after(0, self.update_status, f"Processing {i+1}/{total_v}: {v_name}", (i+1)/total_v)
+                
+                # After first village, delete postback refreshes the page, so re-navigate
+                # and re-select panchayat to restore page state for next village
+                if i > 0:
+                    self.app.log_message(self.log_display, f"Re-navigating to page for next village...")
+                    driver.get(url)
+                    # Wait for page to fully load before interacting
+                    try:
+                        wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")))
+                    except TimeoutException:
+                        pass
+                    try:
+                        panchayat_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")
+                        panchayat_dropdown = Select(panchayat_dd_elem)
+                        found_p = None
+                        target_p_lower = target_panchayat.lower()
+                        for opt in panchayat_dropdown.options:
+                            if target_p_lower in opt.text.lower():
+                                found_p = opt.text
+                                break
+                        if found_p:
+                            panchayat_dropdown.select_by_visible_text(found_p)
+                            fast_wait = WebDriverWait(driver, 8, poll_frequency=0.3)
+                            try:
+                                fast_wait.until(lambda d: len(Select(
+                                    d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
+                                ).options) > 1)
+                            except TimeoutException:
+                                pass
+                    except NoSuchElementException:
+                        pass
+                
                 self._process_village(driver, wait, target_panchayat, v_name)
 
             final_msg = "Finished" if not self.app.stop_events[self.automation_key].is_set() else "Stopped"
@@ -224,6 +256,14 @@ class DelDemandTab(BaseAutomationTab):
             # Re-find dropdown (to avoid stale element after postbacks)
             village_dd_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
             village_dropdown = Select(village_dd_elem)
+            
+            # Verify the village option exists before selecting
+            village_texts = [opt.text.strip() for opt in village_dropdown.options]
+            if village_name not in village_texts:
+                self.app.log_message(self.log_display, f"Village '{village_name}' not in dropdown options. Skipping.", "warning")
+                self._log_result(panchayat, village_name, "-", "Skipped", "Village not found in dropdown after navigation.")
+                return
+            
             village_dropdown.select_by_visible_text(village_name)
             
             self.app.log_message(self.log_display, f"Selected Village: {village_name}. Waiting for data...")
@@ -354,10 +394,8 @@ class DelDemandTab(BaseAutomationTab):
             error_msg = str(e).split('\n')[0]
             self.app.log_message(self.log_display, f"Failed on village {village_name}: {error_msg}", "error")
             self._log_result(panchayat, village_name, "-", "Error", error_msg)
-            
-            # Refresh page to recover state for next village
-            driver.get(config.DEL_DEMAND_CONFIG["url"])
-            time.sleep(2)
+            # NOTE: Page recovery (re-navigation + panchayat re-select) is handled by the
+            # main loop in run_automation_logic() before the next village iteration.
 
     def _log_result(self, panchayat, village, applicant_info, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")

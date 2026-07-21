@@ -109,7 +109,17 @@ class MbEntryTab(BaseAutomationTab):
 
         # Note for user
         note = ctk.CTkLabel(config_frame, text="ℹ️ Note: Use this emb automation only for single activity works.", text_color="#E53E3E", wraplength=450)
-        note.grid(row=4, column=0, columnspan=4, sticky='w', padx=15, pady=(10, 15))
+        note.grid(row=4, column=0, columnspan=4, sticky='w', padx=15, pady=(10, 0))
+
+        # New feature note — process all works from dropdown
+        auto_note = ctk.CTkLabel(
+            config_frame,
+            text="🆕 Workcode box khaali chhod kar 'Start Automation' dabayein — saare available works ek-ek karke auto-fill ho jayenge!",
+            text_color="#2563EB",
+            wraplength=450,
+            font=ctk.CTkFont(size=13, weight="bold")
+        )
+        auto_note.grid(row=5, column=0, columnspan=4, sticky='w', padx=15, pady=(0, 15))
 
         # --- Action Buttons (Start, Stop, Reset) ---
         action_frame_container = ctk.CTkFrame(top_frame)
@@ -343,9 +353,15 @@ class MbEntryTab(BaseAutomationTab):
             messagebox.showwarning("Input Error", "All configuration fields must be filled out.")
             return
         work_codes_raw = [line.strip() for line in self.work_codes_text.get("1.0", tkinter.END).strip().splitlines() if line.strip()]
+        
         if not work_codes_raw:
-            messagebox.showwarning("Input Required", "Please paste at least one work code.")
-            return
+            proceed = messagebox.askyesno(
+                "No Work Codes",
+                "No work codes entered. This will process ALL available works from the 'Select Work' dropdown on the portal.\n\nContinue?"
+            )
+            if not proceed:
+                return
+            self.app.log_message(self.log_display, "ℹ️ No work codes provided. Will process all works from dropdown.")
         self._save_mapping_pair(cfg['panchayat_name'], cfg['mate_name'])
         self._save_inputs(cfg)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(cfg, work_codes_raw))
@@ -387,6 +403,15 @@ class MbEntryTab(BaseAutomationTab):
                 mate_key = self._get_current_mate_key()
                 for mate in mate_names_list: self.app.update_history(mate_key, mate)
             
+            # If no work codes entered by user, process all works from dropdown
+            if not work_codes_raw:
+                self._process_all_works_from_dropdown(driver, cfg, mate_names_list)
+                final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
+                self.app.after(0, self.update_status, final_msg, 1.0)
+                if not self.app.stop_events[self.automation_key].is_set():
+                    messagebox.showinfo("Complete", "e-MB Entry process has finished.")
+                return
+
             processed_codes = set()
             total = len(work_codes_raw)
             self.app.after(0, self.app.set_status, f"Starting eMB Entry for {total} workcodes...")
@@ -476,6 +501,9 @@ class MbEntryTab(BaseAutomationTab):
             try: wait.until(EC.staleness_of(element_to_go_stale))
             except TimeoutException: pass
 
+            # Re-set page no after dropdown selection (page refresh may clear it)
+            driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpageno').value = '{cfg['page_no']}';")
+
             self.app.log_message(self.log_display, "🔘 Clicking Radio Button...")
             radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rddist_0")))
             driver.execute_script("arguments[0].click();", radio_btn)
@@ -537,6 +565,219 @@ class MbEntryTab(BaseAutomationTab):
             err_msg = str(e).splitlines()[0]
             self.app.log_message(self.log_display, f"Error on {work_code}: {err_msg}", "error")
             self._log_result(cfg, work_code, "Failed", "Script Error", extracted_work_name, extracted_mr_no, extracted_mr_period)
+
+    def _process_all_works_from_dropdown(self, driver, cfg, mate_names_list):
+        """
+        Processes ALL available works from the 'Select Work' dropdown.
+        Used when user does NOT provide specific work codes.
+        The dropdown list is NOT cleared after each entry.
+        """
+        wait = WebDriverWait(driver, 25)
+
+        # Step 1: Navigate to page & set panchayat
+        self.app.after(0, self.app.set_status, "Navigating to MB Entry page...")
+        if "MustorRoll/MeasurementBook.aspx" not in driver.current_url:
+            driver.get(config.MB_ENTRY_CONFIG["url"])
+
+        try:
+            panchayat_dropdown = wait.until(
+                EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch'))
+            )
+            selected_option = Select(panchayat_dropdown).first_selected_option
+            if selected_option.text.strip() != cfg['panchayat_name']:
+                Select(panchayat_dropdown).select_by_visible_text(cfg['panchayat_name'])
+                wait.until(EC.staleness_of(panchayat_dropdown))
+                wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
+        except Exception:
+            pass
+
+        wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtMBNo')))
+
+        # Step 2: Fill search fields (leave work code empty to fetch all works)
+        # For search, use a generic MB No — will be updated per work later for auto mode
+        search_mb_no = cfg["measurement_book_no"] if cfg["measurement_book_no"] else "Auto"
+        driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtMBNo').value = '{search_mb_no}';")
+        driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpageno').value = '{cfg['page_no']}';")
+        driver.execute_script("document.getElementById('ctl00_ContentPlaceHolder1_txtWrkCode').value = '';")
+
+        # Step 3: Click search
+        self.app.log_message(self.log_display, "🔍 Searching for all available works...")
+        work_dropdown_old = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_ddlSelWrk')
+        search_btn = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_imgButtonSearch')
+        driver.execute_script("arguments[0].click();", search_btn)
+
+        # Wait for dropdown to refresh
+        try:
+            wait.until(EC.staleness_of(work_dropdown_old))
+        except TimeoutException:
+            pass
+
+        # Step 4: Extract all work options from dropdown
+        select_work_elem = wait.until(
+            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddlSelWrk'))
+        )
+        select_work = Select(select_work_elem)
+
+        work_options = []
+        for option in select_work.options:
+            val = option.get_attribute("value")
+            if val and val != "0":
+                option_text = option.text
+                try:
+                    extracted_name = re.findall(r'\((.*?)\)', option_text)[-1]
+                except Exception:
+                    extracted_name = option_text
+                # Extract work code from option text (before $ sign)
+                # Dropdown format: workcode$workname
+                wc_from_text = option_text.split('$')[0] if '$' in option_text else val
+                work_options.append((val, extracted_name, wc_from_text))
+
+        if not work_options:
+            self.app.log_message(self.log_display, "❌ No works found in dropdown!", "error")
+            self._log_result(cfg, "N/A", "Failed", "No works found in dropdown after search")
+            return
+
+        self.app.log_message(self.log_display, f"✅ Found {len(work_options)} works to process from dropdown.")
+        total = len(work_options)
+        processed_codes = set()
+
+        # Step 5: Process each work from the dropdown
+        for i, (work_code, work_name, wc_from_text) in enumerate(work_options):
+            if self.app.stop_events[self.automation_key].is_set():
+                self.app.log_message(self.log_display, "Automation stopped.", "warning")
+                break
+
+            if work_code in processed_codes:
+                self._log_result(cfg, work_code, "Skipped", "Duplicate entry (already processed)", work_name)
+                continue
+
+            self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {work_code}", (i + 1) / total)
+
+            try:
+                processed_codes.add(work_code)
+                # Re-fetch dropdown and select this work
+                select_work_elem = wait.until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddlSelWrk'))
+                )
+                select_work = Select(select_work_elem)
+
+                # Find matching option
+                found_idx = None
+                for idx, option in enumerate(select_work.options):
+                    if option.get_attribute("value") == work_code:
+                        found_idx = idx
+                        break
+
+                if found_idx is None:
+                    self._log_result(cfg, work_code, "Failed", "Work disappeared from dropdown", work_name)
+                    continue
+
+                # Select the work from dropdown
+                stale_marker = select_work_elem
+                select_work.select_by_index(found_idx)
+                try:
+                    wait.until(EC.staleness_of(stale_marker))
+                except TimeoutException:
+                    pass
+
+                # Re-set page no after dropdown selection (page refresh may clear it)
+                driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpageno').value = '{cfg['page_no']}';")
+
+                # --- Auto MB No: update MB No field based on work code from option text ---
+                # Dropdown text format = workcode$workname → take last 4 digits before $
+                if self.auto_mb_no_var.get() and len(wc_from_text) >= 4:
+                    auto_mb = wc_from_text[-4:]
+                    driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtMBNo').value = '{auto_mb}';")
+
+                # Click Radio Button (district = first option)
+                radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rddist_0")))
+                driver.execute_script("arguments[0].click();", radio_btn)
+                time.sleep(1)
+
+                # Wait for Period Dropdown
+                period_dropdown_elem = wait.until(
+                    EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod"))
+                )
+                period_dropdown = Select(period_dropdown_elem)
+                if len(period_dropdown.options) <= 1:
+                    self._log_result(cfg, work_code, "Failed", "No measurement period found", work_name)
+                    continue
+
+                extracted_mr_period = period_dropdown.options[1].text
+                period_stale = period_dropdown_elem
+                period_dropdown.select_by_index(1)
+                try:
+                    wait.until(EC.staleness_of(period_stale))
+                except TimeoutException:
+                    pass
+
+                # Wait for person days to load
+                wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days')))
+                wait.until(
+                    lambda d: d.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days').get_attribute('value') != ''
+                )
+
+                # Get MR No
+                try:
+                    extracted_mr_no = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_lbl_msr").text
+                except Exception:
+                    extracted_mr_no = "-"
+
+                # Check person days
+                pd_elem = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days')
+                total_persondays = int(pd_elem.get_attribute('value') or 0)
+                if total_persondays == 0:
+                    self._log_result(
+                        cfg, work_code, "Failed", "0 Persondays / eMB already Booked",
+                        work_name, extracted_mr_no, extracted_mr_period
+                    )
+                    continue
+
+                # Fill activity details
+                prefix = self._find_activity_prefix(driver)
+                total_cost = total_persondays * int(cfg["unit_cost"])
+
+                driver.execute_script(f"document.getElementsByName('{prefix}$qty')[0].value = '{total_persondays}';")
+                driver.execute_script(f"document.getElementsByName('{prefix}$unitcost')[0].value = '{cfg['unit_cost']}';")
+                self.app.log_message(self.log_display, "⚙️ Triggering Auto-Calculation (check)...")
+                driver.execute_script("if(typeof check === 'function') { check(); }")
+                driver.execute_script(f"document.getElementsByName('{prefix}$labcomp')[0].value = '{total_cost}';")
+                self.app.log_message(self.log_display, "⚙️ Triggering Validation (checkLabCom)...")
+                driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
+
+                try:
+                    driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpit').value = '{cfg['default_pit_count']}';")
+                except Exception:
+                    pass
+
+                random_mate = random.choice(mate_names_list)
+                driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txt_mat_name').value = '{random_mate}';")
+
+                # Save
+                self.app.after(0, self.app.set_status, f"Saving {work_code}...")
+                save_btn = driver.find_element(By.XPATH, '//input[@value="Save"]')
+                driver.execute_script("arguments[0].click();", save_btn)
+
+                # Handle alert
+                try:
+                    alert = wait.until(EC.alert_is_present())
+                    alert_text = alert.text
+                    alert.accept()
+                    status = "Success" if "success" in alert_text.lower() or "saved" in alert_text.lower() else "Failed"
+                    self._log_result(cfg, work_code, status, alert_text, work_name, extracted_mr_no, extracted_mr_period)
+                    self.app.log_message(self.log_display, f"{work_code}: {status} — {alert_text}")
+                except TimeoutException:
+                    self._log_result(cfg, work_code, "Failed", "No Alert Received", work_name, extracted_mr_no, extracted_mr_period)
+
+                # Small delay between entries
+                time.sleep(2)
+
+            except Exception as e:
+                err_msg = str(e).splitlines()[0]
+                self.app.log_message(self.log_display, f"Error on {work_code}: {err_msg}", "error")
+                self._log_result(cfg, work_code, "Failed", "Script Error", work_name)
+
+        self.app.log_message(self.log_display, "✅ All dropdown works processed.")
 
     def _find_activity_prefix(self, driver):
         self.app.log_message(self.log_display, "Searching for 'Earth work' activity...")

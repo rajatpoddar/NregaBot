@@ -8,7 +8,7 @@ APP_TAGLINE = "Your NREGA Task Management Companion"
 APP_DESCRIPTION = "A comprehensive tool for managing NREGA tasks efficiently."
 APP_AUTHOR = "Rajat Poddar"
 APP_AUTHOR_EMAIL = "Rajatpoddar@outlook.com"
-APP_VERSION = "3.0.5"
+APP_VERSION = "3.0.6"
 LICENSE_SERVER_URL = "https://license.nregabot.com"
 MAIN_WEBSITE_URL = "https://nregabot.com"
 SUPPORT_EMAIL = "nregabot@gmail.com"
@@ -221,6 +221,11 @@ MATERIAL_ENTRY_CONFIG = {
 # --- Delete Applicant Configuration ---
 DELETE_APPLICANT_CONFIG = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/DelApp.aspx"
+}
+
+# --- Delete Registration Configuration ---
+DEL_REG_CONFIG = {
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/DelReg.aspx"
 }
 
 # --- eKYC Report Configuration ---
