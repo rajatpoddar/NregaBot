@@ -42,7 +42,7 @@ class LazyIconManager:
         essential = [
             "chrome", "edge", "firefox", "extractor_icon", "emoji_login_automation",
             "sound_on", "minimize", "theme_system", "theme_light", "theme_dark",
-            "history", "emoji_file_manager", "whatsapp", "feedback", "nrega",
+            "history", "emoji_file_manager", "whatsapp", "feedback", "nrega", "home_icon",
         ]
         for name in essential:
             self.get(name)
@@ -62,6 +62,7 @@ def create_icon_manager():
 
     # --- APP BRANDING ---
     mgr._add("nrega",     "assets/icons/nrega.png")
+    mgr._add("home_icon", "assets/icons/home.png", size=(18, 18))
     mgr._add("whatsapp",  "assets/icons/whatsapp.png")
     mgr._add("feedback",  "assets/icons/feedback.png")
     mgr._add("history",   "assets/icons/history.png")

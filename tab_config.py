@@ -6,6 +6,7 @@ def get_tabs_definition(app):
     Reorganized into 7 specific categories with CORRECTED ICON KEYS.
     """
     # --- LAZY LOAD IMPORTS ---
+    from tabs.home_tab import HomeTab
     from tabs.msr_tab import MsrTab
     from tabs.wagelist_gen_tab import WagelistGenTab
     from tabs.wagelist_send_tab import WagelistSendTab
@@ -50,6 +51,11 @@ def get_tabs_definition(app):
     from tabs.nmms_attendance_tab import NmmsAttendanceTab
 
     return {
+        # 0. Dashboard (Home) — Always first!
+        "Dashboard": {
+            "Home": {"creation_func": lambda p, a: HomeTab(p, a), "icon": app.icon_images.get("nrega")},
+        },
+
         # 1. MR Related
         "MR & Wage Management": {
             "Demand": {"creation_func": DemandTab, "icon": app.icon_images.get("emoji_demand"), "key": "demand"},

@@ -198,7 +198,7 @@ class SkeletonLoader(ctk.CTkFrame):
 
 # --- 4. MARQUEE LABEL (Running Text) ---
 class MarqueeLabel(ctk.CTkFrame):
-    def __init__(self, parent, text, speed=3, **kwargs):
+    def __init__(self, parent, text, speed=2, **kwargs):
         super().__init__(parent, fg_color="transparent", **kwargs)
         self.speed = speed
         self.raw_text = text
@@ -329,7 +329,7 @@ class MarqueeLabel(ctk.CTkFrame):
             last_coords = self.canvas.coords(last_item['id'])
             
             if not last_coords: 
-                self.after(80, self._animate)
+                self.after(50, self._animate)
                 return
 
             if last_coords[0] + last_item['width'] < 0:
@@ -342,7 +342,7 @@ class MarqueeLabel(ctk.CTkFrame):
                 for item in self.items:
                     self.canvas.move(item['id'], -self.speed, 0)
 
-            self.after(80, self._animate)
+            self.after(50, self._animate)
         except Exception:
             self.is_running = False
 
@@ -556,32 +556,80 @@ class PerformanceMonitor(ctk.CTkFrame):
                                          text_color=("#D97706", "#FBBF24"))
         self.thread_label.pack(side="right")
 
-        # ---- Start periodic update ----
+        # ---- Start periodic update (deferred) ----
         self._cached_ram = None
         self._cached_cpu = None
-        self._update()
+        # Defer the first _update() call to avoid blocking initial UI rendering
+        # with subprocess calls (wmic/powershell/ps). The labels show '—' until
+        # the 5-second mark, which is fine for a sidebar footer widget.
+        self.after(5000, self._update)
 
     def _get_process_info(self):
-        """Get RAM (RSS in MB), CPU %, and active Python thread count.
-        Uses separate ps commands (each handles failure independently) and
-        threading.active_count() for threads (works on all platforms)."""
+        """Get RAM (RSS in MB) and CPU %.
+        Uses subprocess calls — MUST be called from a background thread
+        because wmic/powershell/ps can block for 50-300ms on slow systems.
+        Returns (ram_mb, cpu_pct).
+        """
         pid = os.getpid()
         ram_mb = None
         cpu_pct = None
-        thread_count = threading.active_count()
 
         try:
             system = platform.system()
             if system == "Windows":
-                out = subprocess.check_output(
-                    ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-                    timeout=2, stderr=subprocess.DEVNULL
-                ).decode("utf-8", errors="replace")
-                parts = out.strip().strip('"').split('","')
-                if len(parts) >= 5:
-                    mem_str = parts[5].replace(",", "").replace(" K", "").strip()
-                    if mem_str.isdigit():
-                        ram_mb = round(int(mem_str) / 1024, 1)
+                # --- RAM via wmic (WorkingSetSize in bytes, simple number output) ---
+                try:
+                    out = subprocess.check_output(
+                        ["wmic", "process", "where", f"ProcessId={pid}", "get", "WorkingSetSize"],
+                        timeout=2, stderr=subprocess.DEVNULL,
+                        creationflags=subprocess.CREATE_NO_WINDOW
+                    ).decode("utf-8", errors="replace")
+                    for line in out.splitlines():
+                        line = line.strip()
+                        if line and line.isdigit():
+                            ram_mb = round(int(line) / (1024 * 1024), 1)
+                            break
+                except Exception:
+                    # Fallback: PowerShell (works on all Windows versions)
+                    try:
+                        out = subprocess.check_output(
+                            ["powershell", "-noprofile", "-command",
+                             f"(Get-Process -Id {pid}).WorkingSet64 / 1MB"],
+                            timeout=3, stderr=subprocess.DEVNULL,
+                            creationflags=subprocess.CREATE_NO_WINDOW
+                        ).decode("utf-8", errors="replace").strip()
+                        if out and out.replace('.', '', 1).replace(',', '', 1).isdigit():
+                            ram_mb = round(float(out), 1)
+                    except Exception:
+                        pass
+
+                # --- CPU via wmic (total system CPU percentage) ---
+                # Note: wmic is deprecated on Win 11 22H2+ and removed on 24H2+
+                # We try wmic first, then fall back to PowerShell
+                try:
+                    out = subprocess.check_output(
+                        ["wmic", "cpu", "get", "loadpercentage"],
+                        timeout=2, stderr=subprocess.DEVNULL,
+                        creationflags=subprocess.CREATE_NO_WINDOW
+                    ).decode("utf-8", errors="replace")
+                    for line in out.splitlines():
+                        line = line.strip()
+                        if line and line.replace('.', '', 1).isdigit():
+                            cpu_pct = float(line)
+                            break
+                except Exception:
+                    # Fallback: PowerShell (works on all Windows versions including 24H2+)
+                    try:
+                        out = subprocess.check_output(
+                            ["powershell", "-noprofile", "-command",
+                             "(Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average"],
+                            timeout=3, stderr=subprocess.DEVNULL,
+                            creationflags=subprocess.CREATE_NO_WINDOW
+                        ).decode("utf-8", errors="replace").strip()
+                        if out and out.replace('.', '', 1).isdigit():
+                            cpu_pct = float(out)
+                    except Exception:
+                        pass
             else:
                 # macOS / Linux — single ps call for both RSS and CPU
                 try:
@@ -600,9 +648,11 @@ class PerformanceMonitor(ctk.CTkFrame):
         except Exception:
             pass
 
-        return ram_mb, cpu_pct, thread_count
+        return ram_mb, cpu_pct
 
     def _update(self):
+        """Starts a background thread for subprocess calls, then updates UI on main thread.
+        This prevents the 50-300ms freeze that wmic/powershell/ps causes every 5 seconds."""
         if not self._running:
             return
         try:
@@ -613,10 +663,41 @@ class PerformanceMonitor(ctk.CTkFrame):
             self._running = False
             return
 
-        ram, cpu, threads = self._get_process_info()
+        # Capture thread count on main thread (threading.active_count is safe from
+        # any thread, but this avoids including the temporary worker thread in count)
+        thread_count = threading.active_count()
 
-        # Only update label text when value actually changes (rounded to avoid
-        # tiny fluctuations like 245.1→245.2 causing unnecessary UI re-renders)
+        def _bg_work():
+            """Run I/O-bound subprocess calls in background thread."""
+            try:
+                ram, cpu = self._get_process_info()
+                # Schedule UI update back on main thread
+                if self._running:
+                    self.after(0, lambda: self._apply_update(ram, cpu, thread_count))
+            except Exception:
+                pass
+
+        threading.Thread(target=_bg_work, daemon=True).start()
+
+        try:
+            self.after(5000, self._update)
+        except Exception:
+            self._running = False
+
+    def _apply_update(self, ram, cpu, threads):
+        """Safely updates label widgets on the main thread."""
+        if not self._running:
+            return
+        try:
+            if not self.winfo_exists():
+                self._running = False
+                return
+        except Exception:
+            self._running = False
+            return
+
+        # Only update when value actually changes (rounded to avoid
+        # tiny fluctuations like 245.1→245.2 causing unnecessary re-renders)
         if ram is not None and round(ram, 0) != round(self._cached_ram or 0, 0):
             self.ram_label.configure(text=f"{ram:.0f} MB")
             self._cached_ram = ram
@@ -625,11 +706,6 @@ class PerformanceMonitor(ctk.CTkFrame):
             self._cached_cpu = cpu
         if threads is not None:
             self.thread_label.configure(text=str(threads))
-
-        try:
-            self.after(5000, self._update)
-        except Exception:
-            self._running = False
 
     def stop(self):
         self._running = False

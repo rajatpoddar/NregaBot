@@ -158,6 +158,9 @@ class NregaBotApp(ctk.CTk):
 
         # 2. Initialize Lazy Icon Manager (definitions only, no image loading yet)
         self.icon_images = create_icon_manager()
+        # Preload essential icons (browser, settings, dock) into cache
+        # so UI creation doesn't trigger on-demand disk I/O on main thread
+        self.icon_images.preload_essential()
 
         # 3. Start Background Initialization (Heavy Tasks)
         threading.Thread(target=self._background_initialization, daemon=True).start()
@@ -166,49 +169,52 @@ class NregaBotApp(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def _create_splash_screen(self):
-        """Creates a professional borderless splash window with loading animation."""
+        """Creates a clean, modern splash screen with high readability on both themes."""
         splash = ctk.CTkToplevel(self)
         splash.overrideredirect(True)
         w, h = 380, 260
         sw, sh = splash.winfo_screenwidth(), splash.winfo_screenheight()
         x, y = (sw // 2) - (w // 2), (sh // 2) - (h // 2)
         splash.geometry(f'{w}x{h}+{int(x)}+{int(y)}')
-        splash.configure(fg_color=("#F3F4F6", "#212325"))
+        # Base window color blends seamlessly with outer frame (no border needed)
+        splash.configure(fg_color=("#FFFFFF", "#2B2B2B"))
 
-        # Outer frame (matches app theme)
+        # Outer frame - seamless card, no awkward border
         outer = ctk.CTkFrame(
             splash, fg_color=("#FFFFFF", "#2B2B2B"), corner_radius=16,
-            border_width=2, border_color=("#D1D5DB", "#565B5E")
+            border_width=0
         )
-        outer.pack(fill="both", expand=True, padx=4, pady=4)
+        outer.pack(fill="both", expand=True, padx=0, pady=0)
 
         inner = ctk.CTkFrame(outer, fg_color="transparent")
-        inner.pack(expand=True, fill="both", padx=25, pady=20)
+        inner.pack(expand=True, fill="both", padx=30, pady=22)
 
         try:
             logo = ctk.CTkImage(Image.open(resource_path("logo.png")), size=(64, 64))
-            ctk.CTkLabel(inner, image=logo, text="").pack(pady=(5, 8))
+            ctk.CTkLabel(inner, image=logo, text="").pack(pady=(5, 10))
         except Exception:
             pass
 
+        # App Name - Large, bold, high contrast on both themes
         ctk.CTkLabel(
             inner, text=f"{config.APP_NAME}",
-            font=ctk.CTkFont(family="Helvetica Neue", size=22, weight="bold"),
-            text_color=("#111827", "#DCE4EE")
+            font=ctk.CTkFont(family="Helvetica Neue", size=24, weight="bold"),
+            text_color=("#111827", "#F3F4F6")
         ).pack()
 
+        # Portal tag - bright blue for both themes with enough contrast
         ctk.CTkLabel(
             inner, text="VB-G-RAM-G Portal Support",
-            font=ctk.CTkFont(family="Helvetica Neue", size=12),
-            text_color=("#2563EB", "#1F6AA5")
-        ).pack(pady=(2, 15))
+            font=ctk.CTkFont(family="Helvetica Neue", size=12, weight="bold"),
+            text_color=("#2563EB", "#60A5FA")
+        ).pack(pady=(2, 18))
 
-        # Animated dots
+        # Animated dots - medium gray, crisp & readable
         self._splash_dots = 0
         splash.dots_label = ctk.CTkLabel(
             inner, text="Initializing",
             font=ctk.CTkFont(family="Helvetica Neue", size=12),
-            text_color=("#6B7280", "#9D9D9D")
+            text_color=("#6B7280", "#9CA3AF")
         )
         splash.dots_label.pack(pady=(0, 0))
 
@@ -224,10 +230,11 @@ class NregaBotApp(ctk.CTk):
                 pass
         _splash_animate()
 
+        # Version - Larger and bold for better visibility
         ctk.CTkLabel(
             inner, text=f"v{config.APP_VERSION}",
-            font=ctk.CTkFont(family="Helvetica Neue", size=10),
-            text_color=("#D1D5DB", "#565B5E")
+            font=ctk.CTkFont(family="Helvetica Neue", size=13, weight="bold"),
+            text_color=("#6B7280", "#9CA3AF")
         ).pack(side="bottom", pady=(0, 5))
 
         splash.lift()
@@ -245,7 +252,10 @@ class NregaBotApp(ctk.CTk):
         self.after(10, self._finish_startup)
 
     def _finish_startup(self):
-        """Called on main thread after background loading is done."""
+        """Called on main thread after background loading is done.
+        Progressively renders UI sections so low-end devices see smooth,
+        staged appearance instead of a long freeze followed by partial widgets.
+        """
         self.bind("<Button-1>", self._on_global_click, add="+")
         self.bind("<FocusIn>", self._on_window_focus)
 
@@ -254,24 +264,54 @@ class NregaBotApp(ctk.CTk):
         # Build Grid Layout
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        
+
+        # --- Stage 1: Header ---
         self._create_header()
+        self.update_idletasks()  # Let tkinter render header before moving on
+
+        # --- Stage 2: Footer ---
         self._create_footer()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.update_idletasks()  # Render footer before heavy layout
         
         # Mac OS Specific Delay fix
         if config.OS_SYSTEM == "Darwin":
             self.update() 
             time.sleep(0.1)
 
+        # --- Stage 3: Main Layout (sidebar + content area) ---
         self._create_main_layout(for_activation=True)
+        self._layout_ready = True  # Signal that critical UI structure is built
+        self.update_idletasks()
+
         self.set_status("Initializing...")
 
         # License Check Flow
         self.perform_license_check_flow()
 
-        # Transition Splash
-        self.after(500, self._transition_from_splash)
+        # Transition Splash — Smart wait:
+        # Minimum 600ms to avoid flash on fast devices, but also waits for
+        # _layout_ready in case device is slow and UI isn't built yet.
+        self.after(600, self._check_splash_ready)
+
+    def _check_splash_ready(self, retries=0):
+        """Waits for both minimum time AND layout readiness before fading splash.
+        On low-end devices _layout_ready may not be True by the 600ms mark
+        because widget creation takes longer — this loop keeps checking.
+        
+        Args:
+            retries: Internal counter to prevent infinite loop (~5s max wait).
+        """
+        if getattr(self, '_layout_ready', False) and self.splash:
+            self._transition_from_splash()
+        elif self.splash and retries < 50:
+            # Keep checking every 100ms (50 retries = ~5s total safety net)
+            # After that, force transition regardless of layout state
+            self.after(100, lambda: self._check_splash_ready(retries + 1))
+        elif self.splash:
+            # Safety net: force transition after ~5s even if layout isn't ready
+            self._transition_from_splash()
+        # If splash is already gone (e.g. error case), do nothing
 
     def _transition_from_splash(self):
         """Initiates splash fade out."""
@@ -344,7 +384,15 @@ class NregaBotApp(ctk.CTk):
             treeview_widget.configure(style="Treeview")
 
     def _fade_in_main_window(self):
-        """Positions and shows the main application window."""
+        """Positions and shows the main application window fully rendered.
+        
+        On low-end devices tkinter's deiconify() can show the window before
+        all widgets are painted, causing a "part by part" appearance.
+        
+        Fix: show at alpha=0 (invisible), force a full paint cycle with
+        self.update(), then set alpha=1. The user sees the COMPLETE window
+        in one frame — no progressive rendering.
+        """
         self.update_idletasks()
         work_x, work_y, work_width, work_height = self._get_work_area()
         min_w, min_h = 1000, 700 
@@ -357,11 +405,23 @@ class NregaBotApp(ctk.CTk):
         y = work_y + (work_height // 2) - (app_height // 2)
         
         self.geometry(f'{app_width}x{app_height}+{x}+{y}')
-        
-        self.attributes("-alpha", 1.0) 
+
+        # Step 1: Make visible but fully transparent
+        self.attributes("-alpha", 0.0)
         self.deiconify()
-        self.lift() 
-        self.focus_force() 
+
+        # Step 2: Force tkinter to paint everything NOW while still invisible
+        # Multiple passes (3x) ensure layout calculation AND pixel composition
+        # complete before the window becomes visible — critical on low-end GPUs
+        # that may skip composition for fully transparent windows.
+        for _ in range(3):
+            self.update()
+            self.update_idletasks()
+
+        # Step 3: Now show the fully-rendered window (all widgets painted in one frame)
+        self.attributes("-alpha", 1.0)
+        self.lift()
+        self.focus_force()
 
         if getattr(self, 'expiry_alert_message', None):
             def _show_delayed():
@@ -462,11 +522,15 @@ class NregaBotApp(ctk.CTk):
         # Using unified sync function
         self._ping_server_in_background()
         
+        # Show Home dashboard by default instead of the first automation tab
         try:
-            first_tab = list(list(self.get_tabs_definition().values())[0].keys())[0]
-            self.show_frame("About" if is_expiring else first_tab)
-        except:
-            self.show_frame("About")
+            self.show_frame("Home" if not is_expiring else "About")
+        except Exception:
+            try:
+                first_tab = list(list(self.get_tabs_definition().values())[0].keys())[0]
+                self.show_frame("About" if is_expiring else first_tab)
+            except:
+                self.show_frame("About")
         
         self.check_for_updates_background()
         self.set_status("Ready")
@@ -977,9 +1041,8 @@ class NregaBotApp(ctk.CTk):
         self.sidebar_container.grid_rowconfigure(1, weight=1)
         self.sidebar_container.grid_columnconfigure(0, weight=1)
 
-        self.sidebar_header = ctk.CTkFrame(self.sidebar_container, height=50, fg_color="transparent")
+        self.sidebar_header = ctk.CTkFrame(self.sidebar_container, fg_color="transparent")
         self.sidebar_header.grid(row=0, column=0, sticky="ew", padx=0, pady=(0, 5))
-        self.sidebar_header.grid_propagate(False)
 
         self.nav_scroll_frame = ctk.CTkScrollableFrame(
             self.sidebar_container, 
@@ -1015,29 +1078,88 @@ class NregaBotApp(ctk.CTk):
 
         for widget in header_parent.winfo_children(): widget.destroy()
 
-        categories = ["All Automations"] + list(self.get_tabs_definition().keys())
+        # --- Pinned Home button (always visible, above everything) ---
+        # Load home icon directly to avoid lazy-manager caching issues
+        _home_icon = None
+        try:
+            _home_icon = ctk.CTkImage(Image.open(resource_path("assets/icons/home.png")), size=(18, 18))
+        except Exception:
+            pass
+        self.home_nav_btn = ctk.CTkButton(
+            header_parent,
+            text="  Home",
+            image=_home_icon,
+            compound="left",
+            command=lambda: self.show_frame("Home"),
+            anchor="w",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            height=32,
+            corner_radius=6,
+            fg_color="transparent",
+            text_color=("#1565C0", "#60A5FA"),
+            hover_color=("#BBDEFB", "#4B5563"),
+            border_spacing=7
+        )
+        self.home_nav_btn.pack(fill="x", padx=5, pady=(8, 2))
+        self.nav_buttons["Home"] = self.home_nav_btn
+        # Keep icon reference so _update_nav_button_color doesn't wipe it
+        self.tab_icon_map["Home"] = _home_icon
+
+        # Thin separator
+        ctk.CTkFrame(header_parent, height=1, fg_color=("gray85", "gray35")).pack(fill="x", padx=15, pady=(2, 5))
+
+        # --- Category Filter (without Dashboard) — clean, modern look ---
+        all_cats = list(self.get_tabs_definition().keys())
+        filtered_cats = [c for c in all_cats if c != "Dashboard"]
+        categories = ["All Automations"] + filtered_cats
+        # Guard: if saved category no longer exists (e.g. old "Dashboard"), reset
+        if self.last_selected_category not in categories:
+            self.last_selected_category = "All Automations"
         
         self.category_filter_menu = ctk.CTkOptionMenu(
             header_parent, 
             values=categories, 
             command=self._on_category_filter_change,
-            height=28, 
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color=("white", "#2B2B2B"),
-            button_color=("gray85", "gray35"),
-            button_hover_color=("gray75", "gray45"),
-            text_color=("gray10", "gray90"),
-            dropdown_fg_color=("white", "#2B2B2B"),
-            dropdown_text_color=("gray10", "gray90"),
-            dropdown_hover_color=("gray90", "gray35"),
+            height=26, 
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="normal"),
+            fg_color=("#F3F4F6", "#333333"),
+            button_color=("#E5E7EB", "#4B5563"),
+            button_hover_color=("#D1D5DB", "#6B7280"),
+            text_color=("#374151", "#D1D5DB"),
+            dropdown_fg_color=("#FFFFFF", "#2B2B2B"),
+            dropdown_text_color=("#374151", "#D1D5DB"),
+            dropdown_hover_color=("#F3F4F6", "#374151"),
             anchor="w",
-            corner_radius=6
+            corner_radius=8
         )
         self.category_filter_menu.set(self.last_selected_category)
         self.category_filter_menu.pack(fill="x", pady=(5, 5), padx=5)
 
+        # Category colors matching the Home page card colors
+        _CATEGORY_BG = {
+            "MR & Wage Management": {"bg": ("#EFF6FF", "#1E3A5F"), "border": ("#BFDBFE", "#3B82F6"), "accent": ("#3B82F6", "#60A5FA")},
+            "JE & AE Approval":      {"bg": ("#F0FDF4", "#14532D"), "border": ("#BBF7D0", "#22C55E"), "accent": ("#16A34A", "#4ADE80")},
+            "Schemes Related":       {"bg": ("#FFF7ED", "#431407"), "border": ("#FED7AA", "#F97316"), "accent": ("#EA580C", "#FB923C")},
+            "Verification & Utility":{"bg": ("#F5F3FF", "#2E1065"), "border": ("#DDD6FE", "#8B5CF6"), "accent": ("#7C3AED", "#A78BFA")},
+            "Reports & Tracking":    {"bg": ("#FEF2F2", "#450A0A"), "border": ("#FECACA", "#EF4444"), "accent": ("#DC2626", "#F87171")},
+            "Smart Tools":           {"bg": ("#FEFCE8", "#422006"), "border": ("#FDE68A", "#EAB308"), "accent": ("#CA8A04", "#FACC15")},
+            "About & Help":          {"bg": ("#F0F9FF", "#0C4A6E"), "border": ("#BAE6FD", "#0EA5E9"), "accent": ("#0284C7", "#38BDF8")},
+        }
+
         for cat, tabs in self.get_tabs_definition().items():
+            if cat == "Dashboard":
+                continue  # Skip Dashboard category — Home is pinned separately
+
             cat_frame = CollapsibleFrame(content_parent, title=cat)
+            # Apply category background and border to the sidebar section
+            colors = _CATEGORY_BG.get(cat)
+            if colors:
+                cat_frame.configure(
+                    fg_color=colors["bg"],
+                    border_width=1,
+                    border_color=colors["border"]
+                )
+                cat_frame.header_label.configure(text_color=colors["accent"])
             self.category_frames[cat] = cat_frame
             
             for name, data in tabs.items():
@@ -1162,6 +1284,11 @@ class NregaBotApp(ctk.CTk):
             if raise_frame:
                 self.content_frames[page_name].tkraise()
                 self._update_nav_button_color(page_name)
+            # Track usage and refresh Home page's Most Used when navigating back
+            self._track_tab_usage(page_name)
+            if page_name == "Home":
+                # Brief delay so the frame renders before the widget rebuild
+                self.after(80, self._refresh_home_most_used)
             return
 
         loading_frame = ctk.CTkFrame(self.content_area)
@@ -1189,13 +1316,43 @@ class NregaBotApp(ctk.CTk):
                         if raise_frame:
                             frame.tkraise()
                             self._update_nav_button_color(page_name)
+                        # Track usage on first load too; refresh Most Used if loading Home
+                        self._track_tab_usage(page_name)
+                        if page_name == "Home":
+                            self._refresh_home_most_used()
                         break
             except Exception as e:
                 print(f"Error loading tab {page_name}: {e}")
                 skeleton.stop()
                 loading_frame.destroy()
 
-        self.after(50, load_actual_tab)
+        self.after(1, load_actual_tab)
+
+    def _refresh_home_most_used(self):
+        """Refresh the Home tab's Most Used section if the tab is loaded."""
+        home = self.tab_instances.get("Home")
+        if home and hasattr(home, "refresh"):
+            try:
+                home.refresh()
+            except Exception:
+                pass
+
+    def _track_tab_usage(self, page_name):
+        """Track usage of a tab for the Home dashboard's 'Most Used' section.
+        Runs DB write in background thread so UI stays snappy."""
+        if page_name in ("Home", "About", "Feedback"):
+            return
+        tabs = self.get_tabs_definition()
+        for cat, tab_items in tabs.items():
+            if page_name in tab_items:
+                tab_key = tab_items[page_name].get("key", page_name)
+                # Non-blocking: offload DB write to thread pool
+                threading.Thread(
+                    target=self.history_manager.increment_usage,
+                    args=(tab_key,),
+                    daemon=True
+                ).start()
+                break
 
     def _update_nav_button_color(self, page_name):
         for name, btn in self.nav_buttons.items():
@@ -1230,10 +1387,12 @@ class NregaBotApp(ctk.CTk):
     def _filter_nav_menu(self, selected_category: str):
         if selected_category == "All Automations":
             for cat, frame in self.category_frames.items():
-                if frame.winfo_manager() != "pack":
+                if frame.winfo_exists() and frame.winfo_manager() != "pack":
                     frame.pack(fill="x", pady=5, padx=2)
         else:
             for cat, frame in self.category_frames.items():
+                if not frame.winfo_exists():
+                    continue
                 if cat == selected_category:
                     if frame.winfo_manager() != "pack":
                         frame.pack(fill="x", pady=5, padx=2)
@@ -1242,6 +1401,8 @@ class NregaBotApp(ctk.CTk):
                         frame.pack_forget()
         
         self.nav_scroll_frame.update_idletasks()
+
+
 
     def show_history_window(self):
         """Modern Activity Log window with stats, search, and filtered treeview."""
@@ -1777,8 +1938,9 @@ class NregaBotApp(ctk.CTk):
                     if self.winfo_exists():
                         self.after(0, self.set_server_status, False)
 
-                # 2. Fetch App Config (Every 120 seconds -> 6 loops of 20s)
-                if ping_counter >= 6:
+                # 2. Fetch App Config (Every 120s -> 6 loops of 20s)
+                # Note: ping_counter starts at 0, so 0%6==0 fetches config on the VERY FIRST run!
+                if ping_counter % 6 == 0:
                     try:
                         url = f"{config.LICENSE_SERVER_URL}/api/app-config"
                         resp = self.http_session.get(url, timeout=10)
