@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from PIL import Image
+from typing import Any, Dict, List, Optional, Tuple
 from utils import resource_path
 
 
@@ -9,15 +10,15 @@ class LazyIconManager:
     No images are decoded or stored in memory until first requested.
     Acts as a drop-in replacement for a dict of icons — supports .get().
     """
-    def __init__(self):
-        self._cache = {}
-        self._definitions = []  # (name, path, size) tuples — no loading yet
+    def __init__(self) -> None:
+        self._cache: Dict[str, Any] = {}
+        self._definitions: List[Tuple[str, str, Tuple[int, int]]] = []  # (name, path, size) tuples — no loading yet
 
-    def _add(self, name, path, size=(20, 20)):
+    def _add(self, name: str, path: str, size: Tuple[int, int] = (20, 20)) -> None:
         """Register an icon definition. Does NOT load the image."""
         self._definitions.append((name, path, size))
 
-    def get(self, name, default=None):
+    def get(self, name: str, default: Any = None) -> Any:
         """Get an icon by name. Loads and caches it on first access."""
         # Return from cache if already loaded
         if name in self._cache:
@@ -37,9 +38,19 @@ class LazyIconManager:
                     return default
         return default
 
-    def preload_essential(self):
+    def clear_cache(self) -> None:
+        """M2: Clear all cached CTkImage objects.
+        
+        Call this after a theme switch to force icons to be recreated with
+        the new appearance mode. CTkImage objects internally cache a PhotoImage
+        that is tied to the current theme — flushing the cache ensures fresh,
+        correctly-themed images are loaded on next access.
+        """
+        self._cache.clear()
+
+    def preload_essential(self) -> None:
         """Preload only the most critical icons (browser, toolbar, settings)."""
-        essential = [
+        essential: List[str] = [
             "chrome", "edge", "firefox", "extractor_icon", "emoji_login_automation",
             "sound_on", "minimize", "theme_system", "theme_light", "theme_dark",
             "history", "emoji_file_manager", "whatsapp", "feedback", "nrega", "home_icon",
@@ -48,7 +59,7 @@ class LazyIconManager:
             self.get(name)
 
 
-def create_icon_manager():
+def create_icon_manager() -> LazyIconManager:
     """
     Factory: creates a LazyIconManager with all icon definitions registered.
     No images are decoded — just path/size tuples stored.

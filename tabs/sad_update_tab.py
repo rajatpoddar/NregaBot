@@ -7,12 +7,13 @@ import os, time, csv, re
 import threading
 from .base_tab import BaseAutomationTab
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
 # --- NAME CHANGED HERE (SADUpdateStatusTab -> SadUpdateTab) ---
 class SadUpdateTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         import openpyxl
         from selenium.webdriver.common.by import By
@@ -32,8 +33,7 @@ class SadUpdateTab(BaseAutomationTab):
 
         self._create_widgets()
         self.load_inputs()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -173,8 +173,7 @@ class SadUpdateTab(BaseAutomationTab):
             messagebox.showinfo("Copied", "Logs copied to clipboard!")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to copy: {e}")
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         self.file_entry.delete(0, tkinter.END)
         self.manual_text_area.delete("1.0", tkinter.END)
         self.app.clear_log(self.log_display)
@@ -260,8 +259,7 @@ class SadUpdateTab(BaseAutomationTab):
             return list(dict.fromkeys(ack_list)), None
         except Exception as e:
             return [], f"File Scan Error: {str(e)}"
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         active_tab = self.main_tabs.get()
         items_to_process = []
 

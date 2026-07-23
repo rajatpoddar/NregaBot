@@ -10,9 +10,10 @@ from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class WorkAllocationTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -36,8 +37,7 @@ class WorkAllocationTab(BaseAutomationTab):
 
         self._create_widgets()
         self.load_inputs()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -161,8 +161,7 @@ class WorkAllocationTab(BaseAutomationTab):
         self.export_format_menu.configure(state=state)
         self.export_filter_menu.configure(state=state)
         if state == "normal": self._on_format_change(self.export_format_menu.get())
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -234,8 +233,7 @@ class WorkAllocationTab(BaseAutomationTab):
         # 4. Save and Start
         self._save_inputs(inputs)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # Default start from UI (Bulk Mode or CSV Mode)
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -608,8 +606,7 @@ class WorkAllocationTab(BaseAutomationTab):
         # --------------------------
         
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
-
-    def retry_logic_handler(self):
+    def retry_logic_handler(self) -> None:
         """
         Custom Retry Logic for Work Allocation.
         Extracts failed Work Keys from the results tree and restarts automation

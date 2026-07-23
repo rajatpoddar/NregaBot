@@ -8,11 +8,12 @@ from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
 class AddActivityTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -27,8 +28,7 @@ class AddActivityTab(BaseAutomationTab):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -127,8 +127,7 @@ class AddActivityTab(BaseAutomationTab):
         self.work_keys_text.configure(state=state)
         self.unit_price_entry.configure(state=state)
         self.quantity_entry.configure(state=state)
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         work_keys = [line.strip() for line in self.work_keys_text.get("1.0", tkinter.END).strip().splitlines() if line.strip()]
         if not work_keys:
             messagebox.showwarning("Input Required", "Please provide at least one work key.")
@@ -144,8 +143,7 @@ class AddActivityTab(BaseAutomationTab):
         
         # Pass the inputs to the automation logic
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(work_keys, unit_price, quantity))
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -225,8 +223,7 @@ class AddActivityTab(BaseAutomationTab):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_key, status, details, timestamp)))
 
     # Inside tabs/add_activity_tab.py
-
-    def retry_logic_handler(self):
+    def retry_logic_handler(self) -> None:
         """Override to map the retry button to the work_keys_text box."""
         self.retry_failed_automation(self.work_keys_text)
 

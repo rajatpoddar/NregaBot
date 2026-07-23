@@ -11,11 +11,12 @@ import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
 class AbpsVerifyTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.support.ui import Select, WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
@@ -28,8 +29,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -115,16 +115,14 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.village_entry.configure(state=state)
         self.export_csv_button.configure(state=state)
         self.export_pdf_button.configure(state=state)
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         panchayat = self.panchayat_entry.get().strip()
         village = self.village_entry.get().strip() # Can be empty for auto-mode
         if not panchayat:
             messagebox.showwarning("Input Required", "Please enter a Panchayat name.")
             return
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(panchayat, village))
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

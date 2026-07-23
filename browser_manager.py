@@ -4,6 +4,7 @@ import subprocess
 import socket
 from tkinter import messagebox
 import tkinter
+from typing import Any, Dict, List, Optional, Tuple
 import customtkinter as ctk
 import config
 from utils import resource_path, get_logger
@@ -14,24 +15,24 @@ logger = get_logger()
 
 
 class BrowserManager:
-    def __init__(self, app):
-        self.app = app # Main App ka reference taaki hum sound/toast use kar sakein
-        self.driver = None
-        self.active_browser = None
+    def __init__(self, app: object) -> None:
+        self.app = app  # Main App ka reference taaki hum sound/toast use kar sakein
+        self.driver: Any = None
+        self.active_browser: Optional[str] = None
         
         # Suppress verbose WDM (WebDriver Manager) INFO logs from terminal
         os.environ['WDM_LOG'] = '0'
 
-    def launch_chrome_detached(self, target_urls=None):
+    def launch_chrome_detached(self, target_urls: Optional[List[str]] = None) -> None:
         """Launches Chrome with debugging port enabled."""
         port, p_dir = "9222", os.path.join(os.path.expanduser("~"), "ChromeProfileForNREGABot")
         os.makedirs(p_dir, exist_ok=True)
         
-        paths = {
+        paths: Dict[str, List[str]] = {
             "Darwin": ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"], 
             "Windows": [r"C:\Program Files\Google\Chrome\Application\chrome.exe", r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"]
         }
-        b_path = next((p for p in paths.get(config.OS_SYSTEM, []) if os.path.exists(p)), None)
+        b_path: Optional[str] = next((p for p in paths.get(config.OS_SYSTEM, []) if os.path.exists(p)), None)
         
         if not b_path: 
             self.app.play_sound("error")
@@ -39,12 +40,12 @@ class BrowserManager:
             return
             
         if target_urls:
-            urls_to_open = target_urls
+            urls_to_open: List[str] = target_urls
         else:
             urls_to_open = [config.MAIN_WEBSITE_URL, "https://bookmark.nregabot.com/"]
             
         try:
-            cmd = [
+            cmd: List[str] = [
                 b_path, 
                 f"--remote-debugging-port={port}", 
                 f"--user-data-dir={p_dir}",
@@ -57,7 +58,7 @@ class BrowserManager:
                 "--silent"
             ] + urls_to_open
             
-            flags = 0x00000008 if config.OS_SYSTEM == "Windows" else 0
+            flags: int = 0x00000008 if config.OS_SYSTEM == "Windows" else 0
             
             subprocess.Popen(
                 cmd, 
@@ -75,11 +76,14 @@ class BrowserManager:
             self.app.play_sound("error")
             messagebox.showerror("Error", f"Failed to launch Chrome:\n{e}")
 
-    def launch_edge_detached(self):
+    def launch_edge_detached(self) -> None:
         port, p_dir = "9223", os.path.join(os.path.expanduser("~"), "EdgeProfileForNREGABot")
         os.makedirs(p_dir, exist_ok=True)
-        paths = {"Darwin": ["/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"], "Windows": [r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]}
-        b_path = next((p for p in paths.get(config.OS_SYSTEM, []) if os.path.exists(p)), None)
+        paths: Dict[str, List[str]] = {
+            "Darwin": ["/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"],
+            "Windows": [r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]
+        }
+        b_path: Optional[str] = next((p for p in paths.get(config.OS_SYSTEM, []) if os.path.exists(p)), None)
         
         if not b_path: 
             self.app.play_sound("error")
@@ -87,7 +91,7 @@ class BrowserManager:
             return
             
         try:
-            cmd = [
+            cmd: List[str] = [
                 b_path, 
                 f"--remote-debugging-port={port}", 
                 f"--user-data-dir={p_dir}",
@@ -98,7 +102,7 @@ class BrowserManager:
                 "https://bookmark.nregabot.com/"
             ]
 
-            flags = 0x00000008 if config.OS_SYSTEM == "Windows" else 0
+            flags: int = 0x00000008 if config.OS_SYSTEM == "Windows" else 0
             subprocess.Popen(
                 cmd, 
                 creationflags=flags, 
@@ -113,7 +117,7 @@ class BrowserManager:
             self.app.play_sound("error")
             messagebox.showerror("Error", f"Failed to launch Edge:\n{e}")
 
-    def launch_firefox_managed(self):
+    def launch_firefox_managed(self) -> None:
         from selenium import webdriver
         from selenium.webdriver.firefox.options import Options as FirefoxOptions
 
@@ -121,7 +125,8 @@ class BrowserManager:
             try: self.driver.quit()
             except Exception as e: logger.debug("Failed to quit Firefox driver: %s", e)
             self.driver = None
-        elif self.driver: return
+        elif self.driver:
+            return
         
         try:
             p_dir = os.path.join(os.path.expanduser("~"), "FirefoxProfileForNREGABot")
@@ -153,7 +158,7 @@ class BrowserManager:
             self.driver = None
             self.active_browser = None
             
-    def launch_old_firefox(self, binary_path, target_url=None):
+    def launch_old_firefox(self, binary_path: str, target_url: Optional[str] = None) -> Tuple[bool, str]:
         """Launches a specific old version of Firefox for FTO DSC processing."""
         try:
             from selenium import webdriver
@@ -170,7 +175,7 @@ class BrowserManager:
             
             # Note: Old Firefox ke liye purana geckodriver chahiye hota hai.
             # Aapko 'assets/drivers/geckodriver_old.exe' rakhna padega.
-            driver_path = resource_path("assets/drivers/geckodriver_old.exe")
+            driver_path: str = resource_path("assets/drivers/geckodriver_old.exe")
             
             if os.path.exists(driver_path):
                 service = Service(executable_path=driver_path)
@@ -189,7 +194,7 @@ class BrowserManager:
         except Exception as e:
             return False, f"Failed to launch Old Firefox: {e}"
 
-    def _create_driver_service(self, browser_type):
+    def _create_driver_service(self, browser_type: str) -> Any:
         """Returns a Service object for the given browser type, or None.
         Uses webdriver_manager to download the driver if needed, with
         a fallback to Selenium's built-in manager.
@@ -211,36 +216,47 @@ class BrowserManager:
             pass
         return None
 
-    def get_driver(self):
+    def get_driver(self) -> Any:
         """Connects to an existing browser session."""
-        available_browsers = []
+        available_browsers: List[str] = []
         
         # Check Firefox (Internal)
         if self.driver:
             try:
-                if not self.driver.window_handles: raise WebDriverException("No active windows")
-                try: _ = self.driver.current_url
-                except WebDriverException: self.driver.switch_to.window(self.driver.window_handles[0])
+                if not self.driver.window_handles:
+                    from selenium.common.exceptions import WebDriverException
+                    raise WebDriverException("No active windows")
+                try:
+                    _ = self.driver.current_url
+                except Exception as e:
+                    from selenium.common.exceptions import WebDriverException
+                    self.driver.switch_to.window(self.driver.window_handles[0])
                 available_browsers.append("firefox")
-            except Exception: self.driver = None
+            except Exception:
+                self.driver = None
 
         # Check Chrome (External Port 9222)
         try:
-            with socket.create_connection(("127.0.0.1", 9222), timeout=0.2): available_browsers.append("chrome")
-        except (socket.timeout, ConnectionRefusedError): pass
+            with socket.create_connection(("127.0.0.1", 9222), timeout=0.2):
+                available_browsers.append("chrome")
+        except (socket.timeout, ConnectionRefusedError):
+            pass
         
         # Check Edge (External Port 9223)
         try:
-            with socket.create_connection(("127.0.0.1", 9223), timeout=0.2): available_browsers.append("edge")
-        except (socket.timeout, ConnectionRefusedError): pass
+            with socket.create_connection(("127.0.0.1", 9223), timeout=0.2):
+                available_browsers.append("edge")
+        except (socket.timeout, ConnectionRefusedError):
+            pass
 
         if not available_browsers:
             self.app.play_sound("error")
             messagebox.showerror("Connection Failed", "No browser is running. Please launch one first.")
             return None
 
-        selected_browser = available_browsers[0] if len(available_browsers) == 1 else self._ask_browser_selection(available_browsers)
-        if not selected_browser: return None
+        selected_browser: str = available_browsers[0] if len(available_browsers) == 1 else self._ask_browser_selection(available_browsers)
+        if not selected_browser:
+            return None
 
         if selected_browser == "firefox":
             if not self.driver:
@@ -292,7 +308,7 @@ class BrowserManager:
                 return None
         return None
 
-    def _ask_browser_selection(self, options):
+    def _ask_browser_selection(self, options: List[str]) -> str:
         selection_var = tkinter.StringVar(value="")
         dialog = ctk.CTkToplevel(self.app)
         dialog.title("Select Browser")
@@ -307,12 +323,13 @@ class BrowserManager:
             x = self.app.winfo_x() + (self.app.winfo_width() // 2) - (300 // 2)
             y = self.app.winfo_y() + (self.app.winfo_height() // 2) - (250 // 2)
             dialog.geometry(f"+{x}+{y}")
-        except Exception as e: logger.debug("Failed to center browser selection dialog: %s", e)
+        except Exception as e:
+            logger.debug("Failed to center browser selection dialog: %s", e)
         
         ctk.CTkLabel(dialog, text="Multiple browsers detected.", font=ctk.CTkFont(weight="bold")).pack(pady=(20, 5))
         ctk.CTkLabel(dialog, text="Which one do you want to use?").pack(pady=(0, 20))
         
-        def select(choice): 
+        def select(choice: str) -> None: 
             selection_var.set(choice)
             dialog.destroy()
             

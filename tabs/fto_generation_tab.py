@@ -8,9 +8,10 @@ from datetime import datetime
 
 import config
 from .base_tab import BaseAutomationTab
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class FtoGenerationTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import WebDriverWait, Select
@@ -30,8 +31,7 @@ class FtoGenerationTab(BaseAutomationTab):
         
         self._create_widgets()
         self._load_saved_path()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -239,8 +239,7 @@ class FtoGenerationTab(BaseAutomationTab):
         else:
              self.check_abps_button.pack_forget()
              self.abps_container.grid_remove() 
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         self.automation_has_run = False 
         self.stored_location_data = {} 
         self.check_abps_button.pack_forget()

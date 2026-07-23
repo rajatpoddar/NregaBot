@@ -1,6 +1,7 @@
 import os
 import subprocess
 import platform
+from typing import List, Tuple
 import config
 from utils import resource_path
 
@@ -16,12 +17,12 @@ class SoundManager:
     No audio library (pygame, etc.) is needed — pure stdlib + OS utilities.
     """
 
-    def __init__(self, app):
+    def __init__(self, app: object) -> None:
         self.app = app
 
     def _play_nix(self, sound_file: str) -> bool:
         """Try common Linux CLI players in order of preference."""
-        players = [
+        players: List[Tuple[str, List[str]]] = [
             ("aplay",  ["aplay", "-q", sound_file]),
             ("paplay", ["paplay", sound_file]),
             ("ffplay", ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", sound_file]),
@@ -34,7 +35,7 @@ class SoundManager:
                 continue
         return False
 
-    def play(self, sound_name: str):
+    def play(self, sound_name: str) -> None:
         """Play a WAV sound file. No dependencies required."""
         # Respect the sound toggle
         if hasattr(self.app, 'sound_switch_var') and not self.app.sound_switch_var.get():

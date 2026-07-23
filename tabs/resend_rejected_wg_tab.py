@@ -8,9 +8,10 @@ from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class ResendRejectedWgTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.support.ui import Select, WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
@@ -25,8 +26,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
         self.grid_rowconfigure(2, weight=1)
         
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -107,8 +107,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
             self.panchayat_entry.configure(state=state)
         if running:
              self.panchayat_entry.configure(state="disabled")
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -122,8 +121,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
             for item in self.results_tree.get_children(): self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         self.app.clear_log(self.log_display)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         

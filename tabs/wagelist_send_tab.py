@@ -6,9 +6,10 @@ import time
 from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class WagelistSendTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -24,8 +25,7 @@ class WagelistSendTab(BaseAutomationTab):
         self.grid_rowconfigure(2, weight=1) 
         
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -98,8 +98,7 @@ class WagelistSendTab(BaseAutomationTab):
         self.fin_year_combobox.configure(state=state)
         self.start_wagelist_entry.configure(state=state)
         self.end_wagelist_entry.configure(state=state)
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -115,8 +114,7 @@ class WagelistSendTab(BaseAutomationTab):
             self.update_status("Ready", 0.0)
             self.app.log_message(self.log_display, "Form has been reset.")
             self.app.after(0, self.app.set_status, "Ready")
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         fin_year = self.fin_year_combobox.get()
         if not fin_year:
             messagebox.showerror("Input Error", "Please select a Financial Year.")
@@ -140,8 +138,7 @@ class WagelistSendTab(BaseAutomationTab):
         self.app.set_status("Ready to send wagelists")
 
     # Inside tabs/wagelist_send_tab.py
-
-    def retry_logic_handler(self):
+    def retry_logic_handler(self) -> None:
         """
         Retry Logic for Wagelist Send.
         Since successful items are processed and removed from the list (or marked done),

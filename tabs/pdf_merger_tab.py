@@ -7,9 +7,10 @@ from pypdf import PdfWriter
 from datetime import datetime  # <-- ADD THIS IMPORT
 
 from .base_tab import BaseAutomationTab
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class PDFMergerTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="pdf_merger")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(4, weight=1) # <-- UPDATED: Make log area (now at row 4) expand
@@ -23,8 +24,7 @@ class PDFMergerTab(BaseAutomationTab):
         if isinstance(color, (list, tuple)):
             return color[1] if ctk.get_appearance_mode() == "Dark" else color[0]
         return color
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # --- Controls Frame ---
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 0))
@@ -165,8 +165,7 @@ class PDFMergerTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Removed: {os.path.basename(removed_file)}")
         except IndexError:
             messagebox.showwarning("No Selection", "Please select a file from the list to remove.", parent=self)
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         if not self.selected_files and not self.file_name_entry.get(): 
             return
         if messagebox.askokcancel("Clear Form?", "Are you sure you want to clear all selected files and the file name?"):
@@ -206,8 +205,7 @@ class PDFMergerTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Error creating output path: {e}", "error")
             messagebox.showerror("Path Error", f"Could not create output directory: {e}", parent=self)
             return None
-            
-    def start_automation(self):
+    def start_automation(self) -> None:
         if len(self.selected_files) < 2:
             messagebox.showwarning("Not Enough Files", "Please select at least two PDF files to merge.", parent=self)
             return

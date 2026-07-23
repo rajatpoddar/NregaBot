@@ -20,6 +20,7 @@ from selenium.common.exceptions import (
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 PROFILES_FILE = os.path.join(os.path.dirname(__file__), "..", "assets", "material_profiles.json")
 MAX_MATERIAL_ROWS = 15
@@ -27,7 +28,7 @@ DEFAULT_MATERIAL_ROWS = 2
 
 
 class MaterialEntryTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="material_entry")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -151,8 +152,7 @@ class MaterialEntryTab(BaseAutomationTab):
     # =========================================================================
     # UI CREATION
     # =========================================================================
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # Outer scrollable container
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -481,8 +481,7 @@ class MaterialEntryTab(BaseAutomationTab):
             "materials": materials,
             "tasks": tasks
         }
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         inputs = self._get_inputs()
         if not inputs["vendor_code"] or not inputs["bill_date"] or not inputs["tasks"]:
             messagebox.showwarning("Missing Input", "Vendor Code, Bill Date, and at least one Work Key/Bill No pair are required.", parent=self)
@@ -812,8 +811,7 @@ class MaterialEntryTab(BaseAutomationTab):
         ts = datetime.now().strftime("%H:%M:%S")
         tags = ('success',) if 'success' in status.lower() else ('failed',) if 'failed' in status.lower() else ()
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(ts, work_key, bill_no, status, details), tags=tags))
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         super().reset_ui()
         self.vendor_code_entry.delete(0, "end")
         self.bill_date_entry.delete(0, "end")

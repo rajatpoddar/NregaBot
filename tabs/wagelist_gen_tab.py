@@ -11,11 +11,12 @@ import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
 class WagelistGenTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.support.ui import Select, WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
@@ -29,8 +30,7 @@ class WagelistGenTab(BaseAutomationTab):
         super().__init__(parent, app_instance, automation_key="gen")
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -169,8 +169,7 @@ class WagelistGenTab(BaseAutomationTab):
         self.export_format_menu.configure(state=state)
         self.export_filter_menu.configure(state=state)
         if state == "normal": self._on_format_change(self.export_format_menu.get())
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -192,8 +191,7 @@ class WagelistGenTab(BaseAutomationTab):
             self.update_status("Ready", 0.0)
             self.app.log_message(self.log_display, "Form has been reset.")
             self.app.after(0, self.app.set_status, "Ready")
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -217,8 +215,7 @@ class WagelistGenTab(BaseAutomationTab):
         # We pass it as a list [agency] so the looping logic in run_automation_logic handles it correctly
         # This keeps it compatible with both manual run and macro run.
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=([agency],))
-
-    def retry_logic_handler(self):
+    def retry_logic_handler(self) -> None:
         """
         Retry Logic for Wagelist Gen.
         Since this works on a 'Pending List' from the website, 

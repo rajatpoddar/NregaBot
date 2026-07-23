@@ -5,10 +5,11 @@ import customtkinter as ctk
 import requests
 import config
 import threading
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class FeedbackTab(ctk.CTkFrame):
     """A tab for users to chat with support."""
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, fg_color="transparent")
         self.app = app_instance
         self.poll_after_id = None

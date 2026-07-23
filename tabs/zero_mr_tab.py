@@ -8,9 +8,10 @@ from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class ZeroMrTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.support.ui import Select, WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
@@ -24,8 +25,7 @@ class ZeroMrTab(BaseAutomationTab):
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
         self.load_inputs()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -132,8 +132,7 @@ class ZeroMrTab(BaseAutomationTab):
         self.export_format_menu.configure(state=state)
         self.export_filter_menu.configure(state=state)
         if state == "normal": self._on_format_change(self.export_format_menu.get())
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -149,8 +148,7 @@ class ZeroMrTab(BaseAutomationTab):
         self.update_status("Ready", 0.0)
         self.app.log_message(self.log_display, "Form has been reset.")
         self.app.after(0, self.app.set_status, "Ready")
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -446,8 +444,7 @@ class ZeroMrTab(BaseAutomationTab):
                 error_msg = f"Unexpected error: {e}"
             self.app.log_message(self.log_display, f"   - FAILED: {error_msg}", "error")
             self._log_result(work_key, msr_no, "Failed", error_msg)
-
-    def retry_logic_handler(self):
+    def retry_logic_handler(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

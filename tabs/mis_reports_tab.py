@@ -14,11 +14,12 @@ from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 import config
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
 class MisReportsTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -36,8 +37,7 @@ class MisReportsTab(BaseAutomationTab):
         
         self._create_widgets()
         self.load_inputs()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -156,8 +156,7 @@ class MisReportsTab(BaseAutomationTab):
                 except Exception:
                     # Failsafe for widgets that don't have a 'state' property (like sub-frames)
                     pass
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -431,8 +430,7 @@ class MisReportsTab(BaseAutomationTab):
             self.block_entry.insert(0, data.get('block', ''))
         except Exception as e:
             print(f"Error loading MIS inputs: {e}")
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         """Resets inputs and checkboxes."""
         super().reset_ui() # Call base to clear logs/status
         

@@ -14,11 +14,12 @@ import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry 
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
 class EKycReportTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.support.ui import Select, WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
@@ -166,8 +167,7 @@ class EKycReportTab(BaseAutomationTab):
     def update_status(self, text, progress=None):
         """Update UI status. Always use from main thread via app.after(0, ...)."""
         self.app.after(0, self._safe_update_status, text, progress)
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         self.save_inputs()
         self.set_common_ui_state(running=True)
         self.export_btn.configure(state="disabled")

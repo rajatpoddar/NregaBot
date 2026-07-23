@@ -6,9 +6,10 @@ import time, csv, sys, os, subprocess, re  # <-- ADD 're'
 from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class UpdateEstimateTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.support.ui import Select, WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
@@ -21,8 +22,7 @@ class UpdateEstimateTab(BaseAutomationTab):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -121,14 +121,12 @@ class UpdateEstimateTab(BaseAutomationTab):
         self.work_key_text.configure(state=state)
         self.export_button.configure(state=state)
         self.export_format_menu.configure(state=state)
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         """Starts the automation logic in a separate thread."""
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
         self.app.start_automation_thread(key=self.automation_key, target=self.run_automation_logic)
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

@@ -19,9 +19,10 @@ logger = get_logger()
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 import config  # <-- Make sure config is imported
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class MrTrackingTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         import pandas as pd
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -60,8 +61,7 @@ class MrTrackingTab(BaseAutomationTab):
         
         self._create_widgets()
         self.load_inputs()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -362,8 +362,7 @@ class MrTrackingTab(BaseAutomationTab):
             else:
                  messagebox.showerror("Browser Error", f"Could not start Headless Chrome.\nError: {e}")
             return None
-        
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

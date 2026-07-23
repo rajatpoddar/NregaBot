@@ -4,212 +4,24 @@ import tkinter
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import os, sys, platform, re
-import calendar
 from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont 
-from fpdf import FPDF 
 
 import config
 from utils import resource_path, get_logger
 
 logger = get_logger()
 
-# --- REUSABLE DATE PICKER CLASS ---
-class DatePickerPopup(ctk.CTkToplevel):
-    """
-    R7: Optimized modal popup for selecting a date.
-    
-    Pre-creates all day buttons ONCE in __init__, then reuses them
-    on month navigation — no widget destruction/creation overhead.
-    
-    Features:
-    - Centered on the main application window.
-    - Highlights Today (Blue), Mondays (Greenish), and Sundays (Reddish).
-    """
-    def __init__(self, parent, on_date_select):
-        super().__init__(parent)
-        self.on_date_select = on_date_select
-        self.title("Select Date")
-        
-        # Dimensions
-        width, height = 300, 360
-        
-        # Calculate Center Position relative to Parent
-        try:
-            parent.update_idletasks()
-            x = parent.winfo_rootx() + (parent.winfo_width() // 2) - (width // 2)
-            y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (height // 2)
-        except:
-            # Fallback if parent coords aren't ready
-            x, y = 100, 100
-        
-        self.geometry(f"{width}x{height}+{x}+{y}")
-        self.resizable(False, False)
-        self.attributes("-topmost", True)
-        self.transient(parent) # Keeps it on top of the parent window
-        
-        self.current_year = datetime.now().year
-        self.current_month = datetime.now().month
-        
-        # --- Header Section (Month/Year & Navigation) ---
-        self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.header_frame.pack(fill="x", padx=10, pady=(10, 5))
-        
-        ctk.CTkButton(self.header_frame, text="<", width=30, command=self.prev_month,
-                      fg_color="transparent", border_width=1, text_color=("black", "white")).pack(side="left")
-        
-        self.lbl_month_year = ctk.CTkLabel(self.header_frame, text="", font=("Arial", 16, "bold"))
-        self.lbl_month_year.pack(side="left", expand=True)
-        
-        ctk.CTkButton(self.header_frame, text=">", width=30, command=self.next_month,
-                      fg_color="transparent", border_width=1, text_color=("black", "white")).pack(side="right")
-        
-        # --- Calendar Grid Section ---
-        self.cal_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.cal_frame.pack(expand=True, fill="both", padx=10, pady=5)
+# Module-level imports for selenium and openpyxl (P4: moved from lazy imports in method bodies)
+from selenium.common.exceptions import NoSuchWindowException, WebDriverException
 
-        # --- R7: Pre-create weekday headers ONCE (never destroyed) ---
-        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        for i, day_name in enumerate(days):
-            t_color = "red" if i == 6 else ("gray30", "gray70")
-            ctk.CTkLabel(
-                self.cal_frame, text=day_name,
-                font=("Arial", 12, "bold"), text_color=t_color
-            ).grid(row=0, column=i, padx=2, pady=5)
-
-        # --- R7: Pre-create 42 reusable day buttons (6 rows × 7 cols) ---
-        self.day_buttons = []  # 2D list: day_buttons[row][col]
-        for r in range(6):
-            row_btns = []
-            for c in range(7):
-                btn = ctk.CTkButton(
-                    self.cal_frame, text="", width=35, height=35,
-                    fg_color="transparent",
-                    hover_color=("gray80", "gray30"),
-                    text_color=("black", "white"),
-                    command=lambda d=0: self._on_day_click(d)
-                )
-                btn.grid(row=r + 1, column=c, padx=2, pady=2)
-                row_btns.append(btn)
-            self.day_buttons.append(row_btns)
-
-        # --- Populate buttons for current month ---
-        self._update_calendar()
-        self.focus_force()
-
-    def _on_day_click(self, day):
-        """Handle a day button click — guard against zero-day (empty cell)."""
-        if day > 0:
-            selected_date = f"{day:02d}/{self.current_month:02d}/{self.current_year}"
-            self.on_date_select(selected_date)
-            self.destroy()
-
-    def _update_calendar(self):
-        """
-        R7: Reuses pre-created day buttons instead of destroying/creating widgets.
-        Only updates text, colors, and commands — no widget creation overhead.
-        """
-        # Update header
-        month_name = calendar.month_name[self.current_month]
-        self.lbl_month_year.configure(text=f"{month_name} {self.current_year}")
-
-        cal = calendar.monthcalendar(self.current_year, self.current_month)
-        now = datetime.now()
-        today = (now.day, now.month, now.year)
-
-        for r, week in enumerate(cal):
-            for c, day in enumerate(week):
-                btn = self.day_buttons[r][c]
-                if day != 0:
-                    # Defaults
-                    fg = "transparent"
-                    hov = ("gray80", "gray30")
-                    txt = ("black", "white")
-
-                    if c == 0:  # Monday — Greenish
-                        fg = (config.COLORS["green_very_light"], config.COLORS["green_dark_btn"])
-                    elif c == 6:  # Sunday — Reddish
-                        fg = (config.COLORS["red_very_light"], config.COLORS["red_dark"])
-                        txt = (config.COLORS["red_text"], config.COLORS["red_text_light"])
-
-                    # Highlight Today — Blue
-                    if day == today[0] and self.current_month == today[1] and self.current_year == today[2]:
-                        fg = (config.COLORS["blue"], config.COLORS["blue_hover"])
-                        txt = "white"
-                        hov = (config.COLORS["blue_hover_nav"], config.COLORS["blue_dark"])
-
-                    btn.configure(
-                        text=str(day),
-                        fg_color=fg,
-                        hover_color=hov,
-                        text_color=txt,
-                        state="normal",
-                        command=lambda d=day: self._on_day_click(d)
-                    )
-                else:
-                    # Empty cell — hide button
-                    btn.configure(text="", state="disabled")
-
-    def prev_month(self):
-        self.current_month -= 1
-        if self.current_month == 0:
-            self.current_month = 12
-            self.current_year -= 1
-        self._update_calendar()
-
-    def next_month(self):
-        self.current_month += 1
-        if self.current_month == 13:
-            self.current_month = 1
-            self.current_year += 1
-        self._update_calendar()
-
-    def select_date(self, day):
-        """Legacy method kept for backward compatibility."""
-        if day > 0:
-            selected_date = f"{day:02d}/{self.current_month:02d}/{self.current_year}"
-            self.on_date_select(selected_date)
-            self.destroy()
-
-# --- CUSTOM PDF CLASS FOR PROFESSIONAL HEADER/FOOTER ---
-class ProfessionalPDF(FPDF):
-    def __init__(self, title_text, date_text, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.report_title = title_text
-        self.report_date = date_text
-
-    def header(self):
-        # Logo (if exists)
-        try:
-            logo_path = resource_path("assets/logo.png")
-            if os.path.exists(logo_path):
-                self.image(logo_path, 10, 8, 12)
-                self.set_x(25) # Move text cursor after logo
-        except Exception as e: logger.debug("Failed to load PDF logo: %s", e)
-
-        # Title
-        self.set_font('Arial', 'B', 15)
-        self.cell(0, 10, self.report_title, 0, 1, 'L')
-        
-        # Date & Subtitle
-        self.set_font('Arial', 'I', 10)
-        self.set_text_color(100, 100, 100)
-        self.cell(0, 5, f"Generated on: {self.report_date}", 0, 1, 'L')
-        
-        # Line break and horizontal rule
-        self.ln(4)
-        self.set_draw_color(200, 200, 200)
-        self.line(10, self.get_y(), 287, self.get_y()) # A4 Landscape width is ~297mm
-        self.ln(6)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        self.set_text_color(128, 128, 128)
-        self.cell(0, 10, f'Page {self.page_no()}/{{nb}} - Generated by NregaBot.com', 0, 0, 'C')
+# A2: Import extracted components from their own modules
+from .date_picker_popup import DatePickerPopup
+from .professional_pdf import ProfessionalPDF
 
 class BaseAutomationTab(ctk.CTkFrame):
-    def __init__(self, parent, app_instance, automation_key):
+    def __init__(self, parent: Any, app_instance: Any, automation_key: str) -> None:
         super().__init__(parent, fg_color="transparent")
         self.app = app_instance
         self.automation_key = automation_key
@@ -220,7 +32,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         from ui_components import AfterTracker
         self._safe_after = AfterTracker(self)
         
-    def destroy(self):
+    def destroy(self) -> None:
         """
         Override destroy() to set a flag that prevents background threads
         from updating widgets on a destroyed tab.
@@ -237,7 +49,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         self._tab_destroyed = True
         super().destroy()
         
-    def _is_alive(self):
+    def _is_alive(self) -> bool:
         """Returns True if the tab's widgets still exist and can be updated.
         
         Background threads call set_common_ui_state() / log_message() via
@@ -252,7 +64,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         except Exception:
             return False
         
-    def safe_after(self, ms, callback, *args):
+    def safe_after(self, ms: int, callback: Callable, *args: Any) -> str:
         """
         Tracked version of after() that auto-cancels when tab is destroyed.
         Prevents ghost callbacks from firing after tab is gone.
@@ -260,26 +72,12 @@ class BaseAutomationTab(ctk.CTkFrame):
         """
         return self._safe_after.after(ms, callback, *args)
         
-    def open_date_picker(self, callback):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import WebDriverException
-        from selenium.common.exceptions import NoSuchWindowException
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-
+    def open_date_picker(self, callback: Callable[[str], None]) -> None:
         """Opens the reusable DatePickerPopup."""
         DatePickerPopup(self, callback)
 
-    def handle_error(self, e):
+    def handle_error(self, e: Exception) -> None:
         """Centralized error handler."""
-        from selenium.common.exceptions import NoSuchWindowException, WebDriverException
         error_msg = str(e).lower()
         if "no such window" in error_msg or "target window already closed" in error_msg or "web view not found" in error_msg:
             self.app.log_message(self.log_display, "Automation Stopped: Browser tab/window was closed.", "error")
@@ -291,7 +89,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             self.app.log_message(self.log_display, f"Error: {e}", "error")
             messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
 
-    def _get_wkhtml_path(self):
+    def _get_wkhtml_path(self) -> str:
         os_type = platform.system()
     
         if hasattr(sys, '_MEIPASS'):
@@ -309,20 +107,7 @@ class BaseAutomationTab(ctk.CTkFrame):
                 
         return 'wkhtmltoimage'
         
-    def generate_report_image(self, data, headers, title, date_str, output_path):
-        # ... (No changes here)
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
+    def generate_report_image(self, data: List[List[str]], headers: List[str], title: str, date_str: str, output_path: str) -> bool:
         try:
             try:
                 font_path_regular = resource_path("assets/fonts/NotoSansDevanagari-Regular.ttf")
@@ -480,7 +265,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             messagebox.showerror("PNG Export Error", f"Could not generate PNG report.\nError: {e}", parent=self.app)
             return False
 
-    def _wrap_text(self, text, font, max_width):
+    def _wrap_text(self, text: str, font: Any, max_width: float) -> List[str]:
         """Helper to wrap text for Pillow."""
         if not text: return [""]
         text_lines = text.split('\n')
@@ -510,20 +295,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             final_lines.extend(lines)
         return final_lines if final_lines else [""]
 
-    def generate_report_pdf(self, data, headers, col_widths, title, date_str, file_path):
-        # ... (No changes here)
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
+    def generate_report_pdf(self, data: List[List[str]], headers: List[str], col_widths: List[float], title: str, date_str: str, file_path: str) -> bool:
         try:
             pdf = ProfessionalPDF(title, date_str, orientation='L', unit='mm', format='A4')
             pdf.alias_nb_pages()
@@ -606,19 +378,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             messagebox.showerror("PDF Export Error", f"Could not generate PDF.\nError: {e}", parent=self.app)
             return False
 
-    def _create_action_buttons(self, parent_frame):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
+    def _create_action_buttons(self, parent_frame: Any) -> ctk.CTkFrame:
         """Creates Start, Stop, Reset AND Retry buttons."""
         outer_wrapper = ctk.CTkFrame(parent_frame, fg_color="transparent")
         inner_container = ctk.CTkFrame(outer_wrapper, fg_color="transparent")
@@ -672,7 +432,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.progress_bar.set(0)
         self.progress_bar.pack(side="right", padx=10, fill="x", expand=True)
     
-    def set_common_ui_state(self, running: bool):
+    def set_common_ui_state(self, running: bool) -> None:
         """Updates Start/Stop/Reset/Retry buttons based on running state.
         
         Safe to call after tab has been destroyed — checks _is_alive()
@@ -698,30 +458,18 @@ class BaseAutomationTab(ctk.CTkFrame):
             except Exception:
                 pass
 
-    def reset_ui(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
+    def reset_ui(self) -> None:
         self.update_status("Ready", 0)
         self.app.set_status("Ready")
         self.log_display.configure(state="normal")
         self.log_display.delete("1.0", tkinter.END)
         self.log_display.configure(state="disabled")
 
-    def stop_automation(self):
+    def stop_automation(self) -> None:
         self.app.stop_events[self.automation_key].set()
         self.app.log_message(self.log_display, "Stop signal sent. Finishing current task...", "warning")
 
-    def update_status(self, message, progress=None):
+    def update_status(self, message: str, progress: Optional[float] = None) -> None:
         """Update status label and progress bar.
         
         Safe to call after tab has been destroyed — checks _is_alive()
@@ -742,7 +490,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         if hasattr(self.app, 'set_status'):
             self.app.set_status(message)
 
-    def retry_logic_handler(self):
+    def retry_logic_handler(self) -> None:
         """Override this in child tabs if specific logic is needed, otherwise uses default."""
         # Child tab should define 'self.input_text_widget' (the textbox with codes/jobcards)
         if hasattr(self, 'work_codes_text'):
@@ -752,19 +500,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         else:
             messagebox.showinfo("Info", "Retry logic not configured for this tab.")
 
-    def retry_failed_automation(self, input_widget):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
+    def retry_failed_automation(self, input_widget: Any) -> None:
         """
         Generic Logic:
         1. Reads 'Failed' items from Treeview.
@@ -810,7 +546,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.app.log_message(self.log_display, f"Retrying {len(failed_items)} failed items...", "info")
         self.start_automation()
 
-    def _get_style(self):
+    def _get_style(self) -> ttk.Style:
         """Return a cached ttk.Style singleton to avoid recreation overhead."""
         if not hasattr(self.app, '_cached_style') or self.app._cached_style is None:
             style = ttk.Style()
@@ -818,7 +554,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             self.app._cached_style = style
         return self.app._cached_style
 
-    def style_treeview(self, treeview_widget=None):
+    def style_treeview(self, treeview_widget: Optional[Any] = None) -> None:
         style = self._get_style()
 
         mode = ctk.get_appearance_mode()
@@ -891,18 +627,18 @@ class BaseAutomationTab(ctk.CTkFrame):
             treeview_widget.tag_configure('success', background=success_bg, foreground=success_fg)
             treeview_widget.tag_configure('warning', background=skip_bg, foreground=skip_fg)
 
-    def _setup_treeview_sorting(self, tree):
+    def _setup_treeview_sorting(self, tree: Any) -> None:
         for col in tree["columns"]:
             tree.heading(col, text=col, command=lambda _col=col: self._treeview_sort_column(tree, _col, False))
 
-    def _treeview_sort_column(self, tv, col, reverse):
+    def _treeview_sort_column(self, tv: Any, col: str, reverse: bool) -> None:
         l = [(tv.set(k, col), k) for k in tv.get_children('')]
         try: l.sort(key=lambda t: float(t[0]), reverse=reverse)
         except ValueError: l.sort(reverse=reverse)
         for index, (val, k) in enumerate(l): tv.move(k, '', index)
         tv.heading(col, command=lambda: self._treeview_sort_column(tv, col, not reverse))
         
-    def export_treeview_to_csv(self, tree, default_filename):
+    def export_treeview_to_csv(self, tree: Any, default_filename: str) -> None:
         file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialdir=self.app.get_user_downloads_path(), initialfile=default_filename, title="Save CSV Report")
         if not file_path: return
         try:
@@ -914,7 +650,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         except Exception as e:
             messagebox.showerror("Export Failed", f"An error occurred while saving the CSV file:\n{e}", parent=self)
 
-    def _extract_and_update_workcodes(self, textbox_widget):
+    def _extract_and_update_workcodes(self, textbox_widget: Any) -> None:
         try:
             input_content = textbox_widget.get("1.0", tkinter.END)
             if not input_content.strip(): return
@@ -947,7 +683,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         except Exception as e:
             messagebox.showerror("Extraction Error", f"An error occurred during extraction: {e}", parent=self)
 
-    def _apply_appearance_mode(self, theme_color_tuple):
+    def _apply_appearance_mode(self, theme_color_tuple: Any) -> str:
         if isinstance(theme_color_tuple, (tuple, list)):
             if ctk.get_appearance_mode().lower() == "light": return theme_color_tuple[0]
             else: return theme_color_tuple[1]

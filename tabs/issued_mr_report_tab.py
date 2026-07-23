@@ -17,9 +17,10 @@ from .base_tab import BaseAutomationTab
 logger = get_logger()
 from .autocomplete_widget import AutocompleteEntry
 import config
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class IssuedMrReportTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         import pandas as pd
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -57,8 +58,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         
         self._create_widgets()
         self.load_inputs()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -214,8 +214,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.run_dup_mr_button.configure(state=state)
         self.btn_abps_check.configure(state=state)
         self.abps_export_button.configure(state=state)
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -277,8 +276,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Headless browser shuru karne mein BADI GADBAD: {e}", "error")
             messagebox.showerror("Browser Error", f"Naya Headless Chrome browser shuru nahi ho saka.\n\nError: {e}\n\nKya Chrome installed hai?")
             return None
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

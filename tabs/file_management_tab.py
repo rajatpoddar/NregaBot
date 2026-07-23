@@ -12,9 +12,10 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder, MultipartEncod
 import webbrowser
 
 import config
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class FileManagementTab(ctk.CTkFrame):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, fg_color="transparent")
         self.app = app_instance
         self.current_folder_id = None
@@ -28,8 +29,7 @@ class FileManagementTab(ctk.CTkFrame):
 
         self._create_widgets()
         self.refresh_files()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         header_frame = ctk.CTkFrame(self)
         header_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         header_frame.grid_columnconfigure(0, weight=1)

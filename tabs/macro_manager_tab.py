@@ -7,16 +7,16 @@ import time
 from datetime import datetime
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class MacroManagerTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="macro")
         self.queue_items = [] 
         # Stores specific inputs for bulk demand
         self.bulk_inputs = {} 
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
 
@@ -251,7 +251,7 @@ class MacroManagerTab(BaseAutomationTab):
         
         self.app.start_automation_thread(self.automation_key, self.app.workflows.process_global_queue, args=(self,))
 
-    def set_ui_state(self, running):
+    def set_ui_state(self, running: bool) -> None:
         if not self._is_alive():
             return
         state = "disabled" if running else "normal"

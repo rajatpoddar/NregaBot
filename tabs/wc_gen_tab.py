@@ -12,11 +12,12 @@ from .date_entry_widget import DateEntry
 from .autocomplete_widget import AutocompleteEntry
 from .demand_tab import CloudFilePicker 
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
 class WcGenTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -36,8 +37,7 @@ class WcGenTab(BaseAutomationTab):
 
         self._create_widgets()
         self._load_profiles_from_file()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -876,8 +876,7 @@ class WcGenTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "Row submitted, but URL did not change to the success page.", "warning")
         
         return None
-        
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -1002,8 +1001,7 @@ class WcGenTab(BaseAutomationTab):
             if self.ui_fields['master_category'].cget("values"):
                  for child in self.step2_frame.winfo_children():
                     if isinstance(child, (ctk.CTkEntry, ctk.CTkComboBox, DateEntry)): child.configure(state="normal")
-                        
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

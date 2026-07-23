@@ -4,17 +4,18 @@ import sys
 import json
 import logging
 from pathlib import Path
+from typing import Any, Optional
 from appdirs import user_data_dir
 
 # --- C8: Centralized Logging Setup ---
 
-_LOGGER_SETUP_DONE = False
+_LOGGER_SETUP_DONE: bool = False
 
-def get_log_path():
+def get_log_path() -> str:
     """Returns the path to the application log file."""
     return os.path.join(get_data_path(), "nregabot.log")
 
-def setup_logging(level=logging.INFO):
+def setup_logging(level: int = logging.INFO) -> logging.Logger:
     """
     C8: Configure centralized logging for the application.
     
@@ -57,12 +58,12 @@ def setup_logging(level=logging.INFO):
     _LOGGER_SETUP_DONE = True
     return logger
 
-def get_logger():
+def get_logger() -> logging.Logger:
     """Get the application's root logger. Call setup_logging() first."""
     return logging.getLogger("nregabot")
 
 
-def resource_path(relative_path):
+def resource_path(relative_path: str) -> str:
     """ 
     Get absolute path to resource.
     Priority:
@@ -71,7 +72,7 @@ def resource_path(relative_path):
     """
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
+        base_path: str = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
     
@@ -79,7 +80,7 @@ def resource_path(relative_path):
     normalized = os.path.normpath(relative_path)
     return os.path.join(base_path, normalized)
 
-def get_data_path(filename=""):
+def get_data_path(filename: str = "") -> str:
     """Get the path to the application's data directory."""
     app_name = "NREGABot"
     app_author = "PoddarSolutions"
@@ -89,15 +90,36 @@ def get_data_path(filename=""):
     # Return the full path to the file or just the directory if no filename is given
     return os.path.join(data_dir, filename)
 
-def get_user_downloads_path():
+def get_user_downloads_path() -> str:
     """Returns the default downloads path for the user."""
     return str(Path.home() / "Downloads")
 
 # --- UPDATED CONFIG FUNCTIONS ---
 
-CONFIG_FILE = get_data_path('config.json')
+CONFIG_FILE: str = get_data_path('config.json')
 
-def validate_config():
+def parse_version(version_str: str) -> tuple:
+    """
+    A7: Parse a semver-like version string into a comparable tuple of integers.
+    Replaces 'packaging.version.parse' to remove the external dependency.
+    
+    Examples:
+        '3.0.6' -> (3, 0, 6)
+        '3.0'   -> (3, 0)
+        ''       -> (0,)
+    
+    Usage:
+        if parse_version(latest) > parse_version(config.APP_VERSION):
+            # newer version available
+    """
+    try:
+        parts = version_str.strip().split('.')
+        return tuple(int(p) if p.isdigit() else 0 for p in parts)
+    except (ValueError, AttributeError):
+        return (0,)
+
+
+def validate_config() -> bool:
     """
     Validates the config.json file. If corrupted or unreadable, 
     backs up the old file and creates a fresh default.
@@ -130,7 +152,7 @@ def validate_config():
             logger.warning("Failed to remove corrupted config file: %s", e)
         return False
 
-def get_config(key=None, default=None):
+def get_config(key: Optional[str] = None, default: Any = None) -> Any:
     """
     Loads the configuration from config.json.
     If a key is provided, it returns the value for that key, otherwise the entire config.
@@ -146,7 +168,7 @@ def get_config(key=None, default=None):
     except (json.JSONDecodeError, IOError):
         return {} if key is None else default
 
-def save_config(key, value):
+def save_config(key: str, value: Any) -> None:
     """
     Saves a specific key-value pair to the config.json file.
     """

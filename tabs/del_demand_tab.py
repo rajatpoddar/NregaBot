@@ -7,6 +7,7 @@ from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class DelDemandTab(BaseAutomationTab):
     """
@@ -18,15 +19,14 @@ class DelDemandTab(BaseAutomationTab):
     - Smart checkbox toggle to bypass NREGA state persistence bugs.
     - Captures and logs Jobcard & Applicant Name for each deleted row.
     """
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="del_demand")
         
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1) 
         
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # --- Section 1: Input Controls ---
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -111,8 +111,7 @@ class DelDemandTab(BaseAutomationTab):
         state = "disabled" if running else "normal"
         self.panchayat_entry.configure(state=state)
         self.village_entry.configure(state=state)
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

@@ -7,11 +7,12 @@ import os, time, csv, re, sys, subprocess
 from datetime import datetime
 from .base_tab import BaseAutomationTab
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
 class SarkarAapkeDwarTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -32,8 +33,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.grid_rowconfigure(2, weight=1)
         self._create_widgets()
         self.load_inputs()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -313,8 +313,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                 messagebox.showinfo("Success", "Template saved with Remark columns!")
             except Exception as e:
                 messagebox.showerror("Error", f"Could not save file: {e}")
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -684,8 +683,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             elem.clear(); elem.send_keys(value)
         except Exception as e:
             logger.debug("SAD: _safe_send_keys failed for %s: %s", element_name, e)
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

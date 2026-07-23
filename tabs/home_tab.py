@@ -11,6 +11,7 @@ from PIL import Image
 from utils import resource_path
 import config
 from ui_components import AfterTracker
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 class HomeTab(ctk.CTkFrame):
@@ -27,7 +28,7 @@ class HomeTab(ctk.CTkFrame):
         "About & Help":          config.COLORS["cat_about"],
     }
 
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, fg_color="transparent")
         self.app = app_instance
         self.pack(expand=True, fill="both")

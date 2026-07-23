@@ -13,9 +13,10 @@ from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class PhysicalCompleteTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -37,8 +38,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         
         self._create_widgets()
         self._load_saved_inputs()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -199,8 +199,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             pass
         except Exception as e:
             print(f"Error loading inputs: {e}")
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -433,8 +432,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             self.app.after(500, scheme_tab.start_automation)
         else:
             messagebox.showinfo("Forwarded Successfully", f"{len(work_codes)} successful work codes 'Scheme Closing' tab mein bhej diye gaye hain.")
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

@@ -1,27 +1,29 @@
 # config.py
 # This file contains centralized configuration settings for the NREGA Bot.
+from typing import Any, Dict, List, Tuple, Union
 
 # --- Application & Brand Info ---
-APP_NAME = "NREGA Bot"
-APP_SHORT_NAME = "NREGA Bot"
-APP_TAGLINE = "Your NREGA Task Management Companion"
-APP_DESCRIPTION = "A comprehensive tool for managing NREGA tasks efficiently."
-APP_AUTHOR = "Rajat Poddar"
-APP_AUTHOR_EMAIL = "Rajatpoddar@outlook.com"
-APP_VERSION = "3.0.6"
-LICENSE_SERVER_URL = "https://license.nregabot.com"
-MAIN_WEBSITE_URL = "https://nregabot.com"
-SUPPORT_EMAIL = "nregabot@gmail.com"
+APP_NAME: str = "NREGA Bot"
+APP_SHORT_NAME: str = "NREGA Bot"
+APP_TAGLINE: str = "Your NREGA Task Management Companion"
+APP_DESCRIPTION: str = "A comprehensive tool for managing NREGA tasks efficiently."
+APP_AUTHOR: str = "Rajat Poddar"
+APP_AUTHOR_EMAIL: str = "Rajatpoddar@outlook.com"
+APP_VERSION: str = "3.0.6"
+LICENSE_SERVER_URL: str = "https://license.nregabot.com"
+MAIN_WEBSITE_URL: str = "https://nregabot.com"
+SUPPORT_EMAIL: str = "nregabot@gmail.com"
 
 # --- Platform & UI Configuration ---
 import platform
-OS_SYSTEM = platform.system()
+OS_SYSTEM: str = platform.system()
 
 # ============================================================================
 # CENTRALIZED COLOR PALETTE
 # All UI colors should be defined here and referenced via config.COLORS.
 # ============================================================================
-COLORS = {
+ColorValue = Union[str, Tuple[str, str]]
+COLORS: Dict[str, ColorValue] = {
     # === SURFACE / BACKGROUND ===
     "bg_dark": "#2B2B2B",           # Dark mode main bg (footer, splash, header)
     "bg_darker": "#1D1E1E",         # Dark mode container bg (header, cards)
@@ -337,7 +339,7 @@ COLORS = {
 }
 
 # --- Centralized Style and Icon Configuration fix---
-ICONS = {
+ICONS: Dict[str, object] = {
     # MR & Wage Management
     "Demand": "📝", "Work Allocation": "📋", "Muster Roll Gen": "📄",
     "Mate/Mistri MR": "👥", "MR Fill": "✍️", "MR Payment": "💳",
@@ -367,9 +369,9 @@ ICONS = {
 
 # --- Automation Configurations --- 
 # Shared value for Panchayat prefix
-AGENCY_PREFIX = "Gram Panchayat -"
+AGENCY_PREFIX: str = "Gram Panchayat -"
 
-MUSTER_ROLL_CONFIG = {
+MUSTER_ROLL_CONFIG: Dict[str, object] = {
     "base_url": "https://vbgramgde2.dord.gov.in/vbgramg/preprintmsr.aspx",
     "output_folder_name": "NREGABot_MR_Output",
     "pdf_options": {
@@ -388,21 +390,21 @@ MUSTER_ROLL_CONFIG = {
 
 # Mate/Mistri (Skilled/Semi-Skilled) MR generation uses the same base URL
 # but selects the Skilled worker category checkbox and fills workers_per_mr.
-MATE_MR_CONFIG = {
+MATE_MR_CONFIG: Dict[str, str] = {
     "base_url": "https://vbgramgde2.dord.gov.in/vbgramg/preprintmsr.aspx",
     "output_folder_name": "NREGABot_MateMR_Output",
 }
 
-MSR_CONFIG = {
+MSR_CONFIG: Dict[str, object] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/msrpayment.aspx",
     "work_code_index": 1, "muster_roll_index": 1, "min_delay": 2, "max_delay": 6
 }
 
-WAGELIST_GEN_CONFIG = {
+WAGELIST_GEN_CONFIG: Dict[str, str] = {
     "base_url": 'https://vbgramgde2.dord.gov.in/vbgramg/SendMSRtoPO.aspx',
 }
 
-WAGELIST_SEND_CONFIG = {
+WAGELIST_SEND_CONFIG: Dict[str, object] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/sendforpay.aspx",
     "defaults": {
         "start_row": "3",
@@ -410,7 +412,7 @@ WAGELIST_SEND_CONFIG = {
     }
 }
 
-MB_ENTRY_CONFIG = {
+MB_ENTRY_CONFIG: Dict[str, object] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/mbbook.aspx",
     "defaults": {
         "measurement_book_no": "", "page_no": "", "unit_cost": "282",
@@ -419,7 +421,7 @@ MB_ENTRY_CONFIG = {
 }
 
 
-IF_EDIT_CONFIG = {
+IF_EDIT_CONFIG: Dict[str, object] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/IFEdit.aspx",
     "page1": {
         "estimated_pd": "0.090", "beneficiaries_count": "1",
@@ -439,7 +441,7 @@ IF_EDIT_CONFIG = {
     "page3": {} # Page 3 now controlled by CSV
 }
 
-WC_GEN_CONFIG = {
+WC_GEN_CONFIG: Dict[str, object] = {
     "url": "https://mnregaweb2.dord.gov.in/netnrega/work_entry.aspx",
     "defaults": {
         "master_category": "B", "work_category": "Construction of house", "beneficiary_type": "Individual",
@@ -450,7 +452,7 @@ WC_GEN_CONFIG = {
     }
 }
 
-FTO_GEN_CONFIG = {
+FTO_GEN_CONFIG: Dict[str, str] = {
     "login_url": "https://mnregaweb3.nic.in/Netnrega/FTO/Login.aspx?&level=HomeACGP&state_code=34",
     "aadhaar_fto_url": "https://mnregaweb3.nic.in/netnrega/FTO/ftoverify_aadhar.aspx",
     "top_up_fto_url": "https://mnregaweb3.nic.in/netnrega/FTO/ftoverify_aadhar.aspx?wg_topup=S",
@@ -460,12 +462,12 @@ FTO_GEN_CONFIG = {
     "delete_url_2": "https://mnregaweb3.nic.in/netnrega/FTO/Fto_ds_po.aspx"
 }
 
-JOBCARD_VERIFY_CONFIG = {
+JOBCARD_VERIFY_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/VerificationJCatPO.aspx",
     "default_photo": "jobcard.jpeg"
 }
 # --- Add Activity Configuration ---
-ADD_ACTIVITY_CONFIG = {
+ADD_ACTIVITY_CONFIG: Dict[str, object] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/IAY_Act_Mat.aspx",
     "defaults": {
         "activity_code": "ACT105",
@@ -474,22 +476,22 @@ ADD_ACTIVITY_CONFIG = {
     }
 }
 # --- ABPS Verification Configuration ---
-ABPS_VERIFY_CONFIG = {
+ABPS_VERIFY_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/UID/VUID_NPCI.aspx"
 }
 
-DEL_WORK_ALLOC_CONFIG = {
+DEL_WORK_ALLOC_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/delWrkAlloc.aspx"
 }
 
 # --- Update Estimate Configuration ---
-UPDATE_ESTIMATE_CONFIG = {
+UPDATE_ESTIMATE_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/Update_proposedstatus.aspx"
 }
 
 # --- ADD THIS NEW DICTIONARY ---
 # Config for state-specific demand URLs and logic
-STATE_DEMAND_CONFIG = {
+STATE_DEMAND_CONFIG: Dict[str, Dict[str, str]] = {
     "Jharkhand": {
         "base_url": "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx",
         # Logic to parse village code from 'JH-01-001-001-001/123' -> '001'
@@ -505,74 +507,74 @@ STATE_DEMAND_CONFIG = {
 
 
 # --- Duplicate MR Print Configuration ---
-DUPLICATE_MR_CONFIG = {
+DUPLICATE_MR_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/reprintmsr.aspx"
 }
 
 # --- NEW: eMB Verify Configuration ---
-EMB_VERIFY_CONFIG = {
+EMB_VERIFY_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/mbookverify.aspx"
 }
-REJECTED_WL_CONFIG = {
+REJECTED_WL_CONFIG: Dict[str, str] = {
     "RESEND_REJECTED_WG": "https://vbgramgde2.dord.gov.in/vbgramg/view_wagelist_rejected.aspx"
 }
 
 # --- MR Tracking Configuration  ---
-MR_TRACKING_CONFIG = {
+MR_TRACKING_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgrep.dord.gov.in/VBGRAMG/dynamic_muster_track.aspx?lflag=eng&state_code=34&fin_year=2026-2027&state_name=JHARKHAND&Digest=J5TMmiE35cAOwcsR6vvJIA"
 }
 
 # --- NMMS Daily Attendance Configuration ---
-NMMS_ATTENDANCE_CONFIG = {
+NMMS_ATTENDANCE_CONFIG: Dict[str, str] = {
     "base_url": "https://vbgramgrep.dord.gov.in/vbgramg/NMMS_DailyAttendance.aspx"
 }
 
 # --- MIS Reports Configuration ---
-MIS_REPORTS_CONFIG = {
+MIS_REPORTS_CONFIG: Dict[str, str] = {
     "base_url": "https://nreganarep.nic.in/netnrega/MISreport4.aspx"
 }
 
 # --- NEW: MR Fill (Attendance) Configuration ---
-MR_FILL_CONFIG = {
+MR_FILL_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/mustrollattend.aspx"
 }
 
 # --- NEW: Zero MR Configuration ---
-ZERO_MR_CONFIG = {
+ZERO_MR_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/musteraszero.aspx"
 }
 
 # ---NEW: Work Allocation Configuration ---
-WORK_ALLOCATION_CONFIG = {
+WORK_ALLOCATION_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/workalloc.aspx"
 }
 
-DEL_DEMAND_CONFIG = {
+DEL_DEMAND_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/deletedemand.aspx"
 }
 
-MATERIAL_ENTRY_CONFIG = {
+MATERIAL_ENTRY_CONFIG: Dict[str, str] = {
     # Replace with the exact base url used for material entry from your PO login
     "url": "https://nregade4.dord.gov.in/Netnrega/billdetail.aspx" 
 }
 
 # --- Delete Applicant Configuration ---
-DELETE_APPLICANT_CONFIG = {
+DELETE_APPLICANT_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/DelApp.aspx"
 }
 
 # --- Delete Registration Configuration ---
-DEL_REG_CONFIG = {
+DEL_REG_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/DelReg.aspx"
 }
 
 # --- eKYC Report Configuration ---
-EKYC_REPORT_CONFIG = {
+EKYC_REPORT_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/UID/AppABPSRpt.aspx"
 }
 
 # --- Physical Complete Configuration ---
-PHYSICAL_COMPLETE_CONFIG = {
+PHYSICAL_COMPLETE_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/phycomp_work.aspx"
 }
 
@@ -580,7 +582,7 @@ import os
 import json
 from utils import get_data_path
 
-def create_default_config_if_not_exists():
+def create_default_config_if_not_exists() -> None:
     """
     Creates a default config.json in the app data directory if it doesn't exist.
     """
@@ -588,7 +590,7 @@ def create_default_config_if_not_exists():
 
     if not os.path.exists(config_file_path):
         # Define the default settings that should be in the config.json
-        DEFAULT_USER_CONFIG = {
+        DEFAULT_USER_CONFIG: Dict[str, object] = {
             "theme": "System",
             "last_used_browser": "chrome",
             "onboarding_complete": False

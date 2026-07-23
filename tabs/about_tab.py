@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 # --- MODIFIED IMPORT ---
 # Assuming utils.py has resource_path, get_data_path, get_config, save_config
 from utils import resource_path, get_data_path, get_config, save_config, get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
@@ -24,7 +25,7 @@ logger = get_logger()
 # DEVICE_NAMES_FILE = 'device_names.json'
 
 class AboutTab(ctk.CTkFrame):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, fg_color="transparent")
         self.app = app_instance
         self.license_info = {}

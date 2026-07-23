@@ -10,6 +10,7 @@ import sys, subprocess
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
@@ -18,7 +19,7 @@ class CloudFilePicker(ctk.CTkToplevel):
     """
     A Toplevel window to select a file from the user's cloud storage.
     """
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.support.ui import Select, WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
@@ -211,7 +212,7 @@ class DemandTab(BaseAutomationTab):
     """
     The main class for the "Demand" automation tab.
     """
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         """
         Initializes the Demand automation tab.
         """
@@ -229,8 +230,7 @@ class DemandTab(BaseAutomationTab):
 
         self._create_widgets()
         self.load_inputs()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -1258,8 +1258,7 @@ class DemandTab(BaseAutomationTab):
         else:
             print(f"Error: File path not found: {file_path}")
             self.app.log_message(self.log_display, f"Macro Error: File not found {file_path}", "error")
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -1350,8 +1349,7 @@ class DemandTab(BaseAutomationTab):
             target=self._process_demand,
             args=args_tuple
         )
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

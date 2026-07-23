@@ -8,6 +8,7 @@ from datetime import datetime
 
 import config
 from .base_tab import BaseAutomationTab
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Excel export imports
 try:
@@ -18,7 +19,7 @@ except ImportError:
     HAS_OPENPYXL = False
 
 class DeleteApplicantTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         import openpyxl as xl
         from selenium.webdriver.common.by import By
@@ -59,8 +60,7 @@ class DeleteApplicantTab(BaseAutomationTab):
     # ──────────────────────────────────────────────────
     #  UI
     # ──────────────────────────────────────────────────
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -406,8 +406,7 @@ class DeleteApplicantTab(BaseAutomationTab):
     # ──────────────────────────────────────────────────
     #  Automation
     # ──────────────────────────────────────────────────
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -1126,8 +1125,7 @@ class DeleteApplicantTab(BaseAutomationTab):
     # ──────────────────────────────────────────────────
     #  Reset
     # ──────────────────────────────────────────────────
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

@@ -36,11 +36,12 @@ import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
 class MbEntryTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         """Initializes the eMB Entry tab."""
         super().__init__(parent, app_instance, automation_key="mb_entry")
         
@@ -68,8 +69,7 @@ class MbEntryTab(BaseAutomationTab):
         # Create and load UI elements
         self._create_widgets(); self._load_inputs()
         self._toggle_mb_no_entry() 
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -299,8 +299,7 @@ class MbEntryTab(BaseAutomationTab):
             self._toggle_mb_no_entry()
         else:
             self.mb_no_entry.configure(state="disabled")
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -323,7 +322,7 @@ class MbEntryTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     # --- NEW: Override Retry Logic for MB Entry ---
-    def retry_logic_handler(self):
+    def retry_logic_handler(self) -> None:
         """
         Custom retry logic for MB Entry Tab because columns are different.
         Tree Columns: 
@@ -365,8 +364,7 @@ class MbEntryTab(BaseAutomationTab):
 
         # 3. Auto Start
         self.start_automation()
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         cfg = {key: var.get().strip() for key, var in self.config_vars.items()}
         if not self.auto_mb_no_var.get() and not cfg.get("measurement_book_no"):
             messagebox.showwarning("Input Error", "MB No. field is required when 'Auto' is unchecked.")

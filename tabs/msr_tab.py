@@ -8,9 +8,10 @@ from fpdf import FPDF
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class MsrTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.support.ui import Select, WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
@@ -22,8 +23,7 @@ class MsrTab(BaseAutomationTab):
         super().__init__(parent, app_instance, automation_key="msr")
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -156,10 +156,9 @@ class MsrTab(BaseAutomationTab):
         if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     # ... (start_automation, reset_ui, run_automation_logic, etc., are unchanged)
-    def start_automation(self):
+    def start_automation(self) -> None:
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic)
-        
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -251,8 +250,7 @@ class MsrTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
             
     # Inside tabs/msr_tab.py
-
-    def retry_logic_handler(self):
+    def retry_logic_handler(self) -> None:
         """
         Overriding base method to connect the Retry button to 
         the specific text box used in this tab (work_key_text).

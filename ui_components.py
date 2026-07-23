@@ -8,6 +8,7 @@ import platform
 import subprocess
 import threading
 import queue
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 from PIL import Image
 import config
 from utils import resource_path, get_logger
@@ -28,31 +29,31 @@ class AfterTracker:
         # Auto-cancels when widget is destroyed via <Destroy> binding
         # You can also manually call: self._tracker.cancel_all()
     """
-    def __init__(self, widget):
+    def __init__(self, widget: Any) -> None:
         self.widget = widget
-        self._ids = set()
+        self._ids: Set[str] = set()
         # Auto-cancel on widget destroy
         widget.bind("<Destroy>", self._on_destroy_evt, add="+")
 
-    def __call__(self, ms, callback, *args):
+    def __call__(self, ms: int, callback: Callable, *args: Any) -> str:
         """Allows the tracker instance to be called directly.
         e.g. self.tracker(1000, callback) instead of self.tracker.after(1000, callback).
         This enables HomeTab's pattern: self.safe_after = AfterTracker(self)."""
         return self.after(ms, callback, *args)
 
-    def after(self, ms, callback, *args):
+    def after(self, ms: int, callback: Callable, *args: Any) -> str:
         """Register a tracked after() callback.
         Auto-cancels when widget is destroyed. Use this instead of widget.after()."""
         after_id = self.widget.after(ms, lambda: self._wrap(callback, args))
         self._ids.add(after_id)
         return after_id
 
-    def after_id(self, after_id):
+    def after_id(self, after_id: str) -> str:
         """Track an externally-created after() ID."""
         self._ids.add(after_id)
         return after_id
 
-    def _wrap(self, callback, args):
+    def _wrap(self, callback: Callable, args: Tuple) -> None:
         """Wrap the callback so it's safe even after widget destruction."""
         try:
             if self.widget.winfo_exists():
@@ -60,14 +61,14 @@ class AfterTracker:
         except Exception as e:
             logger.debug("AfterTracker._wrap: callback failed (widget may be destroyed): %s", e)
 
-    def _on_destroy_evt(self, event):
+    def _on_destroy_evt(self, event: Any) -> None:
         """Cancel all tracked callbacks when this specific widget is destroyed.
         The event.widget check prevents us from responding to child widget destroys."""
         if event.widget is not self.widget:
             return
         self.cancel_all()
 
-    def cancel_all(self):
+    def cancel_all(self) -> None:
         """Cancel all pending tracked callbacks immediately."""
         for after_id in list(self._ids):
             try:
@@ -76,12 +77,12 @@ class AfterTracker:
                 logger.debug("Failed to cancel after_id %s: %s", after_id, e)
         self._ids.clear()
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.cancel_all()
 
 # --- 1. COLLAPSIBLE FRAME (Sidebar Categories) ---
 class CollapsibleFrame(ctk.CTkFrame):
-    def __init__(self, parent, title=""):
+    def __init__(self, parent: Any, title: str = "") -> None:
         # OPTIMIZATION: corner_radius=0 for faster rendering
         super().__init__(parent, fg_color="transparent", corner_radius=0)
         self.grid_columnconfigure(0, weight=1)
@@ -106,13 +107,13 @@ class CollapsibleFrame(ctk.CTkFrame):
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         self.content_frame.grid(row=1, column=0, sticky="ew", padx=(0, 0))
 
-    def add_widget(self, widget, **pack_options):
+    def add_widget(self, widget: Any, **pack_options: Any) -> Any:
         widget.pack(in_=self.content_frame, **pack_options)
         return widget
 
 # --- 2. ONBOARDING STEP (Guide UI) ---
 class OnboardingStep(ctk.CTkFrame):
-    def __init__(self, parent, title, description, icon):
+    def __init__(self, parent: Any, title: str, description: str, icon: Any) -> None:
         super().__init__(parent, fg_color="transparent")
         self.pack(expand=True, fill="both", padx=20, pady=(10, 0))
 
@@ -129,14 +130,14 @@ class OnboardingStep(ctk.CTkFrame):
 # --- 3. SKELETON LOADER (Loading Effect) ---
 
 class FormSkeleton(tk.Frame):
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent: Any, **kwargs: Any) -> None:
         super().__init__(parent, **kwargs)
         # Background color aapke app theme ke hisab se set karein
         self.canvas = tk.Canvas(self, bg="white", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
         self.bind("<Configure>", self.redraw)
 
-    def redraw(self, event=None):
+    def redraw(self, event: Any = None) -> None:
         self.canvas.delete("all")
         w = self.canvas.winfo_width()
         h = self.canvas.winfo_height()
@@ -170,7 +171,7 @@ class SkeletonLoader(ctk.CTkFrame):
     Replaces 55+ CTkFrame placeholders with a single tk.Canvas
     for much faster rendering and less GPU canvas redraw overhead.
     """
-    def __init__(self, parent, rows=8, **kwargs):
+    def __init__(self, parent: Any, rows: int = 8, **kwargs: Any) -> None:
         super().__init__(parent, fg_color="transparent", **kwargs)
         self.pack(fill="both", expand=True, padx=20, pady=20)
 
@@ -178,7 +179,7 @@ class SkeletonLoader(ctk.CTkFrame):
         self.canvas = tk.Canvas(self, highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True)
 
-        self._items = []  # Canvas item IDs
+        self._items: List[int] = []  # Canvas item IDs
         self._rows = rows
         self._animating = True
         self._animate_step = 0
@@ -190,7 +191,7 @@ class SkeletonLoader(ctk.CTkFrame):
         self._tracker = AfterTracker(self)
         self._tracker.after(1000, self._animate)
 
-    def _get_colors(self):
+    def _get_colors(self) -> Tuple[str, Any, str, str]:
         """Return (bg_light, bg_dark, item_light, item_dark) based on current theme."""
         mode = ctk.get_appearance_mode()
         if mode == "Dark":
@@ -198,13 +199,13 @@ class SkeletonLoader(ctk.CTkFrame):
         else:
             return ("#f0f0f0", None, config.COLORS["skel_light"], config.COLORS["skel_light_alt"])
 
-    def _on_resize(self, event=None):
+    def _on_resize(self, event: Any = None) -> None:
         """Redraw skeleton shapes when widget resizes."""
         if not self.winfo_exists():
             return
         self._draw_skeleton()
 
-    def _draw_skeleton(self):
+    def _draw_skeleton(self) -> None:
         """Draw all skeleton placeholders on the canvas.
         Visual layout matches the original CTkFrame-based design:
           - Title bar (top-left)
@@ -271,7 +272,7 @@ class SkeletonLoader(ctk.CTkFrame):
             self._items.append(_id)
             ry += row_gap
 
-    def _animate(self):
+    def _animate(self) -> None:
         """Pulse animation: alternates between two shades for all skeleton items."""
         if not self._animating or not self.winfo_exists():
             return
@@ -303,7 +304,7 @@ class SkeletonLoader(ctk.CTkFrame):
 
 # --- 4. MARQUEE LABEL (Running Text) ---
 class MarqueeLabel(ctk.CTkFrame):
-    def __init__(self, parent, text, speed=2, **kwargs):
+    def __init__(self, parent: Any, text: str, speed: int = 2, **kwargs: Any) -> None:
         super().__init__(parent, fg_color="transparent", **kwargs)
         self.speed = speed
         self.raw_text = text
@@ -332,15 +333,15 @@ class MarqueeLabel(ctk.CTkFrame):
         self.update_text(text) 
         self._tracker.after(50, self._animate)
 
-    def _on_destroy(self, event):
+    def _on_destroy(self, event: Any) -> None:
         self.is_running = False
         self._tracker.cancel_all()
 
-    def _on_resize(self, event):
+    def _on_resize(self, event: Any) -> None:
         self.canvas_width = event.width
         self.update_colors()
 
-    def update_colors(self):
+    def update_colors(self) -> None:
         try:
             if not self.winfo_exists(): return
             mode = ctk.get_appearance_mode()
@@ -353,7 +354,7 @@ class MarqueeLabel(ctk.CTkFrame):
         except Exception as e:
             logger.debug("MarqueeLabel.update_colors failed: %s", e)
 
-    def _parse_html(self, text):
+    def _parse_html(self, text: str) -> List[Dict[str, Any]]:
         pattern = re.compile(r'(<a\s+href="([^"]+)">(.+?)</a>|<b>(.+?)</b>|<i>(.+?)</i>)')
         parts = []
         last_pos = 0
@@ -372,7 +373,7 @@ class MarqueeLabel(ctk.CTkFrame):
             parts.append({'text': text[last_pos:], 'type': 'normal'})
         return parts if parts else [{'text': text, 'type': 'normal'}]
 
-    def update_text(self, new_text):
+    def update_text(self, new_text: str) -> None:
         if not self.winfo_exists(): return
         self.raw_text = new_text
         self.canvas.delete("all")
@@ -479,7 +480,7 @@ class MarqueeLabel(ctk.CTkFrame):
 
 # --- 5. TOAST NOTIFICATION (Popup) ---
 class ToastNotification(ctk.CTkToplevel):
-    def __init__(self, parent, message, kind="success", duration=3000):
+    def __init__(self, parent: Any, message: str, kind: str = "success", duration: int = 3000) -> None:
         super().__init__(parent)
         self.parent = parent
         
@@ -516,7 +517,7 @@ class ToastNotification(ctk.CTkToplevel):
         self.msg_label.bind("<Button-1>", lambda e: self._animate_out())
         self.icon_label.bind("<Button-1>", lambda e: self._animate_out())
 
-    def _position_window(self):
+    def _position_window(self) -> None:
         try:
             parent_x = self.parent.winfo_rootx()
             parent_y = self.parent.winfo_rooty()
@@ -533,13 +534,13 @@ class ToastNotification(ctk.CTkToplevel):
         except Exception as e:
             logger.debug("ToastNotification._position_window failed: %s", e)
 
-    def _animate_in(self, step=0):
+    def _animate_in(self, step: int = 0) -> None:
         if step <= 10:
             alpha = step / 10
             self.attributes("-alpha", alpha)
             self.after(30, lambda: self._animate_in(step+1))
             
-    def _animate_out(self, step=10):
+    def _animate_out(self, step: int = 10) -> None:
         if step >= 0:
             alpha = step / 10
             self.attributes("-alpha", alpha)
@@ -549,7 +550,7 @@ class ToastNotification(ctk.CTkToplevel):
 
 # --- 6. ONBOARDING GUIDE ---
 class OnboardingGuide(ctk.CTkToplevel):
-    def __init__(self, parent):
+    def __init__(self, parent: Any) -> None:
         super().__init__(parent)
         self.parent = parent
         self.current_step = 0
@@ -595,7 +596,7 @@ class OnboardingGuide(ctk.CTkToplevel):
         self.show_step(0)
         self.focus_force()
 
-    def show_step(self, step_index):
+    def show_step(self, step_index: int) -> None:
         for i, frame in enumerate(self.step_frames):
             if i == step_index:
                 frame.pack(expand=True, fill="both")
@@ -611,14 +612,14 @@ class OnboardingGuide(ctk.CTkToplevel):
         else:
             self.next_button.configure(text="Next")
 
-    def show_next_step(self):
+    def show_next_step(self) -> None:
         self.current_step += 1
         if self.current_step < len(self.steps_data):
             self.show_step(self.current_step)
 
 # --- 7. COMING SOON TAB ---
 class ComingSoonTab(ctk.CTkFrame):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, fg_color="transparent")
         self.pack(expand=True, fill="both")
         
@@ -645,7 +646,7 @@ class PerformanceMonitor(ctk.CTkFrame):
     Updates every 5 seconds via a single persistent worker thread
     (queue-based) instead of spawning a new thread each cycle.
     """
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, fg_color="transparent", corner_radius=0)
         self.app = app_instance
         self._running = True
@@ -715,7 +716,7 @@ class PerformanceMonitor(ctk.CTkFrame):
         # the 5-second mark, which is fine for a sidebar footer widget.
         self._tracker.after(5000, self._schedule_update)
 
-    def _worker_loop(self):
+    def _worker_loop(self) -> None:
         """Persistent worker thread. Waits for update requests via queue.
         This replaces the old pattern of spawning a new thread every 5 seconds."""
         while self._running:
@@ -737,7 +738,7 @@ class PerformanceMonitor(ctk.CTkFrame):
                 self.after(0, lambda r=ram, c=cpu, t=thread_count: 
                            self._apply_update(r, c, t))
 
-    def _get_process_info(self):
+    def _get_process_info(self) -> Tuple[Optional[float], Optional[float]]:
         """Get RAM (RSS in MB) and CPU %.
         Uses subprocess calls — MUST be called from a background thread
         because wmic/powershell/ps can block for 50-300ms on slow systems.
@@ -823,7 +824,7 @@ class PerformanceMonitor(ctk.CTkFrame):
 
         return ram_mb, cpu_pct
 
-    def _schedule_update(self):
+    def _schedule_update(self) -> None:
         """Called every 5 seconds from main thread via after().
         Sends an update request to the persistent worker thread via queue.
         If worker is still busy with previous update, the cycle is skipped."""
@@ -858,7 +859,7 @@ class PerformanceMonitor(ctk.CTkFrame):
         except Exception:
             self._running = False
 
-    def _apply_update(self, ram, cpu, threads):
+    def _apply_update(self, ram: Optional[float], cpu: Optional[float], threads: int) -> None:
         """Safely updates label widgets on the main thread."""
         if not self._running:
             return

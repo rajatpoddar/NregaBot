@@ -12,6 +12,7 @@ from datetime import datetime
 
 from .base_tab import BaseAutomationTab
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
@@ -45,7 +46,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         "S No.", "Panchayat", "No. of Works", "No. of Muster Rolls", "Persondays Generated",
     ]
 
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side  # type: ignore
         from openpyxl.utils import get_column_letter  # type: ignore
@@ -66,7 +67,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
     # -----------------------------------------------------------------------
     # UI
     # -----------------------------------------------------------------------
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -265,8 +266,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         self.set_common_ui_state(running)
         s = "disabled" if running else "normal"
         self._scrape_btn.configure(state=s)
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -404,7 +404,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
     # -----------------------------------------------------------------------
     # PHASE 3 — START AUTOMATION
     # -----------------------------------------------------------------------
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

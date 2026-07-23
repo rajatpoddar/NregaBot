@@ -11,9 +11,10 @@ from .base_tab import BaseAutomationTab
 
 logger = get_logger()
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class SAReportTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.support.ui import Select, WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
@@ -22,8 +23,7 @@ class SAReportTab(BaseAutomationTab):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -91,8 +91,7 @@ class SAReportTab(BaseAutomationTab):
         if not self._is_alive():
             return
         self.set_common_ui_state(running); state = "disabled" if running else "normal"; self.panchayat_entry.configure(state=state); self.year_entry.configure(state=state); self.status_entry.configure(state=state)
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         """Resets inputs to default."""
         super().reset_ui() # Call base to clear logs/status
         
@@ -110,8 +109,7 @@ class SAReportTab(BaseAutomationTab):
         # Clear Treeview
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

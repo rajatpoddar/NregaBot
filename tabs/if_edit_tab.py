@@ -7,9 +7,10 @@ from datetime import datetime
 from collections import defaultdict
 import config
 from .base_tab import BaseAutomationTab
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class IfEditTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -34,8 +35,7 @@ class IfEditTab(BaseAutomationTab):
 
         self._create_widgets()
         self._load_profiles_from_file()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -434,8 +434,7 @@ class IfEditTab(BaseAutomationTab):
         if not running:
             for key in ['estimated_pd', 'beneficiaries_count', 'automation_mode']: self.ui_fields[key].configure(state="normal")
             self._toggle_page_settings()
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         if messagebox.askokcancel("Reset Form?", "Are you sure?"):
             self.file_label.configure(text="No data source selected")
             self.csv_path = None
@@ -473,8 +472,7 @@ class IfEditTab(BaseAutomationTab):
             except Exception as e:
                 messagebox.showerror("CSV Error", f"Required columns not in CSV header: {', '.join(required_cols)}\n\nError: {e}")
                 self.csv_path = None; self.column_map = {}; self.file_label.configure(text="No data source selected")
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         if not self.csv_path and not self.data_from_wc_gen:
             messagebox.showwarning("Input Missing", "Please select a CSV file or generate data from the WC Gen tab."); return
         self._save_profile(profile_name="Last Used Config", is_autosave=True)

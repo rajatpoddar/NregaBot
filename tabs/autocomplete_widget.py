@@ -1,6 +1,7 @@
 # tabs/autocomplete_widget.py
 import customtkinter as ctk
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 

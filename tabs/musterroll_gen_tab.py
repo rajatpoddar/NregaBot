@@ -17,9 +17,10 @@ from selenium.common.exceptions import (
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class MusterrollGenTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="muster")
         self.config_file = self.app.get_data_path("muster_roll_inputs.json")
         
@@ -38,8 +39,7 @@ class MusterrollGenTab(BaseAutomationTab):
         self.grid_rowconfigure(2, weight=1)
         self._create_widgets()
         self.load_inputs()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # This frame holds all the user input fields
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -242,8 +242,7 @@ class MusterrollGenTab(BaseAutomationTab):
             if self.staff_entry.get().strip() != saved_staff:
                 self.staff_entry.delete(0, tkinter.END)
                 self.staff_entry.insert(0, saved_staff)
-        
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -279,8 +278,7 @@ class MusterrollGenTab(BaseAutomationTab):
         inputs['auto_mode'] = not bool(inputs['work_codes'])
         self.save_inputs(inputs)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
-
-    def retry_logic_handler(self):
+    def retry_logic_handler(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -316,8 +314,7 @@ class MusterrollGenTab(BaseAutomationTab):
         self.skipped_count = 0
         self.update_status("Retrying failed items...", 0.0)
         self.start_automation()
-        
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

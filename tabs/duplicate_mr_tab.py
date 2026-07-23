@@ -13,12 +13,13 @@ from pypdf import PdfWriter # <-- IMPORT ADD KIYA GAYA
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class DuplicateMrTab(BaseAutomationTab):
     """
     A tab for automating the process of re-printing Muster Rolls (MRs) for multiple work codes.
     """
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.common.action_chains import ActionChains
@@ -51,8 +52,7 @@ class DuplicateMrTab(BaseAutomationTab):
         self._load_history()
         self.current_panchayat = ""
         self.output_dir = "" # <-- ADDED
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -167,8 +167,7 @@ class DuplicateMrTab(BaseAutomationTab):
     def _log_result(self, work_code, msr_no, status):
         timestamp = time.strftime("%H:%M:%S")
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, work_code, msr_no, status)))
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         panchayat = self.panchayat_entry.get().strip()
         work_codes_raw = self.work_codes_textbox.get("1.0", "end").strip()
         action = self.output_action_var.get()
@@ -360,10 +359,13 @@ class DuplicateMrTab(BaseAutomationTab):
                 driver.switch_to.default_content()
         
         except TimeoutException:
+            self.app.log_message(self.log_display, f"Timeout: Page element not found for work code {work_code}", "error")
             self._log_result(work_code, "N/A", "Timeout")
         except NoSuchElementException:
+            self.app.log_message(self.log_display, f"Element not found for work code {work_code}", "error")
             self._log_result(work_code, "N/A", "Element not found")
         except Exception as e:
+            self.app.log_message(self.log_display, f"Error processing {work_code}: {str(e).splitlines()[0]}", "error")
             self._log_result(work_code, "N/A", "Unexpected Error")
 
     def _get_msr_list(self, driver, wait, work_code, panchayat, url):
@@ -377,32 +379,39 @@ class DuplicateMrTab(BaseAutomationTab):
         from selenium import webdriver
         """Helper to get list of MSRs (Background Safe)."""
         self.app.log_message(self.log_display, f"Getting MSR list for Work Code: {work_code}")
-        driver.get(url)
-        
-        panchayat_dd_element = wait.until(EC.presence_of_element_located((By.ID, "ddlPanchayat")))
-        Select(panchayat_dd_element).select_by_visible_text(panchayat)
-        
-        wc_input = wait.until(EC.presence_of_element_located((By.ID, "txtWork")))
-        driver.execute_script("arguments[0].value = arguments[1];", wc_input, work_code)
-        
-        search_btn = driver.find_element(By.ID, "imgButtonSearch")
-        driver.execute_script("arguments[0].click();", search_btn)
-        time.sleep(2.0)  # Short wait after click
-        
-        wait.until(lambda d: len(Select(d.find_element(By.ID, "ddlworkcode")).options) > 1)
-        Select(driver.find_element(By.ID, "ddlworkcode")).select_by_index(1)
-        
-        wait.until(lambda d: len(Select(d.find_element(By.ID, "ddlmsrno")).options) > 1)
-        msr_dd_element = driver.find_element(By.ID, "ddlmsrno")
-        msr_options = [opt.get_attribute('value') for opt in Select(msr_dd_element).options if '--' not in opt.text]
-        
-        if not msr_options:
-            self.app.log_message(self.log_display, "No MSR numbers found.", "warning")
-            self._log_result(work_code, "N/A", "No MSRs found")
+        try:
+            driver.get(url)
+            
+            panchayat_dd_element = wait.until(EC.presence_of_element_located((By.ID, "ddlPanchayat")))
+            Select(panchayat_dd_element).select_by_visible_text(panchayat)
+            
+            wc_input = wait.until(EC.presence_of_element_located((By.ID, "txtWork")))
+            driver.execute_script("arguments[0].value = arguments[1];", wc_input, work_code)
+            
+            search_btn = driver.find_element(By.ID, "imgButtonSearch")
+            driver.execute_script("arguments[0].click();", search_btn)
+            time.sleep(2.0)  # Short wait after click
+            
+            wait.until(lambda d: len(Select(d.find_element(By.ID, "ddlworkcode")).options) > 1)
+            Select(driver.find_element(By.ID, "ddlworkcode")).select_by_index(1)
+            
+            wait.until(lambda d: len(Select(d.find_element(By.ID, "ddlmsrno")).options) > 1)
+            msr_dd_element = driver.find_element(By.ID, "ddlmsrno")
+            msr_options = [opt.get_attribute('value') for opt in Select(msr_dd_element).options if '--' not in opt.text]
+            
+            if not msr_options:
+                self.app.log_message(self.log_display, "No MSR numbers found.", "warning")
+                self._log_result(work_code, "N/A", "No MSRs found")
+                return []
+            
+            self.app.log_message(self.log_display, f"Found {len(msr_options)} MSRs: {', '.join(msr_options)}")
+            return msr_options
+        except TimeoutException:
+            self.app.log_message(self.log_display, f"Timeout getting MSR list for {work_code}: page elements not loading", "error")
             return []
-        
-        self.app.log_message(self.log_display, f"Found {len(msr_options)} MSRs: {', '.join(msr_options)}")
-        return msr_options
+        except Exception as e:
+            self.app.log_message(self.log_display, f"Error getting MSR list for {work_code}: {str(e).splitlines()[0]}", "error")
+            return []
 
     # --- FUNCTION SIGNATURE UPDATED ---
     def _save_mr_as_pdf(self, driver, work_code, msr_no, orientation, scale, output_dir):
@@ -550,8 +559,7 @@ class DuplicateMrTab(BaseAutomationTab):
         self.scale_slider.configure(state=state)
         self.merge_pdfs_button.configure(state=state) # <-- ADDED
         self.export_csv_button.configure(state=state) # <-- ADDED
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

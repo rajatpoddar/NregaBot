@@ -19,6 +19,7 @@ import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
@@ -32,7 +33,7 @@ class DelWorkAllocTab(BaseAutomationTab):
     - Skips gracefully if applicant row is missing.
     - Manual List vs Auto Mode.
     """
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="del_work_alloc")
         
         # Configure Grid Layout
@@ -40,8 +41,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         self.grid_rowconfigure(2, weight=1) 
         
         self._create_widgets()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -175,8 +175,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         self.from_date_entry.configure(state=state)
         self.cal_btn.configure(state=state)
         self.jobcards_text.configure(state=state)
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -210,8 +209,7 @@ class DelWorkAllocTab(BaseAutomationTab):
             self.run_automation_logic, 
             args=(panchayat, jobcard_list, target_dates)
         )
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

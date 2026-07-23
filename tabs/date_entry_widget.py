@@ -2,6 +2,7 @@ import tkinter
 import customtkinter as ctk
 from tkcalendar import Calendar
 from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class DateEntry(ctk.CTkFrame):
     """A custom widget that combines a CTkEntry with a calendar popup button."""

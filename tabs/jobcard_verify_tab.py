@@ -8,6 +8,7 @@ import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 from utils import get_logger
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
@@ -17,7 +18,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 class JobcardVerifyTab(BaseAutomationTab):
-    def __init__(self, parent, app_instance):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
         # Lazy imports
         from selenium.webdriver.support.ui import Select, WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
@@ -32,8 +33,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
         self._load_saved_preferences()
-
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -146,8 +146,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.photo_folder_path = path
             self.photo_path_label.configure(text=self.photo_folder_path)
             self.app.log_message(self.log_display, f"Selected photo folder: {self.photo_folder_path}")
-
-    def reset_ui(self):
+    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -165,8 +164,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.app.clear_log(self.log_display)
             self.update_status("Ready")
             self.app.after(0, self.app.set_status, "Ready")
-
-    def start_automation(self):
+    def start_automation(self) -> None:
         panchayat = self.panchayat_entry.get().strip()
         village = self.village_entry.get().strip()
         process_all = self.process_all_villages_var.get()
