@@ -10,6 +10,7 @@ import subprocess
 import socket
 import json
 import os
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from tkinter import messagebox
@@ -122,7 +123,6 @@ class AutomationMixin:
     def _get_current_financial_year():
         """Returns current Indian financial year as 'YYYY-YYYY' (e.g. '2026-2027').
         Indian FY runs from April to March."""
-        from datetime import datetime
         now = datetime.now()
         year = now.year
         if now.month < 4:

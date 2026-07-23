@@ -1180,8 +1180,6 @@ class DemandTab(BaseAutomationTab):
         Naya function: Ye specifically Macro ke liye hai taaki bina button dabaye
         CSV file load aur parse ho jaye.
         """
-        import csv
-        
         if not file_path:
             return
 

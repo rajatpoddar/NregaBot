@@ -164,7 +164,6 @@ class BrowserManager:
             from selenium import webdriver
             from selenium.webdriver.firefox.options import Options
             from selenium.webdriver.firefox.service import Service
-            import os
             from utils import resource_path
 
             if not os.path.exists(binary_path):

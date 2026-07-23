@@ -551,7 +551,6 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
         self.services.download_and_install_update(url, version)
 
     def _apply_smart_update(self, zip_path):
-        import shutil
         import zipfile
 
         if sys.platform == "darwin":

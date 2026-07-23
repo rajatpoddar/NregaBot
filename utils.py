@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import logging
+import shutil
 from pathlib import Path
 from typing import Any, Optional
 from appdirs import user_data_dir
@@ -140,7 +141,6 @@ def validate_config() -> bool:
         try:
             # Backup corrupted file
             backup_path = CONFIG_FILE + ".corrupted"
-            import shutil
             shutil.copy2(CONFIG_FILE, backup_path)
             logger.info("Backed up corrupted config to %s", backup_path)
         except Exception:
