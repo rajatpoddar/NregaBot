@@ -9,6 +9,8 @@ import threading
 import subprocess
 import traceback
 from appdirs import user_data_dir
+# Add import config for COLORS
+import config
 
 # --- Try importing CustomTkinter for Modern UI ---
 try:
@@ -70,12 +72,12 @@ class ModernSplashScreen(ctk.CTk):
         ctk.set_appearance_mode("System")
 
         # ---------- BACKGROUND (adapts to light/dark system theme) ----------
-        self.configure(fg_color=("#F3F4F6", "#212325"))
+        self.configure(fg_color=(config.COLORS["bg_light_alt"], config.COLORS["bg_loader"]))
 
         # Outer frame with subtle border
         self._outer = ctk.CTkFrame(
-            self, fg_color=("#FFFFFF", "#2B2B2B"), corner_radius=20,
-            border_width=2, border_color=("#D1D5DB", "#565B5E")
+            self, fg_color=((config.COLORS["bg_light"], config.COLORS["bg_dark"])), corner_radius=20,
+            border_width=2, border_color=((config.COLORS["text_border"], config.COLORS["text_border_dark"]))
         )
         self._outer.pack(fill="both", expand=True, padx=4, pady=4)
 
@@ -108,7 +110,7 @@ class ModernSplashScreen(ctk.CTk):
             container,
             text="NREGA Bot",
             font=ctk.CTkFont(family="Helvetica Neue", size=28, weight="bold"),
-            text_color=("#111827", "#DCE4EE")
+            text_color=(config.COLORS["text_dark"], config.COLORS["text_bright"])
         ).pack(pady=(3, 2))
 
         # ---------- 3. TAGLINE ----------
@@ -116,7 +118,7 @@ class ModernSplashScreen(ctk.CTk):
             container,
             text="VB-G-RAM-G Portal Support",
             font=ctk.CTkFont(family="Helvetica Neue", size=13),
-            text_color=("#2563EB", "#1F6AA5")
+            text_color=(config.COLORS["blue_hover"], config.COLORS["blue_loader_tag"])
         ).pack(pady=(0, 22))
 
         # ---------- 4. ANIMATED DOTS ----------
@@ -124,7 +126,7 @@ class ModernSplashScreen(ctk.CTk):
             container,
             text="Loading",
             font=ctk.CTkFont(family="Helvetica Neue", size=13),
-            text_color=("#6B7280", "#9D9D9D")
+            text_color=(config.COLORS["text_medium"], config.COLORS["text_muted_light"])
         )
         self.dots_label.pack(pady=(0, 4))
 
@@ -133,7 +135,7 @@ class ModernSplashScreen(ctk.CTk):
             container,
             text="",
             font=ctk.CTkFont(family="Helvetica Neue", size=11),
-            text_color=("#9CA3AF", "#767676")
+            text_color=(config.COLORS["text_light"], config.COLORS["text_muted_dark"])
         )
         self.status_label.pack(pady=(2, 0))
 
@@ -142,7 +144,7 @@ class ModernSplashScreen(ctk.CTk):
             container,
             text="v3.0.6 \u00b7 NregaBot.com",
             font=ctk.CTkFont(family="Helvetica Neue", size=10),
-            text_color=("#D1D5DB", "#565B5E")
+            text_color=(config.COLORS["text_border"], config.COLORS["text_border_dark"])
         ).pack(side="bottom", pady=(0, 5))
 
         # ---------- START ANIMATIONS ----------

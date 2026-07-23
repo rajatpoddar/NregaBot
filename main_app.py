@@ -33,6 +33,15 @@ from packaging.version import parse as parse_version
 import config
 if config.OS_SYSTEM == "Windows":
     import ctypes
+    try:
+        # Enable per-monitor DPI awareness (v2) for smooth rendering on hi-DPI displays
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try:
+            # Fallback: system DPI awareness
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
 
 # --- Local Modules / UI Components ---
 from ui_components import (
@@ -94,6 +103,10 @@ class NregaBotApp(ctk.CTk):
         self.initial_width = 1100
         self.initial_height = 800
         self.minsize(1000, 700)
+        
+        # Root-window background — matches the theme so no default tk bg
+        # flashes during maximize/restore transitions.
+        self.configure(bg=config.COLORS["bg_dark"])
 
         # --- Feature Flags & Restrictions ---
         self.global_disabled_features = []
@@ -145,6 +158,17 @@ class NregaBotApp(ctk.CTk):
         self.is_animating = False
         self.splash = None
         self.expiry_alert_message = None
+        
+        # --- Resize Smoothing ---
+        self._resize_timer = None
+        self._is_resizing = False
+        self._resize_overlay = None  # Opaque overlay to hide flicker during resize
+        
+        # --- Theme Switch Smoothing ---
+        self._is_theme_transitioning = False  # Prevents rapid re-triggering
+        
+        # --- Cached Style Registry ---
+        self._cached_style = None  # ttk.Style singleton: created once, reused
 
         # --- GC Tuning: Reduce memory fragmentation for long-running GUI app ---
         gc.set_threshold(700, 10, 5)
@@ -177,11 +201,11 @@ class NregaBotApp(ctk.CTk):
         x, y = (sw // 2) - (w // 2), (sh // 2) - (h // 2)
         splash.geometry(f'{w}x{h}+{int(x)}+{int(y)}')
         # Base window color blends seamlessly with outer frame (no border needed)
-        splash.configure(fg_color=("#FFFFFF", "#2B2B2B"))
+        splash.configure(fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
 
         # Outer frame - seamless card, no awkward border
         outer = ctk.CTkFrame(
-            splash, fg_color=("#FFFFFF", "#2B2B2B"), corner_radius=16,
+            splash, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]), corner_radius=16,
             border_width=0
         )
         outer.pack(fill="both", expand=True, padx=0, pady=0)
@@ -199,14 +223,14 @@ class NregaBotApp(ctk.CTk):
         ctk.CTkLabel(
             inner, text=f"{config.APP_NAME}",
             font=ctk.CTkFont(family="Helvetica Neue", size=24, weight="bold"),
-            text_color=("#111827", "#F3F4F6")
+            text_color=(config.COLORS["text_dark"], config.COLORS["text_white"])
         ).pack()
 
         # Portal tag - bright blue for both themes with enough contrast
         ctk.CTkLabel(
             inner, text="VB-G-RAM-G Portal Support",
             font=ctk.CTkFont(family="Helvetica Neue", size=12, weight="bold"),
-            text_color=("#2563EB", "#60A5FA")
+            text_color=(config.COLORS["blue_hover"], config.COLORS["blue_light"])
         ).pack(pady=(2, 18))
 
         # Animated dots - medium gray, crisp & readable
@@ -214,7 +238,7 @@ class NregaBotApp(ctk.CTk):
         splash.dots_label = ctk.CTkLabel(
             inner, text="Initializing",
             font=ctk.CTkFont(family="Helvetica Neue", size=12),
-            text_color=("#6B7280", "#9CA3AF")
+            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
         )
         splash.dots_label.pack(pady=(0, 0))
 
@@ -234,7 +258,7 @@ class NregaBotApp(ctk.CTk):
         ctk.CTkLabel(
             inner, text=f"v{config.APP_VERSION}",
             font=ctk.CTkFont(family="Helvetica Neue", size=13, weight="bold"),
-            text_color=("#6B7280", "#9CA3AF")
+            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
         ).pack(side="bottom", pady=(0, 5))
 
         splash.lift()
@@ -258,6 +282,9 @@ class NregaBotApp(ctk.CTk):
         """
         self.bind("<Button-1>", self._on_global_click, add="+")
         self.bind("<FocusIn>", self._on_window_focus)
+        
+        # Detect window state changes (maximize/restore) to smooth transitions
+        self.bind("<Configure>", self._on_window_resize_detect, add="+")
 
         self.style_treeview()
         
@@ -335,29 +362,37 @@ class NregaBotApp(ctk.CTk):
             self.splash = None
             self.after(0, self._fade_in_main_window)
 
+    def _get_style(self):
+        """Return a cached ttk.Style singleton.
+        Creating a new ttk.Style() on every style_treeview() call is expensive
+        because it re-reads all theme defaults. We cache it after first use."""
+        if self._cached_style is None:
+            self._cached_style = ttk.Style()
+            self._cached_style.theme_use("clam")
+        return self._cached_style
+
     def style_treeview(self, treeview_widget=None):
-        style = ttk.Style()
-        style.theme_use("clam")
+        style = self._get_style()
 
         # 1. Theme Detection
         mode = ctk.get_appearance_mode()
 
         if mode == "Dark":
-            bg_color = "#2b2b2b"
-            text_color = "#e5e7eb"
-            row_hover = "#3f3f46"
-            selected_bg = "#3B82F6"
-            header_bg = "#1f2937"
-            header_fg = "#ffffff"
-            header_hover = "#374151"
+            bg_color = config.COLORS["tv_bg_dark"]
+            text_color = config.COLORS["tv_fg_dark"]
+            row_hover = config.COLORS["tv_hover_dark"]
+            selected_bg = config.COLORS["tv_sel"]
+            header_bg = config.COLORS["tv_header_bg_dark"]
+            header_fg = config.COLORS["tv_header_fg_dark"]
+            header_hover = config.COLORS["tv_header_hover_dark"]
         else:
-            bg_color = "#ffffff"
-            text_color = "#374151"
-            row_hover = "#f3f4f6"
-            selected_bg = "#3B82F6"
-            header_bg = "#f9fafb"
-            header_fg = "#111827"
-            header_hover = "#e5e7eb"
+            bg_color = config.COLORS["tv_bg_light"]
+            text_color = config.COLORS["text_dark_alt"]
+            row_hover = config.COLORS["tv_hover_light"]
+            selected_bg = config.COLORS["tv_sel"]
+            header_bg = config.COLORS["tv_header_bg_light"]
+            header_fg = config.COLORS["tv_header_fg_light"]
+            header_hover = config.COLORS["tv_header_hover_light"]
 
         style.configure("Treeview",
                         background=bg_color,
@@ -489,6 +524,88 @@ class NregaBotApp(ctk.CTk):
     def validate_on_server(self, key, is_startup_check=False):
         return self.services.validate_on_server(key, is_startup_check)
 
+    def _on_window_resize_detect(self, event):
+        """
+        Detects window resize and shows a flat overlay to hide flickering
+        from expensive canvas redraws (corner_radius, CTkScrollableFrame, etc.).
+        """
+        if event.widget is not self:
+            return
+        
+        # Only act when size meaningfully changes
+        old_w = getattr(self, '_last_resize_w', None)
+        old_h = getattr(self, '_last_resize_h', None)
+        cur_w, cur_h = event.width, event.height
+        
+        if old_w is not None and old_h is not None:
+            dw, dh = abs(cur_w - old_w), abs(cur_h - old_h)
+            if dw < 10 and dh < 10:
+                return
+        
+        self._last_resize_w, self._last_resize_h = cur_w, cur_h
+        
+        if not self._is_resizing:
+            self._is_resizing = True
+            # Pause animations
+            if hasattr(self, 'performance_monitor'):
+                try: self.performance_monitor.pause()
+                except: pass
+            if hasattr(self, 'announcement_label'):
+                try: self.announcement_label.pause()
+                except: pass
+            # Show flat overlay to mask flickering canvas redraws
+            self._show_resize_overlay()
+        
+        if self._resize_timer:
+            try: self.after_cancel(self._resize_timer)
+            except: pass
+        self._resize_timer = self.after(150, self._on_window_resize_end)
+
+    def _show_resize_overlay(self):
+        """Place a solid-color tk.Frame over the ENTIRE window to hide ALL
+        flickering during maximize/restore — including header, sidebar, and
+        content area. Uses a plain tk.Frame (lightest-weight widget) and
+        place() to cover every pixel. Removed automatically after resize ends."""
+        try:
+            if not self.winfo_exists():
+                return
+            mode = ctk.get_appearance_mode()
+            bg = config.COLORS["bg_light"] if mode == "Light" else (config.COLORS["bg_medium"] if mode == "Dark" else config.COLORS["bg_light_alt"])
+            
+            # Use plain tk.Frame — lighter than CTkFrame, no canvas overhead
+            self._resize_overlay = tkinter.Frame(
+                self,
+                bg=bg,
+                highlightthickness=0
+            )
+            # place() covers everything regardless of grid/pack layout
+            self._resize_overlay.place(x=0, y=0, relwidth=1, relheight=1)
+            self._resize_overlay.tkraise()
+        except Exception:
+            pass
+
+    def _hide_resize_overlay(self):
+        """Remove the resize overlay after resize completes."""
+        if self._resize_overlay:
+            try:
+                if self._resize_overlay.winfo_exists():
+                    self._resize_overlay.destroy()
+            except Exception:
+                pass
+            self._resize_overlay = None
+
+    def _on_window_resize_end(self):
+        """Called ~150ms after resize stops. Removes overlay and resumes animations."""
+        self._is_resizing = False
+        self._resize_timer = None
+        self._hide_resize_overlay()
+        if hasattr(self, 'performance_monitor'):
+            try: self.performance_monitor.resume()
+            except: pass
+        if hasattr(self, 'announcement_label'):
+            try: self.announcement_label.resume()
+            except: pass
+
     def _setup_licensed_ui(self):
         """Unlocks the UI for valid license holders."""
         self._unlock_app()
@@ -571,14 +688,14 @@ class NregaBotApp(ctk.CTk):
 
         def show_slots_full_ui(data):
             for widget in main.winfo_children(): widget.pack_forget()
-            ctk.CTkLabel(main, text="All Device Slots Full", font=ctk.CTkFont(size=18, weight="bold"), text_color="#E53E3E").pack(pady=(0, 5))
+            ctk.CTkLabel(main, text="All Device Slots Full", font=ctk.CTkFont(size=18, weight="bold"), text_color=config.COLORS["red_expired"]).pack(pady=(0, 5))
             ctk.CTkLabel(main, text="Deactivate an old device to use this one.", font=ctk.CTkFont(size=12)).pack(pady=(0, 10))
             device_frame = ctk.CTkFrame(main, fg_color="transparent")
             device_frame.pack(fill="x", pady=5)
             temp_key = data.get('license_key')
             devices = data.get('devices', [])
             for dev in devices:
-                row = ctk.CTkFrame(device_frame, fg_color=("gray90", "gray30"))
+                row = ctk.CTkFrame(device_frame, fg_color=(config.COLORS["gray90"], config.COLORS["gray30"]))
                 row.pack(fill="x", pady=3, padx=5)
                 info_frame = ctk.CTkFrame(row, fg_color="transparent")
                 info_frame.pack(side="left", padx=10, pady=5)
@@ -586,7 +703,7 @@ class NregaBotApp(ctk.CTk):
                 if dev['name'] != dev['id']:
                     ctk.CTkLabel(info_frame, text=dev['id'], font=ctk.CTkFont(size=10), text_color="gray60").pack(anchor="w")
                 if dev.get('is_pending'):
-                    status_lbl = ctk.CTkLabel(row, text="Pending Approval ⏳", text_color=("orange", "#FFA500"), font=ctk.CTkFont(size=12, weight="bold"))
+                    status_lbl = ctk.CTkLabel(row, text="Pending Approval ⏳", text_color=config.COLORS["device_pending_text"], font=ctk.CTkFont(size=12, weight="bold"))
                     status_lbl.pack(side="right", padx=15)
                 else:
                     def request_remove(mid=dev['id'], btn_ref=None):
@@ -610,17 +727,17 @@ class NregaBotApp(ctk.CTk):
                                 self.after(0, lambda: messagebox.showerror("Error", str(e), parent=win))
                                 if btn_ref: self.after(0, lambda: btn_ref.configure(state="normal", text="Request Removal"))
                         threading.Thread(target=_req_thread, daemon=True).start()
-                    btn = ctk.CTkButton(row, text="Request Removal", width=110, height=28, fg_color="#C53030", hover_color="#9B2C2C")
+                    btn = ctk.CTkButton(row, text="Request Removal", width=110, height=28, fg_color=config.COLORS["btn_stop"], hover_color=config.COLORS["btn_stop_hover"])
                     btn.configure(command=lambda m=dev['id'], b=btn: request_remove(m, b))
                     btn.pack(side="right", padx=10)
             footer_frame = ctk.CTkFrame(main, fg_color="transparent")
             footer_frame.pack(fill="x", pady=(20, 0))
             ctk.CTkLabel(footer_frame, text="Please contact:", font=ctk.CTkFont(size=12, weight="bold")).pack()
-            email_label = ctk.CTkLabel(footer_frame, text="nregabot@gmail.com", text_color=("#3B82F6", "#60A5FA"), cursor="hand2")
+            email_label = ctk.CTkLabel(footer_frame, text="nregabot@gmail.com", text_color=(config.COLORS["blue"], config.COLORS["blue_light"]), cursor="hand2")
             email_label.pack()
             email_label.bind("<Button-1>", lambda e: webbrowser.open("mailto:nregabot@gmail.com"))
             ctk.CTkLabel(footer_frame, text="- OR -", text_color="gray60", font=ctk.CTkFont(size=10)).pack(pady=5)
-            wa_link = ctk.CTkLabel(footer_frame, text="Join WhatsApp Community", text_color="#25D366", font=ctk.CTkFont(weight="bold"), cursor="hand2")
+            wa_link = ctk.CTkLabel(footer_frame, text="Join WhatsApp Community", text_color=config.COLORS["whatsapp_green"], font=ctk.CTkFont(weight="bold"), cursor="hand2")
             wa_link.pack()
             wa_link.bind("<Button-1>", lambda e: webbrowser.open("https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn"))
             try:
@@ -892,14 +1009,17 @@ class NregaBotApp(ctk.CTk):
     # ============================================================================
 
     def _create_header(self):
-        header = ctk.CTkFrame(self, corner_radius=15, fg_color=("white", "#1D1E1E")) 
+        # Note: corner_radius=0 on structural frames avoids expensive canvas redraws
+        # during maximize/restore on Windows. grid_propagate(False) was removed
+        # because it breaks the announcement-bar flex layout.
+        header = ctk.CTkFrame(self, corner_radius=0, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_darker"])) 
         header.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 10))
         header.grid_columnconfigure(1, weight=1)
 
         def add_status_hover(btn, message):
             def on_enter(e):
                 if hasattr(self, 'status_label') and self.status_label and self.status_label.winfo_exists():
-                    self.status_label.configure(text=message, text_color=("#3B82F6", "#60A5FA"))
+                    self.status_label.configure(text=message, text_color=(config.COLORS["blue"], config.COLORS["blue_light"]))
             def on_leave(e):
                 if hasattr(self, 'status_label') and self.status_label and self.status_label.winfo_exists():
                     self.status_label.configure(text="Ready", text_color="gray60")
@@ -941,7 +1061,7 @@ class NregaBotApp(ctk.CTk):
         self.extractor_btn = ctk.CTkButton(
             controls_frame, text="", image=self.icon_images.get("extractor_icon"), 
             width=35, height=35, corner_radius=8,
-            fg_color=("gray95", "gray25"), hover_color=("gray85", "gray35"),
+            fg_color=(config.COLORS["gray95"], config.COLORS["gray25"]), hover_color=(config.COLORS["gray85"], config.COLORS["gray35"]),
             command=lambda: self.show_frame("Workcode Extractor")
         )
         self.extractor_btn.pack(side="left", padx=(0, 10))
@@ -950,15 +1070,15 @@ class NregaBotApp(ctk.CTk):
         self.quick_login_btn = ctk.CTkButton(
             controls_frame, text="", image=self.icon_images.get("emoji_login_automation"), 
             width=35, height=35, corner_radius=8,
-            fg_color=("gray95", "gray25"), hover_color=("gray85", "gray35"),
+            fg_color=(config.COLORS["gray95"], config.COLORS["gray25"]), hover_color=(config.COLORS["gray85"], config.COLORS["gray35"]),
             command=self._quick_login_automation
         )
         self.quick_login_btn.pack(side="left", padx=(0, 10))
         add_status_hover(self.quick_login_btn, "Auto Login to NREGA")
 
-        ctk.CTkFrame(controls_frame, width=2, height=20, fg_color=("gray90", "gray30")).pack(side="left", padx=(0, 10))
+        ctk.CTkFrame(controls_frame, width=2, height=20, corner_radius=0, fg_color=(config.COLORS["gray90"], config.COLORS["gray30"])).pack(side="left", padx=(0, 10))
 
-        browser_group = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        browser_group = ctk.CTkFrame(controls_frame, fg_color="transparent", corner_radius=0)
         browser_group.pack(side="left", padx=(0, 10))
         
         self.launch_chrome_btn = ctk.CTkButton(
@@ -988,9 +1108,9 @@ class NregaBotApp(ctk.CTk):
         self.launch_firefox_btn.pack(side="left", padx=2)
         add_status_hover(self.launch_firefox_btn, "Launch Mozilla Firefox")
 
-        ctk.CTkFrame(controls_frame, width=2, height=20, fg_color=("gray90", "gray30")).pack(side="left", padx=(0, 10))
+        ctk.CTkFrame(controls_frame, width=2, height=20, corner_radius=0, fg_color=(config.COLORS["gray90"], config.COLORS["gray30"])).pack(side="left", padx=(0, 10))
 
-        settings_group = ctk.CTkFrame(controls_frame, fg_color=("gray95", "gray25"), corner_radius=20)
+        settings_group = ctk.CTkFrame(controls_frame, fg_color=(config.COLORS["gray95"], config.COLORS["gray25"]), corner_radius=20)
         settings_group.pack(side="left")
 
         self.current_theme_mode = get_config("theme_mode", "System")
@@ -1033,6 +1153,7 @@ class NregaBotApp(ctk.CTk):
 
         self.main_layout_frame = ctk.CTkFrame(self, corner_radius=0)
         self.main_layout_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=(10, 10))
+        self.main_layout_frame.grid_propagate(False)
         self.main_layout_frame.grid_rowconfigure(0, weight=1)
         self.main_layout_frame.grid_columnconfigure(1, weight=1)
         
@@ -1060,7 +1181,7 @@ class NregaBotApp(ctk.CTk):
 
         self._create_nav_buttons(self.sidebar_header, self.nav_scroll_frame)
         
-        self.content_area = ctk.CTkFrame(self.main_layout_frame)
+        self.content_area = ctk.CTkFrame(self.main_layout_frame, corner_radius=0)
         self.content_area.grid(row=0, column=1, sticky="nsew")
         self.content_area.grid_rowconfigure(0, weight=1)
         self.content_area.grid_columnconfigure(0, weight=1)
@@ -1106,7 +1227,7 @@ class NregaBotApp(ctk.CTk):
         self.tab_icon_map["Home"] = _home_icon
 
         # Thin separator
-        ctk.CTkFrame(header_parent, height=1, fg_color=("gray85", "gray35")).pack(fill="x", padx=15, pady=(2, 5))
+        ctk.CTkFrame(header_parent, height=1, corner_radius=0, fg_color=("gray85", "gray35")).pack(fill="x", padx=15, pady=(2, 5))
 
         # --- Category Filter (without Dashboard) — clean, modern look ---
         all_cats = list(self.get_tabs_definition().keys())
@@ -1203,11 +1324,11 @@ class NregaBotApp(ctk.CTk):
         self._filter_nav_menu(self.last_selected_category)
 
     def _create_footer(self):
-        footer = ctk.CTkFrame(self, height=50, corner_radius=25, fg_color=("white", "#2B2B2B"))
+        # Flat footer (no corner_radius) — avoids expensive canvas redraws
+        # that cause flickering during window maximize/restore on Windows.
+        footer = ctk.CTkFrame(self, height=50, corner_radius=0, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
         footer.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 20))
-        
-        footer.grid_columnconfigure(0, weight=1)
-        footer.grid_columnconfigure(6, weight=1)
+        footer.grid_propagate(False)
 
         status_frame = ctk.CTkFrame(footer, fg_color="transparent")
         status_frame.pack(side="left", padx=20, fill="y")
@@ -1219,7 +1340,7 @@ class NregaBotApp(ctk.CTk):
             text_color=("gray50", "gray60")
         ).pack(side="left", padx=(0, 15))
 
-        ctk.CTkFrame(status_frame, width=2, height=14, fg_color=("gray80", "gray40")).pack(side="left", padx=(0, 10))
+        ctk.CTkFrame(status_frame, width=2, height=14, corner_radius=0, fg_color=("gray80", "gray40")).pack(side="left", padx=(0, 10))
         
         self.loading_animation_label = ctk.CTkLabel(status_frame, text="", width=20, font=ctk.CTkFont(size=14))
         self.loading_animation_label.pack(side="left")
@@ -1253,7 +1374,7 @@ class NregaBotApp(ctk.CTk):
         create_icon_btn(dock_frame, "whatsapp", lambda: webbrowser.open("https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn"), "Join Community")
         create_icon_btn(dock_frame, "feedback", lambda: self.show_frame("Feedback"), "Contact Support")
 
-        ctk.CTkFrame(dock_frame, width=2, height=20, fg_color=("gray80", "gray40")).pack(side="left", padx=10)
+        ctk.CTkFrame(dock_frame, width=2, height=20, corner_radius=0, fg_color=("gray80", "gray40")).pack(side="left", padx=10)
 
         self.server_status_indicator = ctk.CTkFrame(dock_frame, width=12, height=12, corner_radius=6, fg_color="gray")
         self.server_status_indicator.pack(side="left", padx=(0, 5))
@@ -1291,7 +1412,7 @@ class NregaBotApp(ctk.CTk):
                 self.after(80, self._refresh_home_most_used)
             return
 
-        loading_frame = ctk.CTkFrame(self.content_area)
+        loading_frame = ctk.CTkFrame(self.content_area, corner_radius=0)
         loading_frame.grid(row=0, column=0, sticky="nsew")
         skeleton = SkeletonLoader(loading_frame, rows=10)
         loading_frame.tkraise()
@@ -1302,7 +1423,7 @@ class NregaBotApp(ctk.CTk):
                 tabs = self.get_tabs_definition()
                 for cat, tab_items in tabs.items():
                     if page_name in tab_items:
-                        frame = ctk.CTkFrame(self.content_area)
+                        frame = ctk.CTkFrame(self.content_area, corner_radius=0)
                         frame.grid(row=0, column=0, sticky="nsew")
                         self.content_frames[page_name] = frame
                         
@@ -1355,28 +1476,41 @@ class NregaBotApp(ctk.CTk):
                 break
 
     def _update_nav_button_color(self, page_name):
-        for name, btn in self.nav_buttons.items():
-            current_text = btn.cget("text")
-            
-            if "⚠️" in current_text or "🔒" in current_text:
-                continue
-
-            btn_image = self.tab_icon_map.get(name)
-
-            if name == page_name:
+        """
+        Update nav button highlights. Only touches the previously-active button
+        and the newly-active button — avoids iterating & reconfiguring ALL
+        buttons on every tab switch.
+        """
+        prev_active = getattr(self, '_last_active_nav', None)
+        
+        # Only update previously-active (if different from new)
+        if prev_active and prev_active != page_name:
+            btn = self.nav_buttons.get(prev_active)
+            if btn:
+                txt = btn.cget("text")
+                if "⚠️" not in txt and "🔒" not in txt:
+                    img = self.tab_icon_map.get(prev_active)
+                    btn.configure(
+                        fg_color="transparent",
+                        text_color=("gray30", "gray80"),
+                        font=ctk.CTkFont(family="Segoe UI", size=13, weight="normal"),
+                        image=img
+                    )
+        
+        # Update newly-active
+        btn = self.nav_buttons.get(page_name)
+        if btn:
+            txt = btn.cget("text")
+            if "⚠️" not in txt and "🔒" not in txt:
+                img = self.tab_icon_map.get(page_name)
                 btn.configure(
-                    fg_color=("#E3F2FD", "#374151"),  
-                    text_color=("#1565C0", "#60A5FA"), 
+                    fg_color=("#E3F2FD", "#374151"),
+                    text_color=("#1565C0", "#60A5FA"),
                     font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-                    image=btn_image
+                    image=img
                 )
-            else:
-                btn.configure(
-                    fg_color="transparent",
-                    text_color=("gray30", "gray80"),
-                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="normal"),
-                    image=btn_image
-                )
+        
+        self._last_active_nav = page_name
 
 
     def _on_category_filter_change(self, selected_category: str):
@@ -2225,6 +2359,9 @@ del "%~f0" & exit
 
         if self.is_validating_license:
             return
+        
+        if self._is_resizing:
+            return
 
         if hasattr(self, '_focus_validation_timer') and self._focus_validation_timer:
             try:
@@ -2282,25 +2419,76 @@ del "%~f0" & exit
         self.show_toast(f"Auto-Minimize {state}", "info")
 
     def _cycle_theme(self):
-        modes = ["System", "Light", "Dark"]
+        """Cycle through System → Light → Dark with a smooth alpha fade transition.
+        
+        Strategy: Make window transparent, change all widgets invisibly, force
+        full repaint, then fade alpha back in step by step. This avoids the
+        "overlay pop" issue of the previous approach.
+        """
+        if self._is_theme_transitioning:
+            return
+        self._is_theme_transitioning = True
+        
         try:
-            current_idx = modes.index(self.current_theme_mode)
-        except ValueError:
-            current_idx = 0
+            modes = ["System", "Light", "Dark"]
+            try:
+                current_idx = modes.index(self.current_theme_mode)
+            except ValueError:
+                current_idx = 0
+                
+            next_idx = (current_idx + 1) % len(modes)
+            self.current_theme_mode = modes[next_idx]
             
-        next_idx = (current_idx + 1) % len(modes)
-        self.current_theme_mode = modes[next_idx]
-        
-        ctk.set_appearance_mode(self.current_theme_mode)
-        save_config("theme_mode", self.current_theme_mode)
-        
-        self._update_theme_icon()
-        self.play_sound("click")
-        
-        if hasattr(self, 'announcement_label'):
-            self.announcement_label.update_colors()
+            # Step 1: Make window invisible (instant — no flicker possible)
+            self.attributes("-alpha", 0.0)
+            self.update_idletasks()
             
-        self.after(100, self.restyle_all_treeviews)
+            # Step 2: Change theme (all CTk canvas redraws happen invisibly)
+            ctk.set_appearance_mode(self.current_theme_mode)
+            save_config("theme_mode", self.current_theme_mode)
+            
+            # Step 3: Force multiple paint cycles to complete all canvas redraws
+            # while the window is still invisible. 3 cycles ensure layout calculation
+            # AND pixel composition finish before we start fading in.
+            for _ in range(3):
+                self.update_idletasks()
+                self.update()
+            
+            # Step 4: Update theme-dependent widgets
+            self._update_theme_icon()
+            self.play_sound("click")
+            
+            if hasattr(self, 'announcement_label'):
+                self.announcement_label.update_colors()
+            
+            # Step 5: Restyle treeviews while still invisible
+            self.restyle_all_treeviews()
+            self.update_idletasks()
+            
+            # Step 6: Smooth fade-in (8 steps × 25ms = 200ms total)
+            self._fade_in_after_theme(step=0)
+        except Exception:
+            # Safety: if anything goes wrong, ensure window is visible
+            self.attributes("-alpha", 1.0)
+            self._is_theme_transitioning = False
+            raise
+
+    def _fade_in_after_theme(self, step=0):
+        """Recursively fades the window alpha from 0.0 → 1.0 in 8 steps."""
+        if step <= 8:
+            try:
+                if self.winfo_exists():
+                    alpha = step / 8
+                    self.attributes("-alpha", alpha)
+                    self.after(25, lambda: self._fade_in_after_theme(step + 1))
+                else:
+                    self._is_theme_transitioning = False
+            except Exception:
+                self.attributes("-alpha", 1.0)
+                self._is_theme_transitioning = False
+        else:
+            self.attributes("-alpha", 1.0)
+            self._is_theme_transitioning = False
 
     def _update_theme_icon(self):
         icon_key = f"theme_{self.current_theme_mode.lower()}" 
@@ -2319,7 +2507,7 @@ del "%~f0" & exit
         if user_name:
             self.header_welcome_prefix_label.configure(text=f"v{config.APP_VERSION} | Welcome, ")
             self.header_welcome_name_label.configure(text=user_name)
-            self.header_welcome_suffix_label.configure(text="!")
+            self.header_welcome_suffix_label.configure(text=" !")
             if key_type != 'trial': self.header_welcome_name_label.configure(text_color=("gold4", "#FFD700"), font=ctk.CTkFont(size=13, weight="bold"))
             else: self.header_welcome_name_label.configure(text_color=ctk.ThemeManager.theme["CTkLabel"]["text_color"], font=ctk.CTkFont(size=13, weight="normal"))
         else:
@@ -2496,10 +2684,23 @@ del "%~f0" & exit
     
     def on_theme_change(self, new_theme: str): ctk.set_appearance_mode(new_theme); self.after(100, self.restyle_all_treeviews)
     def restyle_all_treeviews(self):
+        # Only restyle treeviews that have actually been instantiated.
+        # Lazy-loaded tabs that were never shown don't need style updates.
         for tab in self.tab_instances.values():
             if hasattr(tab, 'style_treeview'):
-                if hasattr(tab, 'results_tree'): tab.style_treeview(tab.results_tree)
-                if hasattr(tab, 'files_tree'): tab.style_treeview(tab.files_tree)
+                # Only restyle if the tab actually exists and has visible treeviews
+                if hasattr(tab, 'results_tree'):
+                    try:
+                        if tab.results_tree.winfo_exists():
+                            tab.style_treeview(tab.results_tree)
+                    except Exception:
+                        pass
+                if hasattr(tab, 'files_tree'):
+                    try:
+                        if tab.files_tree.winfo_exists():
+                            tab.style_treeview(tab.files_tree)
+                    except Exception:
+                        pass
 
     def _get_active_tab_context(self):
         try:

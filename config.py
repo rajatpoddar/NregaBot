@@ -17,6 +17,325 @@ SUPPORT_EMAIL = "nregabot@gmail.com"
 import platform
 OS_SYSTEM = platform.system()
 
+# ============================================================================
+# CENTRALIZED COLOR PALETTE
+# All UI colors should be defined here and referenced via config.COLORS.
+# ============================================================================
+COLORS = {
+    # === SURFACE / BACKGROUND ===
+    "bg_dark": "#2B2B2B",           # Dark mode main bg (footer, splash, header)
+    "bg_darker": "#1D1E1E",         # Dark mode container bg (header, cards)
+    "bg_medium": "#333333",         # Medium dark bg (overlay, options)
+    "bg_light": "#FFFFFF",           # Light mode main bg (splash, cards, header)
+    "bg_light_alt": "#F3F4F6",      # Light alt bg (overlay, splash outer, hover)
+    "bg_loader": "#212325",         # Loader outer bg (dark)
+    "bg_loader_inner": ("#F3F4F6", "#212325"),  # Loader fg_color tuple
+
+    # === TEXT COLORS ===
+    "text_dark": "#111827",          # Near-black (headings, primary text light)
+    "text_dark_alt": "#374151",      # Dark gray (body text light)
+    "text_medium": "#6B7280",        # Medium gray (secondary text)
+    "text_light": "#9CA3AF",         # Light gray (tertiary text)
+    "text_border": "#D1D5DB",        # Gray border
+    "text_border_dark": "#565B5E",  # Dark border
+    "text_hover": "#E5E7EB",         # Light hover bg
+    "text_hover_dark": "#374151",   # Dark hover bg
+    "text_bright": "#DCE4EE",        # Bright text on dark (headings)
+    "text_muted_dark": "#767676",    # Muted dark text
+    "text_muted_light": "#9D9D9D",   # Muted light text
+    "text_white": "#F3F4F6",         # Near-white text on dark
+    "text_skeleton_light": "#E0E0E0", # Skeleton placeholder light
+    "text_skeleton_dark_1": "#2D3748", # Skeleton placeholder dark
+    "text_skeleton_dark_2": "#4A5568", # Skeleton placeholder dark alt
+    "text_skeleton_light_alt": "#EEEEEE", # Skeleton placeholder light alt
+
+    # === BLUE / PRIMARY ACCENT ===
+    "blue": "#3B82F6",               # Primary blue
+    "blue_hover": "#2563EB",         # Blue hover
+    "blue_light": "#60A5FA",         # Blue light accent
+    "blue_dark": "#1565C0",          # Blue dark
+    "blue_border": "#BFDBFE",        # Blue light border
+    "blue_bg": "#DBEAFE",            # Blue very light bg
+    "blue_bg_alt": "#EFF6FF",        # Blue extra light bg
+    "blue_bg_nav": "#E3F2FD",        # Blue nav active bg
+    "blue_hover_nav": "#BBDEFB",     # Blue nav hover
+    "blue_bg_dark": "#1E3A5F",       # Blue dark bg
+    "blue_tab_active": "#1D4ED8",    # Blue active tab
+    "blue_tab_hover": "#1E40AF",     # Blue tab hover
+    "blue_link": "#0EA5E9",          # Link blue/cyan mix
+    "blue_link_hover": "#0284C7",    # Link hover
+
+    # === GREEN / SUCCESS ===
+    "green": "#16A34A",              # Green accent
+    "green_light": "#4ADE80",         # Green light accent
+    "green_button": "#2E8B57",       # Green start button
+    "green_button_hover": "#1F5E39", # Green start button hover
+    "green_status": "#38A169",        # Green status active
+    "green_export": "#107C10",        # Green export button
+    "green_launch": "#108842",        # Green Firefox launch
+    "green_file": "#22C55E",          # Green file status
+    "green_del_app": "#10B981",       # Green delete-app count
+    "green_dark_bg": "#14532D",      # Dark green bg
+    "green_light_bg": "#BBF7D0",      # Light green bg
+    "green_bg": "#F0FDF4",            # Very light green bg
+    "green_success_bg": "#DCFCE7",    # Success bg light
+    "green_success_fg": "#166534",    # Success fg dark
+    "green_bg_btn": "#C8E6C9",        # Green button bg light
+    "green_dark_btn": "#1B5E20",      # Green button bg dark
+    "green_very_light": "#E8F5E9",   # Green very light
+    "green_dashboard": "#4A55A2",      # Dashboard report button
+    "green_dashboard_hover": "#5E69B8", # Dashboard report hover
+    "green_whatsapp": "#25D366",       # WhatsApp green
+
+    # === RED / ERROR ===
+    "red": "#DC2626",                 # Red accent
+    "red_light": "#F87171",           # Red light accent
+    "red_button": "#C53030",          # Red stop button
+    "red_button_hover": "#9B2C2C",   # Red stop button hover
+    "red_delete": "#D32F2F",          # Red delete button
+    "red_delete_hover": "#B71C1C",    # Red delete hover
+    "red_error": "#EF4444",           # Red error status
+    "red_expired": "#E53E3E",         # Red expired/error
+    "red_dark_hover": "#7F1D1D",      # Red dark hover
+    "red_text": "#C62828",            # Red text
+    "red_text_light": "#FFCCCC",      # Red light text
+    "red_bg": "#FEE2E2",              # Red light bg
+    "red_border": "#FECACA",          # Red light border
+    "red_bg_alt": "#FEF2F2",          # Red very light bg
+    "red_dark_bg": "#450A0A",         # Red dark bg
+    "red_very_light": "#FFEBEE",      # Red very light bg
+    "red_dark": "#8B0000",            # Red dark
+    "red_dark_bg_alt": "#5c1e1e",     # Fail bg dark
+    "red_text_dark": "#991B1B",       # Red dark text
+
+    # === ORANGE / WARNING ===
+    "orange": "#D97706",              # Orange accent
+    "orange_light": "#FBBF24",        # Orange light accent
+    "orange_hover": "#B45309",        # Orange hover
+    "orange_dark_hover": "#92400E",   # Orange dark hover
+    "orange_expires": "#DD6B20",      # Orange expires-soon
+    "orange_warning": "#C05621",      # Orange warning
+    "orange_accent": "#F97316",       # Orange accent
+    "orange_accent_light": "#FB923C", # Orange light accent
+    "orange_border": "#FED7AA",       # Orange light border
+    "orange_bg": "#FFF7ED",           # Orange very light bg
+    "orange_dark_bg": "#431407",      # Orange dark bg
+    "orange_pending": "#FFA500",      # Orange pending approval
+    "orange_file": "#f59e0b",         # Yellow-orange file status
+    "orange_report": "#D35400",       # Orange report button
+    "orange_report_hover": "#E67E22", # Orange report hover
+    "oranges": "#EA580C",             # Orange shade
+
+    # === YELLOW / GOLD ===
+    "yellow": "#EAB308",              # Yellow accent
+    "yellow_light": "#FACC15",        # Yellow light accent
+    "yellow_border": "#FDE68A",        # Yellow light border
+    "yellow_bg": "#FEFCE8",           # Yellow very light bg
+    "yellow_dark_bg": "#422006",       # Yellow dark bg
+    "yellow_skip_bg": "#fef9c3",      # Skip bg light
+    "yellow_skip_fg": "#854d0e",      # Skip fg
+    "yellow_skip_bg_dark": "#5c4e1e",  # Skip bg dark
+    "gold": "#FFD700",                # Gold
+    "gold4": "gold4",                 # Gold named color
+    "dark_goldenrod": "#B8860B",      # Dark goldenrod
+
+    # === PURPLE ===
+    "purple": "#7C3AED",              # Purple
+    "purple_light": "#A78BFA",        # Purple light accent
+    "purple_accent": "#8B5CF6",       # Purple accent
+    "purple_border": "#DDD6FE",       # Purple light border
+    "purple_bg": "#F5F3FF",           # Purple very light bg
+    "purple_dark_bg": "#2E1065",      # Purple dark bg
+    "purple_report": "#8E24AA",       # Purple report button
+    "purple_report_hover": "#7B1FA2", # Purple report hover
+
+    # === TEAL / CYAN ===
+    "teal": "#0EA5E9",                # Cyan accent
+    "teal_light": "#38BDF8",          # Cyan light accent
+    "teal_dark": "#0284C7",           # Cyan dark
+    "teal_border": "#BAE6FD",         # Cyan light border
+    "teal_bg": "#F0F9FF",             # Cyan very light bg
+    "teal_dark_bg": "#0C4A6E",        # Cyan dark bg
+    "teal_named": "teal",             # Tkinter named teal
+    "teal_hover": "#00695C",          # Teal hover
+    "teal_green_hover": "#1A994C",    # Green hover (Firefox)
+
+    # === NEUTRAL GRAYS ===
+    "gray10": "gray10",               # Tkinter named gray
+    "gray30": "gray30",
+    "gray50": "gray50",
+    "gray60": "gray60",
+    "gray70": "gray70",
+    "gray75": "gray75",
+    "gray80": "gray80",
+    "gray85": "gray85",
+    "gray90": "gray90",
+    "gray95": "gray95",
+    "gray20": "gray20",
+    "gray25": "gray25",
+    "gray30_tk": "gray30",
+    "gray35": "gray35",
+    "gray40": "gray40",
+
+    # === TREEVIEW ===
+    "tv_bg_dark": "#2b2b2b",
+    "tv_fg_dark": "#e5e7eb",
+    "tv_hover_dark": "#3f3f46",
+    "tv_sel": "#3B82F6",
+    "tv_header_bg_dark": "#1f2937",
+    "tv_header_fg_dark": "#ffffff",
+    "tv_header_hover_dark": "#374151",
+    "tv_bg_light": "#ffffff",
+    "tv_fg_light": "#374151",
+    "tv_hover_light": "#f3f4f6",
+    "tv_header_bg_light": "#f9fafb",
+    "tv_header_fg_light": "#111827",
+    "tv_header_hover_light": "#e5e7eb",
+
+    # === CATEGORY COLORS (Home Tab + Sidebar) ===
+    # Format: (light_bg, dark_bg), (light_border, dark_border), (light_accent, dark_accent)
+    "cat_mr_wage": {
+        "bg": ("#EFF6FF", "#1E3A5F"),
+        "border": ("#BFDBFE", "#3B82F6"),
+        "accent": ("#3B82F6", "#60A5FA"),
+    },
+    "cat_je_ae": {
+        "bg": ("#F0FDF4", "#14532D"),
+        "border": ("#BBF7D0", "#22C55E"),
+        "accent": ("#16A34A", "#4ADE80"),
+    },
+    "cat_schemes": {
+        "bg": ("#FFF7ED", "#431407"),
+        "border": ("#FED7AA", "#F97316"),
+        "accent": ("#EA580C", "#FB923C"),
+    },
+    "cat_verify": {
+        "bg": ("#F5F3FF", "#2E1065"),
+        "border": ("#DDD6FE", "#8B5CF6"),
+        "accent": ("#7C3AED", "#A78BFA"),
+    },
+    "cat_reports": {
+        "bg": ("#FEF2F2", "#450A0A"),
+        "border": ("#FECACA", "#EF4444"),
+        "accent": ("#DC2626", "#F87171"),
+    },
+    "cat_tools": {
+        "bg": ("#FEFCE8", "#422006"),
+        "border": ("#FDE68A", "#EAB308"),
+        "accent": ("#CA8A04", "#FACC15"),
+    },
+    "cat_about": {
+        "bg": ("#F0F9FF", "#0C4A6E"),
+        "border": ("#BAE6FD", "#0EA5E9"),
+        "accent": ("#0284C7", "#38BDF8"),
+    },
+
+    # === LOG TAG COLORS ===
+    "log_success": ("#16A34A", "#4ADE80"),
+    "log_warning": ("#D97706", "#FBBF24"),
+    "log_error": ("#DC2626", "#F87171"),
+
+    # === BUTTON COLORS ===
+    "btn_start": "#2E8B57",
+    "btn_start_hover": "#1F5E39",
+    "btn_stop": "#C53030",
+    "btn_stop_hover": "#9B2C2C",
+    "btn_retry": "#D97706",
+    "btn_retry_hover": "#B45309",
+    "btn_reset_light": ("gray70", "#4A4A4A"),
+    "btn_reset_hover_light": ("gray60", "#3A3A3A"),
+
+    # === NAV BUTTON COLORS ===
+    "nav_active_bg": ("#E3F2FD", "#374151"),
+    "nav_active_text": ("#1565C0", "#60A5FA"),
+    "nav_inactive_text": ("gray30", "gray80"),
+
+    # === FOOTER STATUS COLORS ===
+    "status_ready": ("#3B82F6", "#60A5FA"),
+    "status_error_light": ("orange", "#D97706"),
+    "status_error_dark": ("red", "#991B1B"),
+
+    # === HEADER / CONTROLS COLORS ===
+    "header_ctrl_bg": ("gray95", "gray25"),
+    "header_ctrl_hover": ("gray85", "gray35"),
+    "header_separator": ("gray90", "gray30"),
+    "header_browser_bg": "transparent",
+    "header_browser_hover": ("gray90", "gray30"),
+
+    # === DROPDOWN / COMBOBOX COLORS ===
+    "dd_fg": ("#F3F4F6", "#333333"),
+    "dd_button": ("#E5E7EB", "#4B5563"),
+    "dd_button_hover": ("#D1D5DB", "#6B7280"),
+    "dd_text": ("#374151", "#D1D5DB"),
+    "dd_dropdown_fg": ("#FFFFFF", "#2B2B2B"),
+    "dd_dropdown_text": ("#374151", "#D1D5DB"),
+    "dd_dropdown_hover": ("#F3F4F6", "#374151"),
+
+    # === SKELETON COLORS ===
+    "skel_light": "#E0E0E0",
+    "skel_dark_1": "#2D3748",
+    "skel_dark_2": "#4A5568",
+    "skel_light_alt": "#EEEEEE",
+
+    # === ANNOUNCEMENT / BADGE ===
+    "badge_success": ("#2563EB", "#60A5FA"),
+    "badge_info": ("#059669", "#34D399"),
+    "badge_warning": ("#D97706", "#FBBF24"),
+    "badge_error": ("#C53030", "#F87171"),
+
+    # === SCROLLBAR === 
+    "scrollbar_light": "#E0E0E0",
+    "scrollbar_dark": "#333333",
+
+    "blue_loader_tag": "#1F6AA5",
+    "gray40_": "#4A4A4A",
+    "gray35_": "#3A3A3A",
+
+    # === MISC / ONE-OFF ===
+    "orange_abps": "#B45309",
+    "orange_abps_hover": "#92400E",
+    "blue_btn": "#3B82F6",
+    "blue_btn_hover": "#2563EB",
+    "blue_border_card": "#3B82F6",
+    "green_export_btn": "#107C10",
+    "green_del_app_count": "#10B981",
+    "red_error_status": "#EF4444",
+    "red_about_border": "#E53E3E",
+    "orange_about_border": "#DD6B20",
+    "blue_link_text": ("#3B82F6", "#60A5FA"),
+    "blue_link_dark": ("#2563EB", "#60A5FA"),
+    "blue_info": "#2B6CB0",
+    "blue_link_about": ("#3B82F6", "#60A5FA"),
+    "whatsapp_green": "#25D366",
+    "gray_555": "#555555",
+    "gray_4B5563": "#4B5563",
+    "gray_2D2D2D": "#2D2D2D",
+    "gray_444": "#444444",
+    "gray_btn_bg": "gray50",
+    "gray_btn_hover": "gray60",
+    "gray_btn_border": ("gray10", "#DCE4EE"),
+    "gray_btn_reset_light": ("gray70", "#4A4A4A"),
+    "gray_btn_reset_hover": ("gray60", "#3A3A3A"),
+    "chat_bubble_user": ("#d1e7ff", "#2a3b4d"),
+    "chat_bubble_admin": ("#e2e3e5", "#373739"),
+    "gray_card_bg": ("gray90", "gray20"),
+    "fw_label_color": ("#2563EB", "#60A5FA"),
+    "profile_btn_border": ("gray10", "#DCE4EE"),
+
+    # === ABOUT TAB COLORS ===
+    "about_active": "#38A169",
+    "about_expired": "#E53E3E",
+    "about_expires_soon": "#DD6B20",
+    "about_gold_name": ("gold4", "#FFD700"),
+
+    # === DEVICE / ACTIVATION COLORS ===
+    "device_frame_bg": ("gray90", "gray30"),
+    "device_entry_bg": ("gray85", "gray20"),
+    "device_btn_bg": "transparent",
+    "device_btn_hover": ("gray75", "gray25"),
+    "device_pending_text": ("orange", "#FFA500"),
+}
+
 # --- Centralized Style and Icon Configuration fix---
 ICONS = {
     # MR & Wage Management

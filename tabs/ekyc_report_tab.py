@@ -103,7 +103,7 @@ class EKycReportTab(BaseAutomationTab):
         self._create_action_buttons(self).pack(fill="x", padx=10, pady=5)
         
         self.export_btn = ctk.CTkButton(self, text="Download Professional Excel Report", command=self.export_professional_report, 
-                                        state="disabled", fg_color="#107C10")
+                                        state="disabled", fg_color=config.COLORS["green_export"])
         self.export_btn.pack(pady=5)
 
         # --- 3. Tabs (Results & Logs) ---

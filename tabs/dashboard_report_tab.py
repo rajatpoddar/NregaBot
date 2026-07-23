@@ -127,7 +127,7 @@ class DashboardReportTab(BaseAutomationTab):
         self.copy_wc_button.pack(side="left")
 
         self.run_mr_fill_button = ctk.CTkButton(copy_frame, text="Run MR Fill", command=self._run_mr_fill,
-                                                  fg_color="#4A55A2", hover_color="#5E69B8")
+                                                  fg_color=config.COLORS["green_dashboard"], hover_color=config.COLORS["green_dashboard_hover"])
         self.run_mr_fill_button.pack_forget()
 
         self.workcode_textbox = ctk.CTkTextbox(workcode_tab, state="disabled")

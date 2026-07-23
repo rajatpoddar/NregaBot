@@ -114,54 +114,53 @@ class FileManagementTab(ctk.CTkFrame):
         self.download_button.pack(side="left", padx=(0, 5))
         self.share_button = ctk.CTkButton(action_bar, text="Share", command=self.share_selected_item, state="disabled")
         self.share_button.pack(side="left", padx=5)
-        self.delete_button = ctk.CTkButton(action_bar, text="Delete", command=self.delete_selected_item, state="disabled", fg_color="#D32F2F", hover_color="#B71C1C")
+        self.delete_button = ctk.CTkButton(action_bar, text="Delete", command=self.delete_selected_item, state="disabled", fg_color=config.COLORS["red_delete"], hover_color=config.COLORS["red_delete_hover"])
         self.delete_button.pack(side="left", padx=5)
 
     def style_treeview(self, treeview_widget=None):
-        # Agar argument nahi diya (main_app me), toh ye function global style set karega
-        style = ttk.Style()
-        style.theme_use("clam")
+        # Use app's cached style singleton to avoid recreating ttk.Style() every time.
+        # This saves ~50ms per call and prevents unnecessary theme re-initialization.
+        if hasattr(self.app, '_cached_style') and self.app._cached_style is not None:
+            style = self.app._cached_style
+        else:
+            style = ttk.Style()
+            style.theme_use("clam")
+            self.app._cached_style = style
 
         # 1. Theme Detection
         mode = ctk.get_appearance_mode()
 
         if mode == "Dark":
-            # --- DARK MODE COLORS ---
-            bg_color = "#2b2b2b"        # Table Background
-            text_color = "#e5e7eb"      # Text (Light Gray)
-            row_hover = "#3f3f46"       # Row Hover Color (Thoda sa light dark)
-            selected_bg = "#3B82F6"     # Selection (Blue)
+            bg_color = "#2b2b2b"
+            text_color = "#e5e7eb"
+            row_hover = "#3f3f46"
+            selected_bg = "#3B82F6"
             
-            header_bg = "#1f2937"       # Header Background (Dark Slate)
-            header_fg = "#ffffff"       # Header Text
-            header_hover = "#374151"    # Header Hover
+            header_bg = "#1f2937"
+            header_fg = "#ffffff"
+            header_hover = "#374151"
         else:
-            # --- LIGHT MODE COLORS ---
-            bg_color = "#ffffff"        # Table Background
-            text_color = "#374151"      # Text (Dark Gray)
-            row_hover = "#f3f4f6"       # Row Hover Color (Very Light Gray)
-            selected_bg = "#3B82F6"     # Selection (Blue)
+            bg_color = "#ffffff"
+            text_color = "#374151"
+            row_hover = "#f3f4f6"
+            selected_bg = "#3B82F6"
             
-            header_bg = "#f9fafb"       # Header Background (Off-white)
-            header_fg = "#111827"       # Header Text (Almost Black)
-            header_hover = "#e5e7eb"    # Header Hover
+            header_bg = "#f9fafb"
+            header_fg = "#111827"
+            header_hover = "#e5e7eb"
 
-        # 2. Configure Treeview Body
         style.configure("Treeview",
                         background=bg_color,
                         foreground=text_color,
                         fieldbackground=bg_color,
-                        rowheight=35,             # Rows thodi spacious
+                        rowheight=35,
                         font=("Segoe UI", 11),
                         borderwidth=0)
 
-        # 3. Configure Rows (Hover & Selection)
-        # Note: 'selected' pehle check hota hai, isliye hover selected row ka color kharab nahi karega
         style.map("Treeview",
                   background=[('selected', selected_bg), ('active', row_hover)],
                   foreground=[('selected', 'white'), ('active', text_color)])
 
-        # 4. Configure Heading
         style.configure("Treeview.Heading",
                         background=header_bg,
                         foreground=header_fg,
@@ -171,7 +170,6 @@ class FileManagementTab(ctk.CTkFrame):
         style.map("Treeview.Heading",
                   background=[('active', header_hover)])
 
-        # 5. Fix for file_management_tab (jahan widget pass hota hai)
         if treeview_widget:
             treeview_widget.configure(style="Treeview")
 
@@ -295,13 +293,13 @@ class FileManagementTab(ctk.CTkFrame):
             self.storage_progress.set(usage_percent)
 
             if usage_percent < 0.3:
-                color = "#22c55e" # Green
+                color = config.COLORS["green_file"] # Green
             elif 0.3 <= usage_percent < 0.6:
-                color = "#3b82f6" # Blue
+                color = config.COLORS["blue"] # Blue
             elif 0.6 <= usage_percent < 0.8:
-                color = "#f59e0b" # Yellow
+                color = config.COLORS["orange_file"] # Yellow
             else:
-                color = "#ef4444" # Red
+                color = config.COLORS["red_error"] # Red
 
             self.storage_progress.configure(progress_color=color)
             self.upgrade_storage_button.configure(fg_color=color, hover_color=color)

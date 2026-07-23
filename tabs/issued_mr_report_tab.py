@@ -110,8 +110,8 @@ class IssuedMrReportTab(BaseAutomationTab):
             controls_frame,
             text="Pending demand labour for abps",
             command=self.start_abps_automation,
-            fg_color="#8E24AA", # Purple color to distinguish
-            hover_color="#7B1FA2"
+            fg_color=config.COLORS["purple_report"], # Purple color to distinguish
+            hover_color=config.COLORS["purple_report_hover"]
         )
         self.btn_abps_check.grid(row=5, column=0, columnspan=2, pady=(0, 10))
         # ---------------------------------

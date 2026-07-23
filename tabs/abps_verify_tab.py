@@ -76,8 +76,8 @@ class AbpsVerifyTab(BaseAutomationTab):
             results_action_frame, 
             text="Export to PDF", 
             command=self.export_to_pdf, 
-            fg_color="#B45309", 
-            hover_color="#92400E"
+            fg_color=config.COLORS["orange_abps"], 
+            hover_color=config.COLORS["orange_abps_hover"]
         )
         self.export_pdf_button.pack(side="left")
 

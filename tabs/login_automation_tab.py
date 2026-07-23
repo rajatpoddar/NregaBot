@@ -5,6 +5,7 @@ import time
 import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
+import config
 from .base_tab import BaseAutomationTab
 
 class LoginAutomationTab(BaseAutomationTab):
@@ -36,7 +37,7 @@ class LoginAutomationTab(BaseAutomationTab):
         ctk.CTkLabel(form_frame, text="Financial Year:", font=ctk.CTkFont(size=13)).grid(row=0, column=0, sticky='w', padx=15, pady=10)
         fy_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
         fy_frame.grid(row=0, column=1, padx=15, pady=10, sticky='w')
-        ctk.CTkLabel(fy_frame, text=self.current_financial_year, font=ctk.CTkFont(size=13, weight="bold"), text_color=("#2563EB", "#60A5FA")).pack(side="left")
+        ctk.CTkLabel(fy_frame, text=self.current_financial_year, font=ctk.CTkFont(size=13, weight="bold"), text_color=(config.COLORS["blue_hover"], config.COLORS["blue_light"])).pack(side="left")
         ctk.CTkLabel(fy_frame, text="  (auto-set)", font=ctk.CTkFont(size=11), text_color="gray50").pack(side="left")
         
         # 2. District
@@ -56,7 +57,7 @@ class LoginAutomationTab(BaseAutomationTab):
         self.save_btn = ctk.CTkButton(btn_frame, text="💾 Save Location", command=self.save_credentials, fg_color="gray", font=ctk.CTkFont(weight="bold"))
         self.save_btn.pack(side='left', padx=10)
         
-        self.login_btn = ctk.CTkButton(btn_frame, text="🚀 Launch & Navigate", command=self.run_login_thread, fg_color="#2E8B57", hover_color="#1F5E39", font=ctk.CTkFont(weight="bold"))
+        self.login_btn = ctk.CTkButton(btn_frame, text="🚀 Launch & Navigate", command=self.run_login_thread, fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["btn_start_hover"], font=ctk.CTkFont(weight="bold"))
         self.login_btn.pack(side='left', padx=10)
         
         # Info Note

@@ -87,7 +87,7 @@ class IfEditTab(BaseAutomationTab):
         profile_actions.grid(row=1, column=0, padx=15, pady=5)
         self.save_profile_button = ctk.CTkButton(profile_actions, text="Save", command=self._save_profile)
         self.save_profile_button.pack(side="left", padx=(0, 5))
-        self.delete_profile_button = ctk.CTkButton(profile_actions, text="Delete", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self._delete_profile)
+        self.delete_profile_button = ctk.CTkButton(profile_actions, text="Delete", fg_color="transparent", border_width=1, text_color=(config.COLORS["gray10"], config.COLORS["text_bright"]), command=self._delete_profile)
         self.delete_profile_button.pack(side="left")
 
         # CSV Frame
@@ -99,7 +99,7 @@ class IfEditTab(BaseAutomationTab):
         file_frame.grid(row=0, column=1, sticky='ew', pady=10, padx=15)
         self.select_button = ctk.CTkButton(file_frame, text="Select CSV File", command=self.select_csv_file)
         self.select_button.pack(side="left", padx=(0, 10))
-        self.demo_csv_button = ctk.CTkButton(file_frame, text="Download Demo CSV", command=lambda: self.app.save_demo_csv("if_edit"), fg_color="#2E8B57", hover_color="#257247")
+        self.demo_csv_button = ctk.CTkButton(file_frame, text="Download Demo CSV", command=lambda: self.app.save_demo_csv("if_edit"), fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["green_button_hover"])
         self.demo_csv_button.pack(side="left", padx=(0, 10))
         self.file_label = ctk.CTkLabel(file_frame, text="No data source selected", text_color="gray")
         self.file_label.pack(side="left")

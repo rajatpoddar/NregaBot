@@ -6,8 +6,11 @@ categorized, with a "Most Used" section at the top based on usage history.
 
 import customtkinter as ctk
 import tkinter as tk
+import time
 from PIL import Image
 from utils import resource_path
+import config
+from ui_components import AfterTracker
 
 
 class HomeTab(ctk.CTkFrame):
@@ -15,47 +18,26 @@ class HomeTab(ctk.CTkFrame):
 
     # Colors for card variants (light / dark)
     CARD_COLORS = {
-        "MR & Wage Management": {
-            "bg": ("#EFF6FF", "#1E3A5F"),
-            "border": ("#BFDBFE", "#3B82F6"),
-            "accent": ("#3B82F6", "#60A5FA"),
-        },
-        "JE & AE Approval": {
-            "bg": ("#F0FDF4", "#14532D"),
-            "border": ("#BBF7D0", "#22C55E"),
-            "accent": ("#16A34A", "#4ADE80"),
-        },
-        "Schemes Related": {
-            "bg": ("#FFF7ED", "#431407"),
-            "border": ("#FED7AA", "#F97316"),
-            "accent": ("#EA580C", "#FB923C"),
-        },
-        "Verification & Utility": {
-            "bg": ("#F5F3FF", "#2E1065"),
-            "border": ("#DDD6FE", "#8B5CF6"),
-            "accent": ("#7C3AED", "#A78BFA"),
-        },
-        "Reports & Tracking": {
-            "bg": ("#FEF2F2", "#450A0A"),
-            "border": ("#FECACA", "#EF4444"),
-            "accent": ("#DC2626", "#F87171"),
-        },
-        "Smart Tools": {
-            "bg": ("#FEFCE8", "#422006"),
-            "border": ("#FDE68A", "#EAB308"),
-            "accent": ("#CA8A04", "#FACC15"),
-        },
-        "About & Help": {
-            "bg": ("#F0F9FF", "#0C4A6E"),
-            "border": ("#BAE6FD", "#0EA5E9"),
-            "accent": ("#0284C7", "#38BDF8"),
-        },
+        "MR & Wage Management": config.COLORS["cat_mr_wage"],
+        "JE & AE Approval": config.COLORS["cat_je_ae"],
+        "Schemes Related":       config.COLORS["cat_schemes"],
+        "Verification & Utility": config.COLORS["cat_verify"],
+        "Reports & Tracking":    config.COLORS["cat_reports"],
+        "Smart Tools":           config.COLORS["cat_tools"],
+        "About & Help":          config.COLORS["cat_about"],
     }
 
     def __init__(self, parent, app_instance):
         super().__init__(parent, fg_color="transparent")
         self.app = app_instance
         self.pack(expand=True, fill="both")
+        
+        # AfterTracker for safe callback cleanup on tab destroy.
+        # HomeTab extends CTkFrame directly (not BaseAutomationTab),
+        # so we need to create the tracker here.
+        # Using 'self.safe_after' (no underscore) so that calls like
+        # self.safe_after(ms, callback) delegate to AfterTracker.after().
+        self.safe_after = AfterTracker(self)
 
         # Cache all tabs by name
         self._all_tabs = {}
@@ -66,8 +48,8 @@ class HomeTab(ctk.CTkFrame):
         # --- Main scrollable container ---
         self.scroll_container = ctk.CTkScrollableFrame(
             self, fg_color="transparent", corner_radius=0,
-            scrollbar_button_color=("gray80", "gray30"),
-            scrollbar_button_hover_color=("gray70", "gray20"),
+            scrollbar_button_color=(config.COLORS["gray80"], config.COLORS["gray30"]),
+            scrollbar_button_hover_color=(config.COLORS["gray70"], config.COLORS["gray20"]),
         )
         self.scroll_container.pack(expand=True, fill="both", padx=5, pady=5)
         self.scroll_container.grid_columnconfigure(0, weight=1)
@@ -90,12 +72,12 @@ class HomeTab(ctk.CTkFrame):
 
         # Greeting
         user_name = self.app.license_info.get("user_name", "")
-        greet = f"Welcome, {user_name}!" if user_name else "Welcome!"
+        greet = f"Welcome, {user_name} !" if user_name else "Welcome !"
         ctk.CTkLabel(
             header_frame,
             text=greet,
             font=ctk.CTkFont(family="Helvetica Neue", size=26, weight="bold"),
-            text_color=("#111827", "#F3F4F6"),
+            text_color=(config.COLORS["text_dark"], config.COLORS["text_white"]),
             anchor="w",
         ).grid(row=0, column=0, sticky="w")
 
@@ -103,11 +85,11 @@ class HomeTab(ctk.CTkFrame):
             header_frame,
             text="Select an automation below to get started. Quickly find what you need.",
             font=ctk.CTkFont(family="Segoe UI", size=13),
-            text_color=("#6B7280", "#9CA3AF"),
+            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"]),
             anchor="w",
         ).grid(row=1, column=0, sticky="w", pady=(2, 0))
 
-        # Quick action buttons row
+        # Quick action buttons row — keep compact on the left
         actions_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
         actions_frame.grid(row=2, column=0, sticky="w", pady=(15, 5))
 
@@ -115,9 +97,9 @@ class HomeTab(ctk.CTkFrame):
             "height": 34,
             "corner_radius": 10,
             "font": ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            "fg_color": ("#E5E7EB", "#374151"),
-            "hover_color": ("#D1D5DB", "#4B5563"),
-            "text_color": ("#1F2937", "#F3F4F6"),
+            "fg_color": (config.COLORS["text_hover"], config.COLORS["text_hover_dark"]),
+            "hover_color": (config.COLORS["text_border"], "#4B5563"),
+            "text_color": (config.COLORS["tv_header_bg_dark"], config.COLORS["text_white"]),
         }
 
         ctk.CTkButton(
@@ -137,12 +119,26 @@ class HomeTab(ctk.CTkFrame):
         # Quick stats bar
         total = len(self._all_tabs)
         most = len(self._get_most_used_names())
+        stats_icon = self.app.icon_images.get("emoji_tools")
         ctk.CTkLabel(
             actions_frame,
-            text=f"📊 {total} Automations Available",
+            text=f"  {total} Automations Available",
+            image=stats_icon,
+            compound="left",
             font=ctk.CTkFont(family="Segoe UI", size=12),
-            text_color=("#6B7280", "#9CA3AF"),
+            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"]),
         ).pack(side="left", padx=(8, 0))
+
+        # Date & Time display — bold, highlighted, aligned far right in header
+        header_frame.grid_columnconfigure(1, weight=1)
+        self.datetime_label = ctk.CTkLabel(
+            header_frame,
+            text="",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=(config.COLORS["text_dark_alt"], config.COLORS["text_hover"]),
+        )
+        self.datetime_label.grid(row=2, column=1, sticky="e", padx=(10, 5), pady=(15, 5))
+        self._update_datetime()
 
     # ──────────────────────────────────────────────
     # 2. SEARCH BAR
@@ -168,8 +164,8 @@ class HomeTab(ctk.CTkFrame):
             font=ctk.CTkFont(family="Segoe UI", size=13),
             height=38,
             corner_radius=12,
-            fg_color=("#F9FAFB", "#333333"),
-            border_color=("#D1D5DB", "#555555"),
+            fg_color=(config.COLORS["tv_header_bg_light"], config.COLORS["bg_medium"]),
+            border_color=(config.COLORS["text_border"], "#555555"),
             textvariable=self.search_var,
         )
         self.search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
@@ -182,9 +178,9 @@ class HomeTab(ctk.CTkFrame):
             height=38,
             corner_radius=12,
             font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            fg_color=("#E5E7EB", "#4B5563"),
-            hover_color=("#D1D5DB", "#6B7280"),
-            text_color=("#6B7280", "#D1D5DB"),
+            fg_color=(config.COLORS["text_hover"], "#4B5563"),
+            hover_color=(config.COLORS["text_border"], config.COLORS["text_medium"]),
+            text_color=(config.COLORS["text_medium"], config.COLORS["text_border"]),
             command=self._clear_search
         )
         self.clear_search_btn.grid(row=0, column=1)
@@ -213,7 +209,7 @@ class HomeTab(ctk.CTkFrame):
             label_frame,
             text="⭐ Most Used",
             font=ctk.CTkFont(family="Helvetica Neue", size=18, weight="bold"),
-            text_color=("#111827", "#F3F4F6"),
+            text_color=(config.COLORS["text_dark"], config.COLORS["text_white"]),
         ).grid(row=0, column=0, sticky="w")
 
         self.most_used_grid = ctk.CTkFrame(
@@ -259,7 +255,7 @@ class HomeTab(ctk.CTkFrame):
                 self.most_used_grid,
                 text="Start using automations — your most-used will appear here.",
                 font=ctk.CTkFont(family="Segoe UI", size=12),
-                text_color=("#9CA3AF", "#6B7280"),
+                text_color=(config.COLORS["text_light"], config.COLORS["text_medium"]),
             ).grid(row=0, column=0, pady=20)
 
     # ──────────────────────────────────────────────
@@ -288,7 +284,7 @@ class HomeTab(ctk.CTkFrame):
             cat_header.grid_columnconfigure(0, weight=1)
 
             colors = self.CARD_COLORS.get(cat, {})
-            accent = colors.get("accent", ("#3B82F6", "#60A5FA"))
+            accent = colors.get("accent", (config.COLORS["blue"], config.COLORS["blue_light"]))
 
             ctk.CTkLabel(
                 cat_header,
@@ -342,8 +338,8 @@ class HomeTab(ctk.CTkFrame):
             font_size = 10
             pad = 3
 
-        bg_color = colors.get("bg", ("#F9FAFB", "#2D2D2D"))
-        border_color = colors.get("border", ("#E5E7EB", "#444444"))
+        bg_color = colors.get("bg", (config.COLORS["tv_header_bg_light"], config.COLORS["gray_2D2D2D"]))
+        border_color = colors.get("border", (config.COLORS["text_hover"], config.COLORS["gray_444"]))
 
         card = ctk.CTkFrame(
             parent,
@@ -375,7 +371,7 @@ class HomeTab(ctk.CTkFrame):
             inner,
             text=name,
             font=ctk.CTkFont(family="Segoe UI", size=font_size, weight="bold"),
-            text_color=("#1F2937", "#F3F4F6"),
+            text_color=(config.COLORS["tv_header_bg_dark"], config.COLORS["text_white"]),
         )
         name_label.pack()
 
@@ -384,20 +380,24 @@ class HomeTab(ctk.CTkFrame):
 
         # --- Hover effects ---
         hover_bg = self._lighten(bg_color[0], -15) if ctk.get_appearance_mode() == "Light" else self._lighten(bg_color[1], 20)
+        original_text_color = (config.COLORS["tv_header_bg_dark"], config.COLORS["text_white"])
+        hover_text_color = (config.COLORS["tv_header_fg_dark"], config.COLORS["text_white"])  # White in light mode, unchanged in dark
 
-        def on_enter(e, c=card, hb=hover_bg):
+        def on_enter(e, c=card, nl=name_label, hb=hover_bg, htc=hover_text_color):
             c.configure(
                 fg_color=hb,
                 border_width=2,
                 border_color=border_color,
             )
+            nl.configure(text_color=htc)
 
-        def on_leave(e, c=card, bg=bg_color, bc=border_color):
+        def on_leave(e, c=card, nl=name_label, bg=bg_color, bc=border_color, otc=original_text_color):
             c.configure(
                 fg_color=bg,
                 border_width=1,
                 border_color=bc,
             )
+            nl.configure(text_color=otc)
 
         def on_click(e=None):
             self.app.show_frame(name)
@@ -478,6 +478,19 @@ class HomeTab(ctk.CTkFrame):
         g = max(0, min(255, g + amount))
         b = max(0, min(255, b + amount))
         return f"#{r:02x}{g:02x}{b:02x}"
+
+    def _update_datetime(self):
+        """Update the date & time label every second.
+        Only updates when the Home tab is the currently active tab
+        to avoid unnecessary widget rendering overhead."""
+        if hasattr(self, 'datetime_label') and self.datetime_label.winfo_exists():
+            # Skip heavy label update if this tab isn't even visible
+            if getattr(self.app, 'current_active_tab', '') == 'Home':
+                now = time.localtime()
+                date_str = time.strftime("%d %b %Y, %I:%M:%S %p", now)
+                self.datetime_label.configure(text=date_str)
+            # Use safe_after so the timer is auto-cancelled if tab is destroyed
+            self.safe_after(1000, self._update_datetime)
 
     def refresh(self):
         """Re-build most-used section (called after a tab is used)."""

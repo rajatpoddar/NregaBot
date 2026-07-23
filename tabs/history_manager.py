@@ -4,6 +4,7 @@ import json
 import os
 import threading
 from datetime import datetime  # <-- Time save karne ke liye ye zaroori hai
+import config  # For APP_VERSION — auto-reset usage stats on version change
 
 class HistoryManager:
     def __init__(self, data_path_func):
@@ -14,6 +15,7 @@ class HistoryManager:
         
         self._init_db()
         self._migrate_from_json_if_needed()
+        self._check_version_reset()  # Auto-reset usage stats on new version
 
     def _get_connection(self):
         """Returns the persistent connection, creating it on first call with WAL mode."""
@@ -67,9 +69,44 @@ class HistoryManager:
                     )
                 ''')
                 
+                # Table 3: App Meta for version tracking
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS app_meta (
+                        key TEXT PRIMARY KEY,
+                        value TEXT
+                    )
+                ''')
+                
                 conn.commit()
             except Exception as e:
                 print(f"Database Init Error: {e}")
+
+    def _check_version_reset(self):
+        """
+        On every app launch, check if the app version has changed.
+        If so, reset usage_stats so that the 'Most Used' section starts
+        fresh for the new version. This prevents stale historical data
+        from previous versions dominating the top-used list.
+        """
+        current_ver = config.APP_VERSION
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT value FROM app_meta WHERE key = 'app_version'")
+                row = cursor.fetchone()
+                stored_ver = row[0] if row else None
+                
+                if stored_ver != current_ver:
+                    # Version changed (or first launch) — reset usage stats
+                    cursor.execute("DELETE FROM usage_stats")
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('app_version', ?)",
+                        (current_ver,)
+                    )
+                    conn.commit()
+            except Exception:
+                pass  # Non-critical — tab usage just continues with old stats
 
     # --- Migration aur Suggestions ke purane functions (Same as before) ---
     def _migrate_from_json_if_needed(self):

@@ -110,7 +110,7 @@ class DeleteApplicantTab(BaseAutomationTab):
 
         self.upload_btn = ctk.CTkButton(mid_frame, text="📁 Browse eKYC Excel",
                                         command=self.load_excel, width=145, height=32,
-                                        fg_color="#3B82F6", hover_color="#2563EB",
+                                        fg_color=config.COLORS["blue"], hover_color=config.COLORS["blue_hover"],
                                         font=ctk.CTkFont(size=13))
         self.upload_btn.grid(row=0, column=0, padx=(15, 10), pady=6, sticky="w")
 
@@ -188,7 +188,7 @@ class DeleteApplicantTab(BaseAutomationTab):
         export_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
 
         self.export_btn = ctk.CTkButton(export_bar, text="📥 Export to Excel",
-                                        command=self.export_report, fg_color="#107C10",
+                                        command=self.export_report, fg_color=config.COLORS["green_export"],
                                         state="disabled", font=ctk.CTkFont(size=13))
         self.export_btn.pack(side="left", padx=(0, 10))
 
@@ -257,7 +257,7 @@ class DeleteApplicantTab(BaseAutomationTab):
         sel = len(self.selected_items)
         self.sel_count_lbl.configure(
             text=f"Selected: {sel} / {total}  —  Click rows to toggle ☐/☑",
-            text_color="#10B981" if sel > 0 else ("gray50", "gray60"))
+            text_color=config.COLORS["green_del_app"] if sel > 0 else ("gray50", "gray60"))
 
     def select_all(self):
         # ---- Lazy imports ----
@@ -384,7 +384,7 @@ class DeleteApplicantTab(BaseAutomationTab):
             if loaded > 0:
                 self.excel_status_lbl.configure(
                     text=f"✅ {loaded} applicants — {os.path.basename(file_path)}",
-                    text_color="#10B981")
+                    text_color=config.COLORS["green_del_app"])
                 self.select_all_btn.configure(state="normal")
                 self.deselect_all_btn.configure(state="normal")
                 self._update_sel_count()
@@ -395,7 +395,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                 self.app.log_message(self.log_display,
                     f"📂 eKYC Excel loaded: {loaded} records. Panchayat: {self.excel_panchayat or 'N/A'}")
             else:
-                self.excel_status_lbl.configure(text="❌ No valid records.", text_color="#EF4444")
+                self.excel_status_lbl.configure(text="❌ No valid records.", text_color=config.COLORS["red_error"])
 
         except ImportError:
             messagebox.showerror("Library Missing",

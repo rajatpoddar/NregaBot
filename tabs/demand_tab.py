@@ -358,10 +358,10 @@ class DemandTab(BaseAutomationTab):
         self.select_csv_button = ctk.CTkButton(file_row, text="Upload from Computer", command=self._select_csv_from_computer)
         self.select_csv_button.grid(row=0, column=0, padx=(0, 6))
 
-        self.cloud_csv_button = ctk.CTkButton(file_row, text="Select from Cloud", command=self._select_csv_from_cloud, fg_color="teal", hover_color="#00695C")
+        self.cloud_csv_button = ctk.CTkButton(file_row, text="Select from Cloud", command=self._select_csv_from_cloud, fg_color=config.COLORS["teal_named"], hover_color=config.COLORS["teal_hover"])
         self.cloud_csv_button.grid(row=0, column=1, padx=(0, 6))
 
-        self.demo_csv_button = ctk.CTkButton(file_row, text="Demo CSV", command=lambda: self.app.save_demo_csv("demand"), fg_color="#2E8B57", hover_color="#257247", width=90)
+        self.demo_csv_button = ctk.CTkButton(file_row, text="Demo CSV", command=lambda: self.app.save_demo_csv("demand"), fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["green_button_hover"], width=90)
         self.demo_csv_button.grid(row=0, column=2, padx=(0, 6))
 
         self.select_all_button = ctk.CTkButton(file_row, text="Select All", command=self._select_all_applicants, width=90)

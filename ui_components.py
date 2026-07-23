@@ -7,8 +7,75 @@ import re
 import platform
 import subprocess
 import threading
+import queue
 from PIL import Image
+import config
 from utils import resource_path
+
+# --- 0. AFTER TRACKER (Callback Cleanup Utility) ---
+class AfterTracker:
+    """
+    Tracks after() callbacks and auto-cancels them on widget destroy.
+    
+    Prevents "ghost callbacks" — after() timers that continue firing
+    after the associated widget has been destroyed or hidden.
+    
+    Usage:
+        self._tracker = AfterTracker(self)
+        self._tracker.after(1000, self.my_method)
+        # Auto-cancels when widget is destroyed via <Destroy> binding
+        # You can also manually call: self._tracker.cancel_all()
+    """
+    def __init__(self, widget):
+        self.widget = widget
+        self._ids = set()
+        # Auto-cancel on widget destroy
+        widget.bind("<Destroy>", self._on_destroy_evt, add="+")
+
+    def __call__(self, ms, callback, *args):
+        """Allows the tracker instance to be called directly.
+        e.g. self.tracker(1000, callback) instead of self.tracker.after(1000, callback).
+        This enables HomeTab's pattern: self.safe_after = AfterTracker(self)."""
+        return self.after(ms, callback, *args)
+
+    def after(self, ms, callback, *args):
+        """Register a tracked after() callback.
+        Auto-cancels when widget is destroyed. Use this instead of widget.after()."""
+        after_id = self.widget.after(ms, lambda: self._wrap(callback, args))
+        self._ids.add(after_id)
+        return after_id
+
+    def after_id(self, after_id):
+        """Track an externally-created after() ID."""
+        self._ids.add(after_id)
+        return after_id
+
+    def _wrap(self, callback, args):
+        """Wrap the callback so it's safe even after widget destruction."""
+        try:
+            if self.widget.winfo_exists():
+                callback(*args)
+        except Exception:
+            pass
+
+    def _on_destroy_evt(self, event):
+        """Cancel all tracked callbacks when this specific widget is destroyed.
+        The event.widget check prevents us from responding to child widget destroys."""
+        if event.widget is not self.widget:
+            return
+        self.cancel_all()
+
+    def cancel_all(self):
+        """Cancel all pending tracked callbacks immediately."""
+        for after_id in list(self._ids):
+            try:
+                self.widget.after_cancel(after_id)
+            except Exception:
+                pass
+        self._ids.clear()
+
+    def __del__(self):
+        self.cancel_all()
 
 # --- 1. COLLAPSIBLE FRAME (Sidebar Categories) ---
 class CollapsibleFrame(ctk.CTkFrame):
@@ -73,7 +140,7 @@ class FormSkeleton(tk.Frame):
         h = self.canvas.winfo_height()
         
         # Skeleton color (Light Grey)
-        skel_color = "#E0E0E0" 
+        skel_color = config.COLORS["skel_light"] 
 
         # 1. Title/Header Block (Top Left)
         self.canvas.create_rectangle(20, 20, 300, 50, fill=skel_color, outline="")
@@ -112,7 +179,7 @@ class SkeletonLoader(ctk.CTkFrame):
         stats_frame.pack(fill="x", pady=(0, 25))
         
         for _ in range(4): # 4 Blocks banayenge
-            card = ctk.CTkFrame(stats_frame, fg_color=("white", "#2B2B2B"), corner_radius=10)
+            card = ctk.CTkFrame(stats_frame, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]), corner_radius=10)
             card.pack(side="left", expand=True, fill="x", padx=6, ipady=10)
             
             # Circle (Icon Placeholder)
@@ -131,7 +198,7 @@ class SkeletonLoader(ctk.CTkFrame):
             self.placeholders.extend([circle, l1, l2])
 
         # --- 3. Data List / Table (The "8 Lines" Area) ---
-        table_frame = ctk.CTkFrame(self, fg_color=("white", "#2B2B2B"), corner_radius=12)
+        table_frame = ctk.CTkFrame(self, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]), corner_radius=12)
         table_frame.pack(fill="both", expand=True)
         
         # Fake Table Header
@@ -161,17 +228,26 @@ class SkeletonLoader(ctk.CTkFrame):
             
             self.placeholders.extend([c1, c2, c3])
             
+        # Create AfterTracker for auto-cleanup on destroy
+        self._tracker = AfterTracker(self)
+        
         self.animate_step = 0
         self.animating = True
-        self._animate()
+        self._tracker.after(1000, self._animate)
 
     def _animate(self):
         if not self.animating or not self.winfo_exists(): return
         
+        # Skip animation when widget is not visible on screen
+        # Prevents unnecessary CPU usage when SkeletonLoader is hidden
+        if not self.winfo_viewable():
+            self._tracker.after(1000, self._animate)
+            return
+        
         # Thoda modern colors (Light/Dark mode compatible)
         # Pulse Effect: Light Gray <-> Slightly Darker Gray
-        l1, l2 = "#E0E0E0", "#EEEEEE"  # Light Mode
-        d1, d2 = "#2D3748", "#4A5568"  # Dark Mode
+        l1, l2 = config.COLORS["skel_light"], config.COLORS["skel_light_alt"]  # Light Mode
+        d1, d2 = config.COLORS["skel_dark_1"], config.COLORS["skel_dark_2"]  # Dark Mode
         
         mode = ctk.get_appearance_mode()
         
@@ -190,10 +266,11 @@ class SkeletonLoader(ctk.CTkFrame):
                     p.configure(fg_color=final_color)
             except: pass
             
-        self.after(1000, self._animate) # Slower animation to save CPU
+        self._tracker.after(1000, self._animate) # Slower animation to save CPU
 
     def stop(self):
         self.animating = False
+        self._tracker.cancel_all()
         self.destroy()
 
 # --- 4. MARQUEE LABEL (Running Text) ---
@@ -202,7 +279,7 @@ class MarqueeLabel(ctk.CTkFrame):
         super().__init__(parent, fg_color="transparent", **kwargs)
         self.speed = speed
         self.raw_text = text
-        self.safe_bg = ("white", "#1D1E1E")
+        self.safe_bg = (config.COLORS["bg_light"], config.COLORS["bg_darker"])
         
         self.canvas = tkinter.Canvas(
             self, 
@@ -217,15 +294,19 @@ class MarqueeLabel(ctk.CTkFrame):
         self.items = [] 
         self.total_width = 0
         self.canvas_width = 1
-        self.is_running = True 
+        self.is_running = True
+        
+        # Create AfterTracker for auto-cleanup on destroy
+        self._tracker = AfterTracker(self)
         
         self.bind("<Configure>", self._on_resize)
         self.bind("<Destroy>", self._on_destroy)
         self.update_text(text) 
-        self._animate()
+        self._tracker.after(50, self._animate)
 
     def _on_destroy(self, event):
         self.is_running = False
+        self._tracker.cancel_all()
 
     def _on_resize(self, event):
         self.canvas_width = event.width
@@ -271,7 +352,7 @@ class MarqueeLabel(ctk.CTkFrame):
         
         mode = ctk.get_appearance_mode()
         default_color = "gray90" if mode == "Dark" else "gray40"
-        link_color = "#3B82F6"
+        link_color = config.COLORS["blue"]
         base_font_family = "Segoe UI" if os.name == "nt" else "Arial"
         
         parsed_segments = self._parse_html(new_text)
@@ -306,6 +387,15 @@ class MarqueeLabel(ctk.CTkFrame):
             current_x += width
         self.total_width = current_x
 
+    def pause(self):
+        """Pause the marquee animation (called during window resize)."""
+        self.is_paused = True
+
+    def resume(self):
+        """Resume the marquee animation (called after window resize ends)."""
+        if hasattr(self, 'is_paused'):
+            self.is_paused = False
+
     def _animate(self):
         if not self.is_running: return
         try:
@@ -316,8 +406,20 @@ class MarqueeLabel(ctk.CTkFrame):
             self.is_running = False
             return
 
+        # Skip animation when widget is not visible on screen
+        # Prevents unnecessary canvas operations when minimized/covered
+        if not self.winfo_viewable():
+            self._tracker.after(200, self._animate)
+            return
+
         if not self.items:
-            self.after(100, self._animate)
+            self._tracker.after(100, self._animate)
+            return
+        
+        # Skip animation frames when paused (during resize) to avoid competing
+        # with the window manager's repaint cycle.
+        if getattr(self, 'is_paused', False):
+            self._tracker.after(100, self._animate)  # Check less frequently when paused
             return
 
         try:
@@ -329,7 +431,7 @@ class MarqueeLabel(ctk.CTkFrame):
             last_coords = self.canvas.coords(last_item['id'])
             
             if not last_coords: 
-                self.after(50, self._animate)
+                self._tracker.after(50, self._animate)
                 return
 
             if last_coords[0] + last_item['width'] < 0:
@@ -342,7 +444,7 @@ class MarqueeLabel(ctk.CTkFrame):
                 for item in self.items:
                     self.canvas.move(item['id'], -self.speed, 0)
 
-            self.after(50, self._animate)
+            self._tracker.after(50, self._animate)
         except Exception:
             self.is_running = False
 
@@ -352,10 +454,10 @@ class ToastNotification(ctk.CTkToplevel):
         super().__init__(parent)
         self.parent = parent
         
-        colors = {"success": "#2E8B57", "error": "#C53030", "info": "#2B6CB0", "warning": "#C05621"}
+        colors = {"success": config.COLORS["btn_start"], "error": config.COLORS["btn_stop"], "info": config.COLORS["blue_info"], "warning": config.COLORS["orange_warning"]}
         icons = {"success": "✅", "error": "❌", "info": "ℹ️", "warning": "⚠️"}
         
-        bg_color = colors.get(kind, "#333333")
+        bg_color = colors.get(kind, config.COLORS["bg_medium"])
         icon_text = icons.get(kind, "ℹ️")
 
         self.overrideredirect(True)
@@ -509,7 +611,8 @@ class PerformanceMonitor(ctk.CTkFrame):
     """
     Lightweight system resource monitor for the sidebar footer.
     Shows RAM, CPU usage and active thread count.
-    Updates every 3 seconds via self.after() — zero additional dependencies.
+    Updates every 5 seconds via a single persistent worker thread
+    (queue-based) instead of spawning a new thread each cycle.
     """
     def __init__(self, parent, app_instance):
         super().__init__(parent, fg_color="transparent", corner_radius=0)
@@ -517,16 +620,20 @@ class PerformanceMonitor(ctk.CTkFrame):
         self._running = True
 
         # ---- Separator ----
-        ctk.CTkFrame(self, height=1, fg_color=("gray85", "gray35")).pack(fill="x", padx=10, pady=(4, 6))
+        ctk.CTkFrame(self, height=1, corner_radius=0, fg_color=("gray85", "gray35")).pack(fill="x", padx=10, pady=(4, 6))
 
         # ---- Title ----
         title_row = ctk.CTkFrame(self, fg_color="transparent")
         title_row.pack(fill="x", padx=12, pady=(0, 4))
+        thunder_icon = self.app.icon_images.get("performance_thunder")
         ctk.CTkLabel(
-            title_row, text="⚡ Performance", 
+            title_row,
+            text=" Performance",
+            image=thunder_icon,
+            compound="left",
             font=ctk.CTkFont(size=10, weight="bold"),
-            text_color=("gray50", "gray60")
-        ).pack(side="left")
+            text_color=(config.COLORS["dark_goldenrod"], config.COLORS["gold"]),  # DarkGoldenrod light / Gold dark
+        ).pack(anchor="center")
 
         # ---- Metric rows ----
         row_height = 18
@@ -537,7 +644,7 @@ class PerformanceMonitor(ctk.CTkFrame):
         ctk.CTkLabel(self.ram_frame, text="RAM", font=ctk.CTkFont(size=10),
                      text_color=("gray50", "gray60")).pack(side="left")
         self.ram_label = ctk.CTkLabel(self.ram_frame, text="—", font=font_style,
-                                      text_color=("#2563EB", "#60A5FA"))
+                                      text_color=config.COLORS["badge_success"])
         self.ram_label.pack(side="right")
 
         self.cpu_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -545,7 +652,7 @@ class PerformanceMonitor(ctk.CTkFrame):
         ctk.CTkLabel(self.cpu_frame, text="CPU", font=ctk.CTkFont(size=10),
                      text_color=("gray50", "gray60")).pack(side="left")
         self.cpu_label = ctk.CTkLabel(self.cpu_frame, text="—", font=font_style,
-                                      text_color=("#059669", "#34D399"))
+                                      text_color=config.COLORS["badge_info"])
         self.cpu_label.pack(side="right")
 
         self.thread_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -553,16 +660,51 @@ class PerformanceMonitor(ctk.CTkFrame):
         ctk.CTkLabel(self.thread_frame, text="Threads", font=ctk.CTkFont(size=10),
                      text_color=("gray50", "gray60")).pack(side="left")
         self.thread_label = ctk.CTkLabel(self.thread_frame, text="—", font=font_style,
-                                         text_color=("#D97706", "#FBBF24"))
+                                         text_color=config.COLORS["badge_warning"])
         self.thread_label.pack(side="right")
 
+        # --- Persistent Background Worker ---
+        # Instead of spawning a new thread every 5 seconds, use a single
+        # daemon thread with a queue. This eliminates thread creation overhead
+        # and keeps a predictable thread count.
+        self._update_queue = queue.Queue(maxsize=1)  # At most 1 pending update
+        self._worker_thread = threading.Thread(
+            target=self._worker_loop, daemon=True, name="PerfMon-Worker"
+        )
+        self._worker_thread.start()
+
+        # Create AfterTracker for auto-cleanup on destroy
+        self._tracker = AfterTracker(self)
+        
         # ---- Start periodic update (deferred) ----
         self._cached_ram = None
         self._cached_cpu = None
-        # Defer the first _update() call to avoid blocking initial UI rendering
+        # Defer the first _schedule_update() call to avoid blocking initial UI rendering
         # with subprocess calls (wmic/powershell/ps). The labels show '—' until
         # the 5-second mark, which is fine for a sidebar footer widget.
-        self.after(5000, self._update)
+        self._tracker.after(5000, self._schedule_update)
+
+    def _worker_loop(self):
+        """Persistent worker thread. Waits for update requests via queue.
+        This replaces the old pattern of spawning a new thread every 5 seconds."""
+        while self._running:
+            try:
+                # Wait for update request (1s timeout allows checking _running)
+                self._update_queue.get(timeout=1)
+            except queue.Empty:
+                continue
+            
+            if not self._running:
+                break
+            
+            # --- Run I/O-bound subprocess calls ---
+            ram, cpu = self._get_process_info()
+            thread_count = threading.active_count()
+            
+            # --- Report back to main thread ---
+            if self._running:
+                self.after(0, lambda r=ram, c=cpu, t=thread_count: 
+                           self._apply_update(r, c, t))
 
     def _get_process_info(self):
         """Get RAM (RSS in MB) and CPU %.
@@ -650,9 +792,10 @@ class PerformanceMonitor(ctk.CTkFrame):
 
         return ram_mb, cpu_pct
 
-    def _update(self):
-        """Starts a background thread for subprocess calls, then updates UI on main thread.
-        This prevents the 50-300ms freeze that wmic/powershell/ps causes every 5 seconds."""
+    def _schedule_update(self):
+        """Called every 5 seconds from main thread via after().
+        Sends an update request to the persistent worker thread via queue.
+        If worker is still busy with previous update, the cycle is skipped."""
         if not self._running:
             return
         try:
@@ -663,24 +806,24 @@ class PerformanceMonitor(ctk.CTkFrame):
             self._running = False
             return
 
-        # Capture thread count on main thread (threading.active_count is safe from
-        # any thread, but this avoids including the temporary worker thread in count)
-        thread_count = threading.active_count()
-
-        def _bg_work():
-            """Run I/O-bound subprocess calls in background thread."""
+        # Skip update when paused (during window resize) to avoid
+        # subprocess overhead competing with the window manager
+        if getattr(self, '_paused', False):
             try:
-                ram, cpu = self._get_process_info()
-                # Schedule UI update back on main thread
-                if self._running:
-                    self.after(0, lambda: self._apply_update(ram, cpu, thread_count))
+                self._tracker.after(5000, self._schedule_update)
             except Exception:
-                pass
+                self._running = False
+            return
 
-        threading.Thread(target=_bg_work, daemon=True).start()
+        # Send update request to persistent worker (non-blocking)
+        # If queue is full, worker is still busy — skip this cycle gracefully
+        try:
+            self._update_queue.put_nowait(True)
+        except queue.Full:
+            pass  # Worker busy, will pick up next 5s tick
 
         try:
-            self.after(5000, self._update)
+            self._tracker.after(5000, self._schedule_update)
         except Exception:
             self._running = False
 
@@ -707,5 +850,19 @@ class PerformanceMonitor(ctk.CTkFrame):
         if threads is not None:
             self.thread_label.configure(text=str(threads))
 
+    def pause(self):
+        """Pause periodic updates during window resize to avoid subprocess overhead."""
+        self._paused = True
+
+    def resume(self):
+        """Resume periodic updates after window resize ends."""
+        self._paused = False
+
     def stop(self):
+        """Stop the monitor and signal worker thread to exit."""
         self._running = False
+        # Wake up worker thread so it immediately checks _running and exits
+        try:
+            self._update_queue.put_nowait(None)
+        except queue.Full:
+            pass

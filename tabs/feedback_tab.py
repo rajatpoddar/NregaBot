@@ -143,7 +143,7 @@ class FeedbackTab(ctk.CTkFrame):
             is_admin = msg['is_admin_reply']
             bubble = ctk.CTkLabel(
                 frame, text=msg['message'], wraplength=400, justify="left",
-                fg_color=("#d1e7ff", "#2a3b4d") if not is_admin else ("#e2e3e5", "#373739"),
+                fg_color=config.COLORS["chat_bubble_user"] if not is_admin else ("#e2e3e5", "#373739"),
                 corner_radius=10, padx=10, pady=5
             )
 

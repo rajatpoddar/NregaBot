@@ -139,7 +139,7 @@ class AboutTab(ctk.CTkFrame):
         # --- END: NEW REFERRAL CODE ROW ---
 
         # --- START: NEW REFERRAL INFO BOX ---
-        info_frame = ctk.CTkFrame(details_frame, fg_color=("gray90", "gray20"))
+        info_frame = ctk.CTkFrame(details_frame, fg_color=(config.COLORS["gray90"], config.COLORS["gray20"]))
         info_frame.grid(row=8, column=0, columnspan=2, sticky="ew", padx=0, pady=(15, 0))
         
         info_text = "How the Referral Program Works:\n" \
@@ -187,10 +187,10 @@ class AboutTab(ctk.CTkFrame):
 
         # Widgets for showing new version changelog (initially hidden)
         self.new_version_changelog_label = ctk.CTkLabel(update_tab, text="What's New in the Next Version:", font=ctk.CTkFont(weight="bold"))
-        self.new_version_changelog_textbox = ctk.CTkTextbox(update_tab, wrap=tkinter.WORD, state="disabled", fg_color=("gray90", "gray20"))
+        self.new_version_changelog_textbox = ctk.CTkTextbox(update_tab, wrap=tkinter.WORD, state="disabled", fg_color=(config.COLORS["gray90"], config.COLORS["gray20"]))
 
         versions_url = f"{config.MAIN_WEBSITE_URL}/versions.html"
-        versions_link = ctk.CTkLabel(update_tab, text="View Full Version History Online ↗", text_color=("#3B82F6", "#60A5FA"), cursor="hand2")
+        versions_link = ctk.CTkLabel(update_tab, text="View Full Version History Online ↗", text_color=(config.COLORS["blue"], config.COLORS["blue_light"]), cursor="hand2")
         versions_link.grid(row=6, column=0, sticky='s', pady=(10, 5))
         versions_link.bind("<Button-1>", lambda e: webbrowser.open(versions_url))
 
@@ -212,7 +212,7 @@ class AboutTab(ctk.CTkFrame):
             self.welcome_suffix_label.configure(text="!")
 
             if key_type != 'trial': # Premium user styling
-                self.welcome_name_label.configure(text_color=("gold4", "#FFD700"), font=ctk.CTkFont(size=18, weight="bold"))
+                self.welcome_name_label.configure(text_color=(config.COLORS["gold4"], config.COLORS["gold"]), font=ctk.CTkFont(size=18, weight="bold"))
             else: # Trial user styling (default)
                 default_color = ctk.ThemeManager.theme["CTkLabel"]["text_color"]
                 self.welcome_name_label.configure(text_color=default_color, font=ctk.CTkFont(size=18, weight="bold"))
@@ -231,9 +231,9 @@ class AboutTab(ctk.CTkFrame):
                 expiry_date = datetime.fromisoformat(expires_at_str.split('T')[0]).date()
                 delta = expiry_date - datetime.now().date()
                 days_remaining = delta.days
-                if days_remaining < 0: status, status_color = "Expired", "#E53E3E" # Red
-                elif days_remaining <= 15: status, status_color = "Expires Soon", "#DD6B20" # Orange
-                else: status, status_color = "Active", "#38A169" # Green
+                if days_remaining < 0: status, status_color = "Expired", config.COLORS["red_expired"] # Red
+                elif days_remaining <= 15: status, status_color = "Expires Soon", config.COLORS["orange_expires"] # Orange
+                else: status, status_color = "Active", config.COLORS["green_status"] # Green
             except (ValueError, TypeError): pass
 
         self.status_label.configure(text=status.upper(), fg_color=status_color)
@@ -272,7 +272,7 @@ class AboutTab(ctk.CTkFrame):
         self._update_action_panel("Loading", "N/A")
 
     def _create_disclaimer_frame(self, parent):
-        disclaimer_frame = ctk.CTkFrame(parent, fg_color=("gray90", "gray20"))
+        disclaimer_frame = ctk.CTkFrame(parent, fg_color=(config.COLORS["gray90"], config.COLORS["gray20"]))
         disclaimer_frame.grid_columnconfigure(0, weight=1)
 
         title_label = ctk.CTkLabel(disclaimer_frame, text="Disclaimer", image=self.app.icon_images.get("disclaimer_warning"), compound="left", font=ctk.CTkFont(weight="bold"))
@@ -310,15 +310,15 @@ class AboutTab(ctk.CTkFrame):
                     auth_url = f"{config.LICENSE_SERVER_URL}/authenticate-from-app/{self.license_info['key']}"
                     webbrowser.open_new_tab(auth_url)
                 else: messagebox.showerror("Error", "License key not found.")
-            return ctk.CTkButton(parent, text="Manage on Website", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=open_manage_url)
+            return ctk.CTkButton(parent, text="Manage on Website", fg_color="transparent", border_width=1, text_color=(config.COLORS["gray10"], config.COLORS["text_bright"]), command=open_manage_url)
 
         # --- Trial Panel ---
         if key_type == 'trial':
             # (Keep this section as is)
-            panel = ctk.CTkFrame(self.action_panel_container, border_color="#3B82F6", border_width=2) # Blue border
+            panel = ctk.CTkFrame(self.action_panel_container, border_color=config.COLORS["blue"], border_width=2) # Blue border
             panel.grid(row=0, column=0, sticky="nsew")
             panel.grid_columnconfigure(0, weight=1)
-            ctk.CTkLabel(panel, text="Trial Version Active", font=ctk.CTkFont(size=16, weight="bold"), text_color="#3B82F6").pack(pady=(20,10), padx=20)
+            ctk.CTkLabel(panel, text="Trial Version Active", font=ctk.CTkFont(size=16, weight="bold"), text_color=config.COLORS["blue"]).pack(pady=(20,10), padx=20)
             ctk.CTkLabel(panel, text="Upgrade to a full license to unlock all features permanently and remove limitations.", wraplength=300, justify="center").pack(pady=5, padx=20)
             ctk.CTkButton(panel, text="Upgrade to Full License", command=lambda: self.app.show_purchase_window(context='upgrade')).pack(pady=20, ipady=5)
             button_container = ctk.CTkFrame(panel, fg_color="transparent")
@@ -331,7 +331,7 @@ class AboutTab(ctk.CTkFrame):
         # --- Expired / Expires Soon Panel ---
         elif status in ["Expired", "Expires Soon"]:
             # (Keep this section as is)
-            border_color = "#E53E3E" if status == "Expired" else "#DD6B20" # Red or Orange border
+            border_color = config.COLORS["red_expired"] if status == "Expired" else config.COLORS["orange_expires"] # Red or Orange border
             panel = ctk.CTkFrame(self.action_panel_container, border_color=border_color, border_width=2)
             panel.grid(row=0, column=0, sticky="nsew")
             panel.grid_columnconfigure(0, weight=1)
@@ -368,7 +368,7 @@ class AboutTab(ctk.CTkFrame):
         else:
             for machine_id in activated_machines:
                 is_current_device = (machine_id == self.app.machine_id)
-                device_entry_frame = ctk.CTkFrame(scroll_area, fg_color=("gray85", "gray20"))
+                device_entry_frame = ctk.CTkFrame(scroll_area, fg_color=(config.COLORS["gray85"], config.COLORS["gray20"]))
                 device_entry_frame.pack(fill="x", pady=(0, 5))
                 
                 # --- MODIFIED: Display logic for name/mac ---
@@ -430,7 +430,7 @@ class AboutTab(ctk.CTkFrame):
         button_container.grid_columnconfigure((0, 1), weight=1)
 
         create_manage_button(button_container).grid(row=0, column=0, sticky="ew", padx=(0, 5))
-        ctk.CTkButton(button_container, text="Contact Support", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.contact_support_email).grid(row=0, column=1, sticky="ew", padx=(5, 0))
+        ctk.CTkButton(button_container, text="Contact Support", fg_color="transparent", border_width=1, text_color=(config.COLORS["gray10"], config.COLORS["text_bright"]), command=self.contact_support_email).grid(row=0, column=1, sticky="ew", padx=(5, 0))
 
 
     # --- MODIFIED: _send_deactivation_request_api ---
@@ -561,7 +561,7 @@ class AboutTab(ctk.CTkFrame):
         dialog.protocol("WM_DELETE_WINDOW", on_cancel) # Handle 'X' button
 
         ok_button = ctk.CTkButton(main_frame, text="Ok", command=on_ok, width=150,
-                                  fg_color="#3B82F6", hover_color="#2563EB")
+                                  fg_color=config.COLORS["blue"], hover_color=config.COLORS["blue_hover"])
         ok_button.grid(row=2, column=0, padx=(0, 5))
         
         cancel_button = ctk.CTkButton(main_frame, text="Cancel", command=on_cancel, width=150,

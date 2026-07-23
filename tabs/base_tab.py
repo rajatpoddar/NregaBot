@@ -9,6 +9,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont 
 from fpdf import FPDF 
 
+import config
 from utils import resource_path
 
 # --- REUSABLE DATE PICKER CLASS ---
@@ -90,17 +91,17 @@ class DatePickerPopup(ctk.CTkToplevel):
                     text_color = ("black", "white")
 
                     if c == 0: # Monday (Greenish)
-                        btn_fg_color = ("#E8F5E9", "#1B5E20") 
+                        btn_fg_color = ((config.COLORS["green_very_light"], config.COLORS["green_dark_btn"])) 
                     elif c == 6: # Sunday (Reddish)
-                        btn_fg_color = ("#FFEBEE", "#8B0000")
-                        text_color = ("#C62828", "#FFCCCC")
+                        btn_fg_color = ((config.COLORS["red_very_light"], config.COLORS["red_dark"]))
+                        text_color = ((config.COLORS["red_text"], config.COLORS["red_text_light"]))
 
                     # Highlight Today (Blue)
                     now = datetime.now()
                     if day == now.day and self.current_month == now.month and self.current_year == now.year:
-                        btn_fg_color = ("#2196F3", "#1976D2")
+                        btn_fg_color = ((config.COLORS["blue"], config.COLORS["blue_hover"]))
                         text_color = "white"
-                        hover_color = ("#1E88E5", "#1565C0")
+                        hover_color = ((config.COLORS["blue_hover_nav"], config.COLORS["blue_dark"]))
 
                     btn = ctk.CTkButton(
                         self.cal_frame, text=str(day), width=35, height=35,
@@ -174,6 +175,18 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.app = app_instance
         self.automation_key = automation_key
         self.retry_btn = None # Placeholder for retry button
+        
+        # --- AfterTracker for safe callback cleanup on tab destroy ---
+        from ui_components import AfterTracker
+        self._safe_after = AfterTracker(self)
+        
+    def safe_after(self, ms, callback, *args):
+        """
+        Tracked version of after() that auto-cancels when tab is destroyed.
+        Prevents ghost callbacks from firing after tab is gone.
+        Use this instead of self.after() for recurring callbacks.
+        """
+        return self._safe_after.after(ms, callback, *args)
         
     def open_date_picker(self, callback):
         # ---- Lazy imports ----
@@ -539,18 +552,18 @@ class BaseAutomationTab(ctk.CTkFrame):
         inner_container = ctk.CTkFrame(outer_wrapper, fg_color="transparent")
         inner_container.pack(expand=True, anchor="center")
         
-        self.start_button = ctk.CTkButton(inner_container, text="▶ Start", command=self.start_automation, width=110, height=32, corner_radius=8, fg_color="#2E8B57", hover_color="#1F5E39", font=ctk.CTkFont(size=13, weight="bold"))
+        self.start_button = ctk.CTkButton(inner_container, text="▶ Start", command=self.start_automation, width=110, height=32, corner_radius=8, fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["btn_start_hover"], font=ctk.CTkFont(size=13, weight="bold"))
         self.start_button.pack(side="left", padx=(0, 8))
 
-        self.stop_button = ctk.CTkButton(inner_container, text="■ Stop", command=self.stop_automation, state="disabled", width=90, height=32, corner_radius=8, fg_color="#C53030", hover_color="#9B2C2C", font=ctk.CTkFont(size=13, weight="bold"))
+        self.stop_button = ctk.CTkButton(inner_container, text="■ Stop", command=self.stop_automation, state="disabled", width=90, height=32, corner_radius=8, fg_color=config.COLORS["btn_stop"], hover_color=config.COLORS["btn_stop_hover"], font=ctk.CTkFont(size=13, weight="bold"))
         self.stop_button.pack(side="left", padx=(0, 8))
         
         # --- NEW RETRY BUTTON ---
-        self.retry_btn = ctk.CTkButton(inner_container, text="↻ Retry Failed", command=self.retry_logic_handler, width=110, height=32, corner_radius=8, fg_color="#D97706", hover_color="#B45309", font=ctk.CTkFont(size=13, weight="bold"))
+        self.retry_btn = ctk.CTkButton(inner_container, text="↻ Retry Failed", command=self.retry_logic_handler, width=110, height=32, corner_radius=8, fg_color=config.COLORS["orange"], hover_color=config.COLORS["orange_hover"], font=ctk.CTkFont(size=13, weight="bold"))
         self.retry_btn.pack(side="left", padx=(0, 8))
         self.retry_btn.configure(state="disabled") # Initially disabled
 
-        self.reset_button = ctk.CTkButton(inner_container, text="↺ Reset", command=self.reset_ui, width=90, height=32, corner_radius=8, fg_color=("gray70", "#4A4A4A"), hover_color=("gray60", "#3A3A3A"), text_color="white", font=ctk.CTkFont(size=13))
+        self.reset_button = ctk.CTkButton(inner_container, text="↺ Reset", command=self.reset_ui, width=90, height=32, corner_radius=8, fg_color=(config.COLORS["gray70"], config.COLORS["gray40_"]), hover_color=(config.COLORS["gray60"], config.COLORS["gray35_"]), text_color="white", font=ctk.CTkFont(size=13))
         self.reset_button.pack(side="left")
         
         return outer_wrapper
@@ -693,9 +706,16 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.app.log_message(self.log_display, f"Retrying {len(failed_items)} failed items...", "info")
         self.start_automation()
 
+    def _get_style(self):
+        """Return a cached ttk.Style singleton to avoid recreation overhead."""
+        if not hasattr(self.app, '_cached_style') or self.app._cached_style is None:
+            style = ttk.Style()
+            style.theme_use("clam")
+            self.app._cached_style = style
+        return self.app._cached_style
+
     def style_treeview(self, treeview_widget=None):
-        style = ttk.Style()
-        style.theme_use("clam")
+        style = self._get_style()
 
         mode = ctk.get_appearance_mode()
 

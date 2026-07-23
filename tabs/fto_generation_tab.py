@@ -66,10 +66,10 @@ class FtoGenerationTab(BaseAutomationTab):
         self.browse_btn = ctk.CTkButton(setup_frame, text="Browse", width=70, command=self._browse_firefox)
         self.browse_btn.grid(row=0, column=2, padx=5, pady=5)
 
-        self.check_install_btn = ctk.CTkButton(setup_frame, text="Check Install", width=100, fg_color="#D97706", hover_color="#B45309", command=self._check_installation)
+        self.check_install_btn = ctk.CTkButton(setup_frame, text="Check Install", width=100, fg_color=config.COLORS["orange"], hover_color=config.COLORS["orange_hover"], command=self._check_installation)
         self.check_install_btn.grid(row=0, column=3, padx=5, pady=5)
 
-        self.launch_btn = ctk.CTkButton(setup_frame, text="Launch Old Firefox", fg_color="#108842", hover_color="#1A994C", command=self._launch_firefox)
+        self.launch_btn = ctk.CTkButton(setup_frame, text="Launch Old Firefox", fg_color=config.COLORS["green_launch"], hover_color=config.COLORS["teal_green_hover"], command=self._launch_firefox)
         self.launch_btn.grid(row=0, column=4, padx=5, pady=5)
 
         # --- Row 2: Main Action Buttons (Start/Stop/Reset) ---
@@ -105,8 +105,8 @@ class FtoGenerationTab(BaseAutomationTab):
             command=self._go_to_mr_tracking,
             width=200,
             height=32,
-            fg_color="#3B82F6",
-            hover_color="#2563EB",
+            fg_color=config.COLORS["blue"],
+            hover_color=config.COLORS["blue_hover"],
             font=ctk.CTkFont(size=13, weight="bold")
         )
         
