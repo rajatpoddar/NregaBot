@@ -453,6 +453,8 @@ class PhysicalCompleteTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.panchayat_entry.configure(state=state)

@@ -91,6 +91,8 @@ class WagelistSendTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.fin_year_combobox.configure(state=state)

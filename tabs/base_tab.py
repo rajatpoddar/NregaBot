@@ -10,12 +10,18 @@ from PIL import Image, ImageDraw, ImageFont
 from fpdf import FPDF 
 
 import config
-from utils import resource_path
+from utils import resource_path, get_logger
+
+logger = get_logger()
 
 # --- REUSABLE DATE PICKER CLASS ---
 class DatePickerPopup(ctk.CTkToplevel):
     """
-    A reusable modal popup for selecting a date.
+    R7: Optimized modal popup for selecting a date.
+    
+    Pre-creates all day buttons ONCE in __init__, then reuses them
+    on month navigation — no widget destruction/creation overhead.
+    
     Features:
     - Centered on the main application window.
     - Highlights Today (Blue), Mondays (Greenish), and Sundays (Reddish).
@@ -49,88 +55,121 @@ class DatePickerPopup(ctk.CTkToplevel):
         self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.header_frame.pack(fill="x", padx=10, pady=(10, 5))
         
-        ctk.CTkButton(self.header_frame, text="<", width=30, command=self.prev_month, 
+        ctk.CTkButton(self.header_frame, text="<", width=30, command=self.prev_month,
                       fg_color="transparent", border_width=1, text_color=("black", "white")).pack(side="left")
         
         self.lbl_month_year = ctk.CTkLabel(self.header_frame, text="", font=("Arial", 16, "bold"))
         self.lbl_month_year.pack(side="left", expand=True)
         
-        ctk.CTkButton(self.header_frame, text=">", width=30, command=self.next_month, 
+        ctk.CTkButton(self.header_frame, text=">", width=30, command=self.next_month,
                       fg_color="transparent", border_width=1, text_color=("black", "white")).pack(side="right")
         
         # --- Calendar Grid Section ---
         self.cal_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.cal_frame.pack(expand=True, fill="both", padx=10, pady=5)
-        
-        self.draw_calendar()
-        self.focus_force() 
 
-    def draw_calendar(self):
-        """Renders the grid of days for the current month."""
-        for widget in self.cal_frame.winfo_children():
-            widget.destroy()
-            
-        # Update Header
+        # --- R7: Pre-create weekday headers ONCE (never destroyed) ---
+        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        for i, day_name in enumerate(days):
+            t_color = "red" if i == 6 else ("gray30", "gray70")
+            ctk.CTkLabel(
+                self.cal_frame, text=day_name,
+                font=("Arial", 12, "bold"), text_color=t_color
+            ).grid(row=0, column=i, padx=2, pady=5)
+
+        # --- R7: Pre-create 42 reusable day buttons (6 rows × 7 cols) ---
+        self.day_buttons = []  # 2D list: day_buttons[row][col]
+        for r in range(6):
+            row_btns = []
+            for c in range(7):
+                btn = ctk.CTkButton(
+                    self.cal_frame, text="", width=35, height=35,
+                    fg_color="transparent",
+                    hover_color=("gray80", "gray30"),
+                    text_color=("black", "white"),
+                    command=lambda d=0: self._on_day_click(d)
+                )
+                btn.grid(row=r + 1, column=c, padx=2, pady=2)
+                row_btns.append(btn)
+            self.day_buttons.append(row_btns)
+
+        # --- Populate buttons for current month ---
+        self._update_calendar()
+        self.focus_force()
+
+    def _on_day_click(self, day):
+        """Handle a day button click — guard against zero-day (empty cell)."""
+        if day > 0:
+            selected_date = f"{day:02d}/{self.current_month:02d}/{self.current_year}"
+            self.on_date_select(selected_date)
+            self.destroy()
+
+    def _update_calendar(self):
+        """
+        R7: Reuses pre-created day buttons instead of destroying/creating widgets.
+        Only updates text, colors, and commands — no widget creation overhead.
+        """
+        # Update header
         month_name = calendar.month_name[self.current_month]
         self.lbl_month_year.configure(text=f"{month_name} {self.current_year}")
-        
-        # Weekday Headers
-        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        for i, day in enumerate(days):
-            t_color = "red" if i == 6 else ("gray30", "gray70")
-            ctk.CTkLabel(self.cal_frame, text=day, font=("Arial", 12, "bold"), text_color=t_color).grid(row=0, column=i, padx=2, pady=5)
-            
-        # Days Grid
+
         cal = calendar.monthcalendar(self.current_year, self.current_month)
+        now = datetime.now()
+        today = (now.day, now.month, now.year)
+
         for r, week in enumerate(cal):
             for c, day in enumerate(week):
+                btn = self.day_buttons[r][c]
                 if day != 0:
-                    # Color Logic
-                    btn_fg_color = "transparent"
-                    hover_color = ("gray80", "gray30")
-                    text_color = ("black", "white")
+                    # Defaults
+                    fg = "transparent"
+                    hov = ("gray80", "gray30")
+                    txt = ("black", "white")
 
-                    if c == 0: # Monday (Greenish)
-                        btn_fg_color = ((config.COLORS["green_very_light"], config.COLORS["green_dark_btn"])) 
-                    elif c == 6: # Sunday (Reddish)
-                        btn_fg_color = ((config.COLORS["red_very_light"], config.COLORS["red_dark"]))
-                        text_color = ((config.COLORS["red_text"], config.COLORS["red_text_light"]))
+                    if c == 0:  # Monday — Greenish
+                        fg = (config.COLORS["green_very_light"], config.COLORS["green_dark_btn"])
+                    elif c == 6:  # Sunday — Reddish
+                        fg = (config.COLORS["red_very_light"], config.COLORS["red_dark"])
+                        txt = (config.COLORS["red_text"], config.COLORS["red_text_light"])
 
-                    # Highlight Today (Blue)
-                    now = datetime.now()
-                    if day == now.day and self.current_month == now.month and self.current_year == now.year:
-                        btn_fg_color = ((config.COLORS["blue"], config.COLORS["blue_hover"]))
-                        text_color = "white"
-                        hover_color = ((config.COLORS["blue_hover_nav"], config.COLORS["blue_dark"]))
+                    # Highlight Today — Blue
+                    if day == today[0] and self.current_month == today[1] and self.current_year == today[2]:
+                        fg = (config.COLORS["blue"], config.COLORS["blue_hover"])
+                        txt = "white"
+                        hov = (config.COLORS["blue_hover_nav"], config.COLORS["blue_dark"])
 
-                    btn = ctk.CTkButton(
-                        self.cal_frame, text=str(day), width=35, height=35,
-                        fg_color=btn_fg_color, 
-                        hover_color=hover_color,
-                        text_color=text_color,
-                        command=lambda d=day: self.select_date(d)
+                    btn.configure(
+                        text=str(day),
+                        fg_color=fg,
+                        hover_color=hov,
+                        text_color=txt,
+                        state="normal",
+                        command=lambda d=day: self._on_day_click(d)
                     )
-                    btn.grid(row=r+1, column=c, padx=2, pady=2)
+                else:
+                    # Empty cell — hide button
+                    btn.configure(text="", state="disabled")
 
     def prev_month(self):
         self.current_month -= 1
         if self.current_month == 0:
             self.current_month = 12
             self.current_year -= 1
-        self.draw_calendar()
+        self._update_calendar()
 
     def next_month(self):
         self.current_month += 1
         if self.current_month == 13:
             self.current_month = 1
             self.current_year += 1
-        self.draw_calendar()
+        self._update_calendar()
 
     def select_date(self, day):
-        # Return date in DD/MM/YYYY format
-        selected_date = f"{day:02d}/{self.current_month:02d}/{self.current_year}"
-        self.on_date_select(selected_date)
-        self.destroy()
+        """Legacy method kept for backward compatibility."""
+        if day > 0:
+            selected_date = f"{day:02d}/{self.current_month:02d}/{self.current_year}"
+            self.on_date_select(selected_date)
+            self.destroy()
 
 # --- CUSTOM PDF CLASS FOR PROFESSIONAL HEADER/FOOTER ---
 class ProfessionalPDF(FPDF):
@@ -146,7 +185,7 @@ class ProfessionalPDF(FPDF):
             if os.path.exists(logo_path):
                 self.image(logo_path, 10, 8, 12)
                 self.set_x(25) # Move text cursor after logo
-        except: pass
+        except Exception as e: logger.debug("Failed to load PDF logo: %s", e)
 
         # Title
         self.set_font('Arial', 'B', 15)
@@ -175,10 +214,43 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.app = app_instance
         self.automation_key = automation_key
         self.retry_btn = None # Placeholder for retry button
+        self._tab_destroyed = False  # Flag: set True in destroy() to prevent UI updates on dead widgets
         
         # --- AfterTracker for safe callback cleanup on tab destroy ---
         from ui_components import AfterTracker
         self._safe_after = AfterTracker(self)
+        
+    def destroy(self):
+        """
+        Override destroy() to set a flag that prevents background threads
+        from updating widgets on a destroyed tab.
+        
+        DO NOT call driver.quit() here — the automation thread may be using
+        the same driver concurrently, causing a GIL fatal crash. The driver
+        is cleaned up in start_automation_thread()'s wrapper() after the
+        target() function returns.
+        
+        DO NOT set stop_event here — the new tab instance shares the same
+        automation_key, which would replace the Event in stop_events[key],
+        causing the old thread to read the new (unset) Event.
+        """
+        self._tab_destroyed = True
+        super().destroy()
+        
+    def _is_alive(self):
+        """Returns True if the tab's widgets still exist and can be updated.
+        
+        Background threads call set_common_ui_state() / log_message() via
+        self.app.after(0, ...). If the user navigated away before the callback
+        fires, all widgets are destroyed and winfo_exists() returns False.
+        This guard prevents TclError: invalid command name.
+        """
+        if self._tab_destroyed:
+            return False
+        try:
+            return bool(self.winfo_exists())
+        except Exception:
+            return False
         
     def safe_after(self, ms, callback, *args):
         """
@@ -601,11 +673,30 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.progress_bar.pack(side="right", padx=10, fill="x", expand=True)
     
     def set_common_ui_state(self, running: bool):
-        self.start_button.configure(state="disabled" if running else "normal", text="Running..." if running else "▶ Start")
-        self.stop_button.configure(state="normal" if running else "disabled")
-        self.reset_button.configure(state="disabled" if running else "normal")
+        """Updates Start/Stop/Reset/Retry buttons based on running state.
+        
+        Safe to call after tab has been destroyed — checks _is_alive()
+        and wraps each configure() in try/except to prevent TclError.
+        """
+        if not self._is_alive():
+            return
+        try:
+            self.start_button.configure(state="disabled" if running else "normal", text="Running..." if running else "▶ Start")
+        except Exception:
+            pass
+        try:
+            self.stop_button.configure(state="normal" if running else "disabled")
+        except Exception:
+            pass
+        try:
+            self.reset_button.configure(state="disabled" if running else "normal")
+        except Exception:
+            pass
         if self.retry_btn:
-            self.retry_btn.configure(state="disabled" if running else "normal")
+            try:
+                self.retry_btn.configure(state="disabled" if running else "normal")
+            except Exception:
+                pass
 
     def reset_ui(self):
         # ---- Lazy imports ----
@@ -631,9 +722,22 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.app.log_message(self.log_display, "Stop signal sent. Finishing current task...", "warning")
 
     def update_status(self, message, progress=None):
-        self.status_label.configure(text=f"Status: {message}")
+        """Update status label and progress bar.
+        
+        Safe to call after tab has been destroyed — checks _is_alive()
+        and wraps configure() in try/except.
+        """
+        if not self._is_alive():
+            return
+        try:
+            self.status_label.configure(text=f"Status: {message}")
+        except Exception:
+            pass
         if progress is not None:
-            self.progress_bar.set(float(progress))
+            try:
+                self.progress_bar.set(float(progress))
+            except Exception:
+                pass
         # --- FIXED: Update Global App Status ---
         if hasattr(self.app, 'set_status'):
             self.app.set_status(message)

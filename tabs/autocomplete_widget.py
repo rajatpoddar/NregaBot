@@ -1,5 +1,8 @@
 # tabs/autocomplete_widget.py
 import customtkinter as ctk
+from utils import get_logger
+
+logger = get_logger()
 
 class AutocompleteEntry(ctk.CTkEntry):
     def __init__(self, parent, suggestions_list=None, app_instance=None, history_key=None, **kwargs):
@@ -80,7 +83,7 @@ class AutocompleteEntry(ctk.CTkEntry):
         self._suggestion_toplevel = ctk.CTkToplevel(self)
         self._suggestion_toplevel.wm_overrideredirect(True)
         try: self._suggestion_toplevel.transient(self.winfo_toplevel())
-        except: pass
+        except Exception as e: logger.debug("Autocomplete: failed to set transient: %s", e)
         self._suggestion_toplevel.attributes("-topmost", True)
         self._suggestion_toplevel.withdraw()
 
@@ -163,14 +166,14 @@ class AutocompleteEntry(ctk.CTkEntry):
             self._hide_suggestions()
             self.focus_force() 
             self.event_generate("<KeyRelease>") 
-        except: pass
+        except Exception as e: logger.debug("Autocomplete: failed to generate KeyRelease: %s", e)
         self._is_selecting = False
 
     def _on_focus_out(self, event):
         # Safely schedule hide
         try:
             self.after(250, lambda: self._hide_suggestions() if self.winfo_exists() else None)
-        except: pass
+        except Exception as e: logger.debug("Autocomplete: failed to schedule hide: %s", e)
 
     def _delete_suggestion(self, value):
         if self.app and self.history_key:
@@ -187,7 +190,7 @@ class AutocompleteEntry(ctk.CTkEntry):
                 color = ("gray80", "gray30") if i == index else "transparent"
                 frame.configure(fg_color=color)
             self._active_suggestion_index = index
-        except: pass
+        except Exception as e: logger.debug("Autocomplete: failed to highlight suggestion: %s", e)
 
     def _on_arrow_down(self, event):
         if not self._visible_suggestions: return

@@ -112,6 +112,8 @@ class UpdateEstimateTab(BaseAutomationTab):
         self._setup_treeview_sorting(self.results_tree)
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         """Enables or disables UI elements based on automation status."""
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"

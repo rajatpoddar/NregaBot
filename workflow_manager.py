@@ -2,6 +2,9 @@ import threading
 import time
 from tkinter import messagebox
 import tkinter
+from utils import get_logger
+
+logger = get_logger()
 
 class WorkflowManager:
     def __init__(self, app):
@@ -118,7 +121,9 @@ class WorkflowManager:
         self._log(macro_tab, f"Starting automation '{automation_key}' for {target}...")
         
         # 3. Start Automation
-        self.app.after(1500, lambda: self.app.update_idletasks())
+        # P1: Removed unnecessary update_idletasks — the 3s delay before
+        # start_automation gives the event loop plenty of time to flush
+        # pending UI updates naturally.
         self.app.after(3000, lambda: tab.start_automation())
         
         return self._wait_for_automation_finish(automation_key, macro_tab=macro_tab)
@@ -340,7 +345,7 @@ class WorkflowManager:
             for var_name in vars_to_clear:
                 if hasattr(tab, var_name):
                     try: getattr(tab, var_name).set(0)
-                    except: pass
+                    except Exception as e: logger.debug("Failed to clear var %s: %s", var_name, e)
 
             # --- 2. Set "Show Pending for ABPS" Checkbox ---
             if hasattr(tab, 'abps_pending_var'):

@@ -105,6 +105,8 @@ class PDFMergerTab(BaseAutomationTab):
         self.progress_bar.pack_forget()
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         # Use the base class method to handle Start, Stop, Reset
         self.set_common_ui_state(running)
         

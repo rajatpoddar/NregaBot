@@ -13,6 +13,9 @@ from io import StringIO
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 import config
+from utils import get_logger
+
+logger = get_logger()
 
 class MisReportsTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -131,6 +134,8 @@ class MisReportsTab(BaseAutomationTab):
             var.set(1 if select else 0)
     
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         # This function correctly disables UI elements during automation
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
@@ -353,7 +358,7 @@ class MisReportsTab(BaseAutomationTab):
                                 try:
                                     if len(str(cell.value)) > max_length:
                                         max_length = len(str(cell.value))
-                                except: pass
+                                except Exception as e: logger.debug("MIS: Could not adjust column width: %s", e)
                             adjusted_width = min((max_length + 2), 50)
                             worksheet.column_dimensions[column_letter].width = adjusted_width
                         # --- END: FINAL EXCEL FORMATTING ---

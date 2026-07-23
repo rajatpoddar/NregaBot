@@ -7,6 +7,9 @@ from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from utils import get_logger
+
+logger = get_logger()
 
 def resource_path(relative_path):
     try: base_path = sys._MEIPASS
@@ -115,9 +118,11 @@ class JobcardVerifyTab(BaseAutomationTab):
             data = {"panchayat": panchayat, "village": village, "folder": self.photo_folder_path}
             with open(self.pref_file, 'w') as f:
                 json.dump(data, f)
-        except Exception: pass
+        except Exception as e: logger.debug("JobcardVerify: Could not save preferences: %s", e)
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.panchayat_entry.configure(state=state)
@@ -321,7 +326,7 @@ class JobcardVerifyTab(BaseAutomationTab):
                 links = driver.find_elements(By.ID, f"{row_id_base}_link_img_F")
                 if not links: links = driver.find_elements(By.ID, f"{row_id_base}_link_img_W")
                 if links: upload_link = links[0]
-            except: pass
+            except Exception as e: logger.debug("JobcardVerify: Could not find upload link: %s", e)
 
             if upload_link and photo_to_upload:
                 try:

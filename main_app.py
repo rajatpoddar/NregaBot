@@ -59,7 +59,8 @@ from tabs.history_manager import HistoryManager
 from tabs.macro_manager_tab import MacroManagerTab
 from utils import (
     resource_path, get_data_path, get_user_downloads_path, 
-    get_config, save_config
+    get_config, save_config, validate_config,
+    setup_logging, get_logger
 )
 
 # Note: Heavy libraries (Selenium) are imported inside 
@@ -69,8 +70,14 @@ from utils import (
 # CONFIGURATION & SETUP
 # ============================================================================
 
+# C8: Initialize centralized logging before anything else
+setup_logging()
+logger = get_logger()
+
 load_dotenv()
 config.create_default_config_if_not_exists()
+# A5: Validate config.json before use — auto-resets if corrupted
+validate_config()
 
 # Store original messagebox functions to override them later
 _original_showinfo = messagebox.showinfo
@@ -146,6 +153,10 @@ class NregaBotApp(ctk.CTk):
         self.button_to_category_frame = {}
         self.category_frames = {}
         self.last_selected_category = get_config('last_selected_category', 'All Automations')
+
+        # --- P5: Lazy nav icon tracking ---
+        self._category_icons_loaded = set()  # Track which categories have had icons loaded
+        self._tab_icon_keys = {}            # tab_name → icon key string for lazy loading
         
         # --- User Preferences (Reactive Variables) ---
         self.sound_switch_var = tkinter.BooleanVar(value=get_config('sound_enabled', True))
@@ -173,6 +184,7 @@ class NregaBotApp(ctk.CTk):
         # --- GC Tuning: Reduce memory fragmentation for long-running GUI app ---
         gc.set_threshold(700, 10, 5)
         gc.freeze()
+        self._gc_timer_id = None  # P6: Periodic garbage collection timer
 
         # --- STARTUP SEQUENCE ---
         
@@ -191,6 +203,9 @@ class NregaBotApp(ctk.CTk):
 
         # 4. Set Cleanup Protocol
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        # 5. Start periodic GC (5min interval) to prevent memory fragmentation
+        self.after(300000, self._gc_collection_loop)  # First run after 5 min
 
     def _create_splash_screen(self):
         """Creates a clean, modern splash screen with high readability on both themes."""
@@ -216,9 +231,9 @@ class NregaBotApp(ctk.CTk):
         try:
             logo = ctk.CTkImage(Image.open(resource_path("logo.png")), size=(64, 64))
             ctk.CTkLabel(inner, image=logo, text="").pack(pady=(5, 10))
-        except Exception:
-            pass
-
+        except Exception as e:
+            logger.debug("Failed to load splash screen logo: %s", e)
+        
         # App Name - Large, bold, high contrast on both themes
         ctk.CTkLabel(
             inner, text=f"{config.APP_NAME}",
@@ -250,8 +265,8 @@ class NregaBotApp(ctk.CTk):
                     d = "." * (self._splash_dots % 4)
                     splash.dots_label.configure(text=f"Loading{d}")
                     splash.after(120, _splash_animate)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Splash animation error: %s", e)
         _splash_animate()
 
         # Version - Larger and bold for better visibility
@@ -293,18 +308,19 @@ class NregaBotApp(ctk.CTk):
         self.grid_columnconfigure(0, weight=1)
 
         # --- Stage 1: Header ---
+        # P1: Removed intermediate update_idletasks() calls — splash screen is still
+        # visible during these stages, so progressive rendering provides no visual benefit.
         self._create_header()
-        self.update_idletasks()  # Let tkinter render header before moving on
 
         # --- Stage 2: Footer ---
         self._create_footer()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
-        self.update_idletasks()  # Render footer before heavy layout
         
-        # Mac OS Specific Delay fix
+        # Mac OS Specific: force one paint cycle to wake up the event loop.
+        # P1: Removed time.sleep(0.1) — the update() alone is sufficient to
+        # flush the event queue on macOS without blocking the main thread.
         if config.OS_SYSTEM == "Darwin":
-            self.update() 
-            time.sleep(0.1)
+            self.update()
 
         # --- Stage 3: Main Layout (sidebar + content area) ---
         self._create_main_layout(for_activation=True)
@@ -346,15 +362,17 @@ class NregaBotApp(ctk.CTk):
             self._fade_out_splash(self.splash, step=0)
 
     def _fade_out_splash(self, splash, step):
-        """Recursively fades out the splash screen."""
-        if step <= 5:
+        """Recursively fades out the splash screen (15 steps for smooth animation)."""
+        total_steps = 15
+        if step <= total_steps:
             try:
                 if splash.winfo_exists():
-                    splash.attributes("-alpha", 1.0 - (step / 5))
-                    self.after(30, lambda: self._fade_out_splash(splash, step + 1))
+                    splash.attributes("-alpha", 1.0 - (step / total_steps))
+                    self.after(20, lambda: self._fade_out_splash(splash, step + 1))
                 else:
                     self._fade_in_main_window()
-            except Exception:
+            except Exception as e:
+                logger.debug("Splash fade error: %s", e)
                 self._fade_in_main_window()
         else:
             if splash.winfo_exists():
@@ -428,7 +446,8 @@ class NregaBotApp(ctk.CTk):
         self.update(), then set alpha=1. The user sees the COMPLETE window
         in one frame — no progressive rendering.
         """
-        self.update_idletasks()
+        # P1: Removed standalone update_idletasks() — the 2x paint loop
+        # below already handles all pending layout calculations.
         work_x, work_y, work_width, work_height = self._get_work_area()
         min_w, min_h = 1000, 700 
         app_height = min(self.initial_height, work_height - 40 if work_height > min_h else work_height)
@@ -446,10 +465,11 @@ class NregaBotApp(ctk.CTk):
         self.deiconify()
 
         # Step 2: Force tkinter to paint everything NOW while still invisible
-        # Multiple passes (3x) ensure layout calculation AND pixel composition
-        # complete before the window becomes visible — critical on low-end GPUs
-        # that may skip composition for fully transparent windows.
-        for _ in range(3):
+        # P1: Reduced from 3 to 2 passes. Two full paint cycles (update + 
+        # update_idletasks) are sufficient for layout calculation AND pixel
+        # composition — even on low-end GPUs that may skip composition for
+        # transparent windows. The third pass was redundant.
+        for _ in range(2):
             self.update()
             self.update_idletasks()
 
@@ -473,7 +493,27 @@ class NregaBotApp(ctk.CTk):
             OnboardingGuide(self)
             try:
                 with open(flag_path, 'w') as f: f.write(datetime.now().isoformat())
-            except Exception as e: print(f"Could not write first run flag: {e}")
+            except Exception as e: logger.warning("Could not write first run flag: %s", e)
+
+    def _gc_collection_loop(self):
+        """P6: Periodic garbage collection to prevent memory fragmentation.
+        Runs gc.collect() every 5 minutes during long app sessions.
+        gc.freeze() at startup prevents scanning startup objects,
+        so this only collects cycles created during runtime."""
+        try:
+            # Only collect if the app window still exists
+            if self.winfo_exists():
+                collected = gc.collect()
+                if collected > 0:
+                    logger.info("GC Collected %s objects (periodic cleanup)", collected)
+        except Exception as e:
+            logger.debug("GC collection failed: %s", e)
+        # Schedule next run in 5 minutes (300000ms)
+        try:
+            if self.winfo_exists():
+                self._gc_timer_id = self.after(300000, self._gc_collection_loop)
+        except Exception as e:
+            logger.debug("Failed to schedule next GC collection: %s", e)
 
     def on_closing(self, force=False):
         """Handles application shutdown gracefully and cleans up browsers."""
@@ -482,12 +522,21 @@ class NregaBotApp(ctk.CTk):
             try:
                 if hasattr(self, 'performance_monitor'):
                     self.performance_monitor.stop()
-            except: pass
+            except Exception as e:
+                logger.debug("Failed to stop performance monitor during shutdown: %s", e)
+            
+            # Cancel periodic GC timer
+            if self._gc_timer_id:
+                try:
+                    self.after_cancel(self._gc_timer_id)
+                except Exception as e:
+                    logger.warning("Failed to cancel GC timer during shutdown: %s", e)
             
             try:
                 self.play_sound("shutdown")
                 self.attributes("-alpha", 0.0) # Hide window immediately
-            except: pass
+            except Exception as e:
+                logger.warning("Failed to play shutdown sound or hide window: %s", e)
             
             # Force garbage collection before exit
             gc.collect()
@@ -496,7 +545,8 @@ class NregaBotApp(ctk.CTk):
             try:
                 if hasattr(self, 'driver') and self.driver:
                     self.driver.quit()
-            except: pass
+            except Exception as e:
+                logger.debug("Failed to quit browser driver during shutdown: %s", e)
             
             # Force Kill Process
             import os
@@ -549,16 +599,16 @@ class NregaBotApp(ctk.CTk):
             # Pause animations
             if hasattr(self, 'performance_monitor'):
                 try: self.performance_monitor.pause()
-                except: pass
+                except Exception as e: logger.warning("Failed to pause performance monitor during resize: %s", e)
             if hasattr(self, 'announcement_label'):
                 try: self.announcement_label.pause()
-                except: pass
+                except Exception as e: logger.warning("Failed to pause announcement label during resize: %s", e)
             # Show flat overlay to mask flickering canvas redraws
             self._show_resize_overlay()
         
         if self._resize_timer:
             try: self.after_cancel(self._resize_timer)
-            except: pass
+            except Exception as e: logger.warning("Failed to cancel resize timer: %s", e)
         self._resize_timer = self.after(150, self._on_window_resize_end)
 
     def _show_resize_overlay(self):
@@ -581,8 +631,8 @@ class NregaBotApp(ctk.CTk):
             # place() covers everything regardless of grid/pack layout
             self._resize_overlay.place(x=0, y=0, relwidth=1, relheight=1)
             self._resize_overlay.tkraise()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to show resize overlay: %s", e)
 
     def _hide_resize_overlay(self):
         """Remove the resize overlay after resize completes."""
@@ -590,8 +640,8 @@ class NregaBotApp(ctk.CTk):
             try:
                 if self._resize_overlay.winfo_exists():
                     self._resize_overlay.destroy()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to hide resize overlay: %s", e)
             self._resize_overlay = None
 
     def _on_window_resize_end(self):
@@ -601,10 +651,10 @@ class NregaBotApp(ctk.CTk):
         self._hide_resize_overlay()
         if hasattr(self, 'performance_monitor'):
             try: self.performance_monitor.resume()
-            except: pass
+            except Exception as e: logger.warning("Failed to resume performance monitor after resize: %s", e)
         if hasattr(self, 'announcement_label'):
             try: self.announcement_label.resume()
-            except: pass
+            except Exception as e: logger.warning("Failed to resume announcement label after resize: %s", e)
 
     def _setup_licensed_ui(self):
         """Unlocks the UI for valid license holders."""
@@ -631,7 +681,7 @@ class NregaBotApp(ctk.CTk):
             self._apply_feature_flags()
             
         except Exception as e:
-            print(f"Error applying local restrictions: {e}")
+            logger.error("Error applying local restrictions: %s", e)
         
         is_expiring = self.check_expiry_and_notify()
         self._preload_and_update_about_tab()
@@ -642,11 +692,13 @@ class NregaBotApp(ctk.CTk):
         # Show Home dashboard by default instead of the first automation tab
         try:
             self.show_frame("Home" if not is_expiring else "About")
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to show default frame: %s", e)
             try:
                 first_tab = list(list(self.get_tabs_definition().values())[0].keys())[0]
                 self.show_frame("About" if is_expiring else first_tab)
-            except:
+            except Exception as e2:
+                logger.warning("Failed to show fallback frame: %s", e2)
                 self.show_frame("About")
         
         self.check_for_updates_background()
@@ -748,8 +800,8 @@ class NregaBotApp(ctk.CTk):
                     qr_label = ctk.CTkLabel(footer_frame, text="", image=qr_image)
                     qr_label.pack(pady=(10, 0))
                     qr_label.image = qr_image 
-                else: print("QR Image file not found at:", qr_path)
-            except Exception as e: print(f"QR Load Error: {e}")
+                else: logger.warning("QR Image file not found at: %s", qr_path)
+            except Exception as e: logger.error("QR Load Error: %s", e)
             ctk.CTkButton(main, text="Back to Login", command=lambda: [win.destroy(), self.show_activation_window()], fg_color="gray", width=150).pack(pady=20)
         
         ctk.CTkButton(main, text="Start 30-Day Free Trial", command=on_trial).pack(pady=(20, 5), ipady=4, fill='x', padx=10)
@@ -973,8 +1025,9 @@ class NregaBotApp(ctk.CTk):
                 self.expiry_alert_message = f"License expires in {days} days."
                 self.open_on_about_tab = True
                 return True
-        except Exception: pass
-        return False
+        except Exception:
+            logger.debug("check_expiry_and_notify: date parsing failed", exc_info=True)
+            return False
 
     def _lock_app_to_about_tab(self):
         self.show_frame("About")
@@ -1032,7 +1085,8 @@ class NregaBotApp(ctk.CTk):
         try:
             logo = ctk.CTkImage(Image.open(resource_path("logo.png")), size=(38, 38))
             ctk.CTkLabel(branding_frame, image=logo, text="").pack(side="left", padx=(0, 12))
-        except Exception: pass
+        except Exception:
+            logger.debug("Failed to load header logo", exc_info=True)
 
         text_box = ctk.CTkFrame(branding_frame, fg_color="transparent")
         text_box.pack(side="left")
@@ -1195,17 +1249,72 @@ class NregaBotApp(ctk.CTk):
         self.nav_buttons.clear()
         self.button_to_category_frame.clear()
         self.category_frames.clear()
-        self.tab_icon_map = {} 
+        self.tab_icon_map = {}
+        self._tab_icon_keys = {}
+        self._category_icons_loaded = set()
+
+        # P5: Mapping of tab display name → LazyIconManager key for lazy loading.
+        # Only Home icon is eagerly loaded (it's pinned and always visible).
+        _ICON_KEYS = {
+            # MR & Wage Management
+            "Demand": "emoji_demand",
+            "Work Allocation": "emoji_work_allocation",
+            "Muster Roll Gen": "emoji_mr_gen",
+            "Mate/Mistri MR": "emoji_mr_gen",
+            "MR Fill": "emoji_mr_fill",
+            "MR Payment": "emoji_mr_payment",
+            "Gen Wagelist": "emoji_gen_wagelist",
+            "Send Wagelist": "emoji_send_wagelist",
+            "FTO Generation": "emoji_fto_gen",
+            "Duplicate MR Print": "emoji_duplicate_mr",
+            "Material Entry": "emoji_material_entry",
+            # JE & AE Approval
+            "eMB Entry": "emoji_mb_entry",
+            "eMB Verify": "emoji_emb_verify",
+            # Schemes Related
+            "Work Code Gen": "emoji_wc_gen",
+            "IF Editor": "emoji_if_editor",
+            "Update Estimate": "emoji_update_estimate",
+            "Physical Complete": "emoji_physical_complete",
+            "Scheme Closing": "emoji_scheme_closing",
+            "Add Activity": "emoji_add_activity",
+            # Verification & Utility
+            "Job Card Verify": "emoji_verify_jobcard",
+            "Verify ABPS": "emoji_verify_abps",
+            "Del Work Alloc": "emoji_del_work_alloc",
+            "Delete Demand": "emoji_del_demand",
+            "Delete Applicant": "emoji_delete_applicant",
+            "Zero MR": "emoji_zero_mr",
+            "Resend Rejected WG": "emoji_resend_wg",
+            "Sarkar Aapke Dwar": "emoji_sad_status",
+            "SAD Update Status": "emoji_update_outcome",
+            # Reports & Tracking
+            "MR Tracking": "emoji_mr_tracking",
+            "Dashboard Report": "emoji_dashboard_report",
+            "MIS Reports": "emoji_mis_reports",
+            "Issued MR Details": "emoji_issued_mr_report",
+            "eKYC Report": "emoji_ekyc_report",
+            "Social Audit Report": "emoji_social_audit",
+            "NMMS Attendance": "emoji_nmms_attendance",
+            # Smart Tools
+            "Macro Manager": "emoji_tools",
+            "Login Automation": "emoji_login_automation",
+            "PDF Merger": "emoji_pdf_merger",
+            "Workcode Extractor": "emoji_wc_extractor",
+            "File Manager": "emoji_file_manager",
+            # About & Help
+            "About": "emoji_about",
+            "Feedback": "emoji_feedback",
+        }
 
         for widget in header_parent.winfo_children(): widget.destroy()
 
         # --- Pinned Home button (always visible, above everything) ---
-        # Load home icon directly to avoid lazy-manager caching issues
         _home_icon = None
         try:
             _home_icon = ctk.CTkImage(Image.open(resource_path("assets/icons/home.png")), size=(18, 18))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to load home icon: %s", e)
         self.home_nav_btn = ctk.CTkButton(
             header_parent,
             text="  Home",
@@ -1284,12 +1393,16 @@ class NregaBotApp(ctk.CTk):
             self.category_frames[cat] = cat_frame
             
             for name, data in tabs.items():
-                self.tab_icon_map[name] = data.get("icon")
+                # P5: Store icon key for lazy loading — don't load the icon yet
+                icon_key = _ICON_KEYS.get(name)
+                self._tab_icon_keys[name] = icon_key
+                # tab_icon_map starts empty; icons are populated on first category show
 
+                # P5: Create button WITHOUT image (icon loaded lazily when category is shown)
                 btn = ctk.CTkButton(
                     cat_frame.content_frame, 
                     text=f"{name}", 
-                    image=data.get("icon"), 
+                    image=None, 
                     compound="left", 
                     command=lambda n=name: self.show_frame(n), 
                     anchor="w", 
@@ -1321,6 +1434,7 @@ class NregaBotApp(ctk.CTk):
                         hover_color=("#FEE2E2", "#7F1D1D") 
                     )
 
+        # P5: Call _filter_nav_menu to show the saved category (loads icons for visible cats)
         self._filter_nav_menu(self.last_selected_category)
 
     def _create_footer(self):
@@ -1401,6 +1515,28 @@ class NregaBotApp(ctk.CTk):
     def show_frame(self, page_name, raise_frame=True):
         self.current_active_tab = page_name
         
+        # Keep tabs that have run an automation (running OR completed) —
+        # destroying them loses logs, results, and button state.
+        # Home and About are always cached.
+        if page_name not in ("Home", "About") and page_name in self.tab_instances:
+            old_instance = self.tab_instances.get(page_name)
+            # Check if this tab has ever run an automation
+            has_automated = getattr(old_instance, '_has_automated', False)
+            
+            if not has_automated:
+                old_instance = self.tab_instances.pop(page_name, None)
+                old_frame = self.content_frames.pop(page_name, None)
+                if old_instance:
+                    try:
+                        old_instance.destroy()
+                    except Exception:
+                        pass
+                if old_frame:
+                    try:
+                        old_frame.destroy()
+                    except Exception:
+                        pass
+        
         if page_name in self.tab_instances:
             if raise_frame:
                 self.content_frames[page_name].tkraise()
@@ -1443,9 +1579,16 @@ class NregaBotApp(ctk.CTk):
                             self._refresh_home_most_used()
                         break
             except Exception as e:
-                print(f"Error loading tab {page_name}: {e}")
+                logger.error("Error loading tab %s: %s", page_name, e)
+                import traceback
+                traceback.print_exc()
                 skeleton.stop()
                 loading_frame.destroy()
+                # --- F1: Show error toast so user knows what went wrong ---
+                try:
+                    self.show_toast(f"Failed to load '{page_name}'. Please try again.", kind="error", duration=5000)
+                except Exception:
+                    pass
 
         self.after(1, load_actual_tab)
 
@@ -1477,9 +1620,9 @@ class NregaBotApp(ctk.CTk):
 
     def _update_nav_button_color(self, page_name):
         """
-        Update nav button highlights. Only touches the previously-active button
-        and the newly-active button — avoids iterating & reconfiguring ALL
-        buttons on every tab switch.
+        Update nav button highlights. Also lazy-loads the tab's icon
+        if it hasn't been loaded yet (e.g., tab opened programmatically
+        before its category was ever expanded).
         """
         prev_active = getattr(self, '_last_active_nav', None)
         
@@ -1489,7 +1632,14 @@ class NregaBotApp(ctk.CTk):
             if btn:
                 txt = btn.cget("text")
                 if "⚠️" not in txt and "🔒" not in txt:
+                    # P5: Get icon, lazy-load if needed
                     img = self.tab_icon_map.get(prev_active)
+                    if img is None and prev_active in self._tab_icon_keys:
+                        icon_key = self._tab_icon_keys.get(prev_active)
+                        if icon_key:
+                            img = self.icon_images.get(icon_key)
+                            if img:
+                                self.tab_icon_map[prev_active] = img
                     btn.configure(
                         fg_color="transparent",
                         text_color=("gray30", "gray80"),
@@ -1502,7 +1652,14 @@ class NregaBotApp(ctk.CTk):
         if btn:
             txt = btn.cget("text")
             if "⚠️" not in txt and "🔒" not in txt:
+                # P5: Get icon, lazy-load if needed
                 img = self.tab_icon_map.get(page_name)
+                if img is None and page_name in self._tab_icon_keys:
+                    icon_key = self._tab_icon_keys.get(page_name)
+                    if icon_key:
+                        img = self.icon_images.get(icon_key)
+                        if img:
+                            self.tab_icon_map[page_name] = img
                 btn.configure(
                     fg_color=("#E3F2FD", "#374151"),
                     text_color=("#1565C0", "#60A5FA"),
@@ -1518,11 +1675,46 @@ class NregaBotApp(ctk.CTk):
         save_config('last_selected_category', selected_category)
         self._filter_nav_menu(selected_category)
 
+    def _load_category_icons(self, cat_name):
+        """P5: Lazily load nav button icons for a category on first show.
+        Each category's icons are loaded exactly once — when its category
+        frame is first packed into the sidebar. Subsequent show/hide of
+        the same category reuses the cached icons.
+        """
+        if cat_name == "All Automations":
+            # Load icons for all categories that haven't been loaded yet
+            for cat in list(self.category_frames.keys()):
+                self._load_category_icons(cat)
+            return
+
+        if cat_name in self._category_icons_loaded:
+            return
+        cat_frame = self.category_frames.get(cat_name)
+        if not cat_frame:
+            return
+
+        # Find all buttons in this category and load their icons
+        for name, frame in self.button_to_category_frame.items():
+            if frame is cat_frame:
+                icon_key = self._tab_icon_keys.get(name)
+                if icon_key:
+                    icon = self.icon_images.get(icon_key)
+                    if icon:
+                        btn = self.nav_buttons.get(name)
+                        if btn:
+                            try:
+                                btn.configure(image=icon)
+                            except Exception:
+                                pass
+                        self.tab_icon_map[name] = icon
+        self._category_icons_loaded.add(cat_name)
+
     def _filter_nav_menu(self, selected_category: str):
         if selected_category == "All Automations":
             for cat, frame in self.category_frames.items():
                 if frame.winfo_exists() and frame.winfo_manager() != "pack":
                     frame.pack(fill="x", pady=5, padx=2)
+                    self._load_category_icons(cat)
         else:
             for cat, frame in self.category_frames.items():
                 if not frame.winfo_exists():
@@ -1530,11 +1722,15 @@ class NregaBotApp(ctk.CTk):
                 if cat == selected_category:
                     if frame.winfo_manager() != "pack":
                         frame.pack(fill="x", pady=5, padx=2)
+                        self._load_category_icons(cat)
                 else:
                     if frame.winfo_manager() == "pack":
                         frame.pack_forget()
         
         self.nav_scroll_frame.update_idletasks()
+
+
+
 
 
 
@@ -1562,8 +1758,8 @@ class NregaBotApp(ctk.CTk):
             try:
                 if w.winfo_exists():
                     w.attributes(attr, val)
-            except:
-                pass
+            except Exception as e:
+                logger.debug("Failed to set window attr %s: %s", attr, e)
 
         win.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() // 2) - (900 // 2)
@@ -1576,8 +1772,8 @@ class NregaBotApp(ctk.CTk):
             self._history_window = None
             try:
                 win.destroy()
-            except:
-                pass
+            except Exception as e:
+                logger.debug("Failed to destroy history window: %s", e)
         win.protocol("WM_DELETE_WINDOW", on_close)
 
         win.grid_columnconfigure(0, weight=1)
@@ -1998,10 +2194,28 @@ class NregaBotApp(ctk.CTk):
             except Exception:
                 pass
 
+        # Mark the tab as having run an automation — show_frame won't destroy it
+        tab_instance = getattr(target, '__self__', None)
+        if tab_instance is not None:
+            tab_instance._has_automated = True
+
         def wrapper():
             try:
                 target(*args)
             finally:
+                # Access the tab instance via target.__self__ (bound method)
+                # and clean up its driver if it created one.
+                # This is race-condition-free because each thread's closure
+                # captures the correct tab instance — unlike a shared dict
+                # where a new tab could overwrite the old driver reference.
+                tab_instance = getattr(target, '__self__', None)
+                if tab_instance is not None and hasattr(tab_instance, 'driver'):
+                    try:
+                        if tab_instance.driver is not None:
+                            tab_instance.driver.quit()
+                    except Exception:
+                        pass
+                    tab_instance.driver = None
                 self.after(0, self.on_automation_finished, key)
         
         t = threading.Thread(target=wrapper, daemon=True)
@@ -2112,7 +2326,7 @@ class NregaBotApp(ctk.CTk):
             try:
                 with socket.create_connection(("127.0.0.1", 9222), timeout=0.2):
                     chrome_running = True
-            except:
+            except Exception:
                 pass
 
             if not chrome_running:
@@ -2130,8 +2344,8 @@ class NregaBotApp(ctk.CTk):
                         data = json.load(f)
                         district = data.get("district", "").strip()
                         block = data.get("block", "").strip()
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to load login credentials: %s", e)
 
             if not district or not block:
                 self.after(0, lambda: (
@@ -2161,18 +2375,25 @@ class NregaBotApp(ctk.CTk):
         """Optimized unified background sync using requests.Session()"""
         def sync_worker():
             ping_counter = 0
-            while True:
-                # 1. Ping Server
+            _shutdown = False
+            while not _shutdown:
+                # 1. Ping Server — always schedule UI update via after(0, ...);
+                #    no winfo_exists() check from background thread (not thread-safe).
                 try:
                     self.http_session.get(config.LICENSE_SERVER_URL, timeout=5)
-                    if self.winfo_exists():
+                    try:
                         self.after(0, self.set_server_status, True)
+                    except Exception:
+                        _shutdown = True
+                        break
                 except requests.exceptions.RequestException:
-                    if self.winfo_exists():
+                    try:
                         self.after(0, self.set_server_status, False)
+                    except Exception:
+                        _shutdown = True
+                        break
 
                 # 2. Fetch App Config (Every 120s -> 6 loops of 20s)
-                # Note: ping_counter starts at 0, so 0%6==0 fetches config on the VERY FIRST run!
                 if ping_counter % 6 == 0:
                     try:
                         url = f"{config.LICENSE_SERVER_URL}/api/app-config"
@@ -2180,10 +2401,14 @@ class NregaBotApp(ctk.CTk):
                         if resp.status_code == 200:
                             data = resp.json()
                             msg = data.get("global_announcement", "")
-                            if self.winfo_exists():
-                                # Agar admin ne koi message nahi diya hai, to default welcome message dikhao
-                                final_msg = msg if msg else "Welcome to NREGA Bot! Ready to automate."
-                                self.after(0, lambda: self.announcement_label.update_text(final_msg))
+                            final_msg = msg if msg else "Welcome to NREGA Bot! Ready to automate."
+                            try:
+                                self.after(0, lambda m=final_msg: (
+                                    self.announcement_label.update_text(m)
+                                ))
+                            except Exception:
+                                _shutdown = True
+                                break
                             
                             self.global_disabled_features = data.get("disabled_features", [])
                             if (self.license_info.get('key_type') or '').lower() == 'trial':
@@ -2191,10 +2416,13 @@ class NregaBotApp(ctk.CTk):
                             else:
                                 self.trial_restricted_features = []
                             
-                            if self.winfo_exists():
+                            try:
                                 self.after(0, self._apply_feature_flags)
+                            except Exception:
+                                _shutdown = True
+                                break
                     except Exception as e:
-                        print(f"Config Fetch Error: {e}")
+                        logger.error("Config Fetch Error: %s", e)
                     ping_counter = 0
 
                 ping_counter += 1
@@ -2232,7 +2460,8 @@ class NregaBotApp(ctk.CTk):
                 try:
                     if fix_version_str and parse_version(fix_version_str) > current_ver:
                         is_update_available = True
-                except: pass
+                except Exception:
+                    logger.debug("Version comparison failed for fix_version_str=%s", fix_version_str)
 
                 if is_update_available:
                     new_fg = ("orange", "#D97706")
@@ -2285,10 +2514,11 @@ class NregaBotApp(ctk.CTk):
                     new_ver = self.update_info.get('version', '0.0.0')
                     with open(version_file, 'w') as f:
                         json.dump({"version": new_ver}, f)
-                except: pass
+                except Exception:
+                    logger.warning("Failed to write version file: %s", version_file)
 
                 try: os.remove(zip_path)
-                except: pass
+                except Exception as e: logger.debug("Failed to remove old zip file: %s", e)
                 
                 messagebox.showinfo("Update Ready", "Update applied successfully.\nThe application will now restart.")
                 
@@ -2366,7 +2596,7 @@ del "%~f0" & exit
         if hasattr(self, '_focus_validation_timer') and self._focus_validation_timer:
             try:
                 self.after_cancel(self._focus_validation_timer)
-            except: pass
+            except Exception as e: logger.debug("Failed to cancel focus validation timer: %s", e)
         
         self._focus_validation_timer = self.after(2000, self._start_validation_thread)
 
@@ -2389,9 +2619,10 @@ del "%~f0" & exit
             while widget and depth < 4:
                 if isinstance(widget, (ctk.CTkButton, ctk.CTkOptionMenu, ctk.CTkSwitch, ctk.CTkCheckBox, ctk.CTkRadioButton)):
                     btn_text = ""
-                    try: 
+                    try:
                         btn_text = widget.cget("text").lower()
-                    except: pass
+                    except Exception:
+                        logger.debug("Failed to read button text from nav widget", exc_info=True)
                     
                     if "stop" in btn_text or "start automation" in btn_text: return
                     self.play_sound("click")
@@ -2572,7 +2803,7 @@ del "%~f0" & exit
                 try:
                     if self.current_toast.winfo_exists():
                         self.current_toast.destroy()
-                except: pass
+                except Exception as e: logger.debug("Failed to dismiss old toast: %s", e)
             
             self.play_sound("complete" if kind == "success" else "error")
             
@@ -2582,7 +2813,7 @@ del "%~f0" & exit
                 pass 
 
         except Exception as e:
-            print(f"Toast Error: {e}")
+            logger.warning("Toast Error: %s", e)
 
     def set_status(self, message, color=None):
         if self.status_label:
@@ -2636,7 +2867,8 @@ del "%~f0" & exit
                 rect = (ctypes.c_long * 4)()
                 ctypes.windll.user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(rect), 0)
                 return (rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1])
-            except Exception: pass
+            except Exception:
+                logger.debug("Failed to query Windows work area, using fallback", exc_info=True)
         return (0, 0, self.winfo_screenwidth(), self.winfo_screenheight())
 
     def _get_machine_id(self):
@@ -2669,15 +2901,41 @@ del "%~f0" & exit
         )
 
     def log_message(self, log, msg, level="info"): 
-        log.configure(state="normal")
-        log.insert(tkinter.END, f"[{time.strftime('%H:%M:%S')}] {msg}\n")
-        log.configure(state="disabled")
-        log.see(tkinter.END)
+        """Append a timestamped message to a log textbox.
+        
+        Safe to call with a destroyed widget — checks winfo_exists()
+        first to prevent TclError: invalid command name.
+        """
+        try:
+            if not log.winfo_exists():
+                return
+        except Exception:
+            return
+        try:
+            log.configure(state="normal")
+            log.insert(tkinter.END, f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+            log.configure(state="disabled")
+            log.see(tkinter.END)
+        except Exception:
+            pass
     
     def clear_log(self, log): 
-        log.configure(state="normal")
-        log.delete("1.0", tkinter.END)
-        log.configure(state="disabled")
+        """Clear all content from a log textbox.
+        
+        Safe to call with a destroyed widget — checks winfo_exists()
+        first to prevent TclError: invalid command name.
+        """
+        try:
+            if not log.winfo_exists():
+                return
+        except Exception:
+            return
+        try:
+            log.configure(state="normal")
+            log.delete("1.0", tkinter.END)
+            log.configure(state="disabled")
+        except Exception:
+            pass
 
     def update_history(self, key, val): self.history_manager.save_entry(key, val)
     def remove_history(self, key, val): self.history_manager.remove_entry(key, val)
@@ -2719,11 +2977,15 @@ del "%~f0" & exit
                 if any(k in name_lower for k in target_keywords):
                     val = ""
                     if hasattr(var_obj, 'get'):
-                        try: val = var_obj.get()
-                        except: pass
+                        try:
+                            val = var_obj.get()
+                        except Exception:
+                            logger.debug("Failed to get variable value via .get()", exc_info=True)
                     elif hasattr(var_obj, 'winfo_exists') and hasattr(var_obj, 'get'):
-                        try: val = var_obj.get()
-                        except: pass
+                        try:
+                            val = var_obj.get()
+                        except Exception:
+                            logger.debug("Failed to get variable value via .get() (with winfo_exists check)", exc_info=True)
                         
                     if val and isinstance(val, str) and len(val) > 2:
                         if "select" not in val.lower() and "choose" not in val.lower():
@@ -2734,7 +2996,7 @@ del "%~f0" & exit
             
             return ""
         except Exception as e:
-            print(f"Context Error: {e}")
+            logger.warning("Context Error: %s", e)
             return ""
 
     # ============================================================================
@@ -2802,7 +3064,7 @@ def run_application():
             s.connect(("127.0.0.1", 60123))
             s.sendall(b'focus')
             s.close()
-        except: pass
+        except Exception as e: logger.debug("Failed to send focus signal via socket: %s", e)
         sys.exit(0)
     
     try:

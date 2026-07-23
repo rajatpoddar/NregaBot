@@ -9,6 +9,9 @@ import config
 import sys, subprocess
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from utils import get_logger
+
+logger = get_logger()
 
 # --- Cloud File Picker Toplevel Window ---
 class CloudFilePicker(ctk.CTkToplevel):
@@ -1133,6 +1136,8 @@ class DemandTab(BaseAutomationTab):
         self.selection_summary_label.configure(text=f"{len(selected)} applicants / {unique_jcs} unique job cards")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         """
         Enables or disables UI elements based on whether automation is running.
         """
@@ -1612,8 +1617,8 @@ class DemandTab(BaseAutomationTab):
             try:
                 element.clear()
                 element.send_keys(value + Keys.TAB)
-            except:
-                pass
+            except Exception as e:
+                logger.debug("Demand: Failed to set element value: %s", e)
 
     def _process_single_job_card(self, driver, wait, short_wait, jc, apps_in_jc,
                                  user_days, demand_from, work_start,
@@ -1842,11 +1847,10 @@ class DemandTab(BaseAutomationTab):
         try:
             jc_suffix = jc.split('/')[-1]
             self.app.after(0, self.app.log_message, self.log_display, f"Processing JC Suffix: {jc_suffix}")
-            
             old_days_label = None
             try: old_days_label = driver.find_element(By.ID, days_worked_ids[0])
-            except: pass
-
+            except Exception: old_days_label = None
+            
             try:
                 jc_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"#{jc_ids[0]}, #{jc_ids[1]}")))
                 jc_val = jc.split('/')[0]
@@ -1877,7 +1881,7 @@ class DemandTab(BaseAutomationTab):
             try:
                 WebDriverWait(driver, 1.0).until(EC.presence_of_element_located((By.XPATH, "//font[contains(text(), 'not yet issued')]")))
                 msg = "Skipped (JC Not Issued)"; err_found = True
-            except: pass
+            except Exception: err_found = False
 
             if err_found:
                  [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), msg)) for a in apps_in_jc]; return
@@ -1958,7 +1962,7 @@ class DemandTab(BaseAutomationTab):
             self.app.after(0, self.app.log_message, self.log_display, f"CRITICAL ERROR processing {jc}: {e}", "error")
             [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), f"FAIL: {type(e).__name__}")) for a in apps_in_jc]
             try: driver.get(base_url); time.sleep(1)
-            except: pass
+            except Exception as e: logger.debug("Demand: Failed to navigate back after error: %s", e)
             
                           
     def _update_results_tree(self, data):

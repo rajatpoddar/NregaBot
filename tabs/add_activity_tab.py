@@ -7,6 +7,9 @@ from datetime import datetime
 
 import config
 from .base_tab import BaseAutomationTab
+from utils import get_logger
+
+logger = get_logger()
 
 class AddActivityTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -117,6 +120,8 @@ class AddActivityTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.work_keys_text.configure(state=state)
@@ -388,7 +393,7 @@ class AddActivityTab(BaseAutomationTab):
                         )
                     except (TimeoutException, NoSuchElementException):
                         pass
-                except Exception: pass
+                except Exception as e: logger.debug("AddActivity: Failed to process: %s", e)
 
             if not outcome_found:
                 # If no message appears, assume success if inputs cleared, or log warning

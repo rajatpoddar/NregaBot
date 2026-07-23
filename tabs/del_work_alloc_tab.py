@@ -18,6 +18,9 @@ from selenium.common.exceptions import (
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from utils import get_logger
+
+logger = get_logger()
 
 class DelWorkAllocTab(BaseAutomationTab):
     """
@@ -163,6 +166,8 @@ class DelWorkAllocTab(BaseAutomationTab):
         self.open_date_picker(append_date)
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         """Locks/Unlocks UI elements during automation."""
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
@@ -258,8 +263,8 @@ class DelWorkAllocTab(BaseAutomationTab):
                     try: 
                         # Try to stop loading or refresh to reset state
                         driver.execute_script("window.stop();")
-                    except: 
-                        pass
+                    except Exception as e:
+                        logger.debug("DelWorkAlloc: Could not stop page load: %s", e)
                     time.sleep(2)
                 else:
                     raise e # Raise other errors normally

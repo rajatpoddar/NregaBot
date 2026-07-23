@@ -7,6 +7,9 @@ from tkinter import messagebox
 import customtkinter as ctk
 import config
 from .base_tab import BaseAutomationTab
+from utils import get_logger
+
+logger = get_logger()
 
 class LoginAutomationTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -116,7 +119,7 @@ class LoginAutomationTab(BaseAutomationTab):
                     data = json.load(f)
                     self.district_input.delete(0, tk.END); self.district_input.insert(0, data.get("district", ""))
                     self.block_input.delete(0, tk.END); self.block_input.insert(0, data.get("block", ""))
-            except: pass
+            except Exception as e: logger.debug("LoginAutomation: Could not load saved credentials: %s", e)
 
     def run_login_thread(self):
         t = threading.Thread(target=self.run_login_automation)
@@ -213,11 +216,15 @@ class LoginAutomationTab(BaseAutomationTab):
         raise Exception(f"Failed to select '{text}' after retries")
 
     def update_status(self, text):
-        # 1. Update Local Label
-        self.status_label.configure(text=text)
-        
+        """Update status label. Safe to call after tab destroyed."""
+        if not self._is_alive():
+            return
+        try:
+            self.status_label.configure(text=text)
+        except Exception:
+            pass
         # 2. Update Global App Footer
         try:
             clean_text = text.replace("Status: ", "")
             self.app.set_status(clean_text)
-        except: pass
+        except Exception as e: logger.debug("LoginAutomation: Could not update status: %s", e)

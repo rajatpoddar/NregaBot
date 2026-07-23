@@ -5,6 +5,9 @@ import os
 import threading
 from datetime import datetime  # <-- Time save karne ke liye ye zaroori hai
 import config  # For APP_VERSION — auto-reset usage stats on version change
+from utils import get_logger
+
+logger = get_logger()
 
 class HistoryManager:
     def __init__(self, data_path_func):
@@ -32,8 +35,8 @@ class HistoryManager:
                 if self._conn:
                     self._conn.close()
                     self._conn = None
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("HistoryManager.close failed: %s", e)
 
     def _init_db(self):
         """Tables create karta hai."""
@@ -79,7 +82,7 @@ class HistoryManager:
                 
                 conn.commit()
             except Exception as e:
-                print(f"Database Init Error: {e}")
+                logger.error("Database Init Error: %s", e)
 
     def _check_version_reset(self):
         """
@@ -105,8 +108,8 @@ class HistoryManager:
                         (current_ver,)
                     )
                     conn.commit()
-            except Exception:
-                pass  # Non-critical — tab usage just continues with old stats
+            except Exception as e:
+                logger.debug("Version reset check failed: %s", e)
 
     # --- Migration aur Suggestions ke purane functions (Same as before) ---
     def _migrate_from_json_if_needed(self):
@@ -126,7 +129,8 @@ class HistoryManager:
                             for k, v in data["_usage_stats"].items():
                                 cursor.execute("INSERT OR IGNORE INTO usage_stats VALUES (?, ?)", (k, v))
                         conn.commit()
-                except Exception: pass
+                except Exception as e:
+                    logger.debug("Migration from JSON failed: %s", e)
 
     def get_suggestions(self, field_key: str) -> list:
         with self.lock:
@@ -146,7 +150,8 @@ class HistoryManager:
                 cursor = conn.cursor()
                 cursor.execute("INSERT OR IGNORE INTO suggestions VALUES (?, ?)", (field_key, value))
                 conn.commit()
-            except: pass
+            except Exception as e:
+                logger.debug("History save_entry failed: %s", e)
 
     def remove_entry(self, field_key: str, value: str):
         if not value: return
@@ -156,7 +161,8 @@ class HistoryManager:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM suggestions WHERE field_key = ? AND value = ?", (field_key, value))
                 conn.commit()
-            except: pass
+            except Exception as e:
+                logger.debug("History remove_entry failed: %s", e)
 
     def increment_usage(self, automation_key: str):
         with self.lock:
@@ -165,7 +171,8 @@ class HistoryManager:
                 cursor = conn.cursor()
                 cursor.execute("INSERT INTO usage_stats (automation_key, count) VALUES (?, 1) ON CONFLICT(automation_key) DO UPDATE SET count = count + 1", (automation_key,))
                 conn.commit()
-            except: pass
+            except Exception as e:
+                logger.debug("History increment_usage failed: %s", e)
 
     def get_most_used_keys(self, count: int = 5) -> list:
         with self.lock:
@@ -178,7 +185,7 @@ class HistoryManager:
             except:
                 return []
 
-    # --- NEW: Logging Functions (Magic starts here) ---
+    # --- NEW: Logging Functions ---
     def log_activity(self, activity_type: str, description: str):
         """Current time ke saath activity save karta hai."""
         with self.lock:

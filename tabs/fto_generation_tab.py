@@ -221,6 +221,8 @@ class FtoGenerationTab(BaseAutomationTab):
             self.ff_path_entry.insert(0, saved[0])
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         self.delete_btn.configure(state="disabled" if running else "normal")
         self.ff_path_entry.configure(state="disabled" if running else "normal")

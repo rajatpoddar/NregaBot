@@ -11,6 +11,9 @@ from datetime import datetime
 
 
 from .base_tab import BaseAutomationTab
+from utils import get_logger
+
+logger = get_logger()
 
 # ---------------------------------------------------------------------------
 NMMS_BASE_URL = "https://vbgramgrep.dord.gov.in/vbgramg/NMMS_DailyAttendance.aspx"  # kept for photo URL resolution
@@ -257,6 +260,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
         self.update_status("Cleared.", 0)
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         s = "disabled" if running else "normal"
         self._scrape_btn.configure(state=s)
@@ -1142,7 +1147,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
             messagebox.showinfo("Exported", f"Report saved!\n\n{file_path}")
             if os.name == "nt":
                 try: os.startfile(file_path)
-                except Exception: pass
+                except Exception as e_open: logger.debug("NMMS: Could not open file: %s", e_open)
         except Exception as e:
             messagebox.showerror("Export Error", f"Could not save report:\n{e}")
 

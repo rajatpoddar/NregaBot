@@ -6,6 +6,9 @@ import json
 import os, time, csv, re, sys, subprocess
 from datetime import datetime
 from .base_tab import BaseAutomationTab
+from utils import get_logger
+
+logger = get_logger()
 
 class SarkarAapkeDwarTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -230,6 +233,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.summary_label.configure(text=f"Success: {self.success_count} | Failed: {self.fail_count}")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         
@@ -486,7 +491,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                     chk = driver.find_element(By.ID, "isWhatsAppMobile")
                     if (is_whatsapp.startswith("Y") and not chk.selected) or (is_whatsapp.startswith("N") and chk.selected):
                         chk.click()
-                except: pass
+                except Exception as e:
+                    logger.debug("SAD: WhatsApp checkbox toggle failed: %s", e)
 
                 # Village
                 village = row.get("Village", "")
@@ -495,7 +501,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         village_input = driver.find_element(By.ID, "react-select-2-input")
                         village_input.send_keys(village); time.sleep(1)
                         village_input.send_keys(Keys.ENTER)
-                    except: pass
+                    except Exception as e:
+                        logger.debug("SAD: Village autocomplete failed: %s", e)
 
                 self._safe_send_keys(driver, "address", row.get("Address", ""))
                 self._safe_send_keys(driver, "remarks", final_app_remark)
@@ -521,7 +528,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         if not found:
                             self._log_result(applicant_name, final_scheme_remark, "Failed", "Service Error")
                             continue
-                except: pass
+                except Exception as e:
+                    logger.debug("SAD: Getting phone/scheme details failed: %s", e)
 
                 self._safe_send_keys(driver, "schemeRemarks", final_scheme_remark)
 
@@ -540,9 +548,10 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         # Get text
                         popup_text = ""
                         try: popup_text = driver.find_element(By.CLASS_NAME, "swal2-content").text
-                        except: 
+                        except Exception:
                             try: popup_text = driver.find_element(By.CLASS_NAME, "swal2-html-container").text
-                            except: pass
+                            except Exception as e:
+                                logger.debug("SAD: Failed to get popup text: %s", e)
                         
                         # Regex Extract: 3/28/1913/3608040
                         match = re.search(r'Acknowledgement No is\s*:\s*([\d/]+)', popup_text)
@@ -551,7 +560,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         
                         # Close popup
                         try: driver.find_element(By.CSS_SELECTOR, "button.swal2-confirm").click()
-                        except: pass
+                        except Exception as e:
+                            logger.debug("SAD: Failed to close popup: %s", e)
                         
                     except Exception as e:
                         self.app.log_message(self.log_display, f"Popup Error: {e}", "warning")
@@ -599,7 +609,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                     rows = driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
                     if len(rows) > 0 and "No data" not in rows[0].text:
                         time.sleep(2); continue
-                except: pass
+                except Exception as e:
+                    logger.debug("SAD: Table refresh wait failed: %s", e)
 
                 try:
                     scheme_dd = driver.find_element(By.NAME, "schemeId")
@@ -611,8 +622,9 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         try:
                             app_name = driver.find_element(By.NAME, "applicantName").get_attribute("value")
                             if not app_name: app_name = "New Applicant"
-                        except: pass
-                        
+                        except Exception as e:
+                            logger.debug("SAD: Failed to get applicant name: %s", e)
+                    
                         self.app.after(0, self.app.set_status, "Auto-filling Form...")
                         
                         if inputs['app_remarks']: self._safe_send_keys(driver, "remarks", inputs['app_remarks'])
@@ -633,16 +645,17 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                                 for opt in svc_select.options:
                                     if inputs['service'].lower() in opt.text.lower():
                                         svc_select.select_by_visible_text(opt.text); break
-                        except: pass
+                        except Exception as e:
+                            logger.debug("SAD: Service selection failed: %s", e)
                         
                         if inputs['scheme_remarks']: self._safe_send_keys(driver, "schemeRemarks", inputs['scheme_remarks'])
                         
                         try:
                             driver.find_element(By.XPATH, "//button[contains(., 'Add Service')]").click()
-                            # Monitor mode just fills service, it doesn't submit final app, 
-                            # so we don't get Ack No. here.
+                            # Monitor mode just fills service, it doesn't submit final app,                            # so we don't get Ack No. here.
                             self._log_result(app_name, inputs['scheme_remarks'], "Success", "Service Added")
-                        except: pass
+                        except Exception as e:
+                            logger.debug("SAD: Service submission failed: %s", e)
                         
                         time.sleep(3)
                     else: time.sleep(1)
@@ -669,7 +682,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         try:
             elem = driver.find_element(By.NAME, element_name)
             elem.clear(); elem.send_keys(value)
-        except: pass
+        except Exception as e:
+            logger.debug("SAD: _safe_send_keys failed for %s: %s", element_name, e)
 
     def reset_ui(self):
         # ---- Lazy imports ----
@@ -699,7 +713,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
     def save_inputs(self, inputs):
         try:
             with open(self.config_file, 'w') as f: json.dump(inputs, f, indent=4)
-        except: pass
+        except Exception as e:
+            logger.warning("SAD: Failed to save inputs: %s", e)
 
     def load_inputs(self):
         # ---- Lazy imports ----
@@ -731,7 +746,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                     # Check if file exists to toggle state
                     if file_path:
                         self._update_remarks_state(True)
-        except: pass
+        except Exception as e:
+            logger.warning("SAD: Failed to load inputs: %s", e)
 
     def clear_file_selection(self):
         # ---- Lazy imports ----

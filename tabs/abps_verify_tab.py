@@ -10,6 +10,9 @@ from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from utils import get_logger
+
+logger = get_logger()
 
 class AbpsVerifyTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -98,6 +101,8 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -401,4 +406,4 @@ class AbpsVerifyTab(BaseAutomationTab):
             try:
                 if os.name == 'nt': os.startfile(file_path)
                 else: subprocess.call(['open', file_path])
-            except: pass
+            except Exception as e: logger.debug("ABPS: Failed to open exported PDF: %s", e)

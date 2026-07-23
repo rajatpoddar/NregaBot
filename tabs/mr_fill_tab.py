@@ -8,6 +8,9 @@ from fpdf import FPDF
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from utils import get_logger
+
+logger = get_logger()
 
 class MrFillTab(BaseAutomationTab):
     """
@@ -197,6 +200,8 @@ class MrFillTab(BaseAutomationTab):
             self.export_filter_menu.configure(state="normal")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         """Enables/disables UI elements based on automation state."""
         self.set_common_ui_state(running) # Handles Start, Stop, Reset
         state = "disabled" if running else "normal"
@@ -467,14 +472,14 @@ class MrFillTab(BaseAutomationTab):
                     try:
                         chk = driver.find_element(By.ID, f"c_p{col_num}")
                         if not chk.is_selected(): driver.execute_script("arguments[0].click();", chk)
-                    except: pass
+                    except Exception as e: logger.debug("MrFill: Checkbox click failed: %s", e)
 
             # Auto-fill Date (Optional fix for some forms)
             try:
                 if not driver.find_element(By.ID, "txtWrkStartDate").get_attribute("value"):
                     val = driver.find_element(By.ID, "txtDatefrm").get_attribute("value")
                     if val: driver.execute_script(f"document.getElementById('txtWrkStartDate').value = '{val}';")
-            except: pass
+            except Exception as e: logger.debug("MrFill: Could not auto-fill date: %s", e)
 
             # --- 6. Submission ---
             if is_manual_mode:

@@ -13,6 +13,9 @@ import customtkinter as ctk
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry 
+from utils import get_logger
+
+logger = get_logger()
 
 class EKycReportTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -142,23 +145,27 @@ class EKycReportTab(BaseAutomationTab):
         self.tree.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
 
+    def _safe_update_status(self, text, progress=None):
+        """Safe version of update_status — only runs on main thread via after(0, ...)."""
+        if not self._is_alive():
+            return
+        try:
+            self.status_label.configure(text=f"Status: {text}")
+        except Exception:
+            pass
+        if progress is not None:
+            try:
+                self.progress_bar.set(progress)
+            except Exception:
+                pass
+        try:
+            self.app.set_status(f"eKYC Bot: {text}")
+        except Exception:
+            pass
+
     def update_status(self, text, progress=None):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        self.status_label.configure(text=f"Status: {text}")
-        if progress is not None: self.progress_bar.set(progress)
-        try: self.app.set_status(f"eKYC Bot: {text}")
-        except: pass
-        self.update_idletasks()
+        """Update UI status. Always use from main thread via app.after(0, ...)."""
+        self.app.after(0, self._safe_update_status, text, progress)
 
     def start_automation(self):
         self.save_inputs()
@@ -170,7 +177,23 @@ class EKycReportTab(BaseAutomationTab):
         for item in self.tree.get_children(): self.tree.delete(item)
         self.stats_text.configure(text="(Processing...)")
 
-        threading.Thread(target=self.run_process, daemon=True).start()
+        # Start automation thread — uses app.start_automation_thread so
+        # wrapper() handles driver cleanup and safe UI dispatch
+        self.app.start_automation_thread(
+            self.automation_key,
+            self._run_process_safe,
+            args=()
+        )
+
+    def _run_process_safe(self):
+        """Wrapper that maintains backward compatibility.
+        
+        Called via start_automation_thread so driver cleanup and
+        on_automation_finished are handled automatically.
+        run_process references self.driver (which may be None for this tab
+        since it uses app.browser_manager.get_driver() instead).
+        """
+        self.run_process()
 
     def _update_stats_display(self):
         """Scraped data se panchayat-wise stats calculate karke display karo"""
@@ -223,7 +246,7 @@ class EKycReportTab(BaseAutomationTab):
             panchayat_target = self.panchayat_entry.get().strip()
             village_target = self.village_entry.get().strip()
 
-            self.tab_view.set("Logs & Status")
+            self.app.after(0, self.tab_view.set, "Logs & Status")
             driver = self.app.browser_manager.get_driver()
             wait = WebDriverWait(driver, 20)
             
@@ -356,15 +379,15 @@ class EKycReportTab(BaseAutomationTab):
                     self.scrape_current_table(driver, p_name, v_name)
 
             self.update_status("Completed")
-            self._update_stats_display()
-            self.export_btn.configure(state="normal")
-            messagebox.showinfo("Success", f"Scan Complete.\nRecords Found: {len(self.all_scraped_data)}")
+            self.app.after(0, self._update_stats_display)
+            self.app.after(0, lambda: self.export_btn.configure(state="normal"))
+            self.app.after(0, messagebox.showinfo, "Success", f"Scan Complete.\nRecords Found: {len(self.all_scraped_data)}")
 
         except Exception as e:
-            self.handle_error(e)
+            self.app.after(0, self.handle_error, e)
         finally:
-            self.set_common_ui_state(running=False)
-            self.update_status("Ready")
+            self.app.after(0, self.set_common_ui_state, False)
+            self.app.after(0, self._safe_update_status, "Ready")
 
     def scrape_current_table(self, driver, panchayat_name, village_name):
         # ---- Lazy imports ----
@@ -388,8 +411,9 @@ class EKycReportTab(BaseAutomationTab):
                 old_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_gvData")
                 driver.execute_script("arguments[0].click();", page_one_link[0])
                 try: WebDriverWait(driver, 10).until(EC.staleness_of(old_table))
-                except: time.sleep(2)
-        except: pass
+                except Exception: time.sleep(2)
+        except Exception as e:
+            logger.debug("Failed to wait for table staleness: %s", e)
 
         while True:
             if self.app.stop_events[self.automation_key].is_set(): return
@@ -729,7 +753,8 @@ class EKycReportTab(BaseAutomationTab):
             try:
                 if os.name == 'nt': os.startfile(filename)
                 else: subprocess.call(['open', filename])
-            except: pass
+            except Exception as e:
+                logger.debug("Failed to open exported file: %s", e)
 
         except Exception as e:
             messagebox.showerror("Error", f"Save Failed: {e}")
@@ -743,7 +768,8 @@ class EKycReportTab(BaseAutomationTab):
         try:
             config_file = self.app.get_data_path("ekyc_inputs.json")
             with open(config_file, "w") as f: json.dump(data, f, indent=4)
-        except: pass
+        except Exception as e:
+            logger.warning("Failed to save eKYC inputs: %s", e)
 
     def load_inputs(self):
         config_file = self.app.get_data_path("ekyc_inputs.json")
@@ -753,4 +779,5 @@ class EKycReportTab(BaseAutomationTab):
                 self.panchayat_entry.delete(0, "end"); self.panchayat_entry.insert(0, data.get("panchayat", ""))
                 self.village_entry.delete(0, "end"); self.village_entry.insert(0, data.get("village", ""))
                 if data.get("filter"): self.filter_var.set(data.get("filter"))
-            except: pass
+            except Exception as e:
+                logger.warning("Failed to load eKYC inputs: %s", e)

@@ -252,6 +252,8 @@ class MacroManagerTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.app.workflows.process_global_queue, args=(self,))
 
     def set_ui_state(self, running):
+        if not self._is_alive():
+            return
         state = "disabled" if running else "normal"
         self.start_btn.configure(state=state)
         self.stop_btn.configure(state="normal" if running else "disabled")

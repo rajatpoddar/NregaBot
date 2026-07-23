@@ -11,6 +11,9 @@ from .base_tab import BaseAutomationTab
 from .date_entry_widget import DateEntry
 from .autocomplete_widget import AutocompleteEntry
 from .demand_tab import CloudFilePicker 
+from utils import get_logger
+
+logger = get_logger()
 
 class WcGenTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -409,7 +412,7 @@ class WcGenTab(BaseAutomationTab):
                     if field.cget("state") == "disabled":
                         field.configure(state="normal")
                         is_disabled = True
-                except: pass
+                except Exception as e: logger.debug("WcGen: Could not check field state: %s", e)
                 
                 if isinstance(field, DateEntry):
                     field.set_date(value)
@@ -819,7 +822,7 @@ class WcGenTab(BaseAutomationTab):
             try:
                 el = driver.find_element(By.ID, eid)
                 driver.execute_script("arguments[0].value = arguments[1];", el, val)
-            except: pass
+            except Exception as e: logger.debug("WcGen: Could not set field value: %s", e)
 
         set_val("ContentPlaceHolder1_txtPriority", priority)
         set_val("ContentPlaceHolder1_txtPropDate", form_config['proposal_date'])
@@ -830,11 +833,13 @@ class WcGenTab(BaseAutomationTab):
         
         try:
             driver.execute_script("if(typeof TotEstCostFin === 'function') { TotEstCostFin(); }")
-        except Exception:
+        except Exception as e:
+            logger.debug("WcGen: Could not calculate estimate: %s", e)
             try:
                 total_c = float(form_config['est_labour_cost']) + float(form_config['est_material_cost'])
                 driver.execute_script(f"document.getElementById('ContentPlaceHolder1_Txtestcost').value = '{total_c}';")
-            except: pass
+            except Exception as e2:
+                logger.debug("WcGen: Could not set total estimate: %s", e2)
 
         set_val("ContentPlaceHolder1_txtkhtano", khata_no)
         set_val("ContentPlaceHolder1_txtPlotNo", plot_no)
@@ -959,6 +964,8 @@ class WcGenTab(BaseAutomationTab):
         if path: self.csv_path = path; self.file_label.configure(text=os.path.basename(path))
         
     def set_ui_state(self, running: bool, force_disable_form=False):
+        if not self._is_alive():
+            return
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

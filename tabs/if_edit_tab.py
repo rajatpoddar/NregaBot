@@ -406,6 +406,8 @@ class IfEditTab(BaseAutomationTab):
         self.ui_fields['centre_scheme_name'].configure(state="disabled" if is_state else "normal")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

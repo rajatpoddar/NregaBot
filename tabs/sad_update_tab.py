@@ -6,6 +6,9 @@ import json
 import os, time, csv, re
 import threading
 from .base_tab import BaseAutomationTab
+from utils import get_logger
+
+logger = get_logger()
 
 # --- NAME CHANGED HERE (SADUpdateStatusTab -> SadUpdateTab) ---
 class SadUpdateTab(BaseAutomationTab):
@@ -180,6 +183,8 @@ class SadUpdateTab(BaseAutomationTab):
         self.log("UI Reset.")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.file_entry.configure(state=state)
@@ -189,7 +194,8 @@ class SadUpdateTab(BaseAutomationTab):
     def save_inputs(self, inputs):
         try:
             with open(self.config_file, 'w') as f: json.dump(inputs, f, indent=4)
-        except: pass
+        except Exception as e:
+            logger.warning("Failed to save SAD inputs: %s", e)
 
     def load_inputs(self):
         try:
@@ -197,7 +203,8 @@ class SadUpdateTab(BaseAutomationTab):
                 with open(self.config_file, 'r') as f:
                     data = json.load(f)
                     self.file_entry.insert(0, data.get('csv_file', ''))
-        except: pass
+        except Exception as e:
+            logger.warning("Failed to load SAD inputs: %s", e)
 
     # --- Parsing Logic ---
     def _parse_smart_ack_no(self, raw_text):
@@ -359,7 +366,8 @@ class SadUpdateTab(BaseAutomationTab):
                             # Wait for any sweet alert container to NOT be visible
                             wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, "div.swal2-container")))
                             wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "swal2-shown")))
-                        except: pass
+                        except Exception as e:
+                            logger.debug("Sweet alert overlay wait failed: %s", e)
                         
                     except Exception as e:
                         self.log(f"Navigation Error: {e}")
@@ -456,7 +464,8 @@ class SadUpdateTab(BaseAutomationTab):
                             set_docs_btn = WebDriverWait(driver, 3).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Set Documents')]")))
                             driver.execute_script("arguments[0].click();", set_docs_btn)
                             time.sleep(0.5)
-                        except: pass
+                        except Exception as e:
+                            logger.debug("Set Documents button not found: %s", e)
 
                     try:
                         update_btn = driver.find_element(By.XPATH, "//button[contains(., 'Update Status')]")
@@ -469,7 +478,8 @@ class SadUpdateTab(BaseAutomationTab):
                                 ok_btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.swal2-confirm")))
                                 driver.execute_script("arguments[0].click();", ok_btn)
                                 WebDriverWait(driver, 5).until(EC.invisibility_of_element_located((By.CSS_SELECTOR, "div.swal2-container")))
-                            except: pass
+                            except Exception as e:
+                                logger.debug("Sweet alert confirm button click failed: %s", e)
                             
                             processed_success += 1
                             self.log("--> Success"); self.add_result(search_term, "Success", "Updated")

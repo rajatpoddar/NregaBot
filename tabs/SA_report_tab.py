@@ -6,8 +6,10 @@ import time, os, sys, re
 from datetime import datetime
 
 from fpdf import FPDF
-from utils import resource_path
+from utils import resource_path, get_logger
 from .base_tab import BaseAutomationTab
+
+logger = get_logger()
 from .autocomplete_widget import AutocompleteEntry
 
 class SAReportTab(BaseAutomationTab):
@@ -86,6 +88,8 @@ class SAReportTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running); state = "disabled" if running else "normal"; self.panchayat_entry.configure(state=state); self.year_entry.configure(state=state); self.status_entry.configure(state=state)
 
     def reset_ui(self):
@@ -101,7 +105,7 @@ class SAReportTab(BaseAutomationTab):
             default_year = f"{current_year}-{current_year+1}"
             self.year_entry.set(default_year)
             self.status_entry.set("Pending")
-        except: pass
+        except Exception as e: logger.debug("SA: Could not set default status: %s", e)
         
         # Clear Treeview
         for item in self.results_tree.get_children():

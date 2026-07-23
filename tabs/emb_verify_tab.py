@@ -9,6 +9,9 @@ from datetime import datetime
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from utils import get_logger
+
+logger = get_logger()
 
 class EmbVerifyTab(BaseAutomationTab):
     """
@@ -120,6 +123,8 @@ class EmbVerifyTab(BaseAutomationTab):
         else: self.export_filter_menu.configure(state="normal")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         """Enable or disable UI elements based on automation state."""
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
@@ -349,7 +354,7 @@ class EmbVerifyTab(BaseAutomationTab):
                 alert = driver.switch_to.alert
                 self._log_result(work_code, "Failed", f"Unexpected Alert: {alert.text}")
                 alert.accept()
-            except: pass
+            except Exception as e: logger.warning("EmbVerify: Failed to dismiss alert: %s", e)
         except (TimeoutException, NoSuchElementException) as e:
             self._log_result(work_code, "Failed", f"Could not find a required element or work code not found.")
             self.app.log_message(self.log_display, f"Error details: {e}", "error")

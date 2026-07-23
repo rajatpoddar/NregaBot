@@ -121,6 +121,8 @@ class ZeroMrTab(BaseAutomationTab):
             self.export_filter_menu.configure(state="normal")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.fin_year_menu.configure(state=state)

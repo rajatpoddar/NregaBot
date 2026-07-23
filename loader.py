@@ -37,7 +37,8 @@ def log_error(msg):
     try:
         with open(LOG_FILE, "a") as f:
             f.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
-    except: pass
+    except Exception as e:
+        print(f"log_error failed: {e}")
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """

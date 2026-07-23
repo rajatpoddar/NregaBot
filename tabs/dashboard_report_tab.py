@@ -12,10 +12,12 @@ from datetime import datetime
 # PDF & Image Imports
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont 
-from utils import resource_path
+from utils import resource_path, get_logger
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 import config
+
+logger = get_logger()
 
 class DashboardReportTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -161,6 +163,8 @@ class DashboardReportTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.state_entry.configure(state=state)
@@ -429,7 +433,7 @@ class DashboardReportTab(BaseAutomationTab):
         # Directory
         target_dir = os.path.join(self.app.get_user_downloads_path(), f"Reports {current_year}", safe_panchayat)
         try: os.makedirs(target_dir, exist_ok=True)
-        except: pass
+        except Exception as e: logger.debug("Failed to create dirs: %s", e)
 
         # --- EXCEL EXPORT ---
         if "Excel" in export_format:
@@ -536,7 +540,7 @@ class DashboardReportTab(BaseAutomationTab):
 
             wb.save(file_path)
             try: os.startfile(file_path) if os.name == 'nt' else subprocess.call(['open', file_path])
-            except: pass
+            except Exception as e: logger.debug("Failed to open file: %s", e)
             return True
         except Exception as e:
             messagebox.showerror("Export Error", f"{e}"); return False
@@ -762,7 +766,7 @@ class DashboardReportTab(BaseAutomationTab):
         d = {k: inputs.get(k) for k in ('state', 'district', 'block', 'panchayat')}
         try:
             with open(self.app.get_data_path("dashboard_report_inputs.json"), 'w') as f: json.dump(d, f)
-        except: pass
+        except Exception as e: logger.debug("Dashboard: Could not save inputs: %s", e)
 
     def load_inputs(self):
         try:
@@ -771,4 +775,4 @@ class DashboardReportTab(BaseAutomationTab):
             self.district_entry.delete(0, 'end'); self.district_entry.insert(0, data.get('district', ''))
             self.block_entry.delete(0, 'end'); self.block_entry.insert(0, data.get('block', ''))
             self.panchayat_entry.delete(0, 'end'); self.panchayat_entry.insert(0, data.get('panchayat', ''))
-        except: pass
+        except Exception as e: logger.debug("Dashboard: Could not load inputs: %s", e)

@@ -152,6 +152,9 @@ def create_icon_manager():
     mgr._add("emoji_feedback",  "assets/icons/emojis/feedback.png",   size=(16, 16))
     mgr._add("emoji_about",     "assets/icons/emojis/about.png",      size=(16, 16))
 
+    # --- CLOCK ICON (Home Tab Date/Time) ---
+    mgr._add("emoji_clock", "assets/icons/emojis/clock.png", size=(16, 16))
+
     # --- SIDEBAR ---
     mgr._add("performance_thunder", "assets/icons/emojis/thunder.png", size=(14, 14))
 

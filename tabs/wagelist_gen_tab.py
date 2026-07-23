@@ -10,6 +10,9 @@ from urllib.parse import urlparse, parse_qs
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from utils import get_logger
+
+logger = get_logger()
 
 class WagelistGenTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -143,6 +146,8 @@ class WagelistGenTab(BaseAutomationTab):
         else: self.export_filter_menu.configure(state="normal")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -370,7 +375,7 @@ class WagelistGenTab(BaseAutomationTab):
                                 try:
                                     msg = d.find_element(By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
                                     if msg.text.strip(): return True
-                                except: pass
+                                except Exception as e: logger.debug("WagelistGen: Error checking message: %s", e); return False
                                 return False
                             WebDriverWait(driver, 45).until(check_outcome)
                         except TimeoutException:

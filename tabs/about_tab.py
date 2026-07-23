@@ -16,7 +16,9 @@ from urllib.parse import urlencode
 
 # --- MODIFIED IMPORT ---
 # Assuming utils.py has resource_path, get_data_path, get_config, save_config
-from utils import resource_path, get_data_path, get_config, save_config
+from utils import resource_path, get_data_path, get_config, save_config, get_logger
+
+logger = get_logger()
 
 # --- REMOVED ---
 # DEVICE_NAMES_FILE = 'device_names.json'
@@ -475,7 +477,7 @@ class AboutTab(ctk.CTkFrame):
             except requests.exceptions.HTTPError as http_err:
                 error_reason = f"HTTP Error: {http_err.response.status_code}"
                 try: error_reason = http_err.response.json().get("reason", error_reason)
-                except Exception: pass
+                except Exception: logger.warning("About: Could not parse error response JSON")
                 self.app.after(0, lambda: button.configure(state="normal", text=original_text)) # Restore emoji
                 self.app.after(0, lambda: messagebox.showerror("Request Failed", error_reason, parent=self))
             except requests.exceptions.RequestException as req_err:

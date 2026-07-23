@@ -10,7 +10,9 @@ import threading
 import queue
 from PIL import Image
 import config
-from utils import resource_path
+from utils import resource_path, get_logger
+
+logger = get_logger()
 
 # --- 0. AFTER TRACKER (Callback Cleanup Utility) ---
 class AfterTracker:
@@ -55,8 +57,8 @@ class AfterTracker:
         try:
             if self.widget.winfo_exists():
                 callback(*args)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("AfterTracker._wrap: callback failed (widget may be destroyed): %s", e)
 
     def _on_destroy_evt(self, event):
         """Cancel all tracked callbacks when this specific widget is destroyed.
@@ -70,8 +72,8 @@ class AfterTracker:
         for after_id in list(self._ids):
             try:
                 self.widget.after_cancel(after_id)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to cancel after_id %s: %s", after_id, e)
         self._ids.clear()
 
     def __del__(self):
@@ -164,112 +166,138 @@ class FormSkeleton(tk.Frame):
         self.canvas.create_rectangle(20, btn_y, 140, btn_y+40, fill=skel_color, outline="")
         self.canvas.create_rectangle(160, btn_y, 280, btn_y+40, fill=skel_color, outline="")
 class SkeletonLoader(ctk.CTkFrame):
+    """R6: Canvas-based skeleton loading effect.
+    Replaces 55+ CTkFrame placeholders with a single tk.Canvas
+    for much faster rendering and less GPU canvas redraw overhead.
+    """
     def __init__(self, parent, rows=8, **kwargs):
         super().__init__(parent, fg_color="transparent", **kwargs)
         self.pack(fill="both", expand=True, padx=20, pady=20)
-        self.placeholders = []
-        
-        # --- 1. Header Title ---
-        title_frame = ctk.CTkFrame(self, width=250, height=35, corner_radius=8, fg_color=("gray85", "gray25"))
-        title_frame.pack(anchor="w", pady=(0, 25))
-        self.placeholders.append(title_frame)
 
-        # --- 2. Top Info Cards (The "4 Circles" Area) ---
-        stats_frame = ctk.CTkFrame(self, fg_color="transparent")
-        stats_frame.pack(fill="x", pady=(0, 25))
-        
-        for _ in range(4): # 4 Blocks banayenge
-            card = ctk.CTkFrame(stats_frame, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]), corner_radius=10)
-            card.pack(side="left", expand=True, fill="x", padx=6, ipady=10)
-            
-            # Circle (Icon Placeholder)
-            circle = ctk.CTkFrame(card, width=45, height=45, corner_radius=22, fg_color=("gray85", "gray25"))
-            circle.pack(side="left", padx=(15, 10))
-            
-            # Text Details
-            text_box = ctk.CTkFrame(card, fg_color="transparent")
-            text_box.pack(side="left", fill="x", expand=True, padx=(0, 10))
-            
-            l1 = ctk.CTkFrame(text_box, height=14, width=80, corner_radius=6, fg_color=("gray85", "gray25"))
-            l1.pack(anchor="w", pady=(0, 6))
-            l2 = ctk.CTkFrame(text_box, height=12, width=50, corner_radius=6, fg_color=("gray90", "gray30"))
-            l2.pack(anchor="w")
-            
-            self.placeholders.extend([circle, l1, l2])
+        # Use plain tk.Canvas instead of 55+ CTkFrames
+        self.canvas = tk.Canvas(self, highlightthickness=0, bd=0)
+        self.canvas.pack(fill="both", expand=True)
 
-        # --- 3. Data List / Table (The "8 Lines" Area) ---
-        table_frame = ctk.CTkFrame(self, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]), corner_radius=12)
-        table_frame.pack(fill="both", expand=True)
-        
-        # Fake Table Header
-        header_row = ctk.CTkFrame(table_frame, height=40, fg_color="transparent")
-        header_row.pack(fill="x", padx=15, pady=(15, 10))
-        h1 = ctk.CTkFrame(header_row, height=20, width=100, corner_radius=5, fg_color=("gray85", "gray25"))
-        h1.pack(side="left", padx=(0, 20))
-        h2 = ctk.CTkFrame(header_row, height=20, width=150, corner_radius=5, fg_color=("gray85", "gray25"))
-        h2.pack(side="left")
-        self.placeholders.extend([h1, h2])
-        
-        # Fake Table Rows
-        for i in range(rows):
-            row = ctk.CTkFrame(table_frame, fg_color="transparent")
-            row.pack(fill="x", padx=15, pady=8)
-            
-            # Row Structure (Multiple columns simulating real data)
-            c1 = ctk.CTkFrame(row, height=16, width=40, corner_radius=8, fg_color=("gray90", "gray30")) # ID
-            c1.pack(side="left", padx=(0, 20))
-            
-            w_text = 200 if i % 2 == 0 else 150
-            c2 = ctk.CTkFrame(row, height=16, width=w_text, corner_radius=8, fg_color=("gray90", "gray30")) # Name
-            c2.pack(side="left", padx=(0, 20))
-            
-            c3 = ctk.CTkFrame(row, height=16, corner_radius=8, fg_color=("gray90", "gray30")) # Details (Flexible)
-            c3.pack(side="left", fill="x", expand=True)
-            
-            self.placeholders.extend([c1, c2, c3])
-            
+        self._items = []  # Canvas item IDs
+        self._rows = rows
+        self._animating = True
+        self._animate_step = 0
+
+        # Draw skeleton shapes on the canvas when widget is first sized
+        self.bind("<Configure>", self._on_resize)
+
         # Create AfterTracker for auto-cleanup on destroy
         self._tracker = AfterTracker(self)
-        
-        self.animate_step = 0
-        self.animating = True
         self._tracker.after(1000, self._animate)
 
+    def _get_colors(self):
+        """Return (bg_light, bg_dark, item_light, item_dark) based on current theme."""
+        mode = ctk.get_appearance_mode()
+        if mode == "Dark":
+            return ("#2b2b2b", None, config.COLORS["skel_dark_1"], config.COLORS["skel_dark_2"])
+        else:
+            return ("#f0f0f0", None, config.COLORS["skel_light"], config.COLORS["skel_light_alt"])
+
+    def _on_resize(self, event=None):
+        """Redraw skeleton shapes when widget resizes."""
+        if not self.winfo_exists():
+            return
+        self._draw_skeleton()
+
+    def _draw_skeleton(self):
+        """Draw all skeleton placeholders on the canvas.
+        Visual layout matches the original CTkFrame-based design:
+          - Title bar (top-left)
+          - 4 stat cards with circle + text lines
+          - Table header + row data
+        """
+        self.canvas.delete("all")
+        self._items = []
+
+        w = self.canvas.winfo_width() or 600
+        h = self.canvas.winfo_height() or 400
+        bg, _, color_a, _ = self._get_colors()
+
+        # Set canvas background to match theme
+        self.canvas.configure(bg=bg)
+
+        # --- 1. Header Title ---
+        y = 20
+        _id = self.canvas.create_rectangle(20, y, 250, y + 30, fill=color_a, outline="", tags="skel")
+        self._items.append(_id)
+
+        # --- 2. Top Info Cards (4 stat cards) ---
+        y = 75
+        card_w = (w - 60) // 4  # 4 cards with padding
+        for i in range(4):
+            cx = 20 + i * (card_w + 8)
+            # Card background
+            self.canvas.create_rectangle(cx, y, cx + card_w, y + 65, fill=bg, outline="", tags="skel_bg")
+            # Circle (icon placeholder)
+            _id = self.canvas.create_oval(cx + 12, y + 10, cx + 12 + 40, y + 10 + 40, fill=color_a, outline="", tags="skel")
+            self._items.append(_id)
+            # Text line 1
+            _id = self.canvas.create_rectangle(cx + 62, y + 12, cx + 62 + 60, y + 12 + 12, fill=color_a, outline="", tags="skel")
+            self._items.append(_id)
+            # Text line 2
+            _id = self.canvas.create_rectangle(cx + 62, y + 30, cx + 62 + 40, y + 30 + 10, fill=color_a, outline="", tags="skel")
+            self._items.append(_id)
+
+        # --- 3. Table area ---
+        y = 165
+        table_h = h - y - 20
+        # Table background
+        self.canvas.create_rectangle(20, y, w - 20, y + table_h, fill=bg, outline="", tags="skel_bg")
+
+        # Table header
+        hy = y + 15
+        _id = self.canvas.create_rectangle(40, hy, 140, hy + 18, fill=color_a, outline="", tags="skel")
+        self._items.append(_id)
+        _id = self.canvas.create_rectangle(160, hy, 300, hy + 18, fill=color_a, outline="", tags="skel")
+        self._items.append(_id)
+
+        # Table rows
+        ry = hy + 35
+        row_gap = 32
+        for i in range(self._rows):
+            if ry + 20 > y + table_h:
+                break
+            _id = self.canvas.create_rectangle(40, ry, 70, ry + 16, fill=color_a, outline="", tags="skel")
+            self._items.append(_id)
+            w2 = 180 if i % 2 == 0 else 120
+            _id = self.canvas.create_rectangle(90, ry, 90 + w2, ry + 16, fill=color_a, outline="", tags="skel")
+            self._items.append(_id)
+            _id = self.canvas.create_rectangle(90 + w2 + 20, ry, w - 50, ry + 16, fill=color_a, outline="", tags="skel")
+            self._items.append(_id)
+            ry += row_gap
+
     def _animate(self):
-        if not self.animating or not self.winfo_exists(): return
-        
-        # Skip animation when widget is not visible on screen
-        # Prevents unnecessary CPU usage when SkeletonLoader is hidden
+        """Pulse animation: alternates between two shades for all skeleton items."""
+        if not self._animating or not self.winfo_exists():
+            return
+
+        # Skip animation when not visible
         if not self.winfo_viewable():
             self._tracker.after(1000, self._animate)
             return
-        
-        # Thoda modern colors (Light/Dark mode compatible)
-        # Pulse Effect: Light Gray <-> Slightly Darker Gray
-        l1, l2 = config.COLORS["skel_light"], config.COLORS["skel_light_alt"]  # Light Mode
-        d1, d2 = config.COLORS["skel_dark_1"], config.COLORS["skel_dark_2"]  # Dark Mode
-        
-        mode = ctk.get_appearance_mode()
-        
-        if self.animate_step == 0:
-            c_light, c_dark = l2, d2
-            self.animate_step = 1
-        else:
-            c_light, c_dark = l1, d1
-            self.animate_step = 0
-            
-        final_color = c_dark if mode == "Dark" else c_light
-            
-        for p in self.placeholders:
+
+        # Get current theme colors
+        _, _, color_a, color_b = self._get_colors()
+        fill = color_b if self._animate_step == 0 else color_a
+        self._animate_step = 1 - self._animate_step
+
+        # Batch-update all skeleton item colors
+        for item_id in self._items:
             try:
-                if p.winfo_exists():
-                    p.configure(fg_color=final_color)
-            except: pass
-            
-        self._tracker.after(1000, self._animate) # Slower animation to save CPU
+                self.canvas.itemconfig(item_id, fill=fill)
+            except Exception as e:
+                logger.debug("SkeletonLoader animate itemconfig failed: %s", e)
+
+        self._tracker.after(1000, self._animate)
 
     def stop(self):
-        self.animating = False
+        """Stop animation and destroy the skeleton loader."""
+        self._animating = False
         self._tracker.cancel_all()
         self.destroy()
 
@@ -322,7 +350,8 @@ class MarqueeLabel(ctk.CTkFrame):
             for item in self.items:
                 if not item.get('is_link'):
                     self.canvas.itemconfig(item['id'], fill=default_color)
-        except Exception: pass
+        except Exception as e:
+            logger.debug("MarqueeLabel.update_colors failed: %s", e)
 
     def _parse_html(self, text):
         pattern = re.compile(r'(<a\s+href="([^"]+)">(.+?)</a>|<b>(.+?)</b>|<i>(.+?)</i>)')
@@ -501,7 +530,8 @@ class ToastNotification(ctk.CTkToplevel):
             pos_y = parent_y + parent_h - my_h - 60 
             
             self.geometry(f"+{pos_x}+{pos_y}")
-        except: pass
+        except Exception as e:
+            logger.debug("ToastNotification._position_window failed: %s", e)
 
     def _animate_in(self, step=0):
         if step <= 10:
@@ -599,7 +629,8 @@ class ComingSoonTab(ctk.CTkFrame):
             icon_image = app_instance.icon_images.get("onboarding_launch") 
             if icon_image:
                  ctk.CTkLabel(container, text="", image=icon_image).pack(pady=(0, 20))
-        except: pass
+        except Exception as e:
+            logger.debug("ComingSoonTab failed to load icon: %s", e)
 
         ctk.CTkLabel(container, text="Coming Soon", font=ctk.CTkFont(size=28, weight="bold")).pack()
         ctk.CTkLabel(container, text="Sarkar Aapke Dwar Automation is under development.", 

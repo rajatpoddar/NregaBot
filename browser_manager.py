@@ -6,7 +6,9 @@ from tkinter import messagebox
 import tkinter
 import customtkinter as ctk
 import config
-from utils import resource_path
+from utils import resource_path, get_logger
+
+logger = get_logger()
 
 # Selenium Imports (Lazy loading handled inside methods where possible to speed up start)
 
@@ -117,7 +119,7 @@ class BrowserManager:
 
         if self.driver and messagebox.askyesno("Browser Running", "Close existing Firefox and start new?"): 
             try: self.driver.quit()
-            except: pass
+            except Exception as e: logger.debug("Failed to quit Firefox driver: %s", e)
             self.driver = None
         elif self.driver: return
         
@@ -305,7 +307,7 @@ class BrowserManager:
             x = self.app.winfo_x() + (self.app.winfo_width() // 2) - (300 // 2)
             y = self.app.winfo_y() + (self.app.winfo_height() // 2) - (250 // 2)
             dialog.geometry(f"+{x}+{y}")
-        except: pass
+        except Exception as e: logger.debug("Failed to center browser selection dialog: %s", e)
         
         ctk.CTkLabel(dialog, text="Multiple browsers detected.", font=ctk.CTkFont(weight="bold")).pack(pady=(20, 5))
         ctk.CTkLabel(dialog, text="Which one do you want to use?").pack(pady=(0, 20))

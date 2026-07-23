@@ -13,7 +13,9 @@ from datetime import datetime
 
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont # Import Pillow
-from utils import resource_path
+from utils import resource_path, get_logger
+
+logger = get_logger()
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
 import config  # <-- Make sure config is imported
@@ -239,6 +241,8 @@ class MrTrackingTab(BaseAutomationTab):
             self.zero_mr_filter_check.configure(state="normal")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         
@@ -1111,7 +1115,7 @@ class MrTrackingTab(BaseAutomationTab):
             messagebox.showinfo("Success", f"Report saved successfully:\n{save_path}")
             try:
                 os.startfile(save_path) if os.name == 'nt' else subprocess.call(['open', save_path])
-            except: pass
+            except Exception as e: logger.debug("MRTracking: Could not open file: %s", e)
             
         except Exception as e:
             messagebox.showerror("Export Error", f"Failed to save Excel:\n{e}")
@@ -1135,8 +1139,8 @@ class MrTrackingTab(BaseAutomationTab):
                 try:
                     short_code = code.split('/')[-1][-6:]
                     processed_list.append(short_code)
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug("MRTracking: Could not parse code: %s", e)
             elif code:
                 # Agar simple code hai to waisa hi lelo
                 processed_list.append(code)

@@ -11,8 +11,10 @@ from datetime import datetime
 
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont 
-from utils import resource_path
+from utils import resource_path, get_logger
 from .base_tab import BaseAutomationTab
+
+logger = get_logger()
 from .autocomplete_widget import AutocompleteEntry
 import config
 
@@ -201,6 +203,8 @@ class IssuedMrReportTab(BaseAutomationTab):
 
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.state_entry.configure(state=state)
@@ -492,7 +496,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         finally:
             if self.driver: 
                 try: self.driver.quit()
-                except: pass
+                except Exception as e: logger.debug("Failed to quit driver: %s", e)
             self.driver = None
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")
@@ -646,7 +650,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         finally:
             if self.driver: 
                 try: self.driver.quit()
-                except: pass
+                except Exception as e: logger.debug("IssuedMR: Driver quit failed: %s", e)
             self.driver = None
             self.app.after(0, self.set_ui_state, False)
             if hasattr(self, 'success_message') and self.success_message:
@@ -737,7 +741,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         downloads_path = self.app.get_user_downloads_path() 
         target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", safe_name) 
         try: os.makedirs(target_dir, exist_ok=True)
-        except OSError: pass
+        except OSError as e: logger.debug("Failed to create dirs: %s", e)
 
         filename = f"ABPS_Pending_Report_{safe_name}_{current_date_str}.xlsx"
         file_path = filedialog.asksaveasfilename(
@@ -835,7 +839,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             try:
                 if os.name == 'nt': os.startfile(file_path)
                 else: subprocess.call(['open', file_path])
-            except: pass
+            except Exception as e: logger.debug("Failed to open exported file: %s", e)
 
         except Exception as e:
             messagebox.showerror("Export Error", f"Failed to save Excel report:\n{e}")
@@ -1007,7 +1011,8 @@ class IssuedMrReportTab(BaseAutomationTab):
             config_file = self.app.get_data_path("issued_mr_report_inputs.json")
             with open(config_file, 'w') as f:
                 json.dump(save_data, f, indent=4)
-        except Exception: pass
+        except Exception as e:
+            logger.warning("Failed to save Issued MR inputs: %s", e)
 
     def load_inputs(self):
         try:
@@ -1018,4 +1023,5 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.district_entry.delete(0, 'end'); self.district_entry.insert(0, data.get('district', ''))
             self.block_entry.delete(0, 'end'); self.block_entry.insert(0, data.get('block', ''))
             self.panchayat_entry.delete(0, 'end'); self.panchayat_entry.insert(0, data.get('panchayat', ''))
-        except Exception: pass
+        except Exception as e:
+            logger.warning("Failed to load Issued MR inputs: %s", e)

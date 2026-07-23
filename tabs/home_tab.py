@@ -129,15 +129,38 @@ class HomeTab(ctk.CTkFrame):
             text_color=(config.COLORS["text_medium"], config.COLORS["text_light"]),
         ).pack(side="left", padx=(8, 0))
 
-        # Date & Time display — bold, highlighted, aligned far right in header
+        # Date & Time display — clock icon + date (blue) + time (green), aligned far right
         header_frame.grid_columnconfigure(1, weight=1)
-        self.datetime_label = ctk.CTkLabel(
-            header_frame,
+        datetime_container = ctk.CTkFrame(header_frame, fg_color="transparent")
+        datetime_container.grid(row=2, column=1, sticky="e", padx=(10, 5), pady=(15, 5))
+
+        # Clock icon
+        clock_icon = self.app.icon_images.get("emoji_clock")
+        if clock_icon:
+            ctk.CTkLabel(
+                datetime_container,
+                image=clock_icon,
+                text="",
+            ).pack(side="left", padx=(0, 6))
+
+        # Date label — blue (like RAM value)
+        self.date_label = ctk.CTkLabel(
+            datetime_container,
             text="",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-            text_color=(config.COLORS["text_dark_alt"], config.COLORS["text_hover"]),
+            text_color=config.COLORS["badge_success"],  # Blue
         )
-        self.datetime_label.grid(row=2, column=1, sticky="e", padx=(10, 5), pady=(15, 5))
+        self.date_label.pack(side="left", padx=(0, 4))
+
+        # Time label — green (like CPU value)
+        self.time_label = ctk.CTkLabel(
+            datetime_container,
+            text="",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=config.COLORS["badge_info"],  # Green
+        )
+        self.time_label.pack(side="left")
+
         self._update_datetime()
 
     # ──────────────────────────────────────────────
@@ -483,12 +506,14 @@ class HomeTab(ctk.CTkFrame):
         """Update the date & time label every second.
         Only updates when the Home tab is the currently active tab
         to avoid unnecessary widget rendering overhead."""
-        if hasattr(self, 'datetime_label') and self.datetime_label.winfo_exists():
+        if hasattr(self, 'date_label') and self.date_label.winfo_exists():
             # Skip heavy label update if this tab isn't even visible
             if getattr(self.app, 'current_active_tab', '') == 'Home':
                 now = time.localtime()
-                date_str = time.strftime("%d %b %Y, %I:%M:%S %p", now)
-                self.datetime_label.configure(text=date_str)
+                date_str = time.strftime("%a %d %b", now)          # Thu 23 Jul
+                time_str = time.strftime("%I:%M %p", now).lstrip("0")  # 3:23 PM (no leading zero)
+                self.date_label.configure(text=date_str)
+                self.time_label.configure(text=time_str)
             # Use safe_after so the timer is auto-cancelled if tab is destroyed
             self.safe_after(1000, self._update_datetime)
 

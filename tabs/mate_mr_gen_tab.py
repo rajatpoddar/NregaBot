@@ -238,6 +238,8 @@ class MateMrGenTab(BaseAutomationTab):
         self.scale_label.configure(text=f"{int(value)}%")
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

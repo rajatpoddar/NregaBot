@@ -35,6 +35,9 @@ except ImportError:
 import config
 from .base_tab import BaseAutomationTab
 from .autocomplete_widget import AutocompleteEntry
+from utils import get_logger
+
+logger = get_logger()
 
 class MbEntryTab(BaseAutomationTab):
     def __init__(self, parent, app_instance):
@@ -260,7 +263,7 @@ class MbEntryTab(BaseAutomationTab):
         self.mapping_data[key] = mate_names.strip()
         try:
             with open(self.mapping_file, 'w') as f: json.dump(self.mapping_data, f, indent=4)
-        except Exception: pass
+        except Exception as e: logger.debug("MBEntry: Could not save mapping: %s", e)
 
     def _on_panchayat_change(self):
         if self.panchayat_after_id: self.after_cancel(self.panchayat_after_id); self.panchayat_after_id = None
@@ -277,6 +280,8 @@ class MbEntryTab(BaseAutomationTab):
                     self.mate_name_entry.insert(0, saved_mate)
 
     def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
         self.set_common_ui_state(running) 
         state = "disabled" if running else "normal"
         self.work_codes_text.configure(state=state)
@@ -490,7 +495,7 @@ class MbEntryTab(BaseAutomationTab):
                     Select(panchayat_dropdown).select_by_visible_text(cfg['panchayat_name'])
                     wait.until(EC.staleness_of(panchayat_dropdown))
                     wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
-            except Exception: pass
+            except Exception as e: logger.debug("MBEntry: Panchayat select wait failed: %s", e)
             
             wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtMBNo')))
 
@@ -571,7 +576,7 @@ class MbEntryTab(BaseAutomationTab):
             driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
             
             try: driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpit').value = '{cfg['default_pit_count']}';")
-            except: pass 
+            except Exception as e: logger.debug("MBEntry: Could not set pit count: %s", e)
             random_mate = random.choice(mate_names_list)
             driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txt_mat_name').value = '{random_mate}';")
 
@@ -1027,7 +1032,7 @@ class MbEntryTab(BaseAutomationTab):
             try:
                 if os.name == 'nt': os.startfile(filename)
                 else: subprocess.call(['open', filename])
-            except: pass
+            except Exception as e: logger.debug("MBEntry: Could not open exported Excel: %s", e)
 
         except Exception as e:
             messagebox.showerror("Export Error", f"Failed to save Excel: {e}")
@@ -1210,7 +1215,7 @@ class MbEntryTab(BaseAutomationTab):
             try:
                 if os.name == 'nt': os.startfile(filename)
                 else: subprocess.call(['open', filename])
-            except: pass
+            except Exception as e: logger.debug("MBEntry: Could not open exported PDF: %s", e)
 
         except Exception as e:
             messagebox.showerror("PDF Error", f"Failed to generate PDF: {e}")
