@@ -121,12 +121,16 @@ class HomeTab(ctk.CTkFrame):
         }
 
         ctk.CTkButton(
-            actions_frame, text="🚀 Launch Chrome",
+            actions_frame, text="Launch Chrome",
+            image=self.app.icon_images.get("chrome"),
+            compound="left",
             command=self.app.launch_chrome_detached, **btn_style
         ).pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
-            actions_frame, text="🔐 Auto Login",
+            actions_frame, text="Auto Login",
+            image=self.app.icon_images.get("emoji_login_automation"),
+            compound="left",
             command=self.app._quick_login_automation, **btn_style
         ).pack(side="left", padx=(0, 8))
 

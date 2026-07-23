@@ -1880,9 +1880,100 @@ class NregaBotApp(ctk.CTk):
         self.after(5000, lambda: self.set_status("Ready"))
         if not self.active_automations: self.allow_sleep()
 
+    @staticmethod
+    def _get_current_financial_year():
+        """Returns current Indian financial year as 'YYYY-YYYY' (e.g. '2026-2027').
+        Indian FY runs from April to March."""
+        from datetime import datetime
+        now = datetime.now()
+        year = now.year
+        if now.month < 4:
+            return f"{year - 1}-{year}"
+        else:
+            return f"{year}-{year + 1}"
+
+    def _select_dropdown_safe(self, wait, xpath, text, wait_for_options=False):
+        """Helper to select a dropdown option with retry logic for stale elements."""
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import StaleElementReferenceException
+
+        for _ in range(3):
+            try:
+                elem = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
+                sel = Select(elem)
+                if wait_for_options:
+                    d = self.get_driver()
+                    if d:
+                        WebDriverWait(d, 5).until(
+                            lambda d: len(Select(d.find_element(By.XPATH, xpath)).options) > 1
+                        )
+                        sel = Select(d.find_element(By.XPATH, xpath))
+                try:
+                    sel.select_by_visible_text(text)
+                except Exception:
+                    found = False
+                    for opt in sel.options:
+                        if opt.text.strip().lower() == text.lower():
+                            sel.select_by_visible_text(opt.text)
+                            found = True
+                            break
+                    if not found:
+                        raise Exception(f"Option '{text}' not found")
+                return
+            except StaleElementReferenceException:
+                time.sleep(1)
+        raise Exception(f"Failed to select '{text}' after retries")
+
+    def _run_login_navigation_background(self, district, block):
+        """Runs NREGA portal navigation (FY / District / Block selection)
+        silently in background — no tab is opened, only footer status updates.
+        """
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException
+
+        fin_year = self._get_current_financial_year()
+
+        self.set_status("Launching browser...")
+        driver = self.get_driver()
+        if not driver:
+            self.set_status("Login: No browser found")
+            return
+
+        url = "https://vbgramgde2.dord.gov.in/VBGRAMG/Login.aspx?&level=HomePO&state_code=34"
+        driver.get(url)
+        wait = WebDriverWait(driver, 25)
+
+        self.set_status(f"Login: Selecting FY {fin_year}...")
+        self._select_dropdown_safe(wait, "//select[contains(@id, 'ddl_FinYr')]", fin_year)
+
+        self.set_status(f"Login: Finding district '{district}'...")
+        self._select_dropdown_safe(wait, "//select[contains(@id, 'ddl_District')]", district, wait_for_options=True)
+
+        self.set_status(f"Login: Finding block '{block}'...")
+        self._select_dropdown_safe(wait, "//select[contains(@id, 'ddl_Block')]", block, wait_for_options=True)
+
+        self.set_status("Login: Waiting for page refresh...")
+        try:
+            WebDriverWait(driver, 10).until(
+                lambda d: d.execute_script('return document.readyState') == 'complete'
+            )
+        except TimeoutException:
+            pass
+
+        self.set_status("Ready for Login")
+
     def _quick_login_automation(self):
-        """Auto Login Logic: Checks browser state and credentials."""
+        """Auto Login: Launches Chrome if needed, checks if District & Block are set.
+        If credentials are saved, runs automation silently in background with only
+        the footer status bar showing progress. No tab navigation happens — the
+        user stays on their current page (Home or wherever).
+        """
         def _runner():
+            # --- 1. Check / Launch Browser ---
             chrome_running = False
             try:
                 with socket.create_connection(("127.0.0.1", 9222), timeout=0.2):
@@ -1891,32 +1982,40 @@ class NregaBotApp(ctk.CTk):
                 pass
 
             if not chrome_running:
-                login_url = "https://nregade4.nic.in/netnrega/Login.aspx?&level=HomePO&state_code=34"
+                login_url = "https://vbgramgde2.dord.gov.in/VBGRAMG/Login.aspx?&level=HomePO&state_code=34"
                 self.after(0, lambda: self.launch_chrome_detached(target_urls=[login_url]))
                 time.sleep(4)
 
+            # --- 2. Check if District & Block are saved ---
             creds_path = self.get_data_path('user_location_pref.json')
-            has_creds = False
+            district = None
+            block = None
             if os.path.exists(creds_path):
                 try:
                     with open(creds_path, 'r') as f:
                         data = json.load(f)
-                        if data.get("district") and data.get("block"):
-                            has_creds = True
-                except: pass
+                        district = data.get("district", "").strip()
+                        block = data.get("block", "").strip()
+                except:
+                    pass
 
-            should_switch = not has_creds
-            self.after(0, lambda: self.show_frame("Login Automation", raise_frame=should_switch))
+            if not district or not block:
+                self.after(0, lambda: (
+                    self.play_sound("error"),
+                    messagebox.showwarning(
+                        "Setup Required",
+                        "Please set District & Block first.\n\n"
+                        "1. Go to 'Login Automation' tab from the sidebar.\n"
+                        "2. Enter your District and Block names.\n"
+                        "3. Click 'Save Location'.\n"
+                        "4. Then use this quick login button again."
+                    )
+                ))
+                return
 
-            def _trigger(retries=0):
-                if "Login Automation" in self.tab_instances:
-                    self.tab_instances["Login Automation"].run_login_thread()
-                elif retries < 50: # Optimised: max retry limits to avoid infinite loop
-                    self.after(100, lambda: _trigger(retries + 1))
-                else:
-                    print("Timeout: Login Automation tab failed to load.")
-            
-            self.after(500, lambda: _trigger(0))
+            # --- 3. Credentials exist — run silently in background ---
+            # No tab loading, no page switch. Only footer status updates.
+            self._run_login_navigation_background(district, block)
 
         threading.Thread(target=_runner, daemon=True).start()
 

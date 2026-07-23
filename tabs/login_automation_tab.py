@@ -24,20 +24,20 @@ class LoginAutomationTab(BaseAutomationTab):
         title = ctk.CTkLabel(self.main_frame, text="NREGA Navigation Automation", font=ctk.CTkFont(size=20, weight="bold"))
         title.pack(pady=(0, 20))
         
+        # --- Financial Year (Auto-set, read-only display) ---
+        self.current_financial_year = self._get_current_financial_year()
+        
         # --- Location Form Section ---
         form_frame = ctk.CTkFrame(self.main_frame)
         form_frame.pack(fill='x', padx=10, pady=10)
         form_frame.columnconfigure(1, weight=1)
         
-        # 1. Financial Year
+        # 1. Financial Year (Read-only display)
         ctk.CTkLabel(form_frame, text="Financial Year:", font=ctk.CTkFont(size=13)).grid(row=0, column=0, sticky='w', padx=15, pady=10)
-        self.fin_year_var = tk.StringVar()
-        self.fin_year_input = ctk.CTkComboBox(form_frame, variable=self.fin_year_var, width=250)
-        current_year = 2025
-        years = [f"{i}-{i+1}" for i in range(current_year + 1, 2010, -1)]
-        self.fin_year_input.configure(values=years)
-        if years: self.fin_year_input.set(years[1])
-        self.fin_year_input.grid(row=0, column=1, padx=15, pady=10, sticky='w')
+        fy_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        fy_frame.grid(row=0, column=1, padx=15, pady=10, sticky='w')
+        ctk.CTkLabel(fy_frame, text=self.current_financial_year, font=ctk.CTkFont(size=13, weight="bold"), text_color=("#2563EB", "#60A5FA")).pack(side="left")
+        ctk.CTkLabel(fy_frame, text="  (auto-set)", font=ctk.CTkFont(size=11), text_color="gray50").pack(side="left")
         
         # 2. District
         ctk.CTkLabel(form_frame, text="District Name:", font=ctk.CTkFont(size=13)).grid(row=1, column=0, sticky='w', padx=15, pady=10)
@@ -68,6 +68,19 @@ class LoginAutomationTab(BaseAutomationTab):
         
         self.load_credentials()
 
+    @staticmethod
+    def _get_current_financial_year():
+        """Returns current Indian financial year as 'YYYY-YYYY' (e.g. '2026-2027').
+        Indian FY runs from April to March."""
+        from datetime import datetime
+        now = datetime.now()
+        year = now.year
+        # Before April (Jan-Mar), FY is previous year - current year
+        if now.month < 4:
+            return f"{year - 1}-{year}"
+        else:
+            return f"{year}-{year + 1}"
+
     def get_creds_path(self):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -86,7 +99,6 @@ class LoginAutomationTab(BaseAutomationTab):
 
     def save_credentials(self):
         data = {
-            "fin_year": self.fin_year_input.get(),
             "district": self.district_input.get().strip(),
             "block": self.block_input.get().strip()
         }
@@ -101,7 +113,6 @@ class LoginAutomationTab(BaseAutomationTab):
             try:
                 with open(path, 'r') as f:
                     data = json.load(f)
-                    self.fin_year_input.set(data.get("fin_year", ""))
                     self.district_input.delete(0, tk.END); self.district_input.insert(0, data.get("district", ""))
                     self.block_input.delete(0, tk.END); self.block_input.insert(0, data.get("block", ""))
             except: pass
@@ -122,7 +133,7 @@ class LoginAutomationTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        fin_year = self.fin_year_input.get()
+        fin_year = self.current_financial_year  # Auto-calculated, no user input needed
         district = self.district_input.get().strip()
         block = self.block_input.get().strip()
         
@@ -141,7 +152,7 @@ class LoginAutomationTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 25)
             
             # --- 1. Select Dropdowns ---
-            self.update_status("Status: Selecting Financial Year...")
+            self.update_status(f"Status: Selecting Financial Year ({fin_year})...")
             self._safe_select(wait, "//select[contains(@id, 'ddl_FinYr')]", fin_year)
             
             self.update_status(f"Status: Finding District '{district}'...")

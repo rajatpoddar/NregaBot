@@ -2,7 +2,6 @@ import os
 import sys
 import subprocess
 import socket
-import threading
 from tkinter import messagebox
 import tkinter
 import customtkinter as ctk
@@ -20,21 +19,6 @@ class BrowserManager:
         
         # Suppress verbose WDM (WebDriver Manager) INFO logs from terminal
         os.environ['WDM_LOG'] = '0'
-        
-        # Background me Webdriver Manager initialize karo
-        threading.Thread(target=self._initialize_webdriver_manager, daemon=True).start()
-
-    def _initialize_webdriver_manager(self):
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        try:
-            ChromeService(ChromeDriverManager().install())
-        except: pass
-        from selenium.webdriver.firefox.service import Service as FirefoxService
-        from webdriver_manager.firefox import GeckoDriverManager
-        try:
-            FirefoxService(GeckoDriverManager().install())
-        except: pass
 
     def launch_chrome_detached(self, target_urls=None):
         """Launches Chrome with debugging port enabled."""
@@ -130,8 +114,6 @@ class BrowserManager:
     def launch_firefox_managed(self):
         from selenium import webdriver
         from selenium.webdriver.firefox.options import Options as FirefoxOptions
-        from selenium.webdriver.firefox.service import Service as FirefoxService
-        from webdriver_manager.firefox import GeckoDriverManager
 
         if self.driver and messagebox.askyesno("Browser Running", "Close existing Firefox and start new?"): 
             try: self.driver.quit()
@@ -146,7 +128,12 @@ class BrowserManager:
             opts.add_argument("-profile")
             opts.add_argument(p_dir)
             
-            self.driver = webdriver.Firefox(service=FirefoxService(GeckoDriverManager().install()), options=opts)
+            service = self._create_driver_service("firefox")
+            if service:
+                self.driver = webdriver.Firefox(options=opts, service=service)
+            else:
+                # Fallback: let Selenium Manager handle geckodriver
+                self.driver = webdriver.Firefox(options=opts)
             self.active_browser = "firefox"
             self.app.play_sound("success")
             
@@ -200,6 +187,28 @@ class BrowserManager:
         except Exception as e:
             return False, f"Failed to launch Old Firefox: {e}"
 
+    def _create_driver_service(self, browser_type):
+        """Returns a Service object for the given browser type, or None.
+        Uses webdriver_manager to download the driver if needed, with
+        a fallback to Selenium's built-in manager.
+        """
+        try:
+            if browser_type == "chrome":
+                from selenium.webdriver.chrome.service import Service as ChromeService
+                from webdriver_manager.chrome import ChromeDriverManager
+                return ChromeService(ChromeDriverManager().install())
+            elif browser_type == "edge":
+                from selenium.webdriver.edge.service import Service as EdgeService
+                from webdriver_manager.microsoft import EdgeChromiumDriverManager
+                return EdgeService(EdgeChromiumDriverManager().install())
+            elif browser_type == "firefox":
+                from selenium.webdriver.firefox.service import Service as FirefoxService
+                from webdriver_manager.firefox import GeckoDriverManager
+                return FirefoxService(GeckoDriverManager().install())
+        except Exception:
+            pass
+        return None
+
     def get_driver(self):
         """Connects to an existing browser session."""
         available_browsers = []
@@ -246,7 +255,12 @@ class BrowserManager:
             try:
                 opts = ChromeOptions()
                 opts.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
-                driver = webdriver.Chrome(options=opts)
+                service = self._create_driver_service("chrome")
+                if service:
+                    driver = webdriver.Chrome(options=opts, service=service)
+                else:
+                    # Fallback: let Selenium Manager handle driver
+                    driver = webdriver.Chrome(options=opts)
                 self.active_browser = 'chrome'
                 self.app.active_browser = 'chrome'
                 return driver
@@ -261,7 +275,12 @@ class BrowserManager:
             try:
                 opts = EdgeOptions()
                 opts.add_experimental_option("debuggerAddress", "127.0.0.1:9223")
-                driver = webdriver.Edge(options=opts)
+                service = self._create_driver_service("edge")
+                if service:
+                    driver = webdriver.Edge(options=opts, service=service)
+                else:
+                    # Fallback: let Selenium Manager handle driver
+                    driver = webdriver.Edge(options=opts)
                 self.active_browser = 'edge'
                 self.app.active_browser = 'edge'
                 return driver

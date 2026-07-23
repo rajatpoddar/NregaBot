@@ -58,6 +58,10 @@ pyinstaller --noconfirm --clean --windowed --name "${APP_NAME}" \
 --collect-data fpdf \
 --hidden-import=selenium \
 --hidden-import=webdriver_manager \
+--hidden-import=webdriver_manager.chrome \
+--hidden-import=webdriver_manager.firefox \
+--hidden-import=webdriver_manager.microsoft \
+--collect-submodules=webdriver_manager \
 --hidden-import=pandas \
 --hidden-import=PIL \
 --hidden-import=requests \
