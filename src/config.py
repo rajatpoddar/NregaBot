@@ -578,9 +578,47 @@ PHYSICAL_COMPLETE_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/phycomp_work.aspx"
 }
 
+# ============================================================================
+# P1.3: Config Value Cache — avoids repeated dict lookups and color string
+# parsing for frequently-accessed values. The cache is populated lazily.
+# ============================================================================
+
 import os
 import json
+from typing import Any, Optional
 from src.utils import get_data_path
+
+class _ConfigCache:
+    """
+    Lightweight cache for frequently-accessed config values.
+    
+    - get(key): returns cached value or computes from COLORS dict
+    - clear(): resets cache (used on theme change)
+    
+    Usage::
+        COLORS.cache.get("blue")  # 1st call: dict lookup; 2nd+: cache hit
+    """
+    def __init__(self, colors_dict):
+        self._colors = colors_dict
+        self._cache = {}
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if key in self._cache:
+            return self._cache[key]
+        val = self._colors.get(key, default)
+        self._cache[key] = val
+        return val
+
+    def clear(self) -> None:
+        self._cache.clear()
+
+
+# Create a module-level cache so it can be accessed via config.COLORS_CACHE.get("key")
+# NOTE: We cannot set COLORS.cache = ... because Python dict instances don't
+# support arbitrary attribute assignment (AttributeError). Instead, a separate
+# COLORS_CACHE variable is used.
+COLORS_CACHE = _ConfigCache(COLORS)
+
 
 def create_default_config_if_not_exists() -> None:
     """

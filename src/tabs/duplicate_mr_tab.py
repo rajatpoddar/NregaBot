@@ -8,7 +8,7 @@ import json
 import time
 import threading
 from datetime import datetime
-from pypdf import PdfWriter # <-- IMPORT ADD KIYA GAYA
+from pypdf import PdfWriter, PdfReader # <-- IMPORT ADD KIYA GAYA
 
 from src import config
 from .base_tab import BaseAutomationTab
@@ -662,14 +662,36 @@ class DuplicateMrTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.log_message(self.log_display, f"Merging {len(file_list)} files...")
         self.app.after(0, self.app.set_status, "Merging PDFs...")
+        
+        # Note: duplicate_mr_tab uses "pdf_merger_dup_mr" event key, 
+        # while musterroll_gen_tab uses "pdf_merger_mr". 
+        # Getting the key dynamically based on current file/tab:
+        stop_event_key = "pdf_merger_dup_mr" if "duplicate" in self.automation_key else "pdf_merger_mr"
+
         try:
             merger = PdfWriter()
-            for pdf_path in file_list:
-                if self.app.stop_events.get("pdf_merger_dup_mr", threading.Event()).is_set():
+            for i, pdf_path in enumerate(file_list):
+                if self.app.stop_events.get(stop_event_key, threading.Event()).is_set():
                     self.app.log_message(self.log_display, "Merge cancelled.", "warning")
                     merger.close()
                     return
-                merger.append(pdf_path)
+                
+                self.app.log_message(self.log_display, f"Processing file {i+1}/{len(file_list)}: {os.path.basename(pdf_path)}")
+                
+                # Smart blank page filtering logic
+                reader = PdfReader(pdf_path)
+                num_pages = len(reader.pages)
+
+                for page_num in range(num_pages):
+                    page = reader.pages[page_num]
+                    
+                    if page_num == num_pages - 1:
+                        text = page.extract_text()
+                        if text is None or len(text.strip()) < 250:
+                            self.app.log_message(self.log_display, f"  -> Skipped footer-only last page in {os.path.basename(pdf_path)}")
+                            continue 
+
+                    merger.add_page(page)
             
             with open(output_path, "wb") as f_out:
                 merger.write(f_out)
