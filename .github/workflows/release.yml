@@ -25,14 +25,14 @@ jobs:
       - name: Get version from version.json
         id: get_version
         run: |
-          VERSION=$(jq -r '.latest_version' version.json)
+          VERSION=$(jq -r '.latest_version' config/version.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Get changelog for the version
         id: get_changelog
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
-          CHANGELOG_BODY=$(jq -r --arg VERSION "$VERSION" '.changelog[$VERSION] | .[] | "- \(.)"' version.json)
+          CHANGELOG_BODY=$(jq -r --arg VERSION "$VERSION" '.changelog[$VERSION] | .[] | "- \(.)"' config/version.json)
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -67,7 +67,7 @@ jobs:
         - name: Run Windows build script (Loader)
           run: |
             set APP_VERSION=${{ needs.get-release-info.outputs.version }}
-            build_windows.bat
+            scripts\build_windows.bat
           shell: cmd
   
         # ✅ NEW: Create Secure Windows Core Zip (Compiled .pyc with Python 3.11)
@@ -85,8 +85,8 @@ jobs:
             
             # 2. Copy Files (Ignore unwanted: web folder & screenshots)
             def ignore_func(dir, files):
-                # Basic ignores including 'web'
-                ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', 'installer.iss', '.vscode', 'web']]
+                # Basic ignores (only runtime-essential files)
+                ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', '.vscode', 'web', 'docs', 'scripts']]
                 
                 # Specific ignore for screenshots inside assets
                 if os.path.basename(dir) == 'assets':
@@ -108,7 +108,7 @@ jobs:
                         # SECURITY: Skip Source Code
                         if file.endswith('.py'): continue
                         # Skip binaries and build scripts
-                        if file.endswith(('.exe', '.bat', '.sh', '.spec', '.ps1')): continue
+                        if file.endswith(('.exe', '.bat', '.sh', '.spec', '.ps1', '.iss')): continue
                         
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, temp_dir)
@@ -150,12 +150,11 @@ jobs:
         run: |
           pyinstaller --noconfirm --windowed --onefile --name "NREGA Bot" \
           --icon="assets/app_icon.icns" \
-          --add-data="logo.png:." \
-          --add-data="theme.json:." \
-          --add-data="changelog.json:." \
           --add-data="assets:assets" \
-          --add-data="jobcard.jpeg:." \
-          --add-data="tabs:tabs" \
+          --add-data="config:config" \
+          --add-data="docs/changelog.json:docs/" \
+          --add-data="src:src" \
+          --add-data="web:web" \
           --collect-all customtkinter \
           --collect-data fpdf \
           --hidden-import=selenium \
@@ -169,6 +168,7 @@ jobs:
           --hidden-import=getmac \
           --hidden-import=packaging \
           --hidden-import=main_app \
+          --collect-submodules=src.tabs \
           loader.py
 
       - name: Create portable archive
@@ -206,4 +206,4 @@ jobs:
           files: |
             artifacts/windows-builds/**/*
             artifacts/linux-build/*
-            version.json
+            config/version.json

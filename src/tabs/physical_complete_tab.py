@@ -1,0 +1,540 @@
+# tabs/physical_complete_tab.py
+import subprocess
+import sys
+import tkinter
+from tkinter import ttk, messagebox, filedialog
+import customtkinter as ctk
+import os
+import json
+import time
+import re
+from datetime import datetime
+
+from src import config
+from .base_tab import BaseAutomationTab
+from .autocomplete_widget import AutocompleteEntry
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+class PhysicalCompleteTab(BaseAutomationTab):
+    def __init__(self, parent: Any, app_instance: Any) -> None:
+        # Lazy imports
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException
+        super().__init__(parent, app_instance, automation_key="physical_complete")
+        
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+        
+        self.auto_forward_var = tkinter.BooleanVar(value=True)
+        self.last_successful_panchayat = ""
+        self.last_successful_codes = []
+        
+        self._create_widgets()
+        self._load_saved_inputs()
+    def _create_widgets(self) -> None:
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+
+        main_container = ctk.CTkFrame(self, fg_color="transparent")
+        main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        main_container.grid_columnconfigure(0, weight=1)
+
+        # --- Input Frame ---
+        input_frame = ctk.CTkFrame(main_container)
+        input_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        input_frame.grid_columnconfigure(1, weight=1)
+
+        # Row 0: Panchayat
+        ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
+        self.panchayat_entry = AutocompleteEntry(
+            input_frame, 
+            placeholder_text="Enter the Panchayat name as it appears on the website",
+            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            app_instance=self.app,
+            history_key="panchayat_name"
+        )
+        self.panchayat_entry.grid(row=0, column=1, columnspan=3, padx=15, pady=(15, 5), sticky="ew")
+
+        # Row 1: Work Category
+        ctk.CTkLabel(input_frame, text="Work Category:").grid(row=1, column=0, padx=15, pady=5, sticky="w")
+        work_category_options = [
+            "Anganwadi/Other Rural Infrastructure", "Coastal Areas", "Drought Proofing", "Rural Drinking Water",
+            "Food Grain", "Flood Control and Protection", "Fisheries", "Micro Irrigation Works",
+            "Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers",
+            "Land Development", "Other Works", "Play Ground", "Rural Connectivity", "Rural Sanitation",
+            "Bharat Nirman Sewa Kendra", "Water Conservation and Water Harvesting", "Renovation of traditional water bodies"
+        ]
+        self.work_category_var = ctk.StringVar(value=work_category_options[8])
+        self.work_category_menu = ctk.CTkOptionMenu(input_frame, variable=self.work_category_var, values=work_category_options)
+        self.work_category_menu.grid(row=1, column=1, columnspan=3, padx=15, pady=5, sticky="ew")
+
+        # Row 2: Auto Forward Checkbox
+        self.auto_forward_checkbox = ctk.CTkCheckBox(
+            input_frame, 
+            text="Auto-Forward to Scheme Closing after success", 
+            variable=self.auto_forward_var
+        )
+        self.auto_forward_checkbox.grid(row=2, column=1, columnspan=3, padx=15, pady=(5, 15), sticky="w")
+
+        # Action Buttons (Row 1 of Main Container)
+        action_frame = self._create_action_buttons(main_container)
+        action_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
+
+        # Data Notebook (Row 2 of Main Container)
+        notebook = ctk.CTkTabview(main_container)
+        notebook.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
+        
+        work_codes_tab = notebook.add("Work Codes to Complete")
+        results_tab = notebook.add("Results")
+        self._create_log_and_status_area(notebook)
+        
+        work_codes_tab.grid_columnconfigure(0, weight=1)
+        work_codes_tab.grid_rowconfigure(1, weight=1)
+
+        wc_header_frame = ctk.CTkFrame(work_codes_tab, fg_color="transparent")
+        wc_header_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(5,0))
+        
+        clear_wc_button = ctk.CTkButton(wc_header_frame, text="Clear", width=80, command=lambda: self.work_codes_textbox.delete("1.0", "end"))
+        clear_wc_button.pack(side="right", padx=5)
+
+        extract_button = ctk.CTkButton(wc_header_frame, text="Extract from Text", width=120, command=self._extract_work_codes_local)
+        extract_button.pack(side='right', padx=(0, 5))
+        
+        self.work_codes_textbox = ctk.CTkTextbox(work_codes_tab, height=150)
+        self.work_codes_textbox.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+
+        results_tab.grid_columnconfigure(0, weight=1)
+        results_tab.grid_rowconfigure(1, weight=1)
+        
+        results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
+        results_action_frame.grid(row=0, column=0, sticky="ew", pady=(5, 10), padx=5)
+        
+        # Forward Button
+        self.forward_btn = ctk.CTkButton(
+            results_action_frame, 
+            text="Forward to Scheme Closing ➡", 
+            command=self.manual_forward,
+            fg_color="#2b7a0b", hover_color="#1e5c06"
+        )
+        self.forward_btn.pack(side='left', padx=(5, 10))
+
+        export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
+        export_controls_frame.pack(side='right', padx=(10, 0))
+        self.export_button = ctk.CTkButton(export_controls_frame, text="Export Report", command=self.export_report)
+        self.export_button.pack(side='left')
+        self.export_format_menu = ctk.CTkOptionMenu(export_controls_frame, width=130, values=["PDF (.pdf)", "CSV (.csv)"], command=self._on_format_change)
+        self.export_format_menu.pack(side='left', padx=5)
+        self.export_filter_menu = ctk.CTkOptionMenu(export_controls_frame, width=150, values=["Export All", "Success Only", "Failed Only"])
+        self.export_filter_menu.pack(side='left', padx=(0, 5))
+
+        cols = ("Timestamp", "Work Code", "Status", "Details")
+        self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
+        for col in cols: self.results_tree.heading(col, text=col)
+        self.results_tree.column("Timestamp", width=100, anchor="center")
+        self.results_tree.column("Work Code", width=250)
+        self.results_tree.column("Status", width=100, anchor="center")
+        self.results_tree.column("Details", width=350)
+        self.style_treeview(self.results_tree)
+        self._setup_treeview_sorting(self.results_tree) 
+
+        self.results_tree.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)
+        scrollbar = ctk.CTkScrollbar(results_tab, command=self.results_tree.yview)
+        self.results_tree.configure(yscroll=scrollbar.set)
+        scrollbar.grid(row=1, column=1, sticky='ns')
+
+    def _extract_work_codes_local(self):
+        input_content = self.work_codes_textbox.get("1.0", tkinter.END)
+        if not input_content.strip(): return
+        FULL_WC_REGEX = re.compile(r'\b(34\d{8}(?:/\w+)+/\d+)\b')
+        found_work_codes = FULL_WC_REGEX.findall(input_content)
+        self.work_codes_textbox.configure(state="normal")
+        self.work_codes_textbox.delete("1.0", tkinter.END)
+        if found_work_codes:
+            self.work_codes_textbox.insert("1.0", "\n".join(found_work_codes))
+        else:
+            self.work_codes_textbox.insert("1.0", "No matching full work codes found.")
+        self.work_codes_textbox.configure(state="disabled")
+
+    def _on_format_change(self, selected_format):
+        if "CSV" in selected_format: self.export_filter_menu.configure(state="disabled")
+        else: self.export_filter_menu.configure(state="normal")
+
+    def _get_inputs(self):
+        inputs = {
+            "panchayat": self.panchayat_entry.get().strip(),
+            "work_category": self.work_category_var.get(),
+            "work_codes_raw": self.work_codes_textbox.get("1.0", "end").strip()
+        }
+        inputs["work_codes"] = [line.strip() for line in inputs["work_codes_raw"].splitlines() if line.strip()]
+        return inputs
+
+    def _save_inputs(self, inputs):
+        save_data = {k: v for k, v in inputs.items() if k not in ["work_codes_raw", "work_codes"]}
+        try:
+            with open(self.app.get_data_path("physical_complete_inputs.json"), 'w') as f:
+                json.dump(save_data, f, indent=4)
+        except Exception as e:
+            print(f"Error saving inputs: {e}")
+
+    def _load_saved_inputs(self):
+        try:
+            with open(self.app.get_data_path("physical_complete_inputs.json"), 'r') as f:
+                data = json.load(f)
+            self.panchayat_entry.insert(0, data.get("panchayat", ""))
+            self.work_category_var.set(data.get("work_category", "Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers"))
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            print(f"Error loading inputs: {e}")
+    def start_automation(self) -> None:
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        inputs = self._get_inputs()
+        if not inputs["panchayat"] or not inputs["work_category"] or not inputs["work_codes"]:
+            messagebox.showwarning("Input Required", "Panchayat, Work Category, and at least one Work Code are required.")
+            return
+
+        self._save_inputs(inputs)
+        self.app.update_history("panchayat_name", inputs["panchayat"])
+        self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
+
+    def run_automation_logic(self, inputs):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        self.app.after(0, self.set_ui_state, True)
+        self.app.clear_log(self.log_display)
+        for item in self.results_tree.get_children(): self.results_tree.delete(item)
+        
+        # Reset tracking variables for this run
+        self.last_successful_panchayat = inputs["panchayat"]
+        self.last_successful_codes = []
+        
+        self.app.after(0, self.app.set_status, "Running Physical Complete Work...")
+        self.app.log_message(self.log_display, "--- Starting Physical Complete Automation ---")
+        
+        driver = self.app.get_driver()
+        if not driver:
+            messagebox.showerror("Browser Not Found", "Please launch a browser first.")
+            self.app.after(0, self.set_ui_state, False)
+            return
+
+        try:
+            total_codes = len(inputs["work_codes"])
+            success_count, fail_count = 0, 0
+
+            for i, work_code in enumerate(inputs["work_codes"]):
+                if self.app.stop_events[self.automation_key].is_set():
+                    self.app.log_message(self.log_display, "Automation stopped by user.", "warning")
+                    break
+                
+                status_msg = f"Processing {i+1}/{total_codes}: {work_code}"
+                self.app.after(0, self.app.set_status, status_msg)
+                self.app.after(0, self.update_status, status_msg, (i + 1) / total_codes)
+                self.app.log_message(self.log_display, f"\n--- Processing Work Code: {work_code} ---")
+                
+                status, details = self._process_single_work_code(driver, inputs, work_code)
+                self._log_result(work_code, status, details)
+                
+                if status == "Success": 
+                    success_count += 1
+                    self.last_successful_codes.append(work_code)
+                else: 
+                    fail_count += 1
+
+            completion_message = f"Automation Finished!\n\nSuccessful: {success_count}\nFailed/Cancelled: {fail_count}"
+            messagebox.showinfo("Task Complete", completion_message)
+
+            # Auto-forward Logic
+            if self.auto_forward_var.get() and self.last_successful_codes:
+                self.app.log_message(self.log_display, "\n--- Auto-Forwarding to Scheme Closing ---", "info")
+                self.app.after(500, lambda: self.forward_to_scheme_closing(self.last_successful_panchayat, self.last_successful_codes, auto_start=True))
+
+        except Exception as e:
+            self.app.log_message(self.log_display, f"A critical error occurred: {str(e).splitlines()[0]}", "error")
+        finally:
+            self.app.after(0, self.set_ui_state, False)
+            self.update_status("Automation Finished", 1.0)
+            self.app.log_message(self.log_display, "\n--- Automation Finished ---")
+            self.app.after(0, self.app.set_status, "Automation Finished")
+
+    def _log_result(self, work_code, status, details):
+        timestamp = time.strftime("%H:%M:%S")
+        tags = ('failed',) if 'success' not in status.lower() else ()
+        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, work_code, status, details), tags=tags))
+
+    def _process_single_work_code(self, driver, inputs, work_code):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        wait = WebDriverWait(driver, 20)
+        url = config.PHYSICAL_COMPLETE_CONFIG["url"]
+        
+        try:
+            driver.get(url)
+            self.app.log_message(self.log_display, "   - Selecting Panchayat...")
+            panchayat_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlPanchayat")))
+            Select(panchayat_select).select_by_visible_text(inputs["panchayat"])
+            wait.until(EC.staleness_of(panchayat_select))
+
+            self.app.log_message(self.log_display, "   - Selecting Work Category...")
+            category_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlWorkCategroy")))
+            Select(category_select).select_by_visible_text(inputs["work_category"])
+            wait.until(EC.staleness_of(category_select))
+
+            self.app.log_message(self.log_display, "   - Searching for Work Code...")
+            wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
+                )
+            except (TimeoutException, NoSuchElementException):
+                pass
+            wc_input.send_keys(work_code)
+            wc_input.send_keys(Keys.TAB)
+            wait.until(EC.staleness_of(wc_input))
+
+            work_dropdown_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcode")))
+            work_dropdown = Select(work_dropdown_element)
+            option_found = False
+            for option in work_dropdown.options:
+                if work_code in option.get_attribute("value"):
+                    work_dropdown.select_by_value(option.get_attribute("value"))
+                    option_found = True
+                    break
+            if not option_found: return "Failed", f"Work code {work_code} not found."
+            wait.until(EC.staleness_of(work_dropdown_element))
+            
+            self.app.log_message(self.log_display, "   - Verifying Details and Checking Box...")
+            
+            # Postback Handle
+            checkbox = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_checkdisc")))
+            if not checkbox.is_selected():
+                checkbox.click()
+                wait.until(EC.staleness_of(checkbox))
+
+            self.app.log_message(self.log_display, "   - Clicking NEXT and handling alert...")
+            next_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_BtnNext")))
+            next_btn.click()
+
+            try:
+                alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
+                alert_text = alert.text
+                if "remaining to fill" in alert_text or "remaining to payment" in alert_text:
+                    alert.accept()
+                    return "Failed", alert_text
+                alert.accept()
+            except TimeoutException:
+                pass 
+            
+            self.app.log_message(self.log_display, "   - Page 2: Waiting for Asset Details form...")
+            
+            asset_name_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Name")))
+            asset_desc_input = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Description")
+            
+            asset_name_input.clear()
+            asset_name_input.send_keys("Completed")
+            asset_desc_input.clear()
+            asset_desc_input.send_keys("Completed")
+            
+            self.app.log_message(self.log_display, "   - Saving Physical Completion...")
+            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
+            
+            try:
+                alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
+                alert_text = alert.text
+                alert.accept()
+                return "Success", f"Operation completed: {alert_text}"
+            except TimeoutException:
+                if "Work has been Completed Successfully" in driver.page_source:
+                    return "Success", "Work completed successfully (page)."
+                return "Success", "Saved successfully but no confirmation alert found."
+
+        except (TimeoutException, NoSuchElementException, NoAlertPresentException) as e:
+            error_message = str(e).splitlines()[0] if str(e) else "No error message"
+            self.app.log_message(self.log_display, f"   - Error: {error_message}", "error")
+            return "Failed", f"Error on page: {error_message}"
+        except Exception as e:
+            error_message = str(e).splitlines()[0] if str(e) else "No error message"
+            self.app.log_message(self.log_display, f"   - Unexpected error: {error_message}", "error")
+            return "Failed", f"Unexpected error: {error_message}"
+
+    def manual_forward(self):
+        """Button click handler for forwarding to Scheme Closing"""
+        if not self.last_successful_codes:
+            messagebox.showinfo("No Data", "Koi successful work code nahi hai forward karne ke liye. Pehle automation run karein.")
+            return
+        self.forward_to_scheme_closing(self.last_successful_panchayat, self.last_successful_codes, auto_start=False)
+
+    def forward_to_scheme_closing(self, panchayat, work_codes, auto_start=False):
+        scheme_tab = None
+        
+        # NregaBot me tabs 'tab_instances' dictionary me display name ke sath store hote hain
+        if hasattr(self.app, 'tab_instances') and "Scheme Closing" in self.app.tab_instances:
+            scheme_tab = self.app.tab_instances["Scheme Closing"]
+        elif hasattr(self.app, 'tabs') and "scheme_closing" in self.app.tabs:
+            scheme_tab = self.app.tabs["scheme_closing"]
+            
+        if not scheme_tab:
+            messagebox.showerror("Error", "Scheme Closing tab application mein load nahi hua hai. Kripya pehle us tab par ek baar click karein.")
+            return
+            
+        try:
+            # Tab ko visually switch karne ke liye
+            if hasattr(self.app, 'notebook'):
+                for tab_id in self.app.notebook._name_list:
+                    if "Scheme Closing" in tab_id or "scheme" in tab_id.lower():
+                        self.app.notebook.set(tab_id)
+                        break
+        except Exception as e:
+            print(f"Switching tab failed: {e}")
+            
+        # Update the Panchayat Field
+        scheme_tab.panchayat_entry.delete(0, "end")
+        scheme_tab.panchayat_entry.insert(0, panchayat)
+        
+        # Update the Work Codes
+        scheme_tab.work_codes_textbox.configure(state="normal")
+        scheme_tab.work_codes_textbox.delete("1.0", "end")
+        scheme_tab.work_codes_textbox.insert("1.0", "\n".join(work_codes))
+        
+        if auto_start:
+            # Chhota sa delay taaki UI update ho sake aur uske baad Scheme Closing start ho jaye
+            self.app.after(500, scheme_tab.start_automation)
+        else:
+            messagebox.showinfo("Forwarded Successfully", f"{len(work_codes)} successful work codes 'Scheme Closing' tab mein bhej diye gaye hain.")
+    def reset_ui(self) -> None:
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        if messagebox.askokcancel("Reset Form?", "Are you sure? This will clear all inputs."):
+            self.panchayat_entry.delete(0, "end")
+            self.work_codes_textbox.delete("1.0", "end")
+            for item in self.results_tree.get_children():
+                self.results_tree.delete(item)
+            self.app.clear_log(self.log_display)
+            self.update_status("Ready", 0)
+            self.app.after(0, self.app.set_status, "Ready")
+
+    def set_ui_state(self, running: bool):
+        if not self._is_alive():
+            return
+        self.set_common_ui_state(running)
+        state = "disabled" if running else "normal"
+        self.panchayat_entry.configure(state=state)
+        self.work_category_menu.configure(state=state)
+        self.work_codes_textbox.configure(state=state)
+        self.auto_forward_checkbox.configure(state=state)
+        self.forward_btn.configure(state=state)
+        self.export_button.configure(state=state)
+        self.export_format_menu.configure(state=state)
+        self.export_filter_menu.configure(state=state)
+        if state == "normal": self._on_format_change(self.export_format_menu.get())
+
+    def export_report(self):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        export_format = self.export_format_menu.get()
+        if "CSV" in export_format:
+            self.export_treeview_to_csv(self.results_tree, "physical_complete_results.csv")
+            return
+            
+        data, file_path = self._get_filtered_data_and_filepath(export_format)
+        if not data: return
+        
+        report_data = [[row[1], row[2], row[3], row[0]] for row in data]
+        report_headers = ["Work Code", "Status", "Details", "Timestamp"]
+        col_widths = [70, 35, 140, 25]
+
+        if "PDF" in export_format:
+            self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
+
+    def _get_filtered_data_and_filepath(self, export_format):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        if not self.results_tree.get_children(): 
+            messagebox.showinfo("No Data", "No results to export."); return None, None
+        panchayat_name = self.panchayat_entry.get().strip()
+        if not panchayat_name: 
+            messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
+        
+        filter_option = self.export_filter_menu.get()
+        data_to_export = []
+        for item_id in self.results_tree.get_children():
+            row_values = self.results_tree.item(item_id)['values']
+            status = row_values[2].upper()
+            if filter_option == "Export All": data_to_export.append(row_values)
+            elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
+            elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)
+            
+        if not data_to_export: 
+            messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
+
+        safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        details = {"Image (.jpg)": { "ext": ".jpg", "types": [("JPEG Image", "*.jpg")]}, "PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
+        filename = f"Physical_Complete_Report_{safe_name}_{timestamp}{details['ext']}"
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_user_downloads_path(), initialfile=filename, title="Save Report")
+        return (data_to_export, file_path) if file_path else (None, None)
+    
+    def _handle_pdf_export(self, data, headers, col_widths, file_path):
+        # ---- Lazy imports ----
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select, WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+        from selenium.webdriver.common.keys import Keys
+        from selenium.common.exceptions import NoAlertPresentException
+        from selenium import webdriver
+        title = f"Physical Complete Report: {self.panchayat_entry.get().strip()}"
+        report_date = datetime.now().strftime('%d %b %Y')
+        success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
+        if success and messagebox.askyesno("Success", f"PDF Report saved to:\n{file_path}\n\nDo you want to open it?"):
+            if sys.platform == "win32": os.startfile(file_path)
+            else: subprocess.call(['open', file_path])

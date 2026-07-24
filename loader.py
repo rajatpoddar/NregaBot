@@ -10,7 +10,7 @@ import subprocess
 import traceback
 from appdirs import user_data_dir
 # Add import config for COLORS
-import config
+from src import config
 
 # --- Try importing CustomTkinter for Modern UI ---
 try:
@@ -93,7 +93,7 @@ class ModernSplashScreen(ctk.CTk):
 
         self.logo_img_ctk = None
         try:
-            logo_path = resource_path("logo.png")
+            logo_path = resource_path("assets/logo.png")
             if os.path.exists(logo_path):
                 pil_img = Image.open(logo_path)
                 self.logo_img_ctk = ctk.CTkImage(

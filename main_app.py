@@ -29,7 +29,7 @@ import requests
 from PIL import Image
 from dotenv import load_dotenv
 # --- Windows Specific ---
-import config
+from src import config
 if config.OS_SYSTEM == "Windows":
     import ctypes
     try:
@@ -43,25 +43,25 @@ if config.OS_SYSTEM == "Windows":
             pass
 
 # --- Local Modules / UI Components ---
-from ui_components import (
+from src.ui_components import (
     CollapsibleFrame, OnboardingStep, SkeletonLoader, MarqueeLabel,
     ToastNotification, OnboardingGuide, ComingSoonTab, PerformanceMonitor
 )
-from browser_manager import BrowserManager
-from services import ServiceManager
-from tab_config import get_tabs_definition
-from icon_manager import create_icon_manager
-from sound_manager import SoundManager
-from app_license import LicenseMixin
-from app_navigation import NavMixin
-from app_automation import AutomationMixin
-from app_ui import UIMixin
-from workflow_manager import WorkflowManager
-from location_data import STATE_DISTRICT_MAP
-from tabs.history_manager import HistoryManager
-from tabs.macro_manager_tab import MacroManagerTab
-from state import AppState
-from utils import (
+from src.managers.browser_manager import BrowserManager
+from src.managers.services import ServiceManager
+from src.tab_config import get_tabs_definition
+from src.managers.icon_manager import create_icon_manager
+from src.managers.sound_manager import SoundManager
+from src.app.app_license import LicenseMixin
+from src.app.app_navigation import NavMixin
+from src.app.app_automation import AutomationMixin
+from src.app.app_ui import UIMixin
+from src.managers.workflow_manager import WorkflowManager
+from src.location_data import STATE_DISTRICT_MAP
+from src.tabs.history_manager import HistoryManager
+from src.tabs.macro_manager_tab import MacroManagerTab
+from src.state import AppState
+from src.utils import (
     resource_path, get_data_path, get_user_downloads_path,
     get_config, save_config, validate_config,
     setup_logging, get_logger
@@ -89,7 +89,7 @@ _original_showwarning = messagebox.showwarning
 _original_showerror = messagebox.showerror
 
 # Theme Setup
-ctk.set_default_color_theme(resource_path("theme.json"))
+ctk.set_default_color_theme(resource_path(os.path.join("config", "theme.json")))
 ctk.set_appearance_mode("System")
 
 
@@ -190,7 +190,7 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
         inner.pack(expand=True, fill="both", padx=30, pady=22)
 
         try:
-            logo = ctk.CTkImage(Image.open(resource_path("logo.png")), size=(64, 64))
+            logo = ctk.CTkImage(Image.open(resource_path("assets/logo.png")), size=(64, 64))
             ctk.CTkLabel(inner, image=logo, text="").pack(pady=(5, 10))
         except Exception as e:
             logger.debug("Failed to load splash screen logo: %s", e)
