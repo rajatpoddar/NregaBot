@@ -577,12 +577,7 @@ class IfEditTab(BaseAutomationTab):
                 self._log_result(work_code, job_card, "Skipped", "Job card not found, skipped")
                 return
 
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
 
             # --- Page 1 ---
             if mode == "Full Process (All Pages)":
@@ -597,12 +592,7 @@ class IfEditTab(BaseAutomationTab):
                 self._scroll_to(driver, beneficiaries_input)
                 beneficiaries_input.send_keys(cfg.get("beneficiaries_count", "0"))
                 beneficiaries_input.send_keys(Keys.TAB)
-                try:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                    )
-                except (TimeoutException, NoSuchElementException):
-                    pass
+                time.sleep(1.5)  # Brief wait for postback to begin
 
                 try:
                     job_card_ddl = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_ddljobcard")))
@@ -689,12 +679,7 @@ class IfEditTab(BaseAutomationTab):
                 fin_scheme_input.clear()
                 fin_scheme_input.send_keys(cfg.get("fin_scheme_input", "0"))
                 fin_scheme_input.send_keys(Keys.TAB)
-                try:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                    )
-                except (TimeoutException, NoSuchElementException):
-                    pass
+                time.sleep(1.5)  # Brief wait for postback to begin
 
             try:
                 update_btn_p2 = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btUpdate")

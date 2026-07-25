@@ -507,12 +507,7 @@ class FtoGenerationTab(BaseAutomationTab):
             
             self.app.log_message(self.log_display, "Scrolling to bottom...")
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
 
             max_retries = 3
             radio_found = False
@@ -520,41 +515,21 @@ class FtoGenerationTab(BaseAutomationTab):
                 try:
                     no_radio = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_rb_chkfto_n")))
                     driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", no_radio)
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
                     driver.execute_script("arguments[0].click();", no_radio)
                     self.app.log_message(self.log_display, "Selected 'No'.")
                     radio_found = True
                     break
                 except StaleElementReferenceException:
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
                 except Exception:
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
 
             if not radio_found:
                 self.app.log_message(self.log_display, "Could not find 'No' radio button (Check filters or scroll).", "error")
                 return
 
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
             try:
                 sign_btn = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btn")
                 driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", sign_btn)

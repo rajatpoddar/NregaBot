@@ -350,12 +350,7 @@ class AddActivityTab(BaseAutomationTab):
             driver.execute_script("arguments[0].value = arguments[1];", quantity_input, quantity)
             driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", quantity_input)
 
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
 
             # --- 6. Click Save (JS Safe) ---
             self.app.log_message(self.log_display, "Saving activity...")
@@ -384,12 +379,7 @@ class AddActivityTab(BaseAutomationTab):
                             outcome_found = True; break
                     except NoSuchElementException: pass
                     
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
                 except Exception as e: logger.debug("AddActivity: Failed to process: %s", e)
 
             if not outcome_found:

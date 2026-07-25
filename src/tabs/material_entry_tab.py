@@ -530,12 +530,7 @@ class MaterialEntryTab(BaseAutomationTab):
                     driver.get(config.MATERIAL_ENTRY_CONFIG["url"])
                     # Wait for page to fully load before interacting
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 1. Panchayat (Block Login)
                     if inputs['panchayat']:
@@ -543,12 +538,7 @@ class MaterialEntryTab(BaseAutomationTab):
                             panchayat_dd = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
                             Select(panchayat_dd).select_by_visible_text(inputs['panchayat'])
                             self.app.log_message(self.log_display, f"✓ Panchayat selected: {inputs['panchayat']}")
-                            try:
-                                WebDriverWait(driver, 10).until(
-                                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                                )
-                            except (TimeoutException, NoSuchElementException):
-                                pass
+                            time.sleep(1.5)  # Brief wait for postback to begin
                         except TimeoutException:
                             self.app.log_message(self.log_display, "ℹ Panchayat dropdown not found (GP login assumed)")
 
@@ -564,18 +554,8 @@ class MaterialEntryTab(BaseAutomationTab):
                         except StaleElementReferenceException:
                             if attempt == 2:
                                 raise
-                            try:
-                                WebDriverWait(driver, 10).until(
-                                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                                )
-                            except (TimeoutException, NoSuchElementException):
-                                pass
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                            time.sleep(1.5)  # Brief wait for postback to begin
+                    time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 3. Work Code Search
                     self.app.log_message(self.log_display, f"▶ Searching Work Key: {work_key}...")
@@ -589,18 +569,8 @@ class MaterialEntryTab(BaseAutomationTab):
                         except StaleElementReferenceException:
                             if attempt == 2:
                                 raise
-                            try:
-                                WebDriverWait(driver, 10).until(
-                                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                                )
-                            except (TimeoutException, NoSuchElementException):
-                                pass
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                            time.sleep(1.5)  # Brief wait for postback to begin
+                    time.sleep(1.5)  # Brief wait for postback to begin
 
                     # Re-fetch dropdown fresh after postback
                     found_wc = False
@@ -624,12 +594,7 @@ class MaterialEntryTab(BaseAutomationTab):
                         self._log_result(work_key, bill_no, "Failed", "Work code not found in dropdown")
                         fail_count += 1
                         continue
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 4. Vendor Code
                     self.app.log_message(self.log_display, f"▶ Searching Vendor: {inputs['vendor_code']}...")
@@ -643,18 +608,8 @@ class MaterialEntryTab(BaseAutomationTab):
                         except StaleElementReferenceException:
                             if attempt == 2:
                                 raise
-                            try:
-                                WebDriverWait(driver, 10).until(
-                                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                                )
-                            except (TimeoutException, NoSuchElementException):
-                                pass
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                            time.sleep(1.5)  # Brief wait for postback to begin
+                    time.sleep(1.5)  # Brief wait for postback to begin
 
                     vendor_found = False
                     for attempt in range(3):
@@ -668,22 +623,12 @@ class MaterialEntryTab(BaseAutomationTab):
                         except StaleElementReferenceException:
                             if attempt == 2:
                                 raise
-                            try:
-                                WebDriverWait(driver, 10).until(
-                                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                                )
-                            except (TimeoutException, NoSuchElementException):
-                                pass
+                            time.sleep(1.5)  # Brief wait for postback to begin
                     if not vendor_found:
                         self._log_result(work_key, bill_no, "Failed", "Vendor not found after search")
                         fail_count += 1
                         continue
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 5. Bill Details
                     self.app.log_message(self.log_display, "▶ Entering Bill Details...")
@@ -696,12 +641,7 @@ class MaterialEntryTab(BaseAutomationTab):
                     date_input.send_keys(inputs['bill_date'])
                     date_input.send_keys(Keys.TAB)
                     self.app.log_message(self.log_display, f"✓ Bill No: {bill_no}, Date: {inputs['bill_date']}")
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 6. Fill Materials
                     self.app.log_message(self.log_display, "▶ Filling Materials...")
@@ -736,12 +676,7 @@ class MaterialEntryTab(BaseAutomationTab):
                         fail_count += 1
                         continue
 
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 7. Checkbox & Submit
                     self.app.log_message(self.log_display, "▶ Confirming and Saving...")

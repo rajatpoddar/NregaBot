@@ -381,11 +381,17 @@ class HomeTab(ctk.CTkFrame):
         inner = ctk.CTkFrame(card, fg_color="transparent")
         inner.place(relx=0.5, rely=0.5, anchor="center")
 
-        # Icon display
-        if icon:
+        # Icon display — supports both CTkImage (full app) and emoji string (Lite app)
+        if isinstance(icon, str):
+            # Unicode emoji character from Lite config
+            icon_label = ctk.CTkLabel(
+                inner, text=icon, font=ctk.CTkFont(size=icon_size + 4)
+            )
+        elif icon:
+            # CTkImage object from full app
             icon_label = ctk.CTkLabel(inner, image=icon, text="", width=icon_size, height=icon_size)
         else:
-            # Fallback: show emoji based on name
+            # Fallback
             icon_label = ctk.CTkLabel(
                 inner, text="⚙️", font=ctk.CTkFont(size=icon_size + 2)
             )

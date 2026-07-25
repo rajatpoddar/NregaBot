@@ -106,161 +106,522 @@ class LicenseMixin:
     # ------------------------------------------------------------------
 
     def show_activation_window(self) -> bool:
-        win = ctk.CTkToplevel(self); win.title("Activate Product")
+        win = ctk.CTkToplevel(self); win.title(f"{config.APP_SHORT_NAME} - Activate")
         win.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        w, h = min(450, sw-40), min(580, sh-40)
+        w, h = min(500, sw-40), min(600, sh-40)
         win.geometry(f'{w}x{h}+{(sw//2)-(w//2)}+{(sh//2)-(h//2)}')
         win.resizable(False, False); win.transient(self); win.grab_set()
 
-        main = ctk.CTkScrollableFrame(win, fg_color="transparent")
-        main.pack(expand=True, fill="both", padx=20, pady=20)
-        ctk.CTkLabel(main, text="Product Activation", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(0, 10))
+        # --- Main container ---
+        outer = ctk.CTkFrame(win, fg_color="transparent")
+        outer.pack(expand=True, fill="both", padx=24, pady=20)
+
         activated = tkinter.BooleanVar(value=False)
 
-        def on_trial():
-            win.withdraw()
-            if self.show_trial_registration_window(): activated.set(True); win.destroy()
-            else: win.deiconify()
+        # Progress bar (shown during validation)
+        progress_bar = ctk.CTkProgressBar(outer, height=4, corner_radius=2,
+                                           mode="indeterminate")
+        progress_bar.pack(fill="x", pady=(0, 5))
+        progress_bar.pack_forget()  # hidden initially
 
+        # ==============================================================
+        # SLOTS FULL UI — replaces entire window content
+        # ==============================================================
         def show_slots_full_ui(data):
-            for widget in main.winfo_children(): widget.pack_forget()
-            ctk.CTkLabel(main, text="All Device Slots Full", font=ctk.CTkFont(size=18, weight="bold"), text_color=config.COLORS["red_expired"]).pack(pady=(0, 5))
-            ctk.CTkLabel(main, text="Deactivate an old device to use this one.", font=ctk.CTkFont(size=12)).pack(pady=(0, 10))
-            device_frame = ctk.CTkFrame(main, fg_color="transparent")
+            for widget in outer.winfo_children():
+                widget.destroy()
+
+            # Warning header
+            ctk.CTkLabel(outer, text="⚠️  All Device Slots Full",
+                         font=ctk.CTkFont(size=18, weight="bold"),
+                         text_color=config.COLORS["red_expired"]).pack(pady=(5, 2))
+            ctk.CTkLabel(outer, text="Deactivate an old device to activate this one.",
+                         font=ctk.CTkFont(size=12)).pack(pady=(0, 15))
+
+            # Device list
+            device_frame = ctk.CTkFrame(outer, fg_color="transparent")
             device_frame.pack(fill="x", pady=5)
             temp_key = data.get('license_key')
             devices = data.get('devices', [])
+
             for dev in devices:
-                row = ctk.CTkFrame(device_frame, fg_color=(config.COLORS["gray90"], config.COLORS["gray30"]))
-                row.pack(fill="x", pady=3, padx=5)
+                row = ctk.CTkFrame(device_frame,
+                                   fg_color=(config.COLORS["gray90"], config.COLORS["gray30"]),
+                                   corner_radius=8)
+                row.pack(fill="x", pady=4, padx=5)
+
                 info_frame = ctk.CTkFrame(row, fg_color="transparent")
-                info_frame.pack(side="left", padx=10, pady=5)
-                ctk.CTkLabel(info_frame, text=dev['name'], font=ctk.CTkFont(weight="bold")).pack(anchor="w")
+                info_frame.pack(side="left", padx=12, pady=8, fill="x", expand=True)
+
+                ctk.CTkLabel(info_frame, text=dev['name'],
+                             font=ctk.CTkFont(size=13, weight="bold"),
+                             anchor="w").pack(fill="x")
+
                 if dev['name'] != dev['id']:
-                    ctk.CTkLabel(info_frame, text=dev['id'], font=ctk.CTkFont(size=10), text_color="gray60").pack(anchor="w")
+                    ctk.CTkLabel(info_frame, text=f"ID: {dev['id']}",
+                                 font=ctk.CTkFont(size=10),
+                                 text_color="gray60", anchor="w").pack(fill="x")
+
                 if dev.get('is_pending'):
-                    ctk.CTkLabel(row, text="Pending Approval ⏳", text_color=config.COLORS["device_pending_text"], font=ctk.CTkFont(size=12, weight="bold")).pack(side="right", padx=15)
+                    ctk.CTkLabel(row, text="⏳  Pending Approval",
+                                 text_color=config.COLORS["device_pending_text"],
+                                 font=ctk.CTkFont(size=12, weight="bold")
+                                 ).pack(side="right", padx=15)
                 else:
-                    def request_remove(mid=dev['id'], btn_ref=None):
-                        if not messagebox.askyesno("Confirm", f"Request removal of {mid}?", parent=win): return
-                        if btn_ref: btn_ref.configure(state="disabled", text="Sending...")
+                    remove_btn = ctk.CTkButton(row, text="Request Removal",
+                                                width=120, height=30,
+                                                fg_color=config.COLORS["btn_stop"],
+                                                hover_color=config.COLORS["btn_stop_hover"],
+                                                font=ctk.CTkFont(size=12))
+                    remove_btn.pack(side="right", padx=10)
+
+                    def request_remove(mid=dev['id'], btn=remove_btn):
+                        if not messagebox.askyesno("Confirm",
+                                                    f"Request removal of device\n\n{mid}?",
+                                                    parent=win):
+                            return
+                        btn.configure(state="disabled", text="Sending...")
+
                         def _req_thread():
                             try:
                                 headers = {'Authorization': f'Bearer {temp_key}'}
-                                resp = self.app_state.http_session.post(f"{config.LICENSE_SERVER_URL}/api/request-deactivation", json={'machine_id': mid}, headers=headers, timeout=10)
+                                resp = self.app_state.http_session.post(
+                                    f"{config.LICENSE_SERVER_URL}/api/request-deactivation",
+                                    json={'machine_id': mid}, headers=headers, timeout=10)
                                 res = resp.json()
                                 if resp.status_code == 200 and res.get("status") == "success":
-                                    self.after(0, lambda: messagebox.showinfo("Success", "Request Sent! Admin will review it.", parent=win))
-                                    self.after(0, win.destroy)
+                                    self.after(0, lambda: [
+                                        messagebox.showinfo("Success",
+                                            "Request Sent! Admin will review it.",
+                                            parent=win),
+                                        win.destroy()
+                                    ])
                                 else:
-                                    self.after(0, lambda: messagebox.showerror("Error", res.get("reason", "Failed"), parent=win))
-                                    if btn_ref: self.after(0, lambda: btn_ref.configure(state="normal", text="Request Removal"))
+                                    self.after(0, lambda: [
+                                        messagebox.showerror("Error",
+                                            res.get("reason", "Failed"), parent=win),
+                                        btn.configure(state="normal", text="Request Removal")
+                                    ])
                             except Exception as e:
-                                self.after(0, lambda: messagebox.showerror("Error", str(e), parent=win))
-                                if btn_ref: self.after(0, lambda: btn_ref.configure(state="normal", text="Request Removal"))
-                        threading.Thread(target=_req_thread, daemon=True).start()
-                    btn = ctk.CTkButton(row, text="Request Removal", width=110, height=28, fg_color=config.COLORS["btn_stop"], hover_color=config.COLORS["btn_stop_hover"])
-                    btn.configure(command=lambda m=dev['id'], b=btn: request_remove(m, b))
-                    btn.pack(side="right", padx=10)
-            footer_frame = ctk.CTkFrame(main, fg_color="transparent")
-            footer_frame.pack(fill="x", pady=(20, 0))
-            ctk.CTkLabel(footer_frame, text="Please contact:", font=ctk.CTkFont(size=12, weight="bold")).pack()
-            email_label = ctk.CTkLabel(footer_frame, text="nregabot@gmail.com", text_color=(config.COLORS["blue"], config.COLORS["blue_light"]), cursor="hand2")
-            email_label.pack()
-            email_label.bind("<Button-1>", lambda e: webbrowser.open("mailto:nregabot@gmail.com"))
-            ctk.CTkLabel(footer_frame, text="- OR -", text_color="gray60", font=ctk.CTkFont(size=10)).pack(pady=5)
-            wa_link = ctk.CTkLabel(footer_frame, text="Join WhatsApp Community", text_color=config.COLORS["whatsapp_green"], font=ctk.CTkFont(weight="bold"), cursor="hand2")
-            wa_link.pack()
-            wa_link.bind("<Button-1>", lambda e: webbrowser.open("https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn"))
-            try:
-                qr_path = resource_path(os.path.join("assets", "whatsapp_qr.png"))
-                if os.path.exists(qr_path):
-                    pil_img = Image.open(qr_path)
-                    qr_image = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(160, 160))
-                    qr_label = ctk.CTkLabel(footer_frame, text="", image=qr_image)
-                    qr_label.pack(pady=(10, 0))
-                    qr_label.image = qr_image
-                else: logger.warning("QR Image file not found at: %s", qr_path)
-            except Exception as e: logger.error("QR Load Error: %s", e)
-            ctk.CTkButton(main, text="Back to Login", command=lambda: [win.destroy(), self.show_activation_window()], fg_color="gray", width=150).pack(pady=20)
+                                self.after(0, lambda: [
+                                    messagebox.showerror("Error", str(e), parent=win),
+                                    btn.configure(state="normal", text="Request Removal")
+                                ])
 
-        ctk.CTkButton(main, text="Start 30-Day Free Trial", command=on_trial).pack(pady=(20, 5), ipady=4, fill='x', padx=10)
-        ctk.CTkLabel(main, text="— OR —").pack(pady=10)
-        entry = ctk.CTkEntry(main, width=300, placeholder_text="Enter License Key or Email"); entry.pack(pady=5, padx=10, fill='x')
-        if get_config('last_used_email'): entry.insert(0, get_config('last_used_email'))
-        otp_entry = ctk.CTkEntry(main, width=300, placeholder_text="Enter OTP (Only for Email Login)")
-        otp_entry.pack(pady=5, padx=10, fill='x')
+                        threading.Thread(target=_req_thread, daemon=True).start()
+
+                    remove_btn.configure(
+                        command=lambda m=dev['id'], fn=request_remove: fn(m))
+
+            # Contact info
+            ct_frame = ctk.CTkFrame(outer, fg_color="transparent")
+            ct_frame.pack(fill="x", pady=(20, 0))
+            ctk.CTkLabel(ct_frame, text="Need help? Contact us:",
+                         font=ctk.CTkFont(size=12, weight="bold")).pack()
+
+            email_lbl = ctk.CTkLabel(ct_frame,
+                                      text="📧  nregabot@gmail.com",
+                                      text_color=(config.COLORS["blue"], config.COLORS["blue_light"]),
+                                      cursor="hand2", font=ctk.CTkFont(size=12))
+            email_lbl.pack(pady=2)
+            email_lbl.bind("<Button-1>", lambda e: webbrowser.open("mailto:nregabot@gmail.com"))
+
+            wa_lbl = ctk.CTkLabel(ct_frame,
+                                   text="💬  Join WhatsApp Community",
+                                   text_color=config.COLORS["whatsapp_green"],
+                                   cursor="hand2", font=ctk.CTkFont(size=12, weight="bold"))
+            wa_lbl.pack(pady=2)
+            wa_lbl.bind("<Button-1>", lambda e: webbrowser.open(
+                "https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn"))
+
+            ctk.CTkButton(outer, text="←  Back",
+                          command=lambda: [win.destroy(), self.show_activation_window()],
+                          fg_color="gray", width=120,
+                          font=ctk.CTkFont(size=12)).pack(pady=20)
+
+        # ==============================================================
+        # BRANDING HEADER
+        # ==============================================================
+        brand = ctk.CTkFrame(outer, fg_color="transparent")
+        brand.pack(fill="x", pady=(0, 15))
+
+        try:
+            logo_img = ctk.CTkImage(Image.open(resource_path("assets/logo.png")),
+                                     size=(42, 42))
+            ctk.CTkLabel(brand, image=logo_img, text="").pack(side="left", padx=(0, 10))
+        except Exception:
+            ctk.CTkLabel(brand, text="🏛️", font=ctk.CTkFont(size=28)).pack(side="left", padx=(0, 10))
+
+        text_col = ctk.CTkFrame(brand, fg_color="transparent")
+        text_col.pack(side="left")
+        ctk.CTkLabel(text_col, text=f"{config.APP_NAME}",
+                     font=ctk.CTkFont(size=18, weight="bold"),
+                     anchor="w").pack(fill="x")
+        ctk.CTkLabel(text_col, text="Activate your license to get started",
+                     font=ctk.CTkFont(size=11), text_color="gray60",
+                     anchor="w").pack(fill="x")
+
+        # ==============================================================
+        # TAB VIEW: License Key  |  Email & OTP
+        # ==============================================================
+        tab_view = ctk.CTkTabview(outer, corner_radius=8)
+        tab_view.pack(fill="both", expand=True, pady=(0, 12))
+
+        # -------- TAB 1: License Key --------
+        tab_key = tab_view.add("🔑  License Key")
+
+        key_inner = ctk.CTkFrame(tab_key, fg_color="transparent")
+        key_inner.pack(expand=True, fill="both", padx=16, pady=(16, 10))
+
+        ctk.CTkLabel(key_inner, text="Already own a license?",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     anchor="w").pack(fill="x")
+        ctk.CTkLabel(key_inner, text="Paste your key below to activate instantly.",
+                     font=ctk.CTkFont(size=11), text_color="gray60",
+                     anchor="w").pack(fill="x", pady=(0, 12))
+
+        key_entry = ctk.CTkEntry(key_inner, placeholder_text="e.g. NREGABOT-MONTHLY-XXXXXXXX",
+                                  font=ctk.CTkFont(size=13))
+        key_entry.pack(fill="x", ipady=4, pady=(0, 4))
+        if get_config('last_used_license_key'):
+            key_entry.insert(0, get_config('last_used_license_key'))
+
+        # Inline status for key tab
+        key_status = ctk.CTkLabel(key_inner, text="", font=ctk.CTkFont(size=11), anchor="w")
+        key_status.pack(fill="x", pady=(0, 8))
+
+        def on_key_activate():
+            key_val = key_entry.get().strip()
+            if not key_val:
+                self.play_sound("error")
+                key_status.configure(text="⚠️  Please enter a license key.",
+                                     text_color=("#DC2626", "#EF4444"))
+                return
+
+            # Show progress
+            progress_bar.pack(fill="x", pady=(0, 8), before=tab_view)
+            progress_bar.start()
+            key_status.configure(text="⏳  Validating your license...",
+                                 text_color=("#2563EB", "#60A5FA"))
+            key_activate_btn.configure(state="disabled", text="⏳ Validating...")
+
+            def _key_activate_thread():
+                try:
+                    payload = {
+                        "key": key_val,
+                        "machine_id": self.app_state.machine_id,
+                        "app_version": config.APP_VERSION
+                    }
+                    resp = self.app_state.http_session.post(
+                        f"{config.LICENSE_SERVER_URL}/api/validate",
+                        json=payload, timeout=15)
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        raise Exception(
+                            f"Server returned an unexpected response (status {resp.status_code}).")
+
+                    self.after(0, self.set_server_status, True)
+
+                    if resp.status_code == 200 and data.get("status") == "valid":
+                        def _save_success():
+                            if not win.winfo_exists():
+                                return
+                            progress_bar.stop()
+                            progress_bar.pack_forget()
+                            save_config('last_used_license_key', key_val)
+                            self.app_state.license_info.update({**data, 'key': key_val})
+                            with open(get_data_path('license.dat'), 'w') as f:
+                                json.dump(self.app_state.license_info, f)
+                            self.play_sound("success")
+                            key_status.configure(text="✅  Activated successfully!",
+                                                 text_color=("#059669", "#10B981"))
+                            win.after(500, lambda: [activated.set(True), win.destroy()])
+                        self.after(0, _save_success)
+                    elif resp.status_code == 403 and data.get("status") == "slots_full":
+                        def _show_full():
+                            if not win.winfo_exists():
+                                return
+                            progress_bar.stop()
+                            progress_bar.pack_forget()
+                            self.play_sound("error")
+                            show_slots_full_ui(data)
+                        self.after(0, _show_full)
+                    else:
+                        reason = data.get("reason", "Activation failed.")
+                        action = data.get("action")
+                        if action == "redirect":
+                            url = data.get("url")
+                            self.after(0, lambda r=reason, u=url: (
+                                self.play_sound("error"),
+                                messagebox.askyesno("Action Required",
+                                                     r + "\n\nOpen website?",
+                                                     parent=win)
+                                and webbrowser.open(u)
+                            ))
+                        else:
+                            self.after(0, lambda r=reason: [
+                                self.play_sound("error"),
+                                key_status.configure(text=f"❌  {r.split(chr(10))[0][:60]}",
+                                                     text_color=("#DC2626", "#EF4444")),
+                                messagebox.showerror("Failed", r, parent=win) if win.winfo_exists() else None
+                            ])
+
+                        def _reset_btn():
+                            if key_activate_btn.winfo_exists():
+                                progress_bar.stop()
+                                progress_bar.pack_forget()
+                                key_activate_btn.configure(state="normal", text="Activate")
+
+                        self.after(0, _reset_btn)
+
+                except Exception as e:
+                    def _error():
+                        if not win.winfo_exists():
+                            return
+                        progress_bar.stop()
+                        progress_bar.pack_forget()
+                        self.play_sound("error")
+                        key_status.configure(text=f"❌  {str(e).split(chr(10))[0][:60]}",
+                                             text_color=("#DC2626", "#EF4444"))
+                        messagebox.showerror("Error", str(e), parent=win)
+                        if key_activate_btn.winfo_exists():
+                            key_activate_btn.configure(state="normal", text="Activate")
+                    self.after(0, _error)
+
+            threading.Thread(target=_key_activate_thread, daemon=True).start()
+
+        key_activate_btn = ctk.CTkButton(
+            key_inner, text="Activate", command=on_key_activate,
+            fg_color=("#2563EB", "#3B82F6"),
+            hover_color=("#1D4ED8", "#2563EB"),
+            height=40, corner_radius=8,
+            font=ctk.CTkFont(size=13, weight="bold")
+        )
+        key_activate_btn.pack(pady=(6, 8), ipady=2, fill='x')
+
+        buy_link_key = ctk.CTkLabel(
+            key_inner, text="🛒  Don't have a license? Purchase one",
+            text_color=("#2563EB", "#60A5FA"), cursor="hand2",
+            font=ctk.CTkFont(size=12))
+        buy_link_key.pack(pady=(4, 0))
+        buy_link_key.bind("<Button-1>",
+                           lambda e: webbrowser.open_new_tab(
+                               f"{config.LICENSE_SERVER_URL}/buy"))
+
+        # -------- TAB 2: Email & OTP --------
+        tab_email = tab_view.add("📧  Email & OTP")
+
+        email_inner = ctk.CTkFrame(tab_email, fg_color="transparent")
+        email_inner.pack(expand=True, fill="both", padx=16, pady=(16, 10))
+
+        ctk.CTkLabel(email_inner, text="Login with your registered email",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     anchor="w").pack(fill="x")
+        ctk.CTkLabel(email_inner, text="We'll send a one-time passcode to your email.",
+                     font=ctk.CTkFont(size=11), text_color="gray60",
+                     anchor="w").pack(fill="x", pady=(0, 12))
+
+        email_entry = ctk.CTkEntry(email_inner, placeholder_text="Enter your email address",
+                                    font=ctk.CTkFont(size=13))
+        email_entry.pack(fill="x", ipady=4)
+        if get_config('last_used_email'):
+            email_entry.insert(0, get_config('last_used_email'))
+
+        # OTP row: input + send button
+        otp_row = ctk.CTkFrame(email_inner, fg_color="transparent")
+        otp_row.pack(fill="x", pady=(10, 0))
+
+        otp_entry = ctk.CTkEntry(otp_row, placeholder_text="Enter OTP",
+                                  font=ctk.CTkFont(size=13))
+        otp_entry.pack(side="left", fill="x", expand=True, padx=(0, 8), ipady=4)
 
         def send_otp_login():
-            email_val = entry.get().strip()
+            email_val = email_entry.get().strip()
             if "@" not in email_val:
-                messagebox.showwarning("Invalid", "Enter a valid email to send OTP.", parent=win)
+                messagebox.showwarning("Invalid", "Enter a valid email to send OTP.",
+                                        parent=win)
                 return
-            send_otp_btn.configure(state="disabled", text="Sending...")
+            send_otp_btn.configure(state="disabled", text="⏳ Sending...")
             try:
-                resp = self.app_state.http_session.post(f"{config.LICENSE_SERVER_URL}/api/send-otp", json={"identifier": email_val}, timeout=10)
+                resp = self.app_state.http_session.post(
+                    f"{config.LICENSE_SERVER_URL}/api/send-otp",
+                    json={"identifier": email_val}, timeout=10)
                 if resp.status_code == 200:
-                    messagebox.showinfo("OTP Sent", "Check your email for OTP", parent=win)
+                    messagebox.showinfo("OTP Sent", "Check your email for the OTP code.",
+                                        parent=win)
                 else:
-                    try: reason = resp.json().get("reason", "Failed")
-                    except Exception: reason = f"Server returned status {resp.status_code}"
+                    try:
+                        reason = resp.json().get("reason", "Failed")
+                    except Exception:
+                        reason = f"Server returned status {resp.status_code}"
                     messagebox.showerror("Error", reason, parent=win)
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=win)
             finally:
-                win.after(30000, lambda: send_otp_btn.configure(state="normal", text="Send OTP"))
+                win.after(30000, lambda: send_otp_btn.winfo_exists()
+                          and send_otp_btn.configure(state="normal", text="Send OTP"))
 
-        send_otp_btn = ctk.CTkButton(main, text="Send OTP", command=send_otp_login, fg_color="gray")
-        send_otp_btn.pack(pady=5, fill='x', padx=10)
+        send_otp_btn = ctk.CTkButton(
+            otp_row, text="Send OTP", command=send_otp_login,
+            fg_color="gray", width=100, height=34,
+            font=ctk.CTkFont(size=12)
+        )
+        send_otp_btn.pack(side="right")
 
-        def on_unified_activate():
-            input_val = entry.get().strip()
+        # Inline status for email tab
+        email_status = ctk.CTkLabel(email_inner, text="",
+                                     font=ctk.CTkFont(size=11), anchor="w")
+        email_status.pack(fill="x", pady=(8, 4))
+
+        def on_email_activate():
+            email_val = email_entry.get().strip()
             otp_val = otp_entry.get().strip()
-            if not input_val:
+            if not email_val or "@" not in email_val:
                 self.play_sound("error")
-                messagebox.showwarning("Input Required", "Please enter a key or email", parent=win)
+                email_status.configure(text="⚠️  Please enter a valid email address.",
+                                       text_color=("#DC2626", "#EF4444"))
                 return
-            activate_btn.configure(state="disabled", text="Activating...")
-            if "@" in input_val and "." in input_val:
-                if not otp_val:
-                    self.play_sound("error")
-                    messagebox.showwarning("OTP Required", "Please enter OTP for email login.", parent=win)
-                    activate_btn.configure(state="normal", text="Login & Activate")
-                    return
-                try:
-                    resp = self.app_state.http_session.post(f"{config.LICENSE_SERVER_URL}/api/login-for-activation", json={"email": input_val, "machine_id": self.app_state.machine_id, "otp": otp_val, "app_version": config.APP_VERSION}, timeout=15)
-                    try: data = resp.json()
-                    except Exception: raise Exception(f"Server returned an unexpected response (status {resp.status_code}). Please try again.")
-                    if resp.status_code == 200 and data.get("status") == "success":
-                        save_config('last_used_email', input_val)
-                        self.app_state.license_info = data
-                        with open(get_data_path('license.dat'), 'w') as f: json.dump(self.app_state.license_info, f)
-                        self.play_sound("success")
-                        messagebox.showinfo("Success", "Activated!", parent=win)
-                        activated.set(True); win.destroy()
-                    elif resp.status_code == 403 and data.get("status") == "slots_full":
-                        self.play_sound("error"); show_slots_full_ui(data)
-                    else:
-                        self.play_sound("error")
-                        if data.get("action") == "redirect":
-                            if messagebox.askyesno("Action Required", data.get("reason") + "\n\nOpen website?"): webbrowser.open(data.get("url"))
-                        else: messagebox.showerror("Failed", data.get("reason", "Error"), parent=win)
-                except Exception as e:
-                    self.play_sound("error")
-                    messagebox.showerror("Error", str(e), parent=win)
-                finally:
-                    if activate_btn.winfo_exists(): activate_btn.configure(state="normal", text="Login & Activate")
-            else:
-                if self.validate_on_server(input_val):
-                    activated.set(True); win.destroy()
-                else:
-                    if activate_btn.winfo_exists(): activate_btn.configure(state="normal", text="Login & Activate")
+            if not otp_val:
+                self.play_sound("error")
+                email_status.configure(text="⚠️  Please enter the OTP from your email.",
+                                       text_color=("#DC2626", "#EF4444"))
+                return
 
-        activate_btn = ctk.CTkButton(main, text="Login & Activate", command=on_unified_activate); activate_btn.pack(pady=10, ipady=4, fill='x', padx=10)
-        buy_link = ctk.CTkLabel(main, text="Purchase a License Key", text_color=("blue", "cyan"), cursor="hand2"); buy_link.pack(pady=(15,0))
-        buy_link.bind("<Button-1>", lambda e: webbrowser.open_new_tab(f"{config.LICENSE_SERVER_URL}/buy"))
-        self.wait_window(win); return activated.get()
+            email_activate_btn.configure(state="disabled", text="⏳ Activating...")
+            email_status.configure(text="⏳  Verifying OTP and activating...",
+                                   text_color=("#2563EB", "#60A5FA"))
+            progress_bar.pack(fill="x", pady=(0, 8), before=tab_view)
+            progress_bar.start()
+
+            def _email_activate_thread():
+                try:
+                    resp = self.app_state.http_session.post(
+                        f"{config.LICENSE_SERVER_URL}/api/login-for-activation",
+                        json={
+                            "email": email_val,
+                            "machine_id": self.app_state.machine_id,
+                            "otp": otp_val,
+                            "app_version": config.APP_VERSION
+                        },
+                        timeout=15
+                    )
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        raise Exception(
+                            f"Server returned an unexpected response (status {resp.status_code}).")
+
+                    if resp.status_code == 200 and data.get("status") == "success":
+                        def _email_success():
+                            if not win.winfo_exists():
+                                return
+                            progress_bar.stop()
+                            progress_bar.pack_forget()
+                            save_config('last_used_email', email_val)
+                            self.app_state.license_info = data
+                            with open(get_data_path('license.dat'), 'w') as f:
+                                json.dump(self.app_state.license_info, f)
+                            self.play_sound("success")
+                            email_status.configure(text="✅  Activated successfully!",
+                                                   text_color=("#059669", "#10B981"))
+                            win.after(500, lambda: [activated.set(True), win.destroy()])
+                        self.after(0, _email_success)
+                    elif resp.status_code == 403 and data.get("status") == "slots_full":
+                        def _email_full():
+                            if not win.winfo_exists():
+                                return
+                            progress_bar.stop()
+                            progress_bar.pack_forget()
+                            self.play_sound("error")
+                            show_slots_full_ui(data)
+                        self.after(0, _email_full)
+                    else:
+                        reason = data.get("reason", "Activation failed.")
+                        action = data.get("action")
+                        if action == "redirect":
+                            url = data.get("url")
+                            self.after(0, lambda r=reason, u=url: [
+                                self.play_sound("error"),
+                                email_status.configure(text=f"❌  {r.split(chr(10))[0][:60]}",
+                                                       text_color=("#DC2626", "#EF4444")),
+                                messagebox.askyesno("Action Required",
+                                                     r + "\n\nOpen website?",
+                                                     parent=win) and webbrowser.open(u)
+                            ])
+                        else:
+                            self.after(0, lambda r=reason: (
+                                self.play_sound("error") or
+                                email_status.configure(text=f"❌  {r.split(chr(10))[0][:60]}",
+                                                       text_color=("#DC2626", "#EF4444")) or
+                                messagebox.showerror("Failed", r, parent=win)
+                                if win.winfo_exists() else None
+                            ))
+
+                        def _reset_email():
+                            if email_activate_btn.winfo_exists():
+                                progress_bar.stop()
+                                progress_bar.pack_forget()
+                                email_activate_btn.configure(state="normal", text="Login & Activate")
+                        self.after(0, _reset_email)
+
+                except Exception as e:
+                    def _email_error():
+                        if not win.winfo_exists():
+                            return
+                        progress_bar.stop()
+                        progress_bar.pack_forget()
+                        self.play_sound("error")
+                        email_status.configure(text=f"❌  {str(e).split(chr(10))[0][:60]}",
+                                               text_color=("#DC2626", "#EF4444"))
+                        messagebox.showerror("Error", str(e), parent=win)
+                        if email_activate_btn.winfo_exists():
+                            email_activate_btn.configure(state="normal", text="Login & Activate")
+                    self.after(0, _email_error)
+
+            threading.Thread(target=_email_activate_thread, daemon=True).start()
+
+        email_activate_btn = ctk.CTkButton(
+            email_inner, text="Login & Activate", command=on_email_activate,
+            height=40, corner_radius=8,
+            font=ctk.CTkFont(size=13, weight="bold")
+        )
+        email_activate_btn.pack(pady=(10, 8), ipady=2, fill='x')
+
+        # Trial link inside email tab
+        def _start_trial():
+            win.withdraw()
+            if self.show_trial_registration_window():
+                activated.set(True)
+                win.destroy()
+            else:
+                win.deiconify()
+
+        trial_link = ctk.CTkLabel(
+            email_inner, text="🎯  New user? Start a Free Trial",
+            text_color=("#059669", "#10B981"), cursor="hand2",
+            font=ctk.CTkFont(size=12, weight="bold"))
+        trial_link.pack(pady=(4, 0))
+        trial_link.bind("<Button-1>", lambda e: _start_trial())
+
+        # ==============================================================
+        # BOTTOM SECTION (outside tabs)
+        # ==============================================================
+        sep = ctk.CTkFrame(outer, height=1, fg_color=("gray85", "gray35"))
+        sep.pack(fill="x", pady=(0, 12))
+
+        ctk.CTkButton(
+            outer, text="🎯  Start 30-Day Free Trial",
+            command=_start_trial,
+            fg_color=("#059669", "#10B981"),
+            hover_color=("#047857", "#059669"),
+            height=38, corner_radius=8,
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).pack(pady=(0, 4), ipady=2, fill='x')
+
+        self.wait_window(win)
+        return activated.get()
 
     # ------------------------------------------------------------------
     # TRIAL REGISTRATION

@@ -132,6 +132,7 @@ class BrowserManager:
             p_dir = os.path.join(os.path.expanduser("~"), "FirefoxProfileForNREGABot")
             os.makedirs(p_dir, exist_ok=True)
             opts = FirefoxOptions()
+            opts.page_load_strategy = "eager"
             opts.add_argument("-profile")
             opts.add_argument(p_dir)
             
@@ -170,6 +171,7 @@ class BrowserManager:
                 raise Exception(f"Firefox not found at: {binary_path}")
 
             options = Options()
+            options.page_load_strategy = "eager"
             options.binary_location = binary_path
             
             # Note: Old Firefox ke liye purana geckodriver chahiye hota hai.
@@ -271,6 +273,7 @@ class BrowserManager:
             from selenium.webdriver.chrome.options import Options as ChromeOptions
             try:
                 opts = ChromeOptions()
+                opts.page_load_strategy = "eager"
                 opts.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
                 service = self._create_driver_service("chrome")
                 if service:
@@ -291,6 +294,7 @@ class BrowserManager:
             from selenium.webdriver.edge.options import Options as EdgeOptions
             try:
                 opts = EdgeOptions()
+                opts.page_load_strategy = "eager"
                 opts.add_experimental_option("debuggerAddress", "127.0.0.1:9223")
                 service = self._create_driver_service("edge")
                 if service:

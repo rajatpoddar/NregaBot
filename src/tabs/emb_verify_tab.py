@@ -213,12 +213,7 @@ class EmbVerifyTab(BaseAutomationTab):
             
             self.app.log_message(self.log_display, "Waiting for page to reload...")
             wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
             self.app.log_message(self.log_display, "Page reloaded successfully.")
             
             work_codes_to_process = []
@@ -250,12 +245,7 @@ class EmbVerifyTab(BaseAutomationTab):
                     panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
                     panchayat_select.select_by_visible_text(panchayat)
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
 
             final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
             self.app.after(0, self.update_status, final_msg, 1.0)
@@ -293,12 +283,7 @@ class EmbVerifyTab(BaseAutomationTab):
                 raise NoSuchElementException(f"Work code containing '{work_code}' not found in dropdown.")
             
             self.app.log_message(self.log_display, "Work selected. Pausing for page to update...")
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
 
             self.app.log_message(self.log_display, "Selecting 'Musterroll Period Wise'.")
             period_radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rbl_mustrolltype_0")))
@@ -306,12 +291,7 @@ class EmbVerifyTab(BaseAutomationTab):
             
             self.app.log_message(self.log_display, "Waiting for measurement periods to load...")
             period_dropdown_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddl_mperiod")))
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
 
             period_select = Select(period_dropdown_element)
             if len(period_select.options) <= 1:

@@ -8,6 +8,7 @@ REM GitHub Actions se APP_VERSION set hoga, nahi to default use karega
 IF "%APP_VERSION%"=="" SET APP_VERSION="0.0.0"
 
 SET APP_NAME="NREGA Bot"
+SET LITE_APP_NAME="NREGA Bot Lite"
 SET INNO_SETUP_COMPILER="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 
 ECHO ######################################################
@@ -17,22 +18,34 @@ ECHO.
 ECHO ######################################################
 ECHO.
 
-REM --- Step 1: Run PyInstaller on LOADER.PY ---
-ECHO [STEP 1/2] Building the application with PyInstaller...
+REM --- Clean previous builds ---
+ECHO [STEP 0/3] Cleaning old builds...
+if exist "dist\%APP_NAME%" rmdir /s /q "dist\%APP_NAME%"
+if exist "dist\%LITE_APP_NAME%" rmdir /s /q "dist\%LITE_APP_NAME%"
+if exist "dist\installer" rmdir /s /q "dist\installer"
+if exist "build" rmdir /s /q "build"
+ECHO Old builds cleaned.
 ECHO.
 
-REM Hum loader.py ko build kar rahe hain, lekin main_app ki libraries
-REM ko zabardasti pack kar rahe hain (hidden-import) taaki wo andar मौजूद rahein.
+REM ==============================================================
+REM !!! IMPORTANT: PyInstaller 6.x+ uses : as separator on ALL  !!!
+REM !!! platforms, including Windows. Old ; separator no longer !!!
+REM !!! works. Use forward slashes in paths for consistency.    !!!
+REM ==============================================================
+
+REM --- Step 1a: Build MAIN App (Loader) ---
+ECHO [STEP 1a/3] Building MAIN app with PyInstaller...
+ECHO.
 
 pyinstaller --noconfirm --windowed --onedir ^
 --name %APP_NAME% ^
 --icon="assets/app_icon.ico" ^
---add-data="assets;assets" ^
---add-data="config;config" ^
---add-data="docs\changelog.json;docs\" ^
---add-data="src;src" ^
---add-data="web;web" ^
---add-data=".env;." ^
+--add-data="assets:assets" ^
+--add-data="config:config" ^
+--add-data="docs/changelog.json:docs/" ^
+--add-data="src:src" ^
+--add-data="web:web" ^
+--add-data=".env:." ^
 --collect-all customtkinter ^
 --collect-data fpdf ^
 --hidden-import=selenium ^
@@ -52,16 +65,47 @@ loader.py
 REM Check if PyInstaller failed
 if errorlevel 1 (
     ECHO.
-    ECHO !!!!!!! PyInstaller build FAILED. !!!!!!!
+    ECHO !!!!!!! MAIN app PyInstaller build FAILED. !!!!!!!
     goto End
 )
 
 ECHO.
-ECHO PyInstaller build successful.
+ECHO MAIN app PyInstaller build successful.
 ECHO.
 
-REM --- Step 2: Run Inno Setup Compiler ---
-ECHO [STEP 2/2] Creating the installer with Inno Setup...
+REM --- Step 1b: Build LITE App ---
+ECHO [STEP 1b/3] Building LITE app with PyInstaller...
+ECHO.
+
+pyinstaller --noconfirm --windowed --onedir ^
+--name %LITE_APP_NAME% ^
+--icon="assets/app_icon.ico" ^
+--add-data="assets:assets" ^
+--add-data="config:config" ^
+--add-data="src:src" ^
+--add-data=".env:." ^
+--collect-all customtkinter ^
+--hidden-import=getmac ^
+--hidden-import=packaging ^
+--hidden-import=requests ^
+--hidden-import=PIL ^
+--collect-submodules=src.managers ^
+--collect-submodules=src.tabs ^
+lite_app.py
+
+REM Check if PyInstaller failed
+if errorlevel 1 (
+    ECHO.
+    ECHO !!!!!!! LITE app PyInstaller build FAILED. !!!!!!!
+    goto End
+)
+
+ECHO.
+ECHO LITE app PyInstaller build successful.
+ECHO.
+
+REM --- Step 2: Run Inno Setup Compiler (MAIN app installer only) ---
+ECHO [STEP 2/3] Creating the MAIN installer with Inno Setup...
 ECHO.
 
 REM Check if the Inno Setup compiler exists (Local Machine Check)
@@ -83,7 +127,8 @@ ECHO.
 ECHO =======================================================
 ECHO.
 ECHO  Build successful!
-ECHO  Find your installer in the 'dist\installer' sub-folder.
+ECHO  - MAIN installer: dist\installer
+ECHO  - LITE standalone: dist\%LITE_APP_NAME%
 ECHO.
 ECHO =======================================================
 

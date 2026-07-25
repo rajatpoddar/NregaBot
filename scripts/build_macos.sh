@@ -8,6 +8,7 @@ rm -rf dist/*.dmg
 
 # --- 2. Define app details ---
 APP_NAME="NREGABot"
+LITE_APP_NAME="NREGABot Lite"
 ICON_FILE="assets/app_icon.icns"
 
 # Check Icon
@@ -34,7 +35,6 @@ else
 fi
 
 # --- 5. Generate Hidden Imports (CRITICAL FIX) ---
-# Ye loop tabs folder ke andar saari files ko dhoond kar hidden-import me add karega
 echo "Generating hidden imports for tabs..."
 HIDDEN_IMPORTS=""
 for file in src/tabs/*.py; do
@@ -44,13 +44,14 @@ for file in src/tabs/*.py; do
     fi
 done
 
-# --- 6. Build Loader with PyInstaller ---
-echo "Building Application..."
+# --- 6a. Build MAIN Loader with PyInstaller ---
+echo "Building MAIN Application..."
 
 pyinstaller --noconfirm --clean --windowed --name "${APP_NAME}" \
 --icon="$ICON_FILE" \
 --add-data="assets:assets" \
 --add-data="config:config" \
+--add-data="docs/changelog.json:docs/" \
 --add-data="src:src" \
 --add-data="web:web" \
 --add-data=".env:." \
@@ -75,12 +76,36 @@ pyinstaller --noconfirm --clean --windowed --name "${APP_NAME}" \
 $HIDDEN_IMPORTS \
 loader.py
 
-# --- 7. Ad-Hoc Signing (Gatekeeper Fix) ---
-echo "Signing app to prevent 'Damaged' error..."
+# --- 6b. Build LITE App with PyInstaller ---
+echo "Building LITE Application..."
+
+pyinstaller --noconfirm --clean --windowed --name "${LITE_APP_NAME}" \
+--icon="$ICON_FILE" \
+--add-data="assets:assets" \
+--add-data="config:config" \
+--add-data="src:src" \
+--add-data=".env:." \
+--collect-all customtkinter \
+--hidden-import=getmac \
+--hidden-import=packaging \
+--hidden-import=requests \
+--hidden-import=PIL \
+--collect-submodules=src.managers \
+--collect-submodules=src.tabs \
+lite_app.py
+
+# --- 7a. Sign MAIN App (Gatekeeper Fix) ---
+echo "Signing MAIN app..."
 codesign --force --deep --sign - "dist/${APP_NAME}.app"
 
-# --- 8. Create DMG ---
-echo "Creating DMG..."
+# --- 7b. Sign LITE App ---
+echo "Signing LITE app..."
+if [ -d "dist/${LITE_APP_NAME}.app" ]; then
+    codesign --force --deep --sign - "dist/${LITE_APP_NAME}.app"
+fi
+
+# --- 8. Create DMG for MAIN app ---
+echo "Creating DMG for MAIN app..."
 if command -v create-dmg &> /dev/null; then
     [ -f "$OUTPUT_DMG_NAME" ] && rm "$OUTPUT_DMG_NAME"
     create-dmg \

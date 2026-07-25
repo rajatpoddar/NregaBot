@@ -313,12 +313,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
             self.app.log_message(self.log_display, "   - Searching for Work Code...")
             wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
             wc_input.send_keys(work_code)
             wc_input.send_keys(Keys.TAB)
             wait.until(EC.staleness_of(wc_input))

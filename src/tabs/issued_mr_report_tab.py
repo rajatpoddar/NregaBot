@@ -262,6 +262,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Naya Headless Chrome browser shuru kar raha hoon...", "info")
         try:
             chrome_options = ChromeOptions()
+            chrome_options.page_load_strategy = "eager"
             chrome_options.add_argument("--headless=new")
             chrome_options.add_argument("--window-size=1920,1080") 
             chrome_options.add_argument("--disable-gpu")

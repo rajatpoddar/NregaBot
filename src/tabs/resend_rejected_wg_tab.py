@@ -249,12 +249,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"   - Result: {result_text}", "success" if status == "Success" else "info")
             self._log_result(panchayat_name, status, result_text)
             
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
 
         except Exception as e:
             error_msg = f"An unexpected error occurred: {str(e).splitlines()[0]}"

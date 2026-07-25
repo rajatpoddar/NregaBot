@@ -538,12 +538,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                         panch_dd = wait.until(EC.presence_of_element_located(
                             (By.ID, "ctl00_ContentPlaceHolder1_ddlpnch")))
                         Select(panch_dd).select_by_visible_text(panchayat)
-                        try:
-                            WebDriverWait(driver, 10).until(
-                                EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                            )
-                        except (TimeoutException, NoSuchElementException):
-                            pass
+                        time.sleep(1.5)  # Brief wait for postback to begin
                     except (TimeoutException, NoSuchElementException):
                         self.app.log_message(self.log_display, "📍 Panchayat dropdown not found (GP login).")
 
@@ -574,12 +569,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                     for nu, ov in applicants:
                         log_one(jobcard, ov[3], "Failed", "Invalid jobcard format.")
                     continue
-                try:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                    )
-                except (TimeoutException, NoSuchElementException):
-                    pass
+                time.sleep(1.5)  # Brief wait for postback to begin
 
                 # ── 3. Registration (JS — fast) ──
                 try:
@@ -608,12 +598,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                     for nu, ov in applicants:
                         log_one(jobcard, ov[3], "Failed", f"Registration error: {str(e).splitlines()[0]}")
                     continue
-                try:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                    )
-                except (TimeoutException, NoSuchElementException):
-                    pass
+                time.sleep(1.5)  # Brief wait for postback to begin
 
                 # ── We found this jobcard on portal! ──
                 jobcard_found_on_portal = True
@@ -852,12 +837,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                     panch_dd = wait.until(EC.presence_of_element_located(
                         (By.ID, "ctl00_ContentPlaceHolder1_ddlpnch")))
                     Select(panch_dd).select_by_visible_text(panchayat)
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
+                    time.sleep(1.5)  # Brief wait for postback to begin
                 except (TimeoutException, NoSuchElementException):
                     self.app.log_message(self.log_display, "📍 Panchayat dropdown not found (GP login).")
 
@@ -887,12 +867,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                 log_one(jobcard, "[Registration]", "Failed",
                         "Invalid jobcard format on DelReg page.")
                 return
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
 
             # ── Select Registration (JS — fast) ──
             try:
@@ -922,12 +897,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                 log_one(jobcard, "[Registration]", "Failed",
                         f"Reg selection error: {str(e).splitlines()[0]}")
                 return
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_'))
-                )
-            except (TimeoutException, NoSuchElementException):
-                pass
+            time.sleep(1.5)  # Brief wait for postback to begin
 
             # ── Select Reason ──
             try:

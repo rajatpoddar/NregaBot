@@ -7,9 +7,25 @@ on:
   workflow_dispatch: {} # Allows manual trigger
 
 jobs:
+  # --- 0. Clean up old releases before building new ones ---
+  cleanup-old-releases:
+    name: Clean Old GitHub Releases
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Delete all existing GitHub Releases
+        uses: dev-drprasad/delete-older-releases@v0.3.1
+        with:
+          keep_latest: 0        # Delete ALL existing releases
+          delete_tags: true     # Also delete their git tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # --- 1. Get Release Info ---
   get-release-info:
     name: Get Release Information
+    needs: cleanup-old-releases
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
@@ -37,16 +53,15 @@ jobs:
           echo "$CHANGELOG_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-  # --- 2. Build for Windows (Loader EXE + Secure Win Core Zip) ---
+  # --- 2. Build for Windows (Main Loader + Lite App + Core Zip) ---
   build-windows:
-      name: Build Windows (Loader & Core)
+      name: Build Windows (Main + Lite + Core)
       needs: get-release-info
       runs-on: windows-latest
       steps:
         - name: Checkout code
           uses: actions/checkout@v4
   
-        # Using Python 3.11 for Windows builds (Standard for your EXE)
         - name: Set up Python 3.11
           uses: actions/setup-python@v5
           with:
@@ -62,58 +77,54 @@ jobs:
         - name: Install Inno Setup
           run: choco install innosetup --yes
           shell: powershell
-  
-        # Build the Windows Loader EXE
-        - name: Run Windows build script (Loader)
+
+        # Clean old build artifacts first
+        - name: Clean old builds
+          run: |
+            if exist "dist" rmdir /s /q "dist"
+            if exist "build" rmdir /s /q "build"
+            mkdir dist
+          shell: cmd
+
+        # Build both MAIN and LITE apps using the updated script
+        - name: Run Windows build script
           run: |
             set APP_VERSION=${{ needs.get-release-info.outputs.version }}
             scripts\build_windows.bat
           shell: cmd
-  
-        # ✅ NEW: Create Secure Windows Core Zip (Compiled .pyc with Python 3.11)
+
+        # Create Secure Windows Core Zip (compiled .pyc)
         - name: Create Secure Core Zip (Windows)
           shell: python
           run: |
             import os, shutil, zipfile, compileall
-            
+
             version = '${{ needs.get-release-info.outputs.version }}'
             zip_name = f'dist/core_win_v{version}.zip'
             temp_dir = 'dist/core_temp_win'
-            
-            # 1. Clean temp
+
             if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
-            
-            # 2. Copy Files (Ignore unwanted: web folder & screenshots)
+
             def ignore_func(dir, files):
-                # Basic ignores (only runtime-essential files)
                 ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', '.vscode', 'web', 'docs', 'scripts']]
-                
-                # Specific ignore for screenshots inside assets
                 if os.path.basename(dir) == 'assets':
                     if 'screenshots' in files:
                         ignored.append('screenshots')
-                        
                 return ignored
-            
+
             shutil.copytree('.', temp_dir, ignore=ignore_func)
-            
-            # 3. Compile to .pyc (Legacy mode for direct compatibility)
             print('Compiling Windows Core (Py3.11)...')
             compileall.compile_dir(temp_dir, force=True, legacy=True)
-            
-            # 4. Zip (Include .pyc and Assets, Exclude .py)
+
             with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zf:
                 for root, dirs, files in os.walk(temp_dir):
                     for file in files:
-                        # SECURITY: Skip Source Code
                         if file.endswith('.py'): continue
-                        # Skip binaries and build scripts
                         if file.endswith(('.exe', '.bat', '.sh', '.spec', '.ps1', '.iss')): continue
-                        
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, temp_dir)
                         zf.write(full_path, rel_path)
-            
+
             shutil.rmtree(temp_dir)
             print(f'Success: Created {zip_name}')
 
@@ -124,6 +135,7 @@ jobs:
             path: |
               dist/installer/*.exe
               dist/core_win_*.zip
+              dist/NREGA Bot Lite/**/*
             retention-days: 1
 
   # --- 3. Build for Linux (Portable Loader) ---
@@ -146,7 +158,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Build Loader with PyInstaller
+      - name: Build Main Loader with PyInstaller
         run: |
           pyinstaller --noconfirm --windowed --onefile --name "NREGA Bot" \
           --icon="assets/app_icon.icns" \

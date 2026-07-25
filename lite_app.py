@@ -8,6 +8,7 @@
 #   - No sound effects
 #   - No onboarding guide
 #   - No performance monitor
+#   - Unicode emoji icons instead of PNG image files (faster, lighter)
 #   - Simplified UI with fewer transitions
 #
 # Run with:
@@ -36,7 +37,6 @@ import tkinter
 from tkinter import messagebox, ttk
 import customtkinter as ctk
 import requests
-from PIL import Image
 
 # --- Apply Lite config overrides FIRST ---
 from src import config
@@ -82,7 +82,6 @@ validate_config()
 ctk.set_default_color_theme(resource_path(os.path.join("config", "theme.json")))
 ctk.set_appearance_mode("System")
 
-
 class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     """
     Lightweight version of NREGA Bot for low-end devices.
@@ -95,6 +94,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     - Onboarding
     - Sound effects (except essential)
     - Animations & transitions
+    - PNG image icons (uses Unicode emoji characters instead)
     """
 
     def __init__(self) -> None:
@@ -142,9 +142,9 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.workflows = WorkflowManager(self)
         self.sound_manager = None  # No sounds in Lite
         
-        # --- Icons (minimal set) ---
+        # --- Icons (minimal set, for tab compatibility only) ---
         self.icon_images = create_icon_manager()
-        self.icon_images.preload_essential()
+        # No preload_essential() — Lite uses emoji text, not PNG images
         
         # --- Splash (minimal, no animation) ---
         self._splash = self._create_splash()
@@ -200,6 +200,10 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         """Build the UI directly — no progressive rendering."""
         self._build_ui()
         
+        # Hide splash FIRST so the main window is visible
+        # as a proper parent for the activation dialog (fixes blank screen)
+        self._hide_splash()
+        
         # Use LicenseMixin's perform_license_check_flow pattern
         self.is_licensed = self.services.check_license()
         
@@ -214,9 +218,6 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             else:
                 self.on_closing(force=True)
                 return
-        
-        # Fade out splash
-        self.after(200, self._hide_splash)
 
     def _build_ui(self) -> None:
         """Simplified UI — header, sidebar, content area, footer."""
@@ -231,22 +232,43 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         # Logo + Name
         branding = ctk.CTkFrame(header, fg_color="transparent")
         branding.grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(branding, text="🏛️", font=ctk.CTkFont(size=18)).pack(side="left", padx=(0, 5))
         ctk.CTkLabel(branding, text=config.APP_NAME, font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
         ctk.CTkLabel(branding, text=f"v{config.APP_VERSION}", font=ctk.CTkFont(size=10), text_color="gray60").pack(side="left", padx=(5, 0))
         
-        # Browser buttons
+        # Header action buttons — browsers + quick tools
         controls = ctk.CTkFrame(header, fg_color="transparent")
         controls.grid(row=0, column=2, sticky="e", padx=10)
         
-        for browser_name, cmd in [("chrome", self.launch_chrome_detached), 
-                                   ("firefox", self.launch_firefox_managed)]:
+        # Browser buttons with clear labels
+        header_actions = [
+            ("🌐 Chrome", self.launch_chrome_detached),
+            ("🦊 Firefox", self.launch_firefox_managed),
+        ]
+        for label, cmd in header_actions:
             btn = ctk.CTkButton(
-                controls, text="", image=self.icon_images.get(browser_name),
-                width=32, height=32, corner_radius=8,
+                controls, text=label,
+                width=90, height=30, corner_radius=8,
                 fg_color="transparent", hover_color=("gray90", "gray30"),
-                command=cmd
+                command=cmd,
+                font=ctk.CTkFont(size=12)
             )
             btn.pack(side="left", padx=2)
+        
+        # Small separator
+        ctk.CTkFrame(controls, width=1, height=20, fg_color=("gray80", "gray50")).pack(side="left", padx=6)
+        
+        # Workcode Extractor quick-access button
+        self._header_wc_btn = ctk.CTkButton(
+            controls, text="🔧 Extract",
+            width=90, height=30, corner_radius=8,
+            fg_color=("#E8F5E9", "#2E7D32"),
+            hover_color=("#C8E6C9", "#1B5E20"),
+            text_color=("#2E7D32", "#A5D6A7"),
+            command=lambda: self.show_frame("Workcode Extractor"),
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self._header_wc_btn.pack(side="left", padx=2)
         
         # --- Main Layout ---
         main = ctk.CTkFrame(self, corner_radius=0)
@@ -283,17 +305,18 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.server_status_indicator.pack(side="right", padx=10)
 
     def _create_nav_buttons(self) -> None:
-        """Create sidebar navigation from lite_tab_config."""
+        """Create sidebar navigation from lite_tab_config using emoji text icons."""
         self.nav_buttons.clear()
         tabs = get_tabs_definition_lite(self)
         
         for cat_name, cat_tabs in tabs.items():
             if cat_name == "Dashboard":
-                # Pin Home button at top
+                # Pin Home button at top with emoji
                 for name, data in cat_tabs.items():
+                    emoji = data.get("icon", "")
+                    btn_text = f"{emoji}  {name}" if emoji else name
                     btn = ctk.CTkButton(
-                        self.nav_scroll, text=name,
-                        image=data.get("icon"),
+                        self.nav_scroll, text=btn_text,
                         compound="left", anchor="w",
                         font=ctk.CTkFont(size=12, weight="bold"),
                         height=30, corner_radius=6,
@@ -315,9 +338,10 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                 ).pack(fill="x", padx=10, pady=(5, 2))
                 
                 for name, data in cat_tabs.items():
+                    emoji = data.get("icon", "")
+                    btn_text = f"{emoji}  {name}" if emoji else name
                     btn = ctk.CTkButton(
-                        self.nav_scroll, text=name,
-                        image=data.get("icon"),
+                        self.nav_scroll, text=btn_text,
                         compound="left", anchor="w",
                         font=ctk.CTkFont(size=12),
                         height=28, corner_radius=6,
@@ -391,6 +415,10 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         """Set up UI for licensed user."""
         self.set_status("Ready")
         self._show_frame_about()
+        # Update About tab's subscription details with current license info
+        about_tab = self.tab_instances.get("About")
+        if about_tab and hasattr(about_tab, 'update_subscription_details'):
+            about_tab.update_subscription_details(self.license_info)
         self.show_frame("Home")
 
     def get_tabs_definition(self) -> Dict[str, Dict[str, Any]]:
@@ -502,6 +530,248 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     def play_sound(self, sound_name: str) -> None:
         """Silent in Lite version — no sound playback."""
         pass
+
+    # ============================================================================
+    # LITE ACTIVATION — Override the full version's show_activation_window
+    # Simple license-key-only activation for low-end devices.
+    # ============================================================================
+
+    def show_activation_window(self) -> bool:
+        """
+        Lite version: polished dialog asking for a license key only.
+        No email/OTP, no trial, no QR codes, no PIL — minimal & fast.
+        """
+        win = ctk.CTkToplevel(self)
+        win.title(f"Activate {config.APP_SHORT_NAME}")
+        win.update_idletasks()
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        w, h = min(420, sw - 40), min(320, sh - 40)
+        win.geometry(f'{w}x{h}+{(sw // 2) - (w // 2)}+{(sh // 2) - (h // 2)}')
+        win.resizable(False, False)
+        win.transient(self)
+        win.grab_set()
+
+        # --- Main container ---
+        outer = ctk.CTkFrame(win, fg_color="transparent")
+        outer.pack(expand=True, fill="both", padx=24, pady=24)
+
+        # Brand header
+        header_frame = ctk.CTkFrame(outer, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 20))
+        ctk.CTkLabel(header_frame, text="🏛️", font=ctk.CTkFont(size=28)).pack()
+        ctk.CTkLabel(header_frame, text=f"{config.APP_SHORT_NAME}",
+                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(2, 0))
+        ctk.CTkLabel(header_frame, text="Enter your license key to activate",
+                     font=ctk.CTkFont(size=12), text_color="gray60").pack(pady=(2, 0))
+
+        # Key entry with icon-like frame
+        entry_frame = ctk.CTkFrame(outer, fg_color="transparent")
+        entry_frame.pack(fill="x", pady=(0, 12))
+        key_entry = ctk.CTkEntry(entry_frame,
+                                  placeholder_text="Paste License Key Here",
+                                  font=ctk.CTkFont(size=13))
+        key_entry.pack(fill="x", ipady=4)
+        last_key = get_config('last_used_license_key')
+        if last_key:
+            key_entry.insert(0, last_key)
+
+        # Inline status label
+        status_label = ctk.CTkLabel(outer, text="", font=ctk.CTkFont(size=11), anchor="w")
+        status_label.pack(fill="x", pady=(0, 8))
+
+        # Progress bar (hidden by default)
+        progress_bar = ctk.CTkProgressBar(outer, height=4, corner_radius=2,
+                                           mode="indeterminate")
+        # Don't pack yet — shown only during validation
+
+        activated = tkinter.BooleanVar(value=False)
+
+        def do_activate():
+            key_val = key_entry.get().strip()
+            if not key_val:
+                status_label.configure(text="⚠️  Please enter a license key.",
+                                       text_color=("#DC2626", "#EF4444"))
+                return
+
+            # Show progress
+            progress_bar.pack(fill="x", pady=(0, 10))
+            progress_bar.start()
+            status_label.configure(text="⏳  Validating your license...",
+                                   text_color=("#2563EB", "#60A5FA"))
+            activate_btn.configure(state="disabled", text="⏳ Validating...")
+
+            def _activate_thread():
+                try:
+                    payload = {
+                        "key": key_val,
+                        "machine_id": self.services.machine_id,
+                        "app_version": config.APP_VERSION
+                    }
+                    resp = self.http_session.post(
+                        f"{config.LICENSE_SERVER_URL}/api/validate",
+                        json=payload, timeout=15
+                    )
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        raise Exception(
+                            f"Unexpected server response (status {resp.status_code}).")
+
+                    if resp.status_code == 200 and data.get("status") == "valid":
+                        def _success():
+                            if not win.winfo_exists():
+                                return
+                            progress_bar.stop()
+                            progress_bar.pack_forget()
+                            save_config('last_used_license_key', key_val)
+                            self.license_info.update({**data, 'key': key_val})
+                            with open(get_data_path('license.dat'), 'w') as f:
+                                json.dump(self.license_info, f)
+                            self.set_server_status(True)
+                            status_label.configure(text="✅  Activated successfully!",
+                                                   text_color=("#059669", "#10B981"))
+                            win.after(400, lambda: [activated.set(True), win.destroy()])
+                        self.after(0, _success)
+                    elif resp.status_code == 403 and data.get("status") == "slots_full":
+                        def _full():
+                            if not win.winfo_exists():
+                                return
+                            progress_bar.stop()
+                            progress_bar.pack_forget()
+                            devices = data.get('devices', [])
+                            dev_list = "\n".join(f"  • {d['name']}" for d in devices)
+                            msg = (f"All device slots are full.\n\n"
+                                   f"Active devices:\n{dev_list}\n\n"
+                                   f"Please deactivate a device from your account page.")
+                            status_label.configure(text="❌  Device slots full",
+                                                   text_color=("#DC2626", "#EF4444"))
+                            messagebox.showwarning("Slots Full", msg, parent=win)
+                            if activate_btn.winfo_exists():
+                                activate_btn.configure(state="normal", text="Activate")
+                        self.after(0, _full)
+                    else:
+                        reason = data.get("reason", "Activation failed.")
+                        def _fail():
+                            if not win.winfo_exists():
+                                return
+                            progress_bar.stop()
+                            progress_bar.pack_forget()
+                            status_label.configure(
+                                text=f"❌  {reason.split(chr(10))[0][:60]}",
+                                text_color=("#DC2626", "#EF4444"))
+                            messagebox.showerror("Failed", reason, parent=win)
+                            if activate_btn.winfo_exists():
+                                activate_btn.configure(state="normal", text="Activate")
+                        self.after(0, _fail)
+
+                except Exception as e:
+                    def _error():
+                        if not win.winfo_exists():
+                            return
+                        progress_bar.stop()
+                        progress_bar.pack_forget()
+                        status_label.configure(text="❌  Connection error",
+                                               text_color=("#DC2626", "#EF4444"))
+                        messagebox.showerror("Error", str(e), parent=win)
+                        if activate_btn.winfo_exists():
+                            activate_btn.configure(state="normal", text="Activate")
+                    self.after(0, _error)
+
+            threading.Thread(target=_activate_thread, daemon=True).start()
+
+        activate_btn = ctk.CTkButton(
+            outer, text="Activate", command=do_activate,
+            fg_color=("#2563EB", "#3B82F6"),
+            hover_color=("#1D4ED8", "#2563EB"),
+            height=40, corner_radius=8,
+            font=ctk.CTkFont(size=13, weight="bold")
+        )
+        activate_btn.pack(pady=(0, 4), ipady=2, fill='x')
+
+        # Purchase link
+        buy_link = ctk.CTkLabel(
+            outer, text="🛒  Purchase a License Key",
+            text_color=("#2563EB", "#60A5FA"), cursor="hand2",
+            font=ctk.CTkFont(size=12)
+        )
+        buy_link.pack(pady=(8, 0))
+        buy_link.bind("<Button-1>", lambda e: webbrowser.open_new_tab(
+            f"{config.LICENSE_SERVER_URL}/buy"))
+
+        self.wait_window(win)
+        return activated.get()
+
+    # ============================================================================
+    # UPDATE METHODS (called by About tab and ServiceManager)
+    # ============================================================================
+
+    def check_for_updates_background(self) -> None:
+        """Check for updates in a background thread."""
+        self.services.check_for_updates_background()
+
+    def show_update_prompt(self, version: str) -> None:
+        """Show update notification and switch to Updates tab."""
+        if messagebox.askyesno("Update", f"Version {version} available. View?"):
+            self.show_frame("About")
+            about_tab = self.tab_instances.get("About")
+            if about_tab and hasattr(about_tab, 'tab_view'):
+                about_tab.tab_view.set("Updates")
+
+    def download_and_install_update(self, url: str, version: str) -> None:
+        """Download and install an update."""
+        self.services.download_and_install_update(url, version)
+
+    def _update_about_tab_info(self) -> None:
+        """Update About tab's subscription and version info after server response."""
+        about_tab = self.tab_instances.get("About")
+        if about_tab:
+            if hasattr(about_tab, 'update_subscription_details'):
+                about_tab.update_subscription_details(self.license_info)
+            info = self.update_info
+            if info and info.get('status') == 'available':
+                try:
+                    about_tab.latest_version_label.configure(text=f"Latest Version: {info['version']}")
+                    about_tab.update_button.configure(
+                        text=f"Download & Install v{info['version']}",
+                        state="normal",
+                        command=lambda: about_tab.download_and_install_update(
+                            info['url'], info['version']
+                        )
+                    )
+                    if hasattr(about_tab, 'show_new_version_changelog'):
+                        about_tab.show_new_version_changelog(info.get('changelog', []))
+                except Exception:
+                    pass
+            elif info and info.get('status') == 'updated':
+                try:
+                    about_tab.latest_version_label.configure(text="Latest Version: Up to date")
+                    about_tab.update_button.configure(text="Check for Updates", state="normal",
+                                                       command=about_tab.check_for_updates)
+                except Exception:
+                    pass
+
+    def _apply_feature_flags(self) -> None:
+        """Apply global_disabled_features and trial_restricted_features to nav buttons."""
+        if not hasattr(self, 'nav_buttons'):
+            return
+        for name, btn in self.nav_buttons.items():
+            current_text = btn.cget("text")
+            clean_text = current_text.replace(" ⚠️", "").replace(" 🔒", "")
+            new_state = "normal"
+            new_fg = "transparent"
+            new_text = clean_text
+            is_disabled = False
+            if isinstance(self.global_disabled_features, list):
+                if name in self.global_disabled_features:
+                    is_disabled = True
+            elif isinstance(self.global_disabled_features, dict):
+                if name in self.global_disabled_features:
+                    is_disabled = True
+            if is_disabled:
+                new_state = "normal"
+                new_text = f"{clean_text} ⚠️"
+                new_fg = ("#FEF2F2", "#450A0A")
+            btn.configure(text=new_text, fg_color=new_fg)
 
     def open_folder(self, path):
         try:

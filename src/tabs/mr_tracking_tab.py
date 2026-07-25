@@ -320,6 +320,7 @@ class MrTrackingTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Connecting to Chrome browser...", "info")
         try:
             chrome_options = ChromeOptions()
+            chrome_options.page_load_strategy = "eager"
             
             # --- UPDATED LOGIC: Strict Separation of Options ---
             if self.visible_browser_var.get() == 1:
