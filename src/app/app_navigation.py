@@ -81,6 +81,7 @@ class NavMixin:
             "File Manager": "emoji_file_manager",
             # About & Help
             "About": "emoji_about",
+            "Settings": "emoji_tools",
             "Feedback": "emoji_feedback",
         }
 
@@ -804,9 +805,11 @@ class NavMixin:
             if not all_logs:
                 messagebox.showinfo("No Data", "No logs to export.", parent=win)
                 return
+            reports_dir = self.get_nregabot_path("Reports")
             file_path = filedialog.asksaveasfilename(
                 defaultextension=".txt",
                 filetypes=[("Text File", "*.txt"), ("CSV File", "*.csv")],
+                initialdir=reports_dir,
                 initialfile=f"activity_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                 parent=win
             )

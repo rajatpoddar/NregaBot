@@ -648,7 +648,7 @@ class MrFillTab(BaseAutomationTab):
         details = file_details[export_format] # Assume PDF
         filename = f"MR_Fill_Report_{safe_name}_{timestamp}{details['ext']}"
 
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_user_downloads_path(), initialfile=filename, title=details['title'])
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title=details['title'])
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):

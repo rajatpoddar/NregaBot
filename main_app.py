@@ -62,7 +62,7 @@ from src.tabs.history_manager import HistoryManager
 from src.tabs.macro_manager_tab import MacroManagerTab
 from src.state import AppState
 from src.utils import (
-    resource_path, get_data_path, get_user_downloads_path,
+    resource_path, get_data_path, get_user_downloads_path, get_nregabot_path,
     get_config, save_config, validate_config,
     setup_logging, get_logger
 )
@@ -516,6 +516,9 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
 
             try:
                 self.play_sound("shutdown")
+                # Kill lingering audio process immediately (no orphan afplay)
+                if hasattr(self, 'sound_manager'):
+                    self.sound_manager.cleanup()
                 self.attributes("-alpha", 0.0) # Hide window immediately
             except Exception as e:
                 logger.warning("Failed to play shutdown sound or hide window: %s", e)
@@ -688,6 +691,7 @@ del "%~f0" & exit
 
     def get_data_path(self, filename): return get_data_path(filename)
     def get_user_downloads_path(self) -> str: return get_user_downloads_path()
+    def get_nregabot_path(self, subdir: str = "") -> str: return get_nregabot_path(subdir)
 
     def open_folder(self, path):
         try:
@@ -706,7 +710,8 @@ del "%~f0" & exit
         try:
             src = resource_path(f"assets/demo_{file_type}.csv")
             if not os.path.exists(src): self.play_sound("error"); messagebox.showerror("Error", "Demo file not found"); return
-            save_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialfile=f"{file_type}_data.csv")
+            demo_dir = self.get_nregabot_path("Demo")
+            save_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialdir=demo_dir, initialfile=f"{file_type}_data.csv")
             if save_path: shutil.copyfile(src, save_path); self.play_sound("success"); messagebox.showinfo("Success", f"Demo file saved to:\n{save_path}")
         except Exception as e: self.play_sound("error"); messagebox.showerror("Error", str(e))
 
@@ -769,6 +774,18 @@ del "%~f0" & exit
 
     def set_server_status(self, is_connected: bool):
         if self.server_status_indicator: self.server_status_indicator.configure(fg_color="green" if is_connected else "red")
+        # Also update About tab's header banner if loaded
+        about_tab = self.app_state.tab_instances.get("About")
+        if about_tab:
+            color = "green" if is_connected else "red"
+            text = "Connected" if is_connected else "Disconnected"
+            try:
+                if hasattr(about_tab, 'server_dot') and about_tab.server_dot.winfo_exists():
+                    about_tab.server_dot.configure(fg_color=color)
+                if hasattr(about_tab, 'server_status_label') and about_tab.server_status_label.winfo_exists():
+                    about_tab.server_status_label.configure(text=text)
+            except Exception as e:
+                logger.debug("Failed to update About tab server status: %s", e)
 
     def bring_to_front(self):
         self.lift()

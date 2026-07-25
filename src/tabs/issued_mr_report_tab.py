@@ -54,8 +54,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             "S No.", "Panchayat", "Jobcard No.", "Worker Name", "ABPS Status"
         ]
         
-        self.driver = None
-        
+        # Shared browser use karega (self.app.get_driver()) — apna driver nahi banayega
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
@@ -242,41 +241,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Form has been reset.")
         self.update_status("Ready", 0.0)
         
-    def _get_new_driver(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        """Creates a new HEADLESS Chrome driver."""
-        self.app.log_message(self.log_display, "Naya Headless Chrome browser shuru kar raha hoon...", "info")
-        try:
-            chrome_options = ChromeOptions()
-            chrome_options.page_load_strategy = "eager"
-            chrome_options.add_argument("--headless=new")
-            chrome_options.add_argument("--window-size=1920,1080") 
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            
-            service = ChromeService(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            
-            self.app.log_message(self.log_display, "Headless browser safaltapoorvak shuru ho gaya.", "info")
-            return driver
-        except Exception as e:
-            self.app.log_message(self.log_display, f"Headless browser shuru karne mein BADI GADBAD: {e}", "error")
-            messagebox.showerror("Browser Error", f"Naya Headless Chrome browser shuru nahi ho saka.\n\nError: {e}\n\nKya Chrome installed hai?")
-            return None
+
     def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -310,12 +275,10 @@ class IssuedMrReportTab(BaseAutomationTab):
         
         self.save_inputs(inputs)
         
-        if self.driver:
-            messagebox.showwarning("Busy", "Automation is already running.")
+        driver = self.app.get_driver()
+        if not driver:
+            messagebox.showwarning("Browser Required", "Kripya pehle 'Launch Chrome' button se browser start karein.")
             return
-        
-        self.driver = self._get_new_driver()
-        if not self.driver: return
         
         self.app.after(0, self.set_ui_state, True) 
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
@@ -334,12 +297,10 @@ class IssuedMrReportTab(BaseAutomationTab):
         if not all([inputs['state'], inputs['district'], inputs['block']]):
             messagebox.showwarning("Input Error", "State, District and Block are required."); return
         
-        if self.driver:
-            messagebox.showwarning("Busy", "Automation is already running.")
+        driver = self.app.get_driver()
+        if not driver:
+            messagebox.showwarning("Browser Required", "Kripya pehle 'Launch Chrome' button se browser start karein.")
             return
-        
-        self.driver = self._get_new_driver()
-        if not self.driver: return
         
         self.app.after(0, self.set_ui_state, True) 
         self.app.start_automation_thread(self.automation_key, self.run_abps_automation_logic, args=(inputs,))
@@ -409,7 +370,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Starting Issued MR Report automation...")
 
         try:
-            driver = self.driver
+            driver = self.app.get_driver()
             if not driver: return 
 
             wait = WebDriverWait(driver, 20)
@@ -421,7 +382,7 @@ class IssuedMrReportTab(BaseAutomationTab):
 
             self.app.log_message(self.log_display, f"Selecting State: {inputs['state']}...")
             state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
-            Select(state_select).select_by_visible_text(inputs['state'].upper())
+            self._select_by_text_case_insensitive(Select(state_select), inputs['state'])
             wait.until(EC.presence_of_element_located((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
 
             self.app.log_message(self.log_display, "Opening Report...")
@@ -493,10 +454,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Error: {e}", "error")
             self.success_message = None
         finally:
-            if self.driver: 
-                try: self.driver.quit()
-                except Exception as e: logger.debug("Failed to quit driver: %s", e)
-            self.driver = None
+            # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")
 
@@ -523,7 +481,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Starting ABPS Pending Scan (All Panchayats)...")
 
         try:
-            driver = self.driver
+            driver = self.app.get_driver()
             if not driver: return 
             wait = WebDriverWait(driver, 20)
 
@@ -533,7 +491,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             self._solve_captcha(driver, wait)
 
             state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
-            Select(state_select).select_by_visible_text(inputs['state'].upper())
+            self._select_by_text_case_insensitive(Select(state_select), inputs['state'])
             wait.until(EC.presence_of_element_located((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
 
             report_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "MGNREGS daily status as per e-muster issued")))
@@ -647,10 +605,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Critical Error in ABPS Scan: {e}", "error")
             self.success_message = None
         finally:
-            if self.driver: 
-                try: self.driver.quit()
-                except Exception as e: logger.debug("IssuedMR: Driver quit failed: %s", e)
-            self.driver = None
+            # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
             self.app.after(0, self.set_ui_state, False)
             if hasattr(self, 'success_message') and self.success_message:
                 self.app.after(100, lambda: messagebox.showinfo("Complete", self.success_message))
@@ -860,7 +815,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
         downloads_path = self.app.get_user_downloads_path()
-        target_dir = os.path.join(downloads_path, f"Reports {year}", safe_name)
+        target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {year}", safe_name)
         try: os.makedirs(target_dir, exist_ok=True)
         except OSError: return
 

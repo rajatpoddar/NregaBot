@@ -894,8 +894,14 @@ class LicenseMixin:
         if about_tab:
             about_tab.update_subscription_details(self.app_state.license_info)
             info = self.app_state.update_info
-            if info['status'] == 'available':
+            if info.get('status') == 'available':
                 about_tab.latest_version_label.configure(text=f"Latest Version: {info['version']}")
+            elif info.get('status') == 'updated':
+                about_tab.latest_version_label.configure(text="Latest Version: Up to date")
+                about_tab.update_button.configure(state="normal", text="Check for Updates")
+            elif info.get('status') == 'error':
+                about_tab.latest_version_label.configure(text="Latest Version: Check failed")
+                about_tab.update_button.configure(state="normal", text="Retry Check")
 
     # ------------------------------------------------------------------
     # LICENSED FEATURE ALERTS

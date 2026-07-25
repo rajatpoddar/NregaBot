@@ -334,7 +334,7 @@ class UpdateEstimateTab(BaseAutomationTab):
             file_path = filedialog.asksaveasfilename(
                 defaultextension=".pdf",
                 filetypes=[("PDF Document", "*.pdf")],
-                initialdir=self.app.get_user_downloads_path(),
+                initialdir=self.app.get_nregabot_path("Reports"),
                 initialfile=f"{filename}.pdf",
                 title="Save PDF Report"
             )

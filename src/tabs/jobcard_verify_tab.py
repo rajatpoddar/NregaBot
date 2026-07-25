@@ -46,7 +46,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure(1, weight=1)
         
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=10)
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"))
+        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), app_instance=self.app, history_key="panchayat_name")
         self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=10)
         
         ctk.CTkLabel(controls_frame, text="Village Name:").grid(row=1, column=0, sticky='w', padx=15, pady=10)
@@ -225,7 +225,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             villages_to_process = []
             self.app.log_message(self.log_display, f"Selecting Panchayat: {inputs['panchayat']}")
             html_element = driver.find_element(By.TAG_NAME, "html")
-            Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch")))).select_by_visible_text(inputs['panchayat'])
+            self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch")))), inputs['panchayat'])
             wait.until(EC.staleness_of(html_element))
 
             if inputs['process_all']:

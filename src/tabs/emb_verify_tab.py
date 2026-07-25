@@ -48,13 +48,13 @@ class EmbVerifyTab(BaseAutomationTab):
 
         # Panchayat input field
         ctk.CTkLabel(config_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=15)
-        self.panchayat_entry = AutocompleteEntry(config_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"))
+        self.panchayat_entry = AutocompleteEntry(config_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), app_instance=self.app, history_key="panchayat_name")
         self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=15)
         
         # Verify Amount input field
         ctk.CTkLabel(config_frame, text="Verify Amount (₹):").grid(row=1, column=0, sticky='w', padx=15, pady=(0, 15))
         self.verify_amount_entry = ctk.CTkEntry(config_frame)
-        self.verify_amount_entry.insert(0, "282")
+        self.verify_amount_entry.insert(0, "300")
         self.verify_amount_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=(0, 15))
 
         # Action buttons
@@ -147,7 +147,7 @@ class EmbVerifyTab(BaseAutomationTab):
         if messagebox.askokcancel("Reset Form?", "This will clear all inputs and results. Continue?"):
             self.panchayat_entry.delete(0, tkinter.END)
             self.verify_amount_entry.delete(0, tkinter.END)
-            self.verify_amount_entry.insert(0, "282")
+            self.verify_amount_entry.insert(0, "300")
             self.work_codes_text.delete("1.0", tkinter.END)
             for item in self.results_tree.get_children():
                 self.results_tree.delete(item)
@@ -209,7 +209,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
             self.app.log_message(self.log_display, f"Selecting Panchayat: {panchayat}")
             panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
-            panchayat_select.select_by_visible_text(panchayat)
+            self._select_by_text_case_insensitive(panchayat_select, panchayat)
             
             self.app.log_message(self.log_display, "Waiting for page to reload...")
             wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
@@ -243,7 +243,7 @@ class EmbVerifyTab(BaseAutomationTab):
                     self.app.log_message(self.log_display, "Navigating back for next work code...")
                     driver.get(config.EMB_VERIFY_CONFIG["url"])
                     panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
-                    panchayat_select.select_by_visible_text(panchayat)
+                    self._select_by_text_case_insensitive(panchayat_select, panchayat)
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
                     time.sleep(1.5)  # Brief wait for postback to begin
 
@@ -387,7 +387,7 @@ class EmbVerifyTab(BaseAutomationTab):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {"PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
         filename = f"eMB_Verify_Report_{safe_name}_{timestamp}{details['ext']}"
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_user_downloads_path(), initialfile=filename, title="Save Report")
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title="Save Report")
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):

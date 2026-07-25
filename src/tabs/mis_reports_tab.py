@@ -71,15 +71,15 @@ class MisReportsTab(BaseAutomationTab):
         settings_container.grid_columnconfigure(1, weight=1)
         
         ctk.CTkLabel(settings_container, text="State:").grid(row=0, column=0, sticky='w', padx=15, pady=5)
-        self.state_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("mis_state"))
+        self.state_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("mis_state"), app_instance=self.app, history_key="mis_state")
         self.state_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(settings_container, text="District:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
-        self.district_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("mis_district"))
+        self.district_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("mis_district"), app_instance=self.app, history_key="mis_district")
         self.district_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
         
         ctk.CTkLabel(settings_container, text="Block:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
-        self.block_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("mis_block"))
+        self.block_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("mis_block"), app_instance=self.app, history_key="mis_block")
         self.block_entry.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
 
         # Checkbox list for reports
@@ -187,7 +187,7 @@ class MisReportsTab(BaseAutomationTab):
             current_year = datetime.now().strftime("%Y")
             current_date_str_folder = datetime.now().strftime("%d-%m-%Y")
             
-            target_dir = os.path.join(downloads_path, f"Reports {current_year}", "MIS Report", current_date_str_folder)
+            target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", "MIS", current_date_str_folder)
             os.makedirs(target_dir, exist_ok=True)
             
             today_str_file = datetime.now().strftime("%d-%m-%Y")
@@ -279,7 +279,7 @@ class MisReportsTab(BaseAutomationTab):
                         self._solve_captcha(driver, wait)
                         self.app.log_message(self.log_display, "CAPTCHA verified. Selecting state...")
                         state_dropdown = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
-                        Select(state_dropdown).select_by_visible_text(inputs['state'].upper())
+                        self._select_by_text_case_insensitive(Select(state_dropdown), inputs['state'])
                         wait.until(EC.presence_of_element_located((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
                         self.app.log_message(self.log_display, f"Finding and scrolling to '{report_name}'...")
                         report_link = wait.until(EC.presence_of_element_located((By.LINK_TEXT, report_name.strip())))

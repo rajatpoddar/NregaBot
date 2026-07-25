@@ -126,6 +126,26 @@ def get_user_downloads_path() -> str:
     """Returns the default downloads path for the user."""
     return str(Path.home() / "Downloads")
 
+
+def get_nregabot_path(subdir: str = "") -> str:
+    """
+    Returns a path inside ~/Downloads/NregaBot/{subdir}, creating dirs as needed.
+    Ensures ALL user-facing files stay within ~/Downloads/NregaBot/.
+    
+    Examples:
+        get_nregabot_path()              -> ~/Downloads/NregaBot/
+        get_nregabot_path("Reports")      -> ~/Downloads/NregaBot/Reports/
+        get_nregabot_path("Imports")      -> ~/Downloads/NregaBot/Imports/
+        get_nregabot_path("Reports/2026/MB_Report") -> ~/Downloads/NregaBot/Reports/2026/MB_Report/
+    """
+    base = os.path.join(get_user_downloads_path(), "NregaBot")
+    if subdir:
+        full = os.path.join(base, subdir)
+        os.makedirs(full, exist_ok=True)
+        return full
+    os.makedirs(base, exist_ok=True)
+    return base
+
 # --- UPDATED CONFIG FUNCTIONS ---
 
 CONFIG_FILE: str = get_data_path('config.json')

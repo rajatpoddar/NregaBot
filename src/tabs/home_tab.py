@@ -6,11 +6,10 @@ categorized, with a "Most Used" section at the top based on usage history.
 
 import customtkinter as ctk
 import tkinter as tk
-import time
 from PIL import Image
 from src.utils import resource_path, _suppress_overscroll
 from src import config
-from src.ui_components import AfterTracker
+
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
@@ -42,12 +41,7 @@ class HomeTab(ctk.CTkFrame):
         # its packed children's minimal requested sizes.
         self.pack_propagate(False)
         
-        # AfterTracker for safe callback cleanup on tab destroy.
-        # HomeTab extends CTkFrame directly (not BaseAutomationTab),
-        # so we need to create the tracker here.
-        # Using 'self.safe_after' (no underscore) so that calls like
-        # self.safe_after(ms, callback) delegate to AfterTracker.after().
-        self.safe_after = AfterTracker(self)
+
 
         # Cache all tabs by name
         self._all_tabs = {}
@@ -140,40 +134,6 @@ class HomeTab(ctk.CTkFrame):
             text_color=(config.COLORS["text_medium"], config.COLORS["text_light"]),
         ).pack(side="left", padx=(8, 0))
 
-        # Date & Time display — clock icon + date (blue) + time (green), aligned far right
-        header_frame.grid_columnconfigure(1, weight=1)
-        datetime_container = ctk.CTkFrame(header_frame, fg_color="transparent")
-        datetime_container.grid(row=2, column=1, sticky="e", padx=(10, 5), pady=(15, 5))
-
-        # Clock icon
-        clock_icon = self.app.icon_images.get("emoji_clock")
-        if clock_icon:
-            ctk.CTkLabel(
-                datetime_container,
-                image=clock_icon,
-                text="",
-            ).pack(side="left", padx=(0, 6))
-
-        # Date label — blue (like RAM value)
-        self.date_label = ctk.CTkLabel(
-            datetime_container,
-            text="",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-            text_color=config.COLORS["badge_success"],  # Blue
-        )
-        self.date_label.pack(side="left", padx=(0, 4))
-
-        # Time label — green (like CPU value)
-        self.time_label = ctk.CTkLabel(
-            datetime_container,
-            text="",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-            text_color=config.COLORS["badge_info"],  # Green
-        )
-        self.time_label.pack(side="left")
-
-        self._update_datetime()
-
     # ──────────────────────────────────────────────
     # 2. SEARCH BAR
     # ──────────────────────────────────────────────
@@ -221,6 +181,7 @@ class HomeTab(ctk.CTkFrame):
 
     def _clear_search(self):
         """Clear the search field and reset the view."""
+        self.app.play_sound("click")
         self.search_var.set("")
         self.search_entry.focus_set()
 
@@ -440,6 +401,7 @@ class HomeTab(ctk.CTkFrame):
             nl.configure(text_color=otc)
 
         def on_click(e=None):
+            self.app.play_sound("click")
             self.app.show_frame(name)
 
         card.bind("<Enter>", on_enter)
@@ -518,21 +480,6 @@ class HomeTab(ctk.CTkFrame):
         g = max(0, min(255, g + amount))
         b = max(0, min(255, b + amount))
         return f"#{r:02x}{g:02x}{b:02x}"
-
-    def _update_datetime(self):
-        """Update the date & time label every second.
-        Only updates when the Home tab is the currently active tab
-        to avoid unnecessary widget rendering overhead."""
-        if hasattr(self, 'date_label') and self.date_label.winfo_exists():
-            # Skip heavy label update if this tab isn't even visible
-            if getattr(self.app, 'current_active_tab', '') == 'Home':
-                now = time.localtime()
-                date_str = time.strftime("%a %d %b", now)          # Thu 23 Jul
-                time_str = time.strftime("%I:%M %p", now).lstrip("0")  # 3:23 PM (no leading zero)
-                self.date_label.configure(text=date_str)
-                self.time_label.configure(text=time_str)
-            # Use safe_after so the timer is auto-cancelled if tab is destroyed
-            self.safe_after(1000, self._update_datetime)
 
     def refresh(self):
         """Re-build most-used section (called after a tab is used)."""

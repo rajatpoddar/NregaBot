@@ -50,7 +50,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
 
         # Panchayat Selection
         ctk.CTkLabel(controls_frame, text="Panchayat (optional):").grid(row=1, column=0, padx=15, pady=(5,0), sticky="w")
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"))
+        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), app_instance=self.app, history_key="panchayat_name")
         self.panchayat_entry.grid(row=1, column=1, padx=15, pady=(5,0), sticky="ew")
         
         self.process_all_var = tkinter.BooleanVar()
@@ -211,7 +211,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
         try:
             html_element = driver.find_element(By.TAG_NAME, 'html')
             panchayat_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanch"))))
-            panchayat_dropdown.select_by_visible_text(panchayat_name)
+            self._select_by_text_case_insensitive(panchayat_dropdown, panchayat_name)
             self.app.log_message(self.log_display, f"   - Selected {panchayat_name}, waiting for page to update...")
 
             try:

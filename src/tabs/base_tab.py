@@ -15,6 +15,8 @@ logger = get_logger()
 
 # Module-level imports for selenium and openpyxl (P4: moved from lazy imports in method bodies)
 from selenium.common.exceptions import NoSuchWindowException, WebDriverException
+from selenium.webdriver.support.ui import Select
+from selenium.common.exceptions import NoSuchElementException
 
 # A2: Import extracted components from their own modules
 from .date_picker_popup import DatePickerPopup
@@ -639,7 +641,9 @@ class BaseAutomationTab(ctk.CTkFrame):
         tv.heading(col, command=lambda: self._treeview_sort_column(tv, col, not reverse))
         
     def export_treeview_to_csv(self, tree: Any, default_filename: str) -> None:
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialdir=self.app.get_user_downloads_path(), initialfile=default_filename, title="Save CSV Report")
+        """Export treeview contents to CSV inside ~/Downloads/NregaBot/Reports/."""
+        reports_dir = self.app.get_nregabot_path("Reports")
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialdir=reports_dir, initialfile=default_filename, title="Save CSV Report")
         if not file_path: return
         try:
             with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
@@ -683,6 +687,31 @@ class BaseAutomationTab(ctk.CTkFrame):
         except Exception as e:
             messagebox.showerror("Extraction Error", f"An error occurred during extraction: {e}", parent=self)
 
+    # ────────────────────────────────────────────────────────────────
+    # CASE-INSENSITIVE DROPDOWN SELECTION HELPER
+    # ────────────────────────────────────────────────────────────────
+    @staticmethod
+    def _select_by_text_case_insensitive(select_element: Any, target_text: str) -> bool:
+        """
+        Case-insensitive version of Selenium's select_by_visible_text().
+        
+        Website par panchayat kabhi "PALOJORI" (UPPERCASE), kabhi "Palojori" (Title Case)
+        dikhta hai. User ne jaisa bhi save kiya ho, automation kaam karna chahiye.
+        
+        Args:
+            select_element: A selenium.webdriver.support.ui.Select instance
+            target_text: The text to match (case-insensitive)
+            
+        Returns:
+            True if a match was found and selected, False otherwise
+        """
+        target_lower = target_text.strip().lower()
+        for option in select_element.options:
+            if option.text.strip().lower() == target_lower:
+                select_element.select_by_visible_text(option.text)
+                return True
+        return False
+    
     def _apply_appearance_mode(self, theme_color_tuple: Any) -> str:
         if isinstance(theme_color_tuple, (tuple, list)):
             if ctk.get_appearance_mode().lower() == "light": return theme_color_tuple[0]

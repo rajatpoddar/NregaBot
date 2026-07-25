@@ -490,7 +490,7 @@ class MbEntryTab(BaseAutomationTab):
                 panchayat_dropdown = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
                 selected_option = Select(panchayat_dropdown).first_selected_option
                 if selected_option.text.strip() != cfg['panchayat_name']:
-                    Select(panchayat_dropdown).select_by_visible_text(cfg['panchayat_name'])
+                    self._select_by_text_case_insensitive(Select(panchayat_dropdown), cfg['panchayat_name'])
                     wait.until(EC.staleness_of(panchayat_dropdown))
                     wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
             except Exception as e: logger.debug("MBEntry: Panchayat select wait failed: %s", e)

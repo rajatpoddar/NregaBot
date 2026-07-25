@@ -60,7 +60,7 @@ class MusterrollGenTab(BaseAutomationTab):
         self.panchayat_entry.grid(row=0, column=1, columnspan=3, sticky='ew', padx=15, pady=(15,0))
         self.panchayat_entry.bind("<KeyRelease>", self._on_panchayat_change_debounced, add="+")
         
-        ctk.CTkLabel(controls_frame, text="Note: Must exactly match the name on the VB-G-RAM-G portal.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky='w', padx=15, pady=(0,10))
+
         
         # --- Start Date ---
         ctk.CTkLabel(controls_frame, text="तारीख से (DD/MM/YYYY):").grid(row=2, column=0, sticky='w', padx=15, pady=5)
@@ -391,7 +391,7 @@ class MusterrollGenTab(BaseAutomationTab):
             safe_panchayat_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
             if not safe_panchayat_name: safe_panchayat_name = "Unknown_Panchayat"
             date_str = datetime.now().strftime('%Y-%m-%d')
-            output_dir = os.path.join(self.app.get_user_downloads_path(), "NregaBot", "MR_Output", safe_panchayat_name, date_str)
+            output_dir = os.path.join(self.app.get_nregabot_path("PDF_Output/MR_Output"), safe_panchayat_name, date_str)
             os.makedirs(output_dir, exist_ok=True)
             return output_dir
         except Exception as e:
@@ -484,8 +484,7 @@ class MusterrollGenTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "Validating Panchayat name...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
             panchayat_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "exe_agency"))))
-            target_panchayat = config.AGENCY_PREFIX + panchayat_name
-            if target_panchayat not in [opt.text for opt in panchayat_dropdown.options]:
+            if not self._select_by_text_case_insensitive(panchayat_dropdown, config.AGENCY_PREFIX + panchayat_name):
                 error_msg = f"Panchayat name '{panchayat_name}' not found on the website. Please check spelling."
                 if "macro" in self.app.active_automations:
                     self.app.log_message(self.log_display, f"Skipping: {error_msg}", "error")
@@ -510,7 +509,8 @@ class MusterrollGenTab(BaseAutomationTab):
         if inputs['auto_mode']:
             self.app.log_message(self.log_display, "Auto Mode: Fetching available work codes...")
             try:
-                Select(driver.find_element(By.ID, "exe_agency")).select_by_visible_text(config.AGENCY_PREFIX + inputs['panchayat'])
+                agency_select = Select(driver.find_element(By.ID, "exe_agency"))
+                self._select_by_text_case_insensitive(agency_select, config.AGENCY_PREFIX + inputs['panchayat'])
                 wait.until(lambda d: len(Select(d.find_element(By.ID, "ddlWorkCode")).options) > 1)
                 items = [opt.text for opt in Select(driver.find_element(By.ID, "ddlWorkCode")).options if opt.get_attribute("value")]
                 self.app.log_message(self.log_display, f"Found {len(items)} available work codes.")
@@ -538,7 +538,7 @@ class MusterrollGenTab(BaseAutomationTab):
             
             self.app.log_message(self.log_display, "   - Selecting Panchayat...")
             panchayat_dropdown = wait.until(EC.presence_of_element_located((By.ID, "exe_agency")))
-            Select(panchayat_dropdown).select_by_visible_text(config.AGENCY_PREFIX + inputs['panchayat'])
+            self._select_by_text_case_insensitive(Select(panchayat_dropdown), config.AGENCY_PREFIX + inputs['panchayat'])
             
             self.app.log_message(self.log_display, f"   - Selecting work code for '{item}'...")
             full_work_code_text = self._select_work_code(driver, wait, item, inputs['auto_mode'])
@@ -965,7 +965,7 @@ class MusterrollGenTab(BaseAutomationTab):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {"Image (.jpg)": { "ext": ".jpg", "types": [("JPEG Image", "*.jpg")]}, "PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
         filename = f"MR_Gen_Report_{safe_name}_{timestamp}{details['ext']}"
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_user_downloads_path(), initialfile=filename, title="Save Report")
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title="Save Report")
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
@@ -1016,7 +1016,7 @@ class MusterrollGenTab(BaseAutomationTab):
 
         # Get unique output path
         try:
-            merge_output_dir = os.path.join(self.app.get_user_downloads_path(), "NregaBot", "Merged_Pdf_Output")
+            merge_output_dir = self.app.get_nregabot_path("Merged_PDF")
             os.makedirs(merge_output_dir, exist_ok=True)
             
             date_str = datetime.now().strftime("%d-%b-%Y")

@@ -67,11 +67,7 @@ class MateMrGenTab(BaseAutomationTab):
             history_key="panchayat_name")
         self.panchayat_entry.grid(row=0, column=1, columnspan=3, sticky='ew', padx=15, pady=(15, 0))
 
-        ctk.CTkLabel(
-            controls_frame,
-            text="Note: Must exactly match the name on the VB-G-RAM-G portal.",
-            text_color="gray50"
-        ).grid(row=1, column=1, columnspan=3, sticky='w', padx=15, pady=(0, 10))
+
 
         # Row 2 – Dates
         ctk.CTkLabel(controls_frame, text="तारीख से (DD/MM/YYYY):").grid(
@@ -445,8 +441,7 @@ class MateMrGenTab(BaseAutomationTab):
                 safe = "Unknown_Panchayat"
             date_str = datetime.now().strftime('%Y-%m-%d')
             output_dir = os.path.join(
-                self.app.get_user_downloads_path(),
-                "NregaBot", "MateMR_Output", safe, date_str)
+                self.app.get_nregabot_path("MateMR_Output"), safe, date_str)
             os.makedirs(output_dir, exist_ok=True)
             return output_dir
         except Exception as e:
@@ -1100,7 +1095,7 @@ class MateMrGenTab(BaseAutomationTab):
         file_path = filedialog.asksaveasfilename(
             defaultextension=details['ext'],
             filetypes=details['types'],
-            initialdir=self.app.get_user_downloads_path(),
+            initialdir=self.app.get_nregabot_path("Reports"),
             initialfile=filename,
             title="Save Report")
         return (data_to_export, file_path) if file_path else (None, None)
@@ -1158,8 +1153,7 @@ class MateMrGenTab(BaseAutomationTab):
             return
 
         try:
-            merge_dir = os.path.join(
-                self.app.get_user_downloads_path(), "NregaBot", "Merged_Pdf_Output")
+            merge_dir = self.app.get_nregabot_path("Merged_PDF")
             os.makedirs(merge_dir, exist_ok=True)
             date_str = datetime.now().strftime("%d-%b-%Y")
             file_name = f"{base_name}_{date_str}.pdf"

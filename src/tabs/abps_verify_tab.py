@@ -43,7 +43,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure((1, 3), weight=1)
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=0, sticky="w", padx=15, pady=(15, 5))
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"))
+        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), app_instance=self.app, history_key="panchayat_name")
         self.panchayat_entry.grid(row=0, column=1, sticky="ew", padx=(0, 15), pady=(15, 5))
 
         ctk.CTkLabel(controls_frame, text="Village:").grid(row=0, column=2, sticky="w", padx=15, pady=(15, 5))
@@ -173,14 +173,14 @@ class AbpsVerifyTab(BaseAutomationTab):
             try:
                 # Use Presence Check
                 panchayat_select = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']")))
-                Select(panchayat_select).select_by_visible_text(panchayat)
+                self._select_by_text_case_insensitive(Select(panchayat_select), panchayat)
                 self.app.update_history("panchayat_name", panchayat)
                 time.sleep(1)
             except Exception:
                  try:
                     # Fallback locator
                     panchayat_select = driver.find_element(By.NAME, "ctl00$ContentPlaceHolder1$DDL_panchayat")
-                    Select(panchayat_select).select_by_visible_text(panchayat)
+                    self._select_by_text_case_insensitive(Select(panchayat_select), panchayat)
                     try:
                         WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.ID, 'DDL_Village'))

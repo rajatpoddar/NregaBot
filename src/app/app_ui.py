@@ -29,10 +29,8 @@ class UIMixin:
     # ============================================================================
 
     def _create_header(self) -> None:
-        # Note: corner_radius=0 on structural frames avoids expensive canvas redraws
-        # during maximize/restore on Windows. grid_propagate(False) was removed
-        # because it breaks the announcement-bar flex layout.
-        header = ctk.CTkFrame(self, corner_radius=0, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_darker"]))
+        header = ctk.CTkFrame(self, corner_radius=0,
+                                 fg_color=(config.COLORS["bg_light"], config.COLORS["bg_darker"]))
         header.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 10))
         header.grid_columnconfigure(1, weight=1)
 
@@ -235,9 +233,8 @@ class UIMixin:
             self._lock_app_to_about_tab()
 
     def _create_footer(self) -> None:
-        # Flat footer (no corner_radius) — avoids expensive canvas redraws
-        # that cause flickering during window maximize/restore on Windows.
-        footer = ctk.CTkFrame(self, height=50, corner_radius=0, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
+        footer = ctk.CTkFrame(self, height=50, corner_radius=0,
+                                 fg_color=(config.COLORS["bg_light"], config.COLORS["bg_darker"]))
         footer.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 20))
         footer.grid_propagate(False)
 
@@ -261,6 +258,45 @@ class UIMixin:
 
         dock_frame = ctk.CTkFrame(footer, fg_color="transparent")
         dock_frame.pack(side="right", padx=15, pady=5)
+
+        # ── Emergency Stop — clickable dot + label ──
+        _stop_cmd = lambda e: self._emergency_stop_all()
+        self.emergency_stop_frame = ctk.CTkFrame(dock_frame, fg_color="transparent", cursor="hand2")
+        self.emergency_stop_frame.pack(side="left", padx=(4, 4))
+        self.emergency_stop_frame.bind("<Button-1>", _stop_cmd)
+
+        # Bigger red dot indicator
+        self.emergency_stop_indicator = ctk.CTkFrame(
+            self.emergency_stop_frame, width=16, height=16, corner_radius=8,
+            fg_color="transparent",
+        )
+        self.emergency_stop_indicator.pack(side="left", padx=(0, 5))
+        self.emergency_stop_indicator.bind("<Button-1>", _stop_cmd)
+
+        # "STOP ALL" label
+        self.emergency_stop_label = ctk.CTkLabel(
+            self.emergency_stop_frame,
+            text="STOP ALL",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=("gray50", "gray50"),
+            cursor="hand2",
+        )
+        self.emergency_stop_label.pack(side="left")
+        self.emergency_stop_label.bind("<Button-1>", _stop_cmd)
+
+        # Hover tooltip for the whole group
+        def _stop_enter(e):
+            if hasattr(self, 'status_label') and self.status_label and self.status_label.winfo_exists():
+                self.status_label.configure(text="Emergency Stop — Click to halt all automations", text_color=("#DC2626", "#EF4444"))
+        def _stop_leave(e):
+            if hasattr(self, 'status_label') and self.status_label and self.status_label.winfo_exists():
+                self.status_label.configure(text="Ready", text_color="gray60")
+        self.emergency_stop_frame.bind("<Enter>", _stop_enter)
+        self.emergency_stop_frame.bind("<Leave>", _stop_leave)
+        self.emergency_stop_indicator.bind("<Enter>", _stop_enter)
+        self.emergency_stop_indicator.bind("<Leave>", _stop_leave)
+        self.emergency_stop_label.bind("<Enter>", _stop_enter)
+        self.emergency_stop_label.bind("<Leave>", _stop_leave)
 
         def create_icon_btn(parent, icon_name, command, tooltip_text):
             icon = self.icon_images.get(icon_name)

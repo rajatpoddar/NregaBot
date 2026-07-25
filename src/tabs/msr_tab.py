@@ -51,13 +51,13 @@ class MsrTab(BaseAutomationTab):
             history_key="panchayat_name" # <-- ADD THIS LINE
         )
         self.panchayat_entry.pack(fill='x', pady=(5,0))
-        ctk.CTkLabel(panchayat_frame, text="e.g., Palojori (must exactly match the name on the website)", text_color="gray50").pack(anchor='w')
+
         
         amount_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         amount_frame.grid(row=0, column=1, sticky='ew', padx=15, pady=(10,0))
         ctk.CTkLabel(amount_frame, text="Verify Amount (₹)", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         self.verify_amount_entry = ctk.CTkEntry(amount_frame)
-        self.verify_amount_entry.insert(0, "282")
+        self.verify_amount_entry.insert(0, "300")
         self.verify_amount_entry.pack(fill='x', pady=(5,0))
         ctk.CTkLabel(amount_frame, text="Reject if amount does not match this value.", text_color="gray50").pack(anchor='w')
 
@@ -173,7 +173,7 @@ class MsrTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         if messagebox.askokcancel("Reset Form?", "Clear all inputs, results, and logs?"):
             self.panchayat_entry.delete(0, tkinter.END)
-            self.verify_amount_entry.delete(0, tkinter.END); self.verify_amount_entry.insert(0, "282")
+            self.verify_amount_entry.delete(0, tkinter.END); self.verify_amount_entry.insert(0, "300")
             self.work_key_text.configure(state="normal"); self.work_key_text.delete("1.0", tkinter.END); self.work_key_text.configure(state="disabled")
             for item in self.results_tree.get_children(): self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
@@ -484,7 +484,7 @@ class MsrTab(BaseAutomationTab):
         details = file_details[export_format]
         filename = f"MSR_Report_{safe_name}_{timestamp}{details['ext']}"
 
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_user_downloads_path(), initialfile=filename, title=details['title'])
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title=details['title'])
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):

@@ -835,7 +835,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         file_path = filedialog.asksaveasfilename(
             defaultextension=details[export_format]['ext'],
             filetypes=details[export_format]['types'],
-            initialdir=self.app.get_user_downloads_path(),
+            initialdir=self.app.get_nregabot_path("Reports"),
             initialfile=filename,
             title="Save Report"
         )

@@ -72,7 +72,8 @@ class DuplicateMrTab(BaseAutomationTab):
         input_frame.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=10, sticky="w")
-        self.panchayat_entry = AutocompleteEntry(input_frame, placeholder_text="Start typing Panchayat name...",
+        self.panchayat_entry = AutocompleteEntry(input_frame,
+            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
             app_instance=self.app, 
             history_key="panchayat_name")
         self.panchayat_entry.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
@@ -100,7 +101,7 @@ class DuplicateMrTab(BaseAutomationTab):
         self.scale_label.grid(row=0, column=1, padx=(10, 0))
         
         # --- NEW INFO LABEL ---
-        ctk.CTkLabel(input_frame, text="ℹ️ Generated PDFs are saved in 'Downloads/NregaBot/Duplicate_MR_Output'.", text_color="gray50").grid(row=4, column=1, sticky='w', padx=15, pady=(0,5))
+        ctk.CTkLabel(input_frame, text="ℹ️ Generated PDFs saved in 'Downloads/NregaBot/DuplicateMR_Output/{panchayat}/{date}'.", text_color="gray50").grid(row=4, column=1, sticky='w', padx=15, pady=(0,5))
         
         action_frame = self._create_action_buttons(input_frame)
         action_frame.grid(row=5, column=0, columnspan=2, sticky="ew", padx=15, pady=(10, 15)) # <-- Row changed to 5
@@ -197,9 +198,7 @@ class DuplicateMrTab(BaseAutomationTab):
             # Create the full path
             # NregaBot > Duplicate_MR_Output > Panchayat Name > Date
             output_dir = os.path.join(
-                self.app.get_user_downloads_path(), 
-                "NregaBot", 
-                "Duplicate_MR_Output",
+                self.app.get_nregabot_path("DuplicateMR_Output"),
                 safe_panchayat_name,
                 date_str
             )
@@ -310,7 +309,7 @@ class DuplicateMrTab(BaseAutomationTab):
                 
                 # --- Background Safe: Select Panchayat ---
                 panchayat_dd_element = wait.until(EC.presence_of_element_located((By.ID, "ddlPanchayat")))
-                Select(panchayat_dd_element).select_by_visible_text(panchayat)
+                self._select_by_text_case_insensitive(Select(panchayat_dd_element), panchayat)
                 
                 # --- Background Safe: Fill Work Code ---
                 wc_input = wait.until(EC.presence_of_element_located((By.ID, "txtWork")))
@@ -383,7 +382,7 @@ class DuplicateMrTab(BaseAutomationTab):
             driver.get(url)
             
             panchayat_dd_element = wait.until(EC.presence_of_element_located((By.ID, "ddlPanchayat")))
-            Select(panchayat_dd_element).select_by_visible_text(panchayat)
+            self._select_by_text_case_insensitive(Select(panchayat_dd_element), panchayat)
             
             wc_input = wait.until(EC.presence_of_element_located((By.ID, "txtWork")))
             driver.execute_script("arguments[0].value = arguments[1];", wc_input, work_code)
@@ -626,7 +625,7 @@ class DuplicateMrTab(BaseAutomationTab):
 
         # 4. Get unique output path in the Merged_Pdf_Output folder
         try:
-            merge_output_dir = os.path.join(self.app.get_user_downloads_path(), "NregaBot", "Merged_Pdf_Output")
+            merge_output_dir = self.app.get_nregabot_path("Merged_PDF")
             os.makedirs(merge_output_dir, exist_ok=True)
             
             date_str = datetime.now().strftime("%d-%b-%Y")

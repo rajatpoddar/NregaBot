@@ -163,6 +163,9 @@ def create_icon_manager() -> LazyIconManager:
     mgr._add("emoji_feedback",  "assets/icons/emojis/feedback.png",   size=(16, 16))
     mgr._add("emoji_about",     "assets/icons/emojis/about.png",      size=(16, 16))
 
+    # --- SETTINGS ICON ---
+    mgr._add("settings", "assets/icons/settings.png", size=(20, 20))
+
     # --- CLOCK ICON (Home Tab Date/Time) ---
     mgr._add("emoji_clock", "assets/icons/emojis/clock.png", size=(16, 16))
 

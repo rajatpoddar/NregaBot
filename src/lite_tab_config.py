@@ -115,6 +115,11 @@ def get_tabs_definition_lite(app: Any) -> Dict[str, Dict[str, Any]]:
                 "icon": "🤖",
                 "key": "login_automation"
             },
+            "MR Tracking": {
+                "creation_func": _lazy_import("MrTrackingTab", "src.tabs.mr_tracking_tab"),
+                "icon": "📍",
+                "key": "mr_tracking"
+            },
             "Workcode Extractor": {
                 "creation_func": _lazy_import("WorkcodeExtractorTab", "src.tabs.workcode_extractor_tab"),
                 "icon": "🔧",

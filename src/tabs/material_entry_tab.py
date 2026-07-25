@@ -536,7 +536,7 @@ class MaterialEntryTab(BaseAutomationTab):
                     if inputs['panchayat']:
                         try:
                             panchayat_dd = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
-                            Select(panchayat_dd).select_by_visible_text(inputs['panchayat'])
+                            self._select_by_text_case_insensitive(Select(panchayat_dd), inputs['panchayat'])
                             self.app.log_message(self.log_display, f"✓ Panchayat selected: {inputs['panchayat']}")
                             time.sleep(1.5)  # Brief wait for postback to begin
                         except TimeoutException:

@@ -56,8 +56,7 @@ class MrTrackingTab(BaseAutomationTab):
             "Panchayat Name", "Muster Roll No.", "Work Code", "Wagelist Number", "Labour Name", "Jobcard Number"
         ]
         
-        # --- Naya Badlaav: Is tab ka apna driver hoga ---
-        self.driver = None
+        # Is tab ka apna driver nahi hoga — shared browser use karega (self.app.get_driver())
         
         self._create_widgets()
         self.load_inputs()
@@ -135,13 +134,7 @@ class MrTrackingTab(BaseAutomationTab):
                                                   command=self._on_filter_check_changed)
         self.abps_pending_check.pack(side="left", padx=(15, 0))
 
-        # --- Browser Option (Renamed for Clarity) ---
-        self.visible_browser_var = tkinter.IntVar(value=0) 
-        self.visible_browser_check = ctk.CTkCheckBox(filter_frame, 
-                                                  text="Use Open Browser", 
-                                                  variable=self.visible_browser_var,
-                                                  fg_color="#8E44AD", hover_color="#732D91")
-        self.visible_browser_check.pack(side="left", padx=(15, 0))
+
 
         # --- Row 3: Action Buttons ---
         action_frame = self._create_action_buttons(parent_frame=controls_frame)
@@ -254,7 +247,7 @@ class MrTrackingTab(BaseAutomationTab):
         self.pending_only_check.configure(state=state)
         self.abps_pending_check.configure(state=state)
         self.zero_mr_filter_check.configure(state=state)
-        self.visible_browser_check.configure(state=state) # <-- New Line Added
+
         
         if state == "normal":
             self._on_filter_check_changed()
@@ -301,68 +294,7 @@ class MrTrackingTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Form has been reset.")
         self.update_status("Ready", 0.0)
         
-    def _get_new_driver(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        self.app.log_message(self.log_display, "Connecting to Chrome browser...", "info")
-        try:
-            chrome_options = ChromeOptions()
-            chrome_options.page_load_strategy = "eager"
-            
-            # --- UPDATED LOGIC: Strict Separation of Options ---
-            if self.visible_browser_var.get() == 1:
-                # CASE 1: Connect to EXISTING Browser (Port 9222)
-                # Jab existing browser se connect karte hain, to koi bhi extra argument
-                # (jaise excludeSwitches) pass nahi karna chahiye, warna error aata hai.
-                self.app.log_message(self.log_display, "Mode: Connecting to existing open browser (Port 9222).", "info")
-                chrome_options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
-                
-            else:
-                # CASE 2: Start NEW Headless Browser (Background)
-                # Saare arguments sirf tab lagayenge jab naya browser khol rahe hain.
-                self.app.log_message(self.log_display, "Mode: Running in Background (Headless).", "info")
-                
-                chrome_options.add_argument("--headless=new")
-                chrome_options.add_argument("--disable-gpu")
-                chrome_options.add_argument("--window-size=1920,1080")
-                chrome_options.add_argument("--disable-software-rasterizer")
-                chrome_options.add_argument("--log-level=3")
-                chrome_options.add_argument("--silent")
-                chrome_options.add_argument("--disable-dev-shm-usage")
-                chrome_options.add_argument("--no-sandbox")
-                
-                # 'excludeSwitches' sirf naye browser ke liye valid hai
-                chrome_options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"]) 
-            # -----------------------------------------------------------
-            
-            service = ChromeService(ChromeDriverManager().install())
-            service.creation_flags = subprocess.CREATE_NO_WINDOW if config.OS_SYSTEM == "Windows" else 0
-            
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            
-            self.app.log_message(self.log_display, "Browser connected successfully.", "info")
-            return driver
-            
-        except Exception as e:
-            self.app.log_message(self.log_display, f"Browser Error: {e}", "error")
-            if self.visible_browser_var.get() == 1:
-                 messagebox.showerror("Connection Failed", f"Could not connect to the open browser.\n\nEnsure your main browser is open and running on Port 9222.\n\nError: {e}")
-            else:
-                 messagebox.showerror("Browser Error", f"Could not start Headless Chrome.\nError: {e}")
-            return None
+
     def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -406,14 +338,10 @@ class MrTrackingTab(BaseAutomationTab):
         self.app.update_history("mr_track_block", inputs['block'])
         self.app.update_history("mr_track_panchayat", inputs['panchayat'])
         
-        if self.driver:
-            self.app.log_message(self.log_display, "Ek automation pehle se chal raha hai. Rukiye...", "warning")
-            messagebox.showwarning("Automation Jaari Hai", "Report generation pehle se chal raha hai.")
-            return
-        
-        self.driver = self._get_new_driver()
-        if not self.driver:
-            self.app.log_message(self.log_display, "ERROR: WebDriver nahi mila. Automation ruka.", "error")
+        driver = self.app.get_driver()
+        if not driver:
+            self.app.log_message(self.log_display, "ERROR: Pehle Launch Chrome karein.", "error")
+            messagebox.showwarning("Browser Required", "Kripya pehle 'Launch Chrome' button se browser start karein.")
             return
         
         self.app.after(0, self.set_ui_state, True) 
@@ -443,7 +371,7 @@ class MrTrackingTab(BaseAutomationTab):
         self.zero_mr_data = [] 
         
         try:
-            driver = self.driver 
+            driver = self.app.get_driver()
             if not driver:
                 self.app.log_message(self.log_display, "ERROR: Browser driver not found.", "error")
                 return 
@@ -458,16 +386,24 @@ class MrTrackingTab(BaseAutomationTab):
             
             main_window_handle = driver.current_window_handle 
             
-            STATE_ID = "ctl00_ContentPlaceHolder1_ddl_state"
-            DIST_ID = "ctl00_ContentPlaceHolder1_ddl_dist"
-            BLOCK_ID = "ctl00_ContentPlaceHolder1_ddl_blk"
-            PANCH_ID = "ctl00_ContentPlaceHolder1_ddl_pan"
-            RADIO_PAYMENT_PENDING_ID = "ctl00_ContentPlaceHolder1_Rbtn_pay_1"
-            RADIO_T8_T15_ID = "ctl00_ContentPlaceHolder1_Rbtn_pay_2" 
-            SUBMIT_BTN_ID = "ctl00_ContentPlaceHolder1_Button1"
+            # VB-G-RAM-G portal uses IDs WITHOUT the ctl00 prefix
+            STATE_ID = "ContentPlaceHolder1_ddl_state"
+            DIST_ID = "ContentPlaceHolder1_ddl_dist"
+            BLOCK_ID = "ContentPlaceHolder1_ddl_blk"
+            PANCH_ID = "ContentPlaceHolder1_ddl_pan"
+            RADIO_PAYMENT_PENDING_ID = "ContentPlaceHolder1_Rbtn_pay_1"
+            RADIO_T8_T15_ID = "ContentPlaceHolder1_Rbtn_pay_2" 
+            SUBMIT_BTN_ID = "ContentPlaceHolder1_Button1"
             TABLE_XPATH = "//table[@bordercolor='#EBEBEB' and .//b[text()='SNo.']]"
 
             def wait_for_dropdown(dropdown_id, step_name, progress):
+                """
+                Dropdown ke populate hone ka wait karta hai.
+                Asli postback ke liye 'onchange' event fire karna zaroori hai jo
+                __doPostBack trigger karta hai — lekin Selenium ka select_by_visible_text
+                woh event fire nahi karta. Isliye yahan select ke baad manually
+                dropdown ki option count check ki jaati hai.
+                """
                 # ---- Lazy imports ----
                 from selenium.webdriver.common.by import By
                 from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -485,36 +421,40 @@ class MrTrackingTab(BaseAutomationTab):
                 from openpyxl.drawing.image import Image as XLImage
                 self.app.after(0, self.app.set_status, f"Waiting for {step_name}...")
                 self.app.after(0, self.update_status, f"Waiting for {step_name}...", progress)
-                self.app.log_message(self.log_display, f"Waiting for dropdown {dropdown_id} to populate...")
-                wait.until(
-                    EC.presence_of_element_located((By.XPATH, f"//select[@id='{dropdown_id}']/option[position()>1]"))
-                )
-                self.app.log_message(self.log_display, "Dropdown populated.")
-                time.sleep(0.5) 
+                self.app.log_message(self.log_display, f"⏳ Waiting for '{step_name}' dropdown ({dropdown_id}) to populate via postback...")
+                try:
+                    wait.until(
+                        EC.presence_of_element_located((By.XPATH, f"//select[@id='{dropdown_id}']/option[position()>1]"))
+                    )
+                    self.app.log_message(self.log_display, f"✅ '{step_name}' dropdown populated with options.")
+                    time.sleep(0.5)
+                except TimeoutException:
+                    self.app.log_message(self.log_display, f"⚠️ '{step_name}' dropdown ({dropdown_id}) populate nahi hua (postback timeout).", "warning")
+                    raise TimeoutException(f"Dropdown '{step_name}' ({dropdown_id}) did not populate after state selection.")
 
             self.app.after(0, self.app.set_status, f"Selecting State: {inputs['state']}")
             self.app.after(0, self.update_status, "Selecting State...", 0.15)
             self.app.log_message(self.log_display, f"Selecting State: {inputs['state']}")
             state_select = Select(wait.until(EC.element_to_be_clickable((By.ID, STATE_ID))))
-            state_select.select_by_visible_text(inputs['state'].upper())
+            self._select_by_text_case_insensitive(state_select, inputs['state'])
             wait_for_dropdown(DIST_ID, "Districts", 0.2)
 
             self.app.after(0, self.app.set_status, f"Selecting District: {inputs['district']}")
             self.app.after(0, self.update_status, "Selecting District...", 0.25)
             self.app.log_message(self.log_display, f"Selecting District: {inputs['district']}")
             dist_select = Select(wait.until(EC.element_to_be_clickable((By.ID, DIST_ID))))
-            dist_select.select_by_visible_text(inputs['district'].upper())
+            self._select_by_text_case_insensitive(dist_select, inputs['district'])
             wait_for_dropdown(BLOCK_ID, "Blocks", 0.3)
 
             self.app.after(0, self.app.set_status, f"Selecting Block: {inputs['block']}")
             self.app.after(0, self.update_status, "Selecting Block...", 0.35)
             self.app.log_message(self.log_display, f"Selecting Block: {inputs['block']}")
-            Select(wait.until(EC.element_to_be_clickable((By.ID, BLOCK_ID)))).select_by_visible_text(inputs['block'])
+            self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, BLOCK_ID)))), inputs['block'])
             
             self.app.after(0, self.app.set_status, f"Selecting Panchayat: {inputs['panchayat']}")
             self.app.after(0, self.update_status, "Selecting Panchayat...", 0.45)
             self.app.log_message(self.log_display, f"Selecting Panchayat: {inputs['panchayat']}")
-            Select(wait.until(EC.element_to_be_clickable((By.ID, PANCH_ID)))).select_by_visible_text(inputs['panchayat'])
+            self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, PANCH_ID)))), inputs['panchayat'])
             
             self.app.after(0, self.app.set_status, "Setting filter...")
             self.app.after(0, self.update_status, "Setting filter...", 0.5)
@@ -664,17 +604,18 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Processing complete. {self.success_message.replace('MR Tracking complete. ', '')}", "success")
             
         except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as e:
+            err_text = str(e).splitlines()[0] if str(e).strip() else "Element not found on page"
             if driver and "Session Expired" in driver.page_source:
-                self.app.log_message(self.log_display, "Session expired, par yeh headless hai, isliye retry nahi kar rahe.", "warning")
-                error_msg = "Session Expired during headless operation. Please try again."
-                self.app.log_message(self.log_display, error_msg, "error")
-                messagebox.showerror("Automation Error", error_msg)
+                self.app.log_message(self.log_display, "❌ Session expired. Please Login again and retry.", "error")
+                messagebox.showerror("Session Expired", "Session expired. Please Login again and retry.")
             else:
-                error_msg = f"A browser error occurred: {str(e).splitlines()[0]}"
-                self.app.log_message(self.log_display, error_msg, "error")
-                messagebox.showerror("Automation Error", error_msg)
+                self.app.log_message(self.log_display, f"❌ {err_text}", "error")
+                messagebox.showerror("Automation Error",
+                    f"{err_text}\n\n"
+                    f"💡 Tip: Check if the page has changed. "
+                    f"Element IDs might need updating in the code.")
                 
-            self.app.after(0, self.app.set_status, "Browser Error")
+            self.app.after(0, self.app.set_status, "Error")
             self.success_message = None
         except Exception as e:
             self.app.log_message(self.log_display, f"An unexpected error occurred: {e}", "error")
@@ -682,15 +623,7 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Unexpected Error")
             self.success_message = None
         finally:
-            if self.driver: 
-                try:
-                    self.driver.quit()
-                    self.app.after(0, self.app.log_message, self.log_display, "Automation ne browser ko band kar diya hai.", "info")
-                except Exception as e:
-                    self.app.after(0, self.app.log_message, self.log_display, f"Browser band karne mein error: {e}", "warning")
-            
-            self.driver = None 
-            
+            # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
             self.app.after(0, self.set_ui_state, False) 
             
             final_app_status = "Automation Stopped" if self.app.stop_events[self.automation_key].is_set() else \
@@ -751,7 +684,7 @@ class MrTrackingTab(BaseAutomationTab):
             
             self.app.log_message(self.log_display, f"   Selecting State: {inputs['state'].upper()}...")
             state_select = Select(wait.until(EC.element_to_be_clickable((By.ID, "ddl_state"))))
-            state_select.select_by_visible_text(inputs['state'].upper())
+            self._select_by_text_case_insensitive(state_select, inputs['state'])
             
             self.app.log_message(self.log_display, "   Waiting for District dropdown to populate (Postback 2)...")
             wait.until(EC.presence_of_element_located((By.XPATH, f"//select[@id='ddl_district']/option[text()='{inputs['district'].upper()}']")))
@@ -759,7 +692,7 @@ class MrTrackingTab(BaseAutomationTab):
             
             self.app.log_message(self.log_display, f"   Selecting District: {inputs['district'].upper()}...")
             dist_select = Select(driver.find_element(By.ID, "ddl_district"))
-            dist_select.select_by_visible_text(inputs['district'].upper()) 
+            self._select_by_text_case_insensitive(dist_select, inputs['district']) 
             
             self.app.log_message(self.log_display, "   Waiting for final postback (2 sec)...")
             try:

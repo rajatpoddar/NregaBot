@@ -61,7 +61,6 @@ class PhysicalCompleteTab(BaseAutomationTab):
         ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
         self.panchayat_entry = AutocompleteEntry(
             input_frame, 
-            placeholder_text="Enter the Panchayat name as it appears on the website",
             suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
             app_instance=self.app,
             history_key="panchayat_name"
@@ -303,7 +302,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             driver.get(url)
             self.app.log_message(self.log_display, "   - Selecting Panchayat...")
             panchayat_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlPanchayat")))
-            Select(panchayat_select).select_by_visible_text(inputs["panchayat"])
+            self._select_by_text_case_insensitive(Select(panchayat_select), inputs["panchayat"])
             wait.until(EC.staleness_of(panchayat_select))
 
             self.app.log_message(self.log_display, "   - Selecting Work Category...")
@@ -515,7 +514,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {"Image (.jpg)": { "ext": ".jpg", "types": [("JPEG Image", "*.jpg")]}, "PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
         filename = f"Physical_Complete_Report_{safe_name}_{timestamp}{details['ext']}"
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_user_downloads_path(), initialfile=filename, title="Save Report")
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title="Save Report")
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):

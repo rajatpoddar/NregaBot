@@ -19,8 +19,7 @@ class AutocompleteEntry(ctk.CTkEntry):
         # Widget Pooling
         self._pool_frames = [] 
         self._pool_labels = []
-        self._pool_buttons = []
-        self._MAX_SUGGESTIONS = 5
+        self._MAX_SUGGESTIONS = 10  # Increased for better dropdown feel
         self._visible_suggestions = []
         
         # Debounce Timer
@@ -30,6 +29,8 @@ class AutocompleteEntry(ctk.CTkEntry):
 
         self.bind("<KeyRelease>", self._on_key_release)
         self.bind("<FocusOut>", self._on_focus_out)
+        self.bind("<FocusIn>", self._on_focus_in)
+        self.bind("<Button-1>", self._on_click)
         self.bind("<Down>", self._on_arrow_down)
         self.bind("<Up>", self._on_arrow_up)
         self.bind("<Return>", self._on_enter)
@@ -46,45 +47,98 @@ class AutocompleteEntry(ctk.CTkEntry):
             self._suggestion_toplevel.destroy()
             self._suggestion_toplevel = None
 
-    def _on_key_release(self, event):
-        if self._is_selecting: return
-        if event.keysym in ("Up", "Down", "Return", "Enter", "Tab", "Escape"): return
-        if event.keysym in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R"): return
+    # ────────────────────────────────────────────────────────────────
+    # DROPDOWN ON FOCUS / CLICK
+    # ────────────────────────────────────────────────────────────────
+    def _on_focus_in(self, event):
+        """Show all suggestions when field gets focus (dropdown-like)."""
+        self.after(100, self._show_all_suggestions)
 
-        if self._typing_timer: self.after_cancel(self._typing_timer)
-        self._typing_timer = self.after(150, self._process_filtering)
+    def _on_click(self, event):
+        """Show all suggestions on click (dropdown-like)."""
+        self.after(100, self._show_all_suggestions)
 
-    def _process_filtering(self):
-        # STRICT CHECK: Do not run if widget is destroyed
+    def _show_all_suggestions(self):
+        """Show ALL saved suggestions in UPPERCASE sorted order (dropdown feel)."""
         try:
             if not self.winfo_exists(): return
-        except Exception: return
+        except Exception:
+            return
 
-        current_text = self.get().lower()
-        if not current_text:
+        current_text = self.get().strip()
+        if current_text:
+            self._process_filtering()
+            return
+
+        # No text typed — show ALL suggestions in uppercase
+        uppercase_suggestions = sorted(set(s.upper() for s in self.suggestions if s))
+        if not uppercase_suggestions:
             self._hide_suggestions()
             return
 
+        # Show LIMITED set (max 10)
+        limited = uppercase_suggestions[:self._MAX_SUGGESTIONS]
+        self._show_suggestions(limited)
+
+    # ────────────────────────────────────────────────────────────────
+    # AUTO-UPPERCASE + FILTER ON KEY RELEASE
+    # ────────────────────────────────────────────────────────────────
+    def _on_key_release(self, event):
+        if self._is_selecting:
+            return
+        if event.keysym in ("Up", "Down", "Return", "Enter", "Tab", "Escape"):
+            return
+        if event.keysym in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R"):
+            return
+
+        # Auto-uppercase as user types
+        current = self.get()
+        upper = current.upper()
+        if current != upper:
+            self.delete(0, "end")
+            self.insert(0, upper)
+
+        if self._typing_timer:
+            self.after_cancel(self._typing_timer)
+        self._typing_timer = self.after(150, self._process_filtering)
+
+    def _process_filtering(self):
+        """Filter suggestions based on current text (case-insensitive) and show in UPPERCASE."""
+        try:
+            if not self.winfo_exists(): return
+        except Exception:
+            return
+
+        current_text = self.get()  # Already uppercase
+        if not current_text:
+            self._show_all_suggestions()
+            return
+
         matches = []
-        count = 0
         for s in self.suggestions:
-            if current_text in s.lower():
-                matches.append(s)
-                count += 1
-                if count >= self._MAX_SUGGESTIONS: break
-        
+            if current_text in s.upper():
+                matches.append(s.upper())
+                if len(matches) >= self._MAX_SUGGESTIONS:
+                    break
+
         if matches:
             self._show_suggestions(matches)
         else:
             self._hide_suggestions()
 
+    # ────────────────────────────────────────────────────────────────
+    # POPUP MANAGEMENT
+    # ────────────────────────────────────────────────────────────────
     def _init_popup(self):
-        if self._suggestion_toplevel and self._suggestion_toplevel.winfo_exists(): return
+        if self._suggestion_toplevel and self._suggestion_toplevel.winfo_exists():
+            return
 
         self._suggestion_toplevel = ctk.CTkToplevel(self)
         self._suggestion_toplevel.wm_overrideredirect(True)
-        try: self._suggestion_toplevel.transient(self.winfo_toplevel())
-        except Exception as e: logger.debug("Autocomplete: failed to set transient: %s", e)
+        try:
+            self._suggestion_toplevel.transient(self.winfo_toplevel())
+        except Exception as e:
+            logger.debug("Autocomplete: failed to set transient: %s", e)
         self._suggestion_toplevel.attributes("-topmost", True)
         self._suggestion_toplevel.withdraw()
 
@@ -93,35 +147,27 @@ class AutocompleteEntry(ctk.CTkEntry):
 
         self._pool_frames = []
         self._pool_labels = []
-        self._pool_buttons = []
 
         for i in range(self._MAX_SUGGESTIONS):
             frame = ctk.CTkFrame(self._suggestion_listbox, fg_color="transparent", corner_radius=0)
-            frame.grid_columnconfigure(0, weight=1)
-            
-            lbl = ctk.CTkLabel(frame, text="", anchor="w", padx=5)
-            lbl.grid(row=0, column=0, sticky="ew")
-            
-            btn = None
-            if self.app and self.history_key:
-                btn = ctk.CTkButton(frame, text="✕", width=20, height=20, fg_color="transparent", 
-                                  text_color="gray", hover_color="gray70", font=("Arial", 10))
-                btn.grid(row=0, column=1, padx=(0, 2))
-            
+
+            lbl = ctk.CTkLabel(frame, text="", anchor="w", padx=5, font=ctk.CTkFont(size=13, weight="bold"))
+            lbl.pack(fill="x", expand=True)
+
             frame.bind("<Button-1>", lambda e, idx=i: self._on_click_suggestion(idx))
             lbl.bind("<Button-1>", lambda e, idx=i: self._on_click_suggestion(idx))
             frame.bind("<Enter>", lambda e, idx=i: self._highlight_suggestion(idx))
-            
+
             self._pool_frames.append(frame)
             self._pool_labels.append(lbl)
-            self._pool_buttons.append(btn)
 
     def _show_suggestions(self, suggestions):
         self._init_popup()
         self._visible_suggestions = suggestions
-        
+
         try:
-            if not self.winfo_exists(): return
+            if not self.winfo_exists():
+                return
             x = self.winfo_rootx()
             y = self.winfo_rooty() + self.winfo_height()
             w = self.winfo_width()
@@ -129,7 +175,8 @@ class AutocompleteEntry(ctk.CTkEntry):
             self._suggestion_toplevel.deiconify()
             self._suggestion_toplevel.lift()
             self._suggestion_toplevel.attributes("-topmost", True)
-        except: return
+        except Exception:
+            return
 
         self._active_suggestion_index = -1
 
@@ -137,8 +184,6 @@ class AutocompleteEntry(ctk.CTkEntry):
             if i < len(suggestions):
                 text = suggestions[i]
                 self._pool_labels[i].configure(text=text)
-                if self._pool_buttons[i]:
-                    self._pool_buttons[i].configure(command=lambda v=text: self._delete_suggestion(v))
                 self._pool_frames[i].pack(fill="x", ipady=2)
                 self._pool_frames[i].configure(fg_color="transparent")
             else:
@@ -152,55 +197,56 @@ class AutocompleteEntry(ctk.CTkEntry):
             self._suggestion_toplevel.withdraw()
         self._active_suggestion_index = -1
 
+    # ────────────────────────────────────────────────────────────────
+    # SELECTION & NAVIGATION
+    # ────────────────────────────────────────────────────────────────
     def _on_click_suggestion(self, index):
         if 0 <= index < len(self._visible_suggestions):
             self._select_suggestion(self._visible_suggestions[index])
 
     def _select_suggestion(self, value):
-        if self._typing_timer: self.after_cancel(self._typing_timer)
+        if self._typing_timer:
+            self.after_cancel(self._typing_timer)
         self._is_selecting = True
-        
+
         self.delete(0, "end")
-        self.insert(0, value)
-        
+        self.insert(0, value.upper())  # Always uppercase
+
         try:
             self._hide_suggestions()
-            self.focus_force() 
-            self.event_generate("<KeyRelease>") 
-        except Exception as e: logger.debug("Autocomplete: failed to generate KeyRelease: %s", e)
+            self.focus_force()
+            self.event_generate("<KeyRelease>")
+        except Exception as e:
+            logger.debug("Autocomplete: failed to generate KeyRelease: %s", e)
         self._is_selecting = False
 
     def _on_focus_out(self, event):
-        # Safely schedule hide
         try:
             self.after(250, lambda: self._hide_suggestions() if self.winfo_exists() else None)
-        except Exception as e: logger.debug("Autocomplete: failed to schedule hide: %s", e)
-
-    def _delete_suggestion(self, value):
-        if self.app and self.history_key:
-            self.app.remove_history(self.history_key, value)
-            if value in self.suggestions:
-                self.suggestions.remove(value)
-            self.focus()
-            self._process_filtering()
+        except Exception as e:
+            logger.debug("Autocomplete: failed to schedule hide: %s", e)
 
     def _highlight_suggestion(self, index):
         try:
             for i, frame in enumerate(self._pool_frames):
-                if not frame.winfo_ismapped(): continue
+                if not frame.winfo_ismapped():
+                    continue
                 color = ("gray80", "gray30") if i == index else "transparent"
                 frame.configure(fg_color=color)
             self._active_suggestion_index = index
-        except Exception as e: logger.debug("Autocomplete: failed to highlight suggestion: %s", e)
+        except Exception as e:
+            logger.debug("Autocomplete: failed to highlight suggestion: %s", e)
 
     def _on_arrow_down(self, event):
-        if not self._visible_suggestions: return
+        if not self._visible_suggestions:
+            return
         self._active_suggestion_index = (self._active_suggestion_index + 1) % len(self._visible_suggestions)
         self._highlight_suggestion(self._active_suggestion_index)
         return "break"
 
     def _on_arrow_up(self, event):
-        if not self._visible_suggestions: return
+        if not self._visible_suggestions:
+            return
         self._active_suggestion_index = (self._active_suggestion_index - 1) % len(self._visible_suggestions)
         self._highlight_suggestion(self._active_suggestion_index)
         return "break"

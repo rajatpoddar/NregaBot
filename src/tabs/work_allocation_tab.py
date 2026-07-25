@@ -55,7 +55,6 @@ class WorkAllocationTab(BaseAutomationTab):
         # --- Row 0: Panchayat Name ---
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
         self.panchayat_entry = AutocompleteEntry(controls_frame,
-                                                 placeholder_text="Enter the Panchayat name as it appears on the website",
                                                  suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
                                                  app_instance=self.app,
                                                  history_key="panchayat_name")
@@ -350,7 +349,7 @@ class WorkAllocationTab(BaseAutomationTab):
                 if not inputs['panchayat_name']: raise ValueError("Panchayat Name is required for PO login.")
                 panchayat_select = Select(panchayat_select_element)
                 if panchayat_select.first_selected_option.text.strip() != inputs['panchayat_name'].strip():
-                    panchayat_select.select_by_visible_text(inputs['panchayat_name'])
+                    self._select_by_text_case_insensitive(panchayat_select, inputs['panchayat_name'])
                     self._wait_for_settle(driver, wait, "Panchayat Selection")
             except (TimeoutException, NoSuchElementException):
                 self.app.log_message(self.log_display, "Panchayat dropdown not found. Assuming GP Login.", "info")
@@ -712,7 +711,7 @@ class WorkAllocationTab(BaseAutomationTab):
         details = file_details[export_format]
         filename = f"Work_Allocation_Report_{safe_name}_{timestamp}{details['ext']}"
 
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_user_downloads_path(), initialfile=filename, title=details['title'])
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title=details['title'])
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):

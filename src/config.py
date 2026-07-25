@@ -415,7 +415,7 @@ WAGELIST_SEND_CONFIG: Dict[str, object] = {
 MB_ENTRY_CONFIG: Dict[str, object] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/mbbook.aspx",
     "defaults": {
-        "measurement_book_no": "", "page_no": "", "unit_cost": "282",
+        "measurement_book_no": "", "page_no": "", "unit_cost": "300",
         "mate_name": "", "default_pit_count": "112", "je_name": "", "je_designation": "JE"
     }
 }
@@ -471,7 +471,7 @@ ADD_ACTIVITY_CONFIG: Dict[str, object] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/IAY_Act_Mat.aspx",
     "defaults": {
         "activity_code": "ACT105",
-        "unit_price": "282",
+        "unit_price": "300",
         "quantity": "90"
     }
 }

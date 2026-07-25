@@ -1458,7 +1458,7 @@ class DemandTab(BaseAutomationTab):
                 try:
                     self.app.after(0, self.app.set_status, f"Selecting Panchayat: {panchayat}")
                     panchayat_dropdown = driver.find_element(By.CSS_SELECTOR, panchayat_selector)
-                    Select(panchayat_dropdown).select_by_visible_text(panchayat)
+                    self._select_by_text_case_insensitive(Select(panchayat_dropdown), panchayat)
                     self.app.after(0, self.app.log_message, self.log_display, "Waiting for villages to load after P selection...")
                     wait.until(EC.any_of(EC.presence_of_element_located((By.XPATH, f"//select[@id='{v_ids[0]}']/option[position()>1]")), EC.presence_of_element_located((By.XPATH, f"//select[@id='{v_ids[1]}']/option[position()>1]"))))
                 except NoSuchElementException as e_select:
@@ -2239,7 +2239,7 @@ class DemandTab(BaseAutomationTab):
         file_path = filedialog.asksaveasfilename(
             defaultextension=details['ext'], 
             filetypes=details['types'], 
-            initialdir=self.app.get_user_downloads_path(), 
+            initialdir=self.app.get_nregabot_path("Reports"), 
             initialfile=filename, 
             title=details['title']
         )

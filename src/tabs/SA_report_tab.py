@@ -38,7 +38,7 @@ class SAReportTab(BaseAutomationTab):
 
         # --- Input Fields for the NEW page ---
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("audit_panchayat_respond"))
+        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("audit_panchayat_respond"), app_instance=self.app, history_key="audit_panchayat_respond")
         self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
         ctk.CTkLabel(controls_frame, text="On PO LOGIN, go to D23 > Social Audit View, then start the automation. Stay on that page.", text_color="gray50").grid(row=1, column=1, sticky='w', padx=15, pady=(0,10))
 
@@ -137,7 +137,7 @@ class SAReportTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20); url = "https://mnregaweb2.nic.in/netnrega/SocialAuditFindings/SA-ViewRespond-Issue.aspx"; driver.get(url)
             PANCHAYAT_ID, YEAR_ID, STATUS_ID, GET_DETAILS_BTN_ID, RESULTS_TABLE_ID, SPINNER_ID = ("ContentPlaceHolder1_ddlPanchayat", "ContentPlaceHolder1_ddlAuditConduct", "ContentPlaceHolder1_ddlStatus", "ContentPlaceHolder1_btnFilterData", "ContentPlaceHolder1_grd_IssueDetails", "ContentPlaceHolder1_UpdateProgress1")
 
-            self.app.log_message(self.log_display, f"Selecting Panchayat: {inputs['panchayat']}"); Select(wait.until(EC.element_to_be_clickable((By.ID, PANCHAYAT_ID)))).select_by_visible_text(inputs['panchayat']); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
+            self.app.log_message(self.log_display, f"Selecting Panchayat: {inputs['panchayat']}"); self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, PANCHAYAT_ID)))), inputs['panchayat']); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
             self.app.log_message(self.log_display, f"Selecting Year: {inputs['year']}"); Select(wait.until(EC.element_to_be_clickable((By.ID, YEAR_ID)))).select_by_visible_text(inputs['year']); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
             self.app.log_message(self.log_display, f"Selecting Status: {inputs['status']}"); Select(wait.until(EC.element_to_be_clickable((By.ID, STATUS_ID)))).select_by_visible_text(inputs['status'])
             self.app.log_message(self.log_display, "Fetching details...");
@@ -203,7 +203,7 @@ class SAReportTab(BaseAutomationTab):
 
         try:
             downloads_path = self.app.get_user_downloads_path()
-            target_dir = os.path.join(downloads_path, f"Reports {current_year}", "Social Audit Report", financial_year)
+            target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", "Social_Audit", financial_year)
             os.makedirs(target_dir, exist_ok=True)
         except Exception as e:
             messagebox.showerror("Folder Error", f"Could not create directory:\n{e}\nSaving to Downloads instead.")

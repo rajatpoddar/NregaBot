@@ -52,7 +52,7 @@ from src.lite_tab_config import get_tabs_definition_lite
 from src.managers.icon_manager import create_icon_manager
 from src.app.app_license import LicenseMixin
 from src.utils import (
-    resource_path, get_data_path, get_user_downloads_path,
+    resource_path, get_data_path, get_user_downloads_path, get_nregabot_path,
     get_config, save_config, validate_config,
     setup_logging, get_logger, _suppress_overscroll
 )
@@ -442,9 +442,39 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             text_color=("gray50", "gray50")
         ).grid(row=0, column=0, sticky="")
 
-        # Right: server status indicator
-        self.server_status_indicator = ctk.CTkFrame(footer, width=8, height=8, corner_radius=4, fg_color="gray")
-        self.server_status_indicator.grid(row=0, column=0, sticky="e", padx=10)
+        # Right: right-side widgets container (avoids grid overlap)
+        right_frame = ctk.CTkFrame(footer, fg_color="transparent")
+        right_frame.grid(row=0, column=0, sticky="e", padx=10)
+
+        # Server status dot
+        self.server_status_indicator = ctk.CTkFrame(right_frame, width=8, height=8, corner_radius=4, fg_color="gray")
+        self.server_status_indicator.pack(side="left")
+
+        # Separator between status and emergency stop
+        ctk.CTkFrame(right_frame, width=1, height=14, fg_color=("gray80", "gray40")).pack(side="left", padx=(8, 6))
+
+        # Emergency Stop — clickable dot + label
+        _stop_cmd = lambda e: self._emergency_stop_all()
+        self.emergency_stop_frame = ctk.CTkFrame(right_frame, fg_color="transparent", cursor="hand2")
+        self.emergency_stop_frame.pack(side="left", padx=(0, 4))
+        self.emergency_stop_frame.bind("<Button-1>", _stop_cmd)
+
+        self.emergency_stop_indicator = ctk.CTkFrame(
+            self.emergency_stop_frame, width=10, height=10, corner_radius=5,
+            fg_color="transparent",
+        )
+        self.emergency_stop_indicator.pack(side="left", padx=(0, 4))
+        self.emergency_stop_indicator.bind("<Button-1>", _stop_cmd)
+
+        self.emergency_stop_label = ctk.CTkLabel(
+            self.emergency_stop_frame,
+            text="STOP",
+            font=ctk.CTkFont(size=9, weight="bold"),
+            text_color=("gray50", "gray50"),
+            cursor="hand2",
+        )
+        self.emergency_stop_label.pack(side="left")
+        self.emergency_stop_label.bind("<Button-1>", _stop_cmd)
 
     def _create_nav_buttons(self) -> None:
         """Create sidebar navigation from lite_tab_config using emoji text icons."""
@@ -518,6 +548,10 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                 self.tab_instances[page_name] = instance
                 instance.tkraise()
                 self._update_nav_highlight(page_name)
+                
+                # Lite fix: Update About tab subscription data when first loaded
+                if page_name == "About" and self.license_info:
+                    self._update_about_tab_info()
                 return
 
     def _get_cached_tabs(self) -> Dict[str, Dict[str, Any]]:
@@ -610,6 +644,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
         self.active_automations.add(key)
         self.stop_events[key] = threading.Event()
+        self._update_emergency_stop_btn()
 
         tab_instance = getattr(target, '__self__', None)
         if tab_instance is not None:
@@ -636,6 +671,48 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     def _on_automation_finished(self, key: str) -> None:
         self.active_automations.discard(key)
         self.set_status("Ready")
+        if not self.active_automations:
+            self._update_emergency_stop_btn()
+
+    def _emergency_stop_all(self) -> None:
+        """Emergency stop ALL running automations immediately."""
+        if not self.active_automations:
+            return
+        for key in list(self.active_automations):
+            if key in self.stop_events:
+                self.stop_events[key].set()
+        try:
+            if self.driver:
+                try:
+                    self.driver.quit()
+                except Exception:
+                    pass
+                self.driver = None
+                self.active_browser = None
+        except Exception:
+            pass
+        count = len(self.active_automations)
+        self.active_automations.clear()
+        self.set_status(f"Stopped {count} automation(s)")
+        self.show_toast(f"🛑 Stopped {count} automation(s)", "warning", duration=5000)
+        self._update_emergency_stop_btn()
+
+    def _update_emergency_stop_btn(self) -> None:
+        """Toggle emergency stop indicator + label. Red when active, dim when idle."""
+        ind = getattr(self, 'emergency_stop_indicator', None)
+        lbl = getattr(self, 'emergency_stop_label', None)
+        if self.active_automations:
+            red = ("#DC2626", "#EF4444")
+            if ind and ind.winfo_exists():
+                ind.configure(fg_color=red)
+            if lbl and lbl.winfo_exists():
+                lbl.configure(text_color=red)
+        else:
+            gray = ("gray50", "gray50")
+            if ind and ind.winfo_exists():
+                ind.configure(fg_color="transparent")
+            if lbl and lbl.winfo_exists():
+                lbl.configure(text_color=gray)
 
     # ============================================================================
     # UTILITY
@@ -667,6 +744,9 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
     def get_user_downloads_path(self) -> str:
         return get_user_downloads_path()
+
+    def get_nregabot_path(self, subdir: str = "") -> str:
+        return get_nregabot_path(subdir)
 
     def log_message(self, log, msg: str, level: str = "info") -> None:
         """Append a timestamped message to a log textbox.

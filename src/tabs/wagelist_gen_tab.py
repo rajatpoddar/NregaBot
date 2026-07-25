@@ -273,7 +273,7 @@ class WagelistGenTab(BaseAutomationTab):
                         safe_agency_name = "".join(c for c in agency_name_part if c.isalnum() or c in (' ', '_')).rstrip()
                         folder_name = config.WAGELIST_GEN_CONFIG.get('output_folder_name', 'NREGABot_WL_Output')
                         # Create a subfolder for this specific panchayat
-                        output_dir = os.path.join(self.app.get_user_downloads_path(), folder_name, datetime.now().strftime('%Y-%m-%d'), safe_agency_name)
+                        output_dir = os.path.join(self.app.get_nregabot_path("PDF_Output/Wagelist"), folder_name, datetime.now().strftime('%Y-%m-%d'), safe_agency_name)
                         os.makedirs(output_dir, exist_ok=True)
                         self.app.log_message(self.log_display, f"   PDFs will be saved to: {output_dir}", "info")
                     except Exception:
@@ -305,12 +305,9 @@ class WagelistGenTab(BaseAutomationTab):
                             select = Select(agency_select)
                             full_agency_name = config.AGENCY_PREFIX + agency_name_part
                             
-                            match_text = next((opt.text for opt in select.options if opt.text.strip() == full_agency_name), None)
-                            if not match_text:
+                            if not self._select_by_text_case_insensitive(select, full_agency_name):
                                 self.app.log_message(self.log_display, f"   No pending wagelists or Agency not found: '{full_agency_name}'.", "warning")
                                 break # Move to next panchayat
-                            
-                            select.select_by_visible_text(match_text)
                         except Exception as e:
                             self.app.log_message(self.log_display, f"   Error selecting agency: {e}", "error")
                             break 
@@ -581,7 +578,7 @@ class WagelistGenTab(BaseAutomationTab):
         details = file_details.get(export_format, {"ext": ".txt", "types": [("Text File", "*.txt")]}) # Fallback
         filename = f"WagelistGen_Report_{safe_name}_{timestamp}{details['ext']}"
 
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_user_downloads_path(), initialfile=filename, title="Save Report")
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title="Save Report")
         return (data_to_export, file_path) if file_path else (None, None)
 
     def _prepare_report_data(self, raw_data):

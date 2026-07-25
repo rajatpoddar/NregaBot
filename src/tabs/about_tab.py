@@ -31,14 +31,16 @@ class AboutTab(ctk.CTkFrame):
         self.license_info = {}
         self.device_buttons = {} # Store references {machine_id: {'reset': btn, 'edit': btn}}
         self.device_labels = {} # Store references {machine_id: label}
-        # --- MODIFIED: Load from license_info, not local file ---
         self.device_name_map = {} # Will be populated by update_subscription_details
-        self._referral_code_to_copy = "N/A" # <-- YEH LINE ADD KAREIN
-        
+        self._referral_code_to_copy = "N/A"
 
+        # ── Header Banner ──
+        self._create_header_banner()
+
+        # ── Main Content Area ──
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=0, minsize=380)
-        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
         self._create_left_frame()
         self._create_right_frame()
@@ -49,110 +51,197 @@ class AboutTab(ctk.CTkFrame):
 
     def _get_display_name(self, machine_id):
         """Gets the custom name if available, otherwise returns the machine ID."""
-        # --- MODIFIED: Use device_name_map ---
         return self.device_name_map.get(machine_id, machine_id)
+
+    def _create_header_banner(self) -> None:
+        """Top header with app branding."""
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=(15, 10))
+        header.grid_columnconfigure(2, weight=1)
+
+        # App icon
+        icon_label = ctk.CTkLabel(header, text="🏛️", font=ctk.CTkFont(size=32))
+        icon_label.grid(row=0, column=0, padx=(0, 12))
+
+        # Title block
+        title_frame = ctk.CTkFrame(header, fg_color="transparent")
+        title_frame.grid(row=0, column=1, sticky="w")
+
+        ctk.CTkLabel(
+            title_frame, text="NREGA Bot",
+            font=ctk.CTkFont(size=20, weight="bold")
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            title_frame, text=f"Version {config.APP_VERSION}  |  Powerful NREGA Automation",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray50", "gray60")
+        ).pack(anchor="w")
+
+        # Server status dot
+        self.server_dot = ctk.CTkFrame(header, width=10, height=10, corner_radius=5, fg_color="gray")
+        self.server_dot.grid(row=0, column=3, padx=(10, 0))
+        self.server_status_label = ctk.CTkLabel(header, text="Checking...", font=ctk.CTkFont(size=10), text_color="gray50")
+        self.server_status_label.grid(row=0, column=4, padx=(4, 0))
 
     def _create_left_frame(self):
         left_frame = ctk.CTkFrame(self, fg_color="transparent")
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        left_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
         left_frame.grid_columnconfigure(0, weight=1)
-        left_frame.grid_rowconfigure(0, weight=1)
+        left_frame.grid_rowconfigure(1, weight=1)
 
         self.tab_view = ctk.CTkTabview(left_frame, fg_color="transparent")
-        self.tab_view.grid(row=0, column=0, sticky="nsew")
+        self.tab_view.grid(row=1, column=0, sticky="nsew")
         self.tab_view.add("Subscription")
         self.tab_view.add("Changelog")
         self.tab_view.add("Updates")
 
-        # --- Subscription Tab ---
+        # ── SUBSCRIPTION TAB ──
         sub_tab = self.tab_view.tab("Subscription")
         sub_tab.grid_columnconfigure(0, weight=1)
+        sub_tab.grid_rowconfigure(2, weight=1)  # Push referral card to bottom
 
-        sub_frame = ctk.CTkFrame(sub_tab, fg_color="transparent")
-        sub_frame.grid(row=0, column=0, sticky="ew", pady=(0, 15))
-        sub_frame.grid_columnconfigure(1, weight=1)
+        # ── Welcome Banner Card ──
+        self.welcome_card = ctk.CTkFrame(sub_tab, corner_radius=10)
+        self.welcome_card.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 8))
+        self.welcome_card.grid_columnconfigure(0, weight=1)
 
-        welcome_frame = ctk.CTkFrame(sub_frame, fg_color="transparent")
-        welcome_frame.grid(row=0, column=0, columnspan=2, padx=15, pady=(15, 10), sticky="w")
-
-        self.welcome_prefix_label = ctk.CTkLabel(welcome_frame, text="Welcome!", font=ctk.CTkFont(size=18, weight="bold"))
+        welcome_top = ctk.CTkFrame(self.welcome_card, fg_color="transparent")
+        welcome_top.pack(fill="x", padx=18, pady=(14, 4))
+        ctk.CTkLabel(welcome_top, text="👋", font=ctk.CTkFont(size=22)).pack(side="left", padx=(0, 8))
+        
+        self.welcome_prefix_label = ctk.CTkLabel(welcome_top, text="Welcome", font=ctk.CTkFont(size=16, weight="bold"))
         self.welcome_prefix_label.pack(side="left")
+        self.welcome_name_label = ctk.CTkLabel(welcome_top, text="", font=ctk.CTkFont(size=16, weight="bold"))
+        self.welcome_name_label.pack(side="left", padx=(4, 0))
+        self.welcome_suffix_label = ctk.CTkLabel(welcome_top, text="", font=ctk.CTkFont(size=16, weight="bold"))
+        self.welcome_suffix_label.pack(side="left", padx=(2, 0))
 
-        self.welcome_name_label = ctk.CTkLabel(welcome_frame, text="", font=ctk.CTkFont(size=18, weight="bold"))
-        self.welcome_name_label.pack(side="left", padx=(5, 0))
+        # ── License Status Card ──
+        self.status_card = ctk.CTkFrame(sub_tab, corner_radius=10, border_width=2)
+        self.status_card.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
+        self.status_card.grid_columnconfigure((0, 1), weight=1)
 
-        self.welcome_suffix_label = ctk.CTkLabel(welcome_frame, text="", font=ctk.CTkFont(size=18, weight="bold"))
-        self.welcome_suffix_label.pack(side="left")
+        # Left side: status badge + days
+        left = ctk.CTkFrame(self.status_card, fg_color="transparent")
+        left.grid(row=0, column=0, sticky="w", padx=18, pady=(14, 14))
+        
+        self.status_label = ctk.CTkLabel(
+            left, text="INACTIVE",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color="gray", corner_radius=8,
+            text_color="white", padx=16, pady=4
+        )
+        self.status_label.pack(anchor="w")
+        
+        ctk.CTkLabel(left, text="License Status", font=ctk.CTkFont(size=10), text_color=("gray50", "gray60")).pack(anchor="w", pady=(6, 0))
 
-        status_bar = ctk.CTkFrame(sub_frame, fg_color="transparent")
-        status_bar.grid(row=1, column=0, columnspan=2, sticky="ew", padx=15, pady=(0, 15))
-        self.status_label = ctk.CTkLabel(status_bar, text="INACTIVE", font=ctk.CTkFont(size=12, weight="bold"), fg_color="gray", corner_radius=6, text_color="white")
-        self.status_label.pack(side="left", padx=(0, 10), ipady=3, ipadx=8)
-        self.days_remaining_label = ctk.CTkLabel(status_bar, text="-- days remaining", text_color="gray50")
+        # Right side: plan type + expiry
+        right = ctk.CTkFrame(self.status_card, fg_color="transparent")
+        right.grid(row=0, column=1, sticky="e", padx=18, pady=(14, 14))
+
+        plan_frame = ctk.CTkFrame(right, fg_color="transparent")
+        plan_frame.pack(anchor="e")
+        ctk.CTkLabel(plan_frame, text="📋", font=ctk.CTkFont(size=14)).pack(side="left", padx=(0, 6))
+        self.plan_type_label = ctk.CTkLabel(plan_frame, text="N/A", font=ctk.CTkFont(size=14, weight="bold"))
+        self.plan_type_label.pack(side="left")
+
+        days_frame = ctk.CTkFrame(right, fg_color="transparent")
+        days_frame.pack(anchor="e", pady=(6, 0))
+        ctk.CTkLabel(days_frame, text="⏱️", font=ctk.CTkFont(size=12)).pack(side="left", padx=(0, 4))
+        self.days_remaining_label = ctk.CTkLabel(days_frame, text="-- days remaining", font=ctk.CTkFont(size=12))
         self.days_remaining_label.pack(side="left")
 
-        details_frame = ctk.CTkFrame(sub_frame, fg_color="transparent")
-        details_frame.grid(row=2, column=0, columnspan=2, sticky="ew", padx=15, pady=(0, 20))
-        details_frame.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(right, text="Expires On:", font=ctk.CTkFont(size=10), text_color=("gray50", "gray60")).pack(anchor="e", pady=(4, 0))
+        self.expires_on_value_label = ctk.CTkLabel(right, text="N/A", font=ctk.CTkFont(size=11, weight="bold"))
+        self.expires_on_value_label.pack(anchor="e")
 
-        ctk.CTkLabel(details_frame, text="Plan Type:", text_color="gray50").grid(row=0, column=0, sticky="w")
-        self.plan_type_label = ctk.CTkLabel(details_frame, text="N/A", font=ctk.CTkFont(weight="bold"))
-        self.plan_type_label.grid(row=0, column=1, sticky="w", padx=10)
+        # ── DETAILS CARD ──
+        details_card = ctk.CTkFrame(sub_tab, corner_radius=10)
+        details_card.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 8))
+        details_card.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(details_frame, text="Email:", text_color="gray50").grid(row=1, column=0, sticky="w", pady=(5,0))
-        self.email_label = ctk.CTkLabel(details_frame, text="N/A", font=ctk.CTkFont(weight="bold"))
-        self.email_label.grid(row=1, column=1, sticky="w", padx=10, pady=(5,0))
+        # Scrollable details area
+        details_scroll = ctk.CTkScrollableFrame(details_card, fg_color="transparent")
+        details_scroll.pack(fill="both", expand=True, padx=4, pady=4)
+        details_scroll.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(details_frame, text="License Key:", text_color="gray50").grid(row=2, column=0, sticky="w", pady=(5,0))
-        key_frame = ctk.CTkFrame(details_frame, fg_color="transparent")
-        key_frame.grid(row=2, column=1, sticky="ew", padx=10, pady=(5,0))
-        self.key_label = ctk.CTkLabel(key_frame, text="N/A", font=ctk.CTkFont(family="monospace"))
-        self.key_label.pack(side="left")
-        ctk.CTkButton(key_frame, text="Copy", width=50, command=self._copy_key).pack(side="left", padx=(10, 0))
+        row_idx = [0]
+        def add_detail_row(label_text, default_text, copy_cmd=None, label_kwargs=None):
+            """Create a label-value row. Returns the value label for later updates."""
+            r = row_idx[0]
+            ctk.CTkLabel(
+                details_scroll, text=label_text,
+                font=ctk.CTkFont(size=12),
+                text_color=("gray50", "gray60")
+            ).grid(row=r, column=0, sticky="w", padx=(12, 10), pady=6)
 
-        ctk.CTkLabel(details_frame, text="Expires On:", text_color="gray50").grid(row=3, column=0, sticky="w", pady=(5,0))
-        self.expires_on_value_label = ctk.CTkLabel(details_frame, text="N/A", font=ctk.CTkFont(weight="bold"))
-        self.expires_on_value_label.grid(row=3, column=1, sticky="w", padx=10, pady=(5,0))
+            val_frame = ctk.CTkFrame(details_scroll, fg_color="transparent")
+            val_frame.grid(row=r, column=1, sticky="ew", padx=(0, 12), pady=6)
 
-        ctk.CTkLabel(details_frame, text="Devices Used:", text_color="gray50").grid(row=4, column=0, sticky="w", pady=(5,0))
-        self.devices_used_label = ctk.CTkLabel(details_frame, text="N/A", font=ctk.CTkFont(weight="bold"))
-        self.devices_used_label.grid(row=4, column=1, sticky="w", padx=10, pady=(5,0))
+            # Create label INSIDE val_frame — avoids mix of grid/pack on details_scroll
+            kwargs = {"font": ctk.CTkFont(size=12, weight="bold")}
+            if label_kwargs:
+                kwargs.update(label_kwargs)
+            val_label = ctk.CTkLabel(val_frame, text=default_text, **kwargs)
+            val_label.grid(row=0, column=0, sticky="w")
 
-        ctk.CTkLabel(details_frame, text="Storage Used:", text_color="gray50").grid(row=5, column=0, sticky="w", pady=(5,0))
-        self.storage_label = ctk.CTkLabel(details_frame, text="N/A", font=ctk.CTkFont(weight="bold"))
-        self.storage_label.grid(row=5, column=1, sticky="w", padx=10, pady=(5,0))
+            if copy_cmd:
+                copy_btn = ctk.CTkButton(
+                    val_frame, text="📋 Copy", width=60, height=22,
+                    font=ctk.CTkFont(size=10),
+                    fg_color=("#E2E8F0", "#334155"),
+                    text_color=("#1E293B", "#F1F5F9"),
+                    hover_color=("#CBD5E1", "#475569"),
+                    command=copy_cmd
+                )
+                copy_btn.grid(row=0, column=1, padx=(10, 0))
 
-        ctk.CTkLabel(details_frame, text="Machine ID:", text_color="gray50").grid(row=6, column=0, sticky="w", pady=(5,0))
-        machine_id_frame = ctk.CTkFrame(details_frame, fg_color="transparent")
-        machine_id_frame.grid(row=6, column=1, sticky="ew", padx=10, pady=(5,0))
-        self.machine_id_label = ctk.CTkLabel(machine_id_frame, text="N/A", font=ctk.CTkFont(family="monospace"))
-        self.machine_id_label.pack(side="left")
-        ctk.CTkButton(machine_id_frame, text="Copy", width=50, command=self._copy_machine_id).pack(side="left", padx=(10, 0))
+            row_idx[0] += 1
+            return val_label
 
-        # --- START: NEW REFERRAL CODE ROW ---
-        ctk.CTkLabel(details_frame, text="Referral Code:", text_color="gray50").grid(row=7, column=0, sticky="w", pady=(5,0))
-        referral_frame = ctk.CTkFrame(details_frame, fg_color="transparent")
-        referral_frame.grid(row=7, column=1, sticky="ew", padx=10, pady=(5,0))
+        # Create all detail rows — widgets are created inside add_detail_row
+        self.email_label = add_detail_row("📧 Email:", "N/A")
+        self.key_label = add_detail_row("🔑 License Key:", "N/A", self._copy_key,
+                                         label_kwargs={"font": ctk.CTkFont(family="monospace", size=11)})
+        self.machine_id_label = add_detail_row("💻 Machine ID:", "N/A", self._copy_machine_id,
+                                                label_kwargs={"font": ctk.CTkFont(family="monospace", size=11)})
+        self.devices_used_label = add_detail_row("📱 Devices:", "N/A")
+        self.storage_label = add_detail_row("💾 Storage:", "N/A")
+
+        # Separator
+        sep = ctk.CTkFrame(details_scroll, height=1, corner_radius=0, fg_color=("gray85", "gray35"))
+        sep.grid(row=row_idx[0], column=0, columnspan=2, sticky="ew", padx=12, pady=6)
+        row_idx[0] += 1
+
+        # Referral Code
+        self.referral_code_label = add_detail_row("🎁 Referral Code:", "N/A", self._copy_referral_code,
+                                                   label_kwargs={
+                                                       "font": ctk.CTkFont(family="monospace", size=12, weight="bold"),
+                                                       "text_color": ("#2563EB", "#60A5FA")
+                                                   })
+
+        # ── REFERRAL INFO BOX (at bottom of tab, outside scroll) ──
+        referral_card = ctk.CTkFrame(sub_tab, corner_radius=8, fg_color=("#EFF6FF", "#1E3A5F"))
+        referral_card.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 10))
         
-        self.referral_code_label = ctk.CTkLabel(referral_frame, text="N/A", font=ctk.CTkFont(family="monospace"))
-        self.referral_code_label.pack(side="left")
-        
-        self.copy_referral_btn = ctk.CTkButton(referral_frame, text="Copy", width=50, command=self._copy_referral_code)
-        self.copy_referral_btn.pack(side="left", padx=(10, 0))
-        # --- END: NEW REFERRAL CODE ROW ---
+        ctk.CTkLabel(
+            referral_card,
+            text="🎁 Referral Program",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=("#1D4ED8", "#60A5FA")
+        ).pack(anchor="w", padx=14, pady=(10, 4))
 
-        # --- START: NEW REFERRAL INFO BOX ---
-        info_frame = ctk.CTkFrame(details_frame, fg_color=(config.COLORS["gray90"], config.COLORS["gray20"]))
-        info_frame.grid(row=8, column=0, columnspan=2, sticky="ew", padx=0, pady=(15, 0))
-        
-        info_text = "How the Referral Program Works:\n" \
-            "1. Share your 'Referral Code' (given above) with new users.\n" \
-            "2. When the new user registers for a trial, they will enter your code.\n" \
-            "3. When that user purchases their first plan after the trial,\n" \
-            "   you will get 15 days of free validity!"
-        
-        ctk.CTkLabel(info_frame, text=info_text, wraplength=300, justify="left", anchor="w").pack(padx=12, pady=10)
-        # --- END: NEW REFERRAL INFO BOX ---
+        ctk.CTkLabel(
+            referral_card,
+            text="1. Share your referral code with new users.\n"
+                 "2. They enter it during trial registration.\n"
+                 "3. When they purchase a plan, you get 15 days free!",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray50", "gray80"),
+            wraplength=400,
+            justify="left"
+        ).pack(anchor="w", padx=14, pady=(0, 10))
 
         # --- Changelog Tab ---
         changelog_tab = self.tab_view.tab("Changelog")
@@ -269,37 +358,67 @@ class AboutTab(ctk.CTkFrame):
 
     def _create_right_frame(self):
         self.action_panel_container = ctk.CTkFrame(self)
-        self.action_panel_container.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        self.action_panel_container.grid(row=1, column=1, sticky="nsew", padx=(10, 0))
         self.action_panel_container.grid_columnconfigure(0, weight=1)
         self.action_panel_container.grid_rowconfigure(0, weight=1)
         self._update_action_panel("Loading", "N/A")
 
     def _create_disclaimer_frame(self, parent):
-        disclaimer_frame = ctk.CTkFrame(parent, fg_color=(config.COLORS["gray90"], config.COLORS["gray20"]))
+        """Card-style disclaimer with warning accent and emoji icons (safe across all versions)."""
+        disclaimer_frame = ctk.CTkFrame(
+            parent,
+            corner_radius=10,
+            border_width=1,
+            border_color=("#FDE68A", "#78350F"),  # amber border
+            fg_color=("#FFFBEB", "#1C1917")  # amber-tinted bg in light, dark warm in dark
+        )
         disclaimer_frame.grid_columnconfigure(0, weight=1)
 
-        title_label = ctk.CTkLabel(disclaimer_frame, text="Disclaimer", image=self.app.icon_images.get("disclaimer_warning"), compound="left", font=ctk.CTkFont(weight="bold"))
-        title_label.pack(pady=(10, 5), padx=20, anchor="w")
+        # Header
+        header = ctk.CTkFrame(disclaimer_frame, fg_color="transparent")
+        header.pack(pady=(12, 8), padx=16, anchor="w", fill="x")
+        ctk.CTkLabel(header, text="⚠️", font=ctk.CTkFont(size=16)).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(header, text="Disclaimer", font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color=("#92400E", "#FBBF24")).pack(side="left")
 
-        def create_disclaimer_row(parent_frame, icon_key, text):
-            row_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
-            icon_label = ctk.CTkLabel(row_frame, text="", image=self.app.icon_images.get(icon_key))
-            icon_label.pack(side="left", padx=(0, 10), pady=2, anchor="n")
-            text_label = ctk.CTkLabel(row_frame, text=text, wraplength=280, justify="left")
-            text_label.pack(side="left", fill="x", expand=True)
-            return row_frame
+        # Row 1
+        row1 = ctk.CTkFrame(disclaimer_frame, fg_color="transparent")
+        row1.pack(pady=(0, 8), padx=16, anchor="w", fill="x")
+        ctk.CTkLabel(row1, text="⚡", font=ctk.CTkFont(size=12)).pack(side="left", padx=(0, 8), pady=2, anchor="n")
+        ctk.CTkLabel(
+            row1, text="This tool interacts with a live government website. "
+                       "If the portal's structure changes, some features may break until updated.",
+            wraplength=300, justify="left",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray50", "gray60")
+        ).pack(side="left", fill="x", expand=True)
 
-        disclaimer_text1 = "This tool interacts with a live government website. If the portal's structure changes, some features may break until updated."
-        row1 = create_disclaimer_row(disclaimer_frame, "disclaimer_thunder", disclaimer_text1)
-        row1.pack(pady=(0, 10), padx=20, anchor="w", fill="x")
-
-        disclaimer_text2 = "Use this tool responsibly. The author provides no warranties and is not liable for data entry errors. Always double-check automated work."
-        row2 = create_disclaimer_row(disclaimer_frame, "disclaimer_tools", disclaimer_text2)
-        row2.pack(pady=(0, 15), padx=20, anchor="w", fill="x")
+        # Row 2
+        row2 = ctk.CTkFrame(disclaimer_frame, fg_color="transparent")
+        row2.pack(pady=(0, 14), padx=16, anchor="w", fill="x")
+        ctk.CTkLabel(row2, text="🔧", font=ctk.CTkFont(size=12)).pack(side="left", padx=(0, 8), pady=2, anchor="n")
+        ctk.CTkLabel(
+            row2, text="Use this tool responsibly. The author provides no warranties "
+                       "and is not liable for data entry errors. Always double-check automated work.",
+            wraplength=300, justify="left",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray50", "gray60")
+        ).pack(side="left", fill="x", expand=True)
 
         return disclaimer_frame
 
     def _update_action_panel(self, status, key_type):
+        # Only rebuild if panel type actually changed — prevents 2-4 sec blink
+        current_type = getattr(self, '_current_panel_type', None)
+        current_status = getattr(self, '_current_panel_status', None)
+        
+        if current_type == key_type and current_status == status:
+            # Same panel — just update device names / labels in-place
+            return
+        
+        self._current_panel_type = key_type
+        self._current_panel_status = status
+        
         # Clear previous widgets and reset button/label references
         for widget in self.action_panel_container.winfo_children():
             widget.destroy()
@@ -350,145 +469,125 @@ class AboutTab(ctk.CTkFrame):
         panel.grid_rowconfigure(1, weight=1)
         panel.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(panel, text="Account Management", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(20,10), padx=20)
+        # ── Compact Account Management Header ──
+        header_card = ctk.CTkFrame(panel, corner_radius=10, fg_color="transparent")
+        header_card.pack(fill="x", padx=18, pady=(14, 4))
 
-        devices_frame = ctk.CTkFrame(panel, fg_color="transparent")
-        devices_frame.pack(expand=True, fill="both", padx=15, pady=(0, 10))
+        title_frame = ctk.CTkFrame(header_card, fg_color="transparent")
+        title_frame.pack(anchor="w")
+        ctk.CTkLabel(title_frame, text="👤", font=ctk.CTkFont(size=16)).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(title_frame, text="Account Management", font=ctk.CTkFont(size=15, weight="bold")).pack(side="left")
+
+        ctk.CTkLabel(
+            header_card,
+            text="Rename your devices using the ✏️ icon.",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray50", "gray60"),
+            wraplength=320, justify="left"
+        ).pack(anchor="w", pady=(3, 0))
+
+        scroll_area = ctk.CTkScrollableFrame(panel, fg_color="transparent")
+        scroll_area.pack(expand=True, fill="both", padx=14, pady=(6, 0))
 
         max_devices = self.license_info.get('max_devices', 1)
         activated_machines_str = self.license_info.get('activated_machines', '')
         activated_machines = [mid for mid in activated_machines_str.split(',') if mid]
         activated_count = len(activated_machines)
 
-        ctk.CTkLabel(devices_frame, text=f"Activated Devices ({activated_count} of {max_devices} used)", font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(0, 5))
-        ctk.CTkLabel(devices_frame, text="Assign names to devices or request reset (admin approval needed, 1 req/30 days/device).", wraplength=300, justify="left", text_color="gray50").pack(anchor="w", pady=(0, 10))
-
-        scroll_area = ctk.CTkScrollableFrame(devices_frame, fg_color="transparent")
-        scroll_area.pack(expand=True, fill="both")
-
         if not activated_machines:
-            ctk.CTkLabel(scroll_area, text="No devices activated yet.", text_color="gray50").pack(pady=10)
+            empty_card = ctk.CTkFrame(scroll_area, corner_radius=8, fg_color=("gray95", "gray25"))
+            empty_card.pack(pady=15, padx=10, fill="x")
+            ctk.CTkLabel(empty_card, text="📭 No devices activated yet.",
+                         font=ctk.CTkFont(size=12),
+                         text_color="gray50").pack(pady=15)
         else:
             for machine_id in activated_machines:
                 is_current_device = (machine_id == self.app.machine_id)
-                device_entry_frame = ctk.CTkFrame(scroll_area, fg_color=(config.COLORS["gray85"], config.COLORS["gray20"]))
-                device_entry_frame.pack(fill="x", pady=(0, 5))
-                
-                # --- MODIFIED: Display logic for name/mac ---
                 display_name = self._get_display_name(machine_id)
-                
+
+                # Compact device card
+                device_entry_frame = ctk.CTkFrame(
+                    scroll_area,
+                    corner_radius=6,
+                    border_width=1,
+                    border_color=("#22C55E", "#166534") if is_current_device else ("#E5E7EB", "#374151"),
+                    fg_color=("#F0FDF4", "#052E16") if is_current_device else "transparent"
+                )
+                device_entry_frame.pack(fill="x", pady=(0, 4))
+
+                # Left: device info
                 label_frame = ctk.CTkFrame(device_entry_frame, fg_color="transparent")
-                label_frame.pack(side="left", fill="x", expand=True, padx=10, pady=8)
+                label_frame.pack(side="left", fill="x", expand=True, padx=10, pady=6)
 
-                label_text = display_name + (" (This Device)" if is_current_device else "")
-                device_label = ctk.CTkLabel(label_frame, text=label_text, anchor="w", font=ctk.CTkFont(weight="bold"))
-                device_label.pack(side="top", anchor="w")
-                
-                if display_name != machine_id: # Also show MAC if name is custom
-                    ctk.CTkLabel(label_frame, text=machine_id, anchor="w", font=ctk.CTkFont(family="monospace", size=10), text_color="gray50").pack(side="top", anchor="w")
-                
-                self.device_labels[machine_id] = device_label # Store main label
-                # --- END MODIFIED ---
+                name_row = ctk.CTkFrame(label_frame, fg_color="transparent")
+                name_row.pack(anchor="w", fill="x")
 
-                button_frame = ctk.CTkFrame(device_entry_frame, fg_color="transparent")
-                button_frame.pack(side="right", padx=(0, 5))
+                device_icon = "💻" if not is_current_device else "🖥️"
+                ctk.CTkLabel(name_row, text=device_icon, font=ctk.CTkFont(size=11)).pack(side="left", padx=(0, 4))
 
-                # --- UPDATED: Use PNG Icons instead of Emojis ---
+                device_label = ctk.CTkLabel(
+                    name_row, text=display_name,
+                    anchor="w", font=ctk.CTkFont(size=11, weight="bold")
+                )
+                device_label.pack(side="left")
+
+                if is_current_device:
+                    ctk.CTkLabel(
+                        name_row, text="THIS DEVICE",
+                        font=ctk.CTkFont(size=7, weight="bold"),
+                        fg_color=("#22C55E", "#16A34A"),
+                        text_color="white",
+                        corner_radius=3, padx=5, pady=1
+                    ).pack(side="left", padx=(5, 0))
+
+                if display_name != machine_id:
+                    ctk.CTkLabel(
+                        label_frame, text=machine_id,
+                        anchor="w",
+                        font=ctk.CTkFont(family="monospace", size=8),
+                        text_color=("gray50", "gray60")
+                    ).pack(anchor="w", padx=(15, 0))
+
+                self.device_labels[machine_id] = device_label
+
+                # Right: edit button only
                 edit_btn = ctk.CTkButton(
-                    button_frame,
-                    text="",  # Text hata diya
-                    image=self.app.icon_images.get("device_edit"), # PNG Icon use kiya
+                    device_entry_frame,
+                    text="✏️", width=28, height=26,
+                    font=ctk.CTkFont(size=11),
+                    fg_color="transparent",
+                    hover_color=("gray80", "gray30"),
                     command=lambda mid=machine_id: self._rename_device_popup(mid),
-                    width=35, 
-                    height=30,
-                    fg_color="transparent",
-                    hover_color=("gray75", "gray25")
                 )
-                edit_btn.pack(side="left", padx=(0, 2))
+                edit_btn.pack(side="right", padx=(0, 6))
 
-                reset_btn = ctk.CTkButton(
-                    button_frame,
-                    text="", # Text hata diya
-                    image=self.app.icon_images.get("device_reset"), # PNG Icon use kiya
-                    command=lambda mid=machine_id: self._send_deactivation_request_api(mid),
-                    width=35, 
-                    height=30,
-                    fg_color="transparent",
-                    hover_color=("gray75", "gray25")
-                )
-                reset_btn.pack(side="left")
-                # --- END UPDATE ---
+                self.device_buttons[machine_id] = {'edit': edit_btn}
 
-                self.device_buttons[machine_id] = {'reset': reset_btn, 'edit': edit_btn}
-
-        self._check_pending_deactivations(activated_machines)
-
+        # ── Bottom: Disclaimer + Action Buttons ──
         bottom_frame = ctk.CTkFrame(panel)
         bottom_frame.pack(fill='x', side='bottom')
 
-        self._create_disclaimer_frame(bottom_frame).pack(fill='x', padx=10, pady=(10,0))
+        self._create_disclaimer_frame(bottom_frame).pack(fill='x', padx=10, pady=(10, 0))
 
         button_container = ctk.CTkFrame(bottom_frame, fg_color="transparent")
-        button_container.pack(fill='x', padx=10, pady=(10, 15))
+        button_container.pack(fill='x', padx=12, pady=(10, 14))
         button_container.grid_columnconfigure((0, 1), weight=1)
 
-        create_manage_button(button_container).grid(row=0, column=0, sticky="ew", padx=(0, 5))
-        ctk.CTkButton(button_container, text="Contact Support", fg_color="transparent", border_width=1, text_color=(config.COLORS["gray10"], config.COLORS["text_bright"]), command=self.contact_support_email).grid(row=0, column=1, sticky="ew", padx=(5, 0))
+        # Manage on Website button
+        manage_btn = create_manage_button(button_container)
+        manage_btn.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+
+        # Contact Support button
+        support_btn = ctk.CTkButton(
+            button_container, text="📧 Contact Support",
+            fg_color="transparent", border_width=1,
+            text_color=(config.COLORS["gray10"], config.COLORS["text_bright"]),
+            command=self.contact_support_email
+        )
+        support_btn.grid(row=0, column=1, sticky="ew", padx=(4, 0))
 
 
-    # --- MODIFIED: _send_deactivation_request_api ---
-    def _send_deactivation_request_api(self, machine_id):
-        buttons = self.device_buttons.get(machine_id)
-        if not buttons or not buttons.get('reset'): return
-        button = buttons['reset'] # Get the specific reset button
-
-        if button.cget("state") == "disabled": return
-
-        if not messagebox.askyesno("Confirm Deactivation Request",
-                                   f"Request deactivation for device:\n\n{self._get_display_name(machine_id)}\n({machine_id})\n\nAdmin must approve. Once per 30 days/device.",
-                                   parent=self):
-            return
-
-        original_text = button.cget("text") # Store original emoji
-        button.configure(state="disabled", text="...") # Indicate submitting
-
-        def _worker():
-            try:
-                license_key = self.app.license_info.get('key')
-                if not license_key: raise ValueError("License key not found.")
-
-                headers = {'Authorization': f'Bearer {license_key}'}
-                payload = {'machine_id': machine_id}
-                response = self.app.http_session.post(
-                    f"{config.LICENSE_SERVER_URL}/api/request-deactivation",
-                    json=payload, headers=headers, timeout=15
-                )
-                response.raise_for_status()
-                result = response.json()
-
-                if result.get("status") == "success":
-                    message = result.get("message", "Request sent successfully.")
-                    # Keep button disabled, maybe change emoji or add tooltip later if needed
-                    self.app.after(0, lambda: button.configure(text="⏳")) # Optional: Pending emoji
-                    self.app.after(0, lambda: messagebox.showinfo("Request Submitted", message, parent=self))
-                else:
-                    self.app.after(0, lambda: button.configure(state="normal", text=original_text)) # Restore emoji on API error
-                    self.app.after(0, lambda: messagebox.showerror("Request Failed", result.get("reason", "Unknown server error."), parent=self))
-
-            except requests.exceptions.HTTPError as http_err:
-                error_reason = f"HTTP Error: {http_err.response.status_code}"
-                try: error_reason = http_err.response.json().get("reason", error_reason)
-                except Exception: logger.warning("About: Could not parse error response JSON")
-                self.app.after(0, lambda: button.configure(state="normal", text=original_text)) # Restore emoji
-                self.app.after(0, lambda: messagebox.showerror("Request Failed", error_reason, parent=self))
-            except requests.exceptions.RequestException as req_err:
-                self.app.after(0, lambda: button.configure(state="normal", text=original_text)) # Restore emoji
-                self.app.after(0, lambda: messagebox.showerror("Connection Error", f"Could not send request: {req_err}", parent=self))
-            except Exception as e:
-                self.app.after(0, lambda: button.configure(state="normal", text=original_text)) # Restore emoji
-                self.app.after(0, lambda: messagebox.showerror("Error", f"An unexpected error occurred: {e}", parent=self))
-
-        threading.Thread(target=_worker, daemon=True).start()
+    # Deactivation request removed — users can manage devices from their account on the website.
 
 
     def update_storage_display(self, usage, limit):
@@ -656,11 +755,6 @@ class AboutTab(ctk.CTkFrame):
                 if mac_label:
                     mac_label.destroy() # Remove the redundant MAC label
             # --- END MODIFIED ---
-
-
-    def _check_pending_deactivations(self, machine_ids):
-        # Placeholder - needs backend API support to be fully functional
-        pass
 
     def contact_support_email(self):
         # (Keep this method as is)

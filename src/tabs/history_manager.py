@@ -145,6 +145,20 @@ class HistoryManager:
 
     def save_entry(self, field_key: str, value: str):
         if not value or not field_key: return 
+        # Auto-uppercase panchayat, state, district, block keys for consistent display
+        uppercase_keys = {
+            # Panchayat keys
+            "panchayat_name", "panchayat", "dashboard_panchayat",
+            "mr_track_panchayat", "issued_mr_panchayat", "audit_panchayat_respond",
+            # State keys
+            "mr_track_state", "issued_mr_state", "mis_state", "dashboard_state",
+            # District keys
+            "mr_track_district", "issued_mr_district", "mis_district", "dashboard_district",
+            # Block keys
+            "mr_track_block", "issued_mr_block", "mis_block", "dashboard_block",
+        }
+        if field_key in uppercase_keys:
+            value = value.upper()
         with self.lock:
             try:
                 conn = self._get_connection()

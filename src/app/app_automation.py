@@ -67,6 +67,7 @@ class AutomationMixin:
         self.prevent_sleep()
         self.app_state.active_automations.add(key)
         self.app_state.stop_events[key] = threading.Event()
+        self._update_emergency_stop_btn()
 
         if self.app_state.minimize_var.get() and self.app_state.driver:
             try:
@@ -118,6 +119,64 @@ class AutomationMixin:
         self.after(5000, lambda: self.set_status("Ready"))
         if not self.app_state.active_automations:
             self.allow_sleep()
+            self._update_emergency_stop_btn()
+
+    def _emergency_stop_all(self) -> None:
+        """Emergency stop ALL running automations immediately.
+        Sets stop events, force-quits browser, and resets UI.
+        """
+        if not self.app_state.active_automations:
+            return
+
+        # 1. Set ALL stop events
+        for key in list(self.app_state.active_automations):
+            if key in self.app_state.stop_events:
+                self.app_state.stop_events[key].set()
+
+        # 2. Force-quit the browser driver (unblocks stuck page loads)
+        try:
+            if self.app_state.driver:
+                try:
+                    self.app_state.driver.quit()
+                except Exception:
+                    try:
+                        self.app_state.driver.close()
+                    except Exception:
+                        pass
+                self.app_state.driver = None
+                self.app_state.active_browser = None
+        except Exception as e:
+            logger.debug("Emergency stop driver cleanup: %s", e)
+
+        # 3. Clean up all active automation tracking
+        count = len(self.app_state.active_automations)
+        self.app_state.active_automations.clear()
+        self.allow_sleep()
+
+        self.play_sound("error")
+        self.set_status(f"⚠ Emergency Stopped {count} automation(s)")
+        self.show_toast(f"🛑 Emergency stopped {count} automation(s)", "warning", duration=5000)
+        self.after(0, self._update_emergency_stop_btn)
+
+    def _update_emergency_stop_btn(self) -> None:
+        """Toggle emergency stop indicator + label state.
+        Red dot + red label when active, transparent when idle.
+        NEVER uses pack/pack_forget — stays packed always to avoid layout shift."""
+        has_active = bool(self.app_state.active_automations)
+        ind = getattr(self, 'emergency_stop_indicator', None)
+        lbl = getattr(self, 'emergency_stop_label', None)
+        if has_active:
+            red = ("#DC2626", "#EF4444")
+            if ind and ind.winfo_exists():
+                ind.configure(fg_color=red)
+            if lbl and lbl.winfo_exists():
+                lbl.configure(text_color=red)
+        else:
+            gray = ("gray50", "gray50")
+            if ind and ind.winfo_exists():
+                ind.configure(fg_color="transparent")
+            if lbl and lbl.winfo_exists():
+                lbl.configure(text_color=gray)
 
     @staticmethod
     def _get_current_financial_year():

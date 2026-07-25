@@ -537,7 +537,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                         self.app.log_message(self.log_display, f"📍 Selecting Panchayat: {panchayat}")
                         panch_dd = wait.until(EC.presence_of_element_located(
                             (By.ID, "ctl00_ContentPlaceHolder1_ddlpnch")))
-                        Select(panch_dd).select_by_visible_text(panchayat)
+                        self._select_by_text_case_insensitive(Select(panch_dd), panchayat)
                         time.sleep(1.5)  # Brief wait for postback to begin
                     except (TimeoutException, NoSuchElementException):
                         self.app.log_message(self.log_display, "📍 Panchayat dropdown not found (GP login).")
@@ -836,7 +836,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                     self.app.log_message(self.log_display, f"📍 Selecting Panchayat: {panchayat}")
                     panch_dd = wait.until(EC.presence_of_element_located(
                         (By.ID, "ctl00_ContentPlaceHolder1_ddlpnch")))
-                    Select(panch_dd).select_by_visible_text(panchayat)
+                    self._select_by_text_case_insensitive(Select(panch_dd), panchayat)
                     time.sleep(1.5)  # Brief wait for postback to begin
                 except (TimeoutException, NoSuchElementException):
                     self.app.log_message(self.log_display, "📍 Panchayat dropdown not found (GP login).")

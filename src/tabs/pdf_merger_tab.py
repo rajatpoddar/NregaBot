@@ -178,8 +178,7 @@ class PDFMergerTab(BaseAutomationTab):
     def _get_output_path(self, base_name):
         """Generates a unique output path in the user's downloads folder."""
         try:
-            downloads_dir = self.app.get_user_downloads_path()
-            output_dir = os.path.join(downloads_dir, "NregaBot", "Merged_Pdf_Output")
+            output_dir = self.app.get_nregabot_path("Merged_PDF")
             
             os.makedirs(output_dir, exist_ok=True)
             

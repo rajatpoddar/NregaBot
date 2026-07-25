@@ -270,7 +270,7 @@ class DashboardReportTab(BaseAutomationTab):
             self._solve_captcha(driver, wait)
 
             self.update_status("Selecting State...", 0.15)
-            Select(wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))).select_by_visible_text(inputs['state'].upper())
+            self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))), inputs['state'])
             
             self.update_status("Opening Dashboard...", 0.2)
             report_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
@@ -429,7 +429,7 @@ class DashboardReportTab(BaseAutomationTab):
         sub_title = f"District: {district}  |  Block: {block}  |  Panchayat: {panchayat}"
         
         # Directory
-        target_dir = os.path.join(self.app.get_user_downloads_path(), f"Reports {current_year}", safe_panchayat)
+        target_dir = os.path.join(self.app.get_user_downloads_path(), "NregaBot", f"Reports_{current_year}", "Dashboard", safe_panchayat)
         try: os.makedirs(target_dir, exist_ok=True)
         except Exception as e: logger.debug("Failed to create dirs: %s", e)
 

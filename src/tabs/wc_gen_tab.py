@@ -851,7 +851,7 @@ class WcGenTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Step 5: Selecting Agency and Saving...")
         
         agency_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlExeAgency")))
-        Select(agency_select).select_by_visible_text(form_config['executing_agency'])
+        self._select_by_text_case_insensitive(Select(agency_select), form_config['executing_agency'])
         
         save_btn = driver.find_element(By.ID, "ContentPlaceHolder1_btSave")
         driver.execute_script("arguments[0].click();", save_btn)
