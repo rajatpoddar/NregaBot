@@ -1,15 +1,19 @@
 {
-  "latest_version": "3.0.6",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.6-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.6-macOS.dmg",
+  "latest_version": "3.0.7",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.0.7-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.0.7-macOS.dmg",
   "core_update": {
-    "version": "3.0.6",
-    "url": "https://nregabot.com/updates/core_v3.0.6.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.0.6.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.6.zip",
+    "version": "3.0.7",
+    "url": "https://nregabot.com/updates/core_v3.0.7.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.0.7.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.0.7.zip",
     "force_full_reinstall": false
   },
   "changelog": {
+    "3.0.7": [
+      "🧹 **Repository Cleanup:** Removed unnecessary backup files and screenshots from the repository to reduce release size.",
+      "📦 **Optimized Release:** Fixed release pipeline to exclude old backups and screenshots from the build artifacts."
+    ],
     "3.0.6": [
       "🚀 **Delete Applicant Overhaul:** Complete rewrite of the Delete Applicant automation. Now accepts eKYC Report Excel files directly — no more CSV uploads.",
       "🚀 **MB Entry Auto-Process All Works:** When no work codes are provided, MB Entry now processes ALL available works from the 'Select Work' dropdown one by one."

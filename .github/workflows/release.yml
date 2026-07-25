@@ -106,7 +106,7 @@ jobs:
             if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
 
             def ignore_func(dir, files):
-                ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', '.vscode', 'web', 'docs', 'scripts']]
+                ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', '.vscode', 'web', 'docs', 'scripts', 'backups']]
                 if os.path.basename(dir) == 'assets':
                     if 'screenshots' in files:
                         ignored.append('screenshots')

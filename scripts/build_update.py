@@ -38,8 +38,8 @@ def create_source_zip():
         for root, dirs, files in os.walk("."):
             # In folders ko ignore karein (In-place modification taaki os.walk inke andar na jaye)
             dirs[:] = [d for d in dirs if d not in [
-                '__pycache__', '.git', 'venv', 'env', 'dist', 'build', 'user_uploads', 
-                '.idea', '.vscode', 'Update_Output'
+                '__pycache__', '.git', 'venv', 'env', 'dist', 'build', 'user_uploads',
+                '.idea', '.vscode', 'Update_Output', 'backups', 'screenshots'
             ]]
 
             for file in files:

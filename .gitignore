@@ -1,6 +1,7 @@
 # Python cache files
 __pycache__/
 *.pyc
+*.pyo
 
 # Virtual Environment folders (never commit these)
 venv/
@@ -27,20 +28,42 @@ build/
 secrets.ini
 .env
 
-# Personal configuration files
+# Personal / dev-only configuration
 server/
 server 3.0/
 dashboard.py
 experiment/
 dmg/
 updates/
-tabs/__pycache__/
-tabs/__pycache__/about_tab.cpython-312.pyc
-tabs/__pycache__/if_edit_tab.cpython-312.pyc
-tabs/__pycache__/jobcard_verify_tab.cpython-312.pyc
-tabs/__pycache__/mb_entry_tab.cpython-312.pyc
-tabs/__pycache__/msr_tab.cpython-312.pyc
-tabs/__pycache__/musterroll_gen_tab.cpython-312.pyc
-tabs/__pycache__/wagelist_gen_tab.cpython-312.pyc
-tabs/__pycache__/wagelist_send_tab.cpython-312.pyc
-tabs/__pycache__/wc_gen_tab.cpython-312.pyc
+user_uploads/
+
+# Old backup files (not needed in release)
+backups/
+
+# Screenshots (heavy PNGs, not needed in release)
+assets/screenshots/
+
+# Generated report files
+import_check_results.txt
+OPTIMIZATION_REPORT.md
+
+# Generated docs (analysis/plan, not needed for app)
+docs/import_check_results.txt
+docs/last_conversatation.txt
+docs/ARCHITECTURE_ANALYSIS.md
+docs/PERFORMANCE_ANALYSIS.md
+docs/PROJECT_ANALYSIS.md
+docs/OPTIMIZATION_PLAN.md
+
+# Python egg info
+*.egg-info/
+*.egg
+
+# IDE configs
+.idea/
+*.swp
+*.swo
+*~
+
+# Windows reserved names / temp files
+nul

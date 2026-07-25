@@ -1,4 +1,8 @@
 {
+  "3.0.7": [
+      "🧹 **Repository Cleanup:** Removed unnecessary backup files and screenshots from the repository to reduce release size.",
+      "📦 **Optimized Release:** Fixed release pipeline to exclude old backups and screenshots from the build artifacts."
+    ],
   "3.0.6": [
       "🚀 **Delete Applicant Overhaul:** Complete rewrite of the Delete Applicant automation. Now accepts eKYC Report Excel files directly — no more CSV uploads.",
       "🚀 **MB Entry Auto-Process All Works:** When no work codes are provided, MB Entry now processes ALL available works from the 'Select Work' dropdown one by one."
