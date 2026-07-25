@@ -128,12 +128,23 @@ jobs:
             shutil.rmtree(temp_dir)
             print(f'Success: Created {zip_name}')
 
+        # Create portable zip of the MAIN app (in case installer fails)
+        - name: Create Main App Portable Zip
+          shell: powershell
+          run: |
+            $version = "${{ needs.get-release-info.outputs.version }}"
+            $source = "dist\NREGA Bot\*"
+            $dest = "dist\NREGABot-v${version}-Portable.zip"
+            Compress-Archive -Path $source -DestinationPath $dest -Force
+            Write-Host "Created: $dest"
+
         - name: Upload Windows Artifacts
           uses: actions/upload-artifact@v4
           with:
             name: windows-builds
             path: |
               dist/installer/*.exe
+              dist/NREGABot-v*-Portable.zip
               dist/core_win_*.zip
               dist/NREGA Bot Lite.exe
             retention-days: 1

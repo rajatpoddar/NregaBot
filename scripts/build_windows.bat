@@ -114,12 +114,13 @@ if not exist %INNO_SETUP_COMPILER% (
     ECHO Warning: Inno Setup default path not found. Assuming configured in PATH or GitHub Action.
 )
 
-REM Agar GitHub Action me hain, to ISCC command path me hota hai
-ISCC /dAppVersion=%APP_VERSION% "scripts/installer.iss"
+REM Use full path to ISCC (choco installs to Program Files, not in PATH)
+%INNO_SETUP_COMPILER% /dAppVersion=%APP_VERSION% "scripts/installer.iss"
 
 if errorlevel 1 (
     ECHO.
     ECHO !!!!!!! Inno Setup compilation FAILED. !!!!!!!
+    ECHO Main app installer not created, but portable build is in dist\%APP_NAME%\
     goto End
 )
 
