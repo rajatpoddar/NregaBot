@@ -9,9 +9,11 @@ IF "%APP_VERSION%"=="" SET APP_VERSION="0.0.0"
 
 SET APP_NAME="NREGA Bot"
 SET LITE_APP_NAME="NREGA Bot Lite"
-REM Chocolatey installs Inno Setup to %%ProgramFiles%% (C:\Program Files), NOT to (x86)
+REM Chocolatey installs Inno Setup to %%ProgramFiles%% (C:\Program Files)
 SET INNO_SETUP_COMPILER="%ProgramFiles%\Inno Setup 6\ISCC.exe"
 SET INNO_SETUP_COMPILER_X86="%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+REM Chocolatey's own lib path (fallback for different install locations)
+SET INNO_SETUP_CHOCO="%ProgramData%\chocolatey\lib\innosetup\tools\ISCC.exe"
 
 ECHO ######################################################
 ECHO.
@@ -111,26 +113,37 @@ ECHO [STEP 2/3] Creating the MAIN installer with Inno Setup...
 ECHO.
 
 REM Try primary path (%%ProgramFiles%% - chocolatey default)
+set ISCC_FOUND=
 if exist %INNO_SETUP_COMPILER% (
-    ECHO Found Inno Setup at: %INNO_SETUP_COMPILER%
-    %INNO_SETUP_COMPILER% /dAppVersion=%APP_VERSION% "scripts/installer.iss"
+    set ISCC_FOUND=%INNO_SETUP_COMPILER%
 ) else (
     REM Try fallback path (%%ProgramFiles(x86)%% - manual install)
-    ECHO Not found at primary path. Trying fallback...
     if exist %INNO_SETUP_COMPILER_X86% (
-        ECHO Found Inno Setup at: %INNO_SETUP_COMPILER_X86%
-        %INNO_SETUP_COMPILER_X86% /dAppVersion=%APP_VERSION% "scripts/installer.iss"
+        set ISCC_FOUND=%INNO_SETUP_COMPILER_X86%
     ) else (
-        ECHO Inno Setup not found at either path. Skipping installer creation.
-        ECHO Main app portable build is in dist\%APP_NAME%\
-        goto End
+        REM Try Chocolatey lib path (alternative install location)
+        if exist %INNO_SETUP_CHOCO% (
+            set ISCC_FOUND=%INNO_SETUP_CHOCO%
+        )
     )
 )
 
-if errorlevel 1 (
-    ECHO.
-    ECHO !!!!!!! Inno Setup compilation FAILED. !!!!!!!
-    ECHO Main app installer not created, but portable build is in dist\%APP_NAME%\
+if defined ISCC_FOUND (
+    ECHO Found Inno Setup at: %ISCC_FOUND%
+    %ISCC_FOUND% /dAppVersion=%APP_VERSION% "scripts/installer.iss"
+    if errorlevel 1 (
+        ECHO.
+        ECHO !!!!!!! Inno Setup compilation FAILED. !!!!!!!
+        ECHO Main app installer not created, but portable build is in dist\%APP_NAME%\
+        goto End
+    )
+) else (
+    ECHO Inno Setup not found at any path. Skipping installer creation.
+    ECHO Checked:
+    ECHO   - %INNO_SETUP_COMPILER%
+    ECHO   - %INNO_SETUP_COMPILER_X86%
+    ECHO   - %INNO_SETUP_CHOCO%
+    ECHO Main app portable build is in dist\%APP_NAME%\
     goto End
 )
 

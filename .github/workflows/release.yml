@@ -155,6 +155,21 @@ jobs:
             shutil.rmtree(temp_dir)
             print(f'Success: Created {zip_name}')
 
+        # Debug: List dist/installer/ contents before artifact upload
+        - name: Debug - List installer output directory
+          shell: powershell
+          run: |
+            Write-Host "=== dist/installer/ contents ==="
+            if (Test-Path "dist/installer") {
+              Get-ChildItem -Path "dist/installer" -Recurse | Select-Object Name, Length, LastWriteTime
+            } else {
+              Write-Host "[WARNING] dist/installer/ does NOT exist!"
+            }
+            Write-Host "=== dist/ *.exe files ==="
+            Get-ChildItem -Path "dist" -Filter "*.exe" | Select-Object Name, Length
+            Write-Host "=== dist/ *.zip files ==="
+            Get-ChildItem -Path "dist" -Filter "*.zip" | Select-Object Name, Length
+
         # Create portable zip of the MAIN app (in case installer fails)
         - name: Create Main App Portable Zip
           shell: powershell

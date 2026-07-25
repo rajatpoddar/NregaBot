@@ -1,13 +1,16 @@
 ; NREGA Bot Inno Setup Script
-; Version 3.0.7
+; Version defined by build script via /dAppVersion=
 ;
 ; IMPORTANT: Inno Setup resolves all relative paths in this file
 ; RELATIVE TO THIS FILE'S LOCATION (scripts/ directory).
 ; Therefore ALL file paths must be prefixed with ..\ to point
 ; to the project root where the actual files reside.
 
-; The build script will override this version. This is a fallback.
-#define AppVersion "3.0.7"
+; The build script will override this version (via /dAppVersion=...).
+; #ifndef ensures the command-line /d switch always takes precedence.
+#ifndef AppVersion
+#define AppVersion "3.0.0"
+#endif
 #define AppName "NREGA Bot"
 #define AppPublisher "PoddarSolutions"
 #define AppURL "https://nregabot.com"
