@@ -77,7 +77,7 @@ REM --- Step 1b: Build LITE App ---
 ECHO [STEP 1b/3] Building LITE app with PyInstaller...
 ECHO.
 
-pyinstaller --noconfirm --windowed --onedir ^
+pyinstaller --noconfirm --windowed --onefile ^
 --name %LITE_APP_NAME% ^
 --icon="assets/app_icon.ico" ^
 --add-data="assets:assets" ^
@@ -128,7 +128,7 @@ ECHO =======================================================
 ECHO.
 ECHO  Build successful!
 ECHO  - MAIN installer: dist\installer
-ECHO  - LITE standalone: dist\%LITE_APP_NAME%
+ECHO  - LITE standalone: dist\%LITE_APP_NAME%.exe
 ECHO.
 ECHO =======================================================
 

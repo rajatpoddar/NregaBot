@@ -135,7 +135,7 @@ jobs:
             path: |
               dist/installer/*.exe
               dist/core_win_*.zip
-              dist/NREGA Bot Lite/**/*
+              dist/NREGA Bot Lite.exe
             retention-days: 1
 
   # --- 3. Build for Linux (Portable Loader) ---
@@ -216,6 +216,6 @@ jobs:
           body: ${{ needs.get-release-info.outputs.changelog }}
           tag_name: v${{ needs.get-release-info.outputs.version }}
           files: |
-            artifacts/windows-builds/**/*
+            artifacts/windows-builds/*.exe
+            artifacts/windows-builds/*.zip
             artifacts/linux-build/*
-            config/version.json
