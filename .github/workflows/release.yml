@@ -6,14 +6,41 @@ on:
       - main   # Runs automatically on every push to main
   workflow_dispatch: {} # Allows manual trigger
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # --- 0. Clean up old releases before building new ones ---
+  # --- 0. Clean up old releases & cache before building new ones ---
   cleanup-old-releases:
-    name: Clean Old GitHub Releases
+    name: Clean Old Releases & Cache
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
+      - name: Clear GitHub Actions Cache
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const caches = await github.rest.actions.getActionsCacheList({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+              for (const cache of caches.data.actions_caches) {
+                await github.rest.actions.deleteActionsCacheById({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  cache_id: cache.id,
+                });
+                console.log(`Deleted cache: ${cache.key} (${cache.id})`);
+              }
+              console.log(`Cleared ${caches.data.actions_caches.length} caches.`);
+            } catch (error) {
+              console.log(`Cache cleanup skipped: ${error.message}`);
+            }
+
       - name: Delete all existing GitHub Releases
         uses: dev-drprasad/delete-older-releases@v0.3.1
         with:

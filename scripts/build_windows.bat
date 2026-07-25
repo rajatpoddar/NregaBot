@@ -9,7 +9,9 @@ IF "%APP_VERSION%"=="" SET APP_VERSION="0.0.0"
 
 SET APP_NAME="NREGA Bot"
 SET LITE_APP_NAME="NREGA Bot Lite"
-SET INNO_SETUP_COMPILER="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+REM Chocolatey installs Inno Setup to %%ProgramFiles%% (C:\Program Files), NOT to (x86)
+SET INNO_SETUP_COMPILER="%ProgramFiles%\Inno Setup 6\ISCC.exe"
+SET INNO_SETUP_COMPILER_X86="%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
 
 ECHO ######################################################
 ECHO.
@@ -108,14 +110,22 @@ REM --- Step 2: Run Inno Setup Compiler (MAIN app installer only) ---
 ECHO [STEP 2/3] Creating the MAIN installer with Inno Setup...
 ECHO.
 
-REM Check if the Inno Setup compiler exists (Local Machine Check)
-if not exist %INNO_SETUP_COMPILER% (
-    REM GitHub Actions environment me path alag ho sakta hai, ye local check hai
-    ECHO Warning: Inno Setup default path not found. Assuming configured in PATH or GitHub Action.
+REM Try primary path (%%ProgramFiles%% - chocolatey default)
+if exist %INNO_SETUP_COMPILER% (
+    ECHO Found Inno Setup at: %INNO_SETUP_COMPILER%
+    %INNO_SETUP_COMPILER% /dAppVersion=%APP_VERSION% "scripts/installer.iss"
+) else (
+    REM Try fallback path (%%ProgramFiles(x86)%% - manual install)
+    ECHO Not found at primary path. Trying fallback...
+    if exist %INNO_SETUP_COMPILER_X86% (
+        ECHO Found Inno Setup at: %INNO_SETUP_COMPILER_X86%
+        %INNO_SETUP_COMPILER_X86% /dAppVersion=%APP_VERSION% "scripts/installer.iss"
+    ) else (
+        ECHO Inno Setup not found at either path. Skipping installer creation.
+        ECHO Main app portable build is in dist\%APP_NAME%\
+        goto End
+    )
 )
-
-REM Use full path to ISCC (choco installs to Program Files, not in PATH)
-%INNO_SETUP_COMPILER% /dAppVersion=%APP_VERSION% "scripts/installer.iss"
 
 if errorlevel 1 (
     ECHO.
@@ -134,4 +144,5 @@ ECHO.
 ECHO =======================================================
 
 :End
-pause
+REM CI environment me pause mat karo (GitHub Actions hang ho jayega)
+if not defined CI pause
