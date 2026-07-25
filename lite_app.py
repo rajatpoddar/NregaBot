@@ -29,12 +29,16 @@ import json
 import logging
 import socket
 import gc
+import time
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import tkinter
 from tkinter import messagebox
 import customtkinter as ctk
 import requests
+
+
+
 
 # --- Apply Lite config overrides FIRST ---
 from src import config
@@ -50,7 +54,7 @@ from src.app.app_license import LicenseMixin
 from src.utils import (
     resource_path, get_data_path, get_user_downloads_path,
     get_config, save_config, validate_config,
-    setup_logging, get_logger
+    setup_logging, get_logger, _suppress_overscroll
 )
 
 # --- Windows DPI Awareness ---
@@ -77,87 +81,7 @@ validate_config()
 ctk.set_default_color_theme(resource_path(os.path.join("config", "theme.json")))
 ctk.set_appearance_mode("System")
 
-class LightweightScrollFrame(tkinter.Frame):
-    """Lightweight scrollable frame using tk.Canvas + tk.Frame.
-    Avoids the overhead of ctk.CTkScrollableFrame (which creates
-    a CTkCanvas + scrollbar inside). ~3x faster to create.
 
-    Use .interior as parent for scrollable content.
-
-    NOTE: Outer frame bg matches the CTk theme so there's no visible
-    color gap between the scroll area and the sidebar.
-    """
-    def __init__(self, parent: Any, **kwargs: Any) -> None:
-        # Resolve theme colors BEFORE calling tkinter.Frame.__init__
-        mode = ctk.get_appearance_mode()
-        canvas_bg = "#F3F4F6" if mode == "Light" else "#2B2B2B"
-        scrollbar_bg = "#E5E7EB" if mode == "Light" else "#333333"
-
-        # Set outer frame bg to match canvas — prevents gray rectangle
-        # in the dark-themed sidebar.
-        bg = kwargs.pop("bg", canvas_bg)
-        tkinter.Frame.__init__(self, parent, bg=canvas_bg, **kwargs)
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_propagate(False)
-
-        # Create canvas and scrollbar
-        self.canvas = tkinter.Canvas(self, highlightthickness=0, borderwidth=0, bg=canvas_bg)
-        self.scrollbar = tkinter.Scrollbar(
-            self, orient="vertical",
-            command=self.canvas.yview,
-            bg=scrollbar_bg,
-            troughcolor=scrollbar_bg
-        )
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        self.canvas.grid(row=0, column=0, sticky="nsew")
-        self.scrollbar.grid(row=0, column=1, sticky="ns")
-
-        # Interior frame that holds the actual content
-        self.interior = tkinter.Frame(self.canvas, bg=canvas_bg)
-        self.interior_id = self.canvas.create_window(
-            (0, 0), window=self.interior, anchor="nw"
-        )
-
-        # Bind events
-        self.interior.bind("<Configure>", self._on_interior_configure)
-        self.canvas.bind("<Configure>", self._on_canvas_configure)
-        self.canvas.bind("<Enter>", self._bind_mousewheel)
-        self.canvas.bind("<Leave>", self._unbind_mousewheel)
-
-    def _on_interior_configure(self, event: Any = None) -> None:
-        """Update scroll region when interior frame changes size."""
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-    def _on_canvas_configure(self, event: Any = None) -> None:
-        """Resize interior to match canvas width."""
-        if event and self.interior_id:
-            try:
-                self.canvas.itemconfig(self.interior_id, width=event.width)
-            except Exception:
-                pass
-
-    def _bind_mousewheel(self, event: Any = None) -> None:
-        """Bind mousewheel to scroll."""
-        if sys.platform == "linux":
-            self.canvas.bind_all("<Button-4>", lambda e: self.canvas.yview_scroll(-3, "units"))
-            self.canvas.bind_all("<Button-5>", lambda e: self.canvas.yview_scroll(3, "units"))
-        else:
-            self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-
-    def _unbind_mousewheel(self, event: Any = None) -> None:
-        """Unbind mousewheel when leaving."""
-        if sys.platform == "linux":
-            self.canvas.unbind_all("<Button-4>")
-            self.canvas.unbind_all("<Button-5>")
-        else:
-            self.canvas.unbind_all("<MouseWheel>")
-
-    def _on_mousewheel(self, event: Any = None) -> None:
-        """Scroll on mousewheel event."""
-        if event:
-            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
 
 class NregaBotLiteApp(ctk.CTk, LicenseMixin):
@@ -177,8 +101,13 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
     def __init__(self) -> None:
         super().__init__()
+        
+        # NOTE: CTk.__init__ already calls self.withdraw() internally.
+        # We do NOT call self.withdraw() again — macOS has a known Tk bug
+        # where withdraw+deiconify breaks mouse event delivery.
+        # Instead, the splash is built as an internal Frame that covers
+        # the window until the real UI is ready.
 
-        self.withdraw()
         self.title(f"{config.APP_NAME}")
         
         self.initial_width = 920
@@ -221,18 +150,31 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.machine_id: str = self._get_machine_id()
         self.sound_manager = None  # No sounds in Lite
 
-        # --- Resize overlay (created after UI is built) ---
-        self._resize_overlay: Any = None
-        self._resize_timer: Any = None
-        self._is_resizing: bool = False
-        self._window_shown: bool = False  # Prevents overlay on initial paint
+        # --- Internal state ---
+        self._window_shown: bool = False
 
         # --- Icons (minimal set, for tab compatibility only) ---
         self.icon_images = create_icon_manager()
 
-        # --- Splash (minimal, no animation) ---
-        self._splash = self._create_splash()
-        self._splash.update()
+        # --- Splash frame (in-window, not a Toplevel child) ---
+        # macOS Tk bug: a Toplevel child of a withdrawn parent can break
+        # event delivery to the main window. Using a Frame instead avoids
+        # this entirely.
+        self._splash_frame = self._create_splash_frame()
+        self._splash_frame.pack(expand=True, fill="both")
+
+        # Show splash at FINAL app size — prevents visible resize flicker
+        # when UI replaces the splash later.
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        self._final_w = min(self.initial_width, sw - 40)
+        self._final_h = min(self.initial_height, sh - 40)
+        self._final_w = max(self._final_w, 850)
+        self._final_h = max(self._final_h, 600)
+        fx = (sw // 2) - (self._final_w // 2)
+        fy = (sh // 2) - (self._final_h // 2)
+        self.geometry(f'{self._final_w}x{self._final_h}+{int(fx)}+{int(fy)}')
+        self.deiconify()
+        self.update()
 
         # --- GC ---
         gc.set_threshold(*getattr(config, 'GC_THRESHOLD', (700, 10, 5)))
@@ -283,60 +225,84 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     def history_manager(self, value: Any) -> None:
         self._history_manager = value
         
-    def _create_splash(self) -> ctk.CTkToplevel:
-        """Minimal splash screen — no animations, just branding."""
-        splash = ctk.CTkToplevel(self)
-        splash.overrideredirect(True)
-        w, h = 300, 200
-        sw, sh = splash.winfo_screenwidth(), splash.winfo_screenheight()
-        x, y = (sw // 2) - (w // 2), (sh // 2) - (h // 2)
-        splash.geometry(f'{w}x{h}+{int(x)}+{int(y)}')
-        splash.configure(fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
-        
-        inner = ctk.CTkFrame(splash, fg_color="transparent")
-        inner.pack(expand=True, fill="both", padx=20, pady=20)
-        
+    def _create_splash_frame(self) -> ctk.CTkFrame:
+        """Create a polished in-window splash — shown while UI loads.
+        Uses all pack() (no place/grid mix) for consistent layout
+        across platforms. Centered branding, subtle loading bar.
+        """
+        splash = ctk.CTkFrame(self, corner_radius=0,
+                              fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
+
+        # Top spacer pushes center content down
+        ctk.CTkFrame(splash, fg_color="transparent").pack(expand=True, fill="both")
+
+        # Center branding block
         ctk.CTkLabel(
-            inner, text=f"{config.APP_NAME}",
-            font=ctk.CTkFont(family="Helvetica Neue", size=20, weight="bold"),
+            splash, text="🏛️",
+            font=ctk.CTkFont(size=36)
+        ).pack()
+
+        ctk.CTkLabel(
+            splash, text=config.APP_NAME,
+            font=ctk.CTkFont(family="Helvetica Neue", size=24, weight="bold"),
             text_color=(config.COLORS["text_dark"], config.COLORS["text_white"])
-        ).pack(pady=(15, 5))
-        
+        ).pack(pady=(8, 2))
+
         ctk.CTkLabel(
-            inner, text="Lightweight Edition",
-            font=ctk.CTkFont(size=11),
+            splash, text="Lightweight Edition",
+            font=ctk.CTkFont(size=12),
             text_color=(config.COLORS["blue_hover"], config.COLORS["blue_light"])
         ).pack()
-        
+
+        # Bottom spacer keeps content centered
+        ctk.CTkFrame(splash, fg_color="transparent").pack(expand=True, fill="both")
+
+        # Loading bar just above bottom
+        bar_frame = ctk.CTkFrame(splash, fg_color="transparent")
+        bar_frame.pack(side="bottom", fill="x", padx=40, pady=(0, 22))
+
+        progress = ctk.CTkProgressBar(
+            bar_frame, height=3, corner_radius=2,
+            mode="indeterminate",
+            fg_color=("#E5E7EB", "#374151"),
+            progress_color=(config.COLORS["blue_hover"], config.COLORS["blue_light"])
+        )
+        progress.pack(fill="x")
+        progress.start()
+
+        # Version at very bottom
         ctk.CTkLabel(
-            inner, text=f"v{config.APP_VERSION}",
-            font=ctk.CTkFont(size=11),
+            splash, text=f"v{config.APP_VERSION}",
+            font=ctk.CTkFont(size=10),
             text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
-        ).pack(side="bottom", pady=(0, 5))
-        
+        ).pack(side="bottom", pady=(0, 6))
+
         return splash
 
     def _build_ui_on_main_thread(self) -> None:
-        """Build the UI structure while splash is still visible.
-        Once built, destroy splash immediately and show main window.
+        """Build the UI structure.
+        First destroy the splash frame so it doesn't conflict with
+        _build_ui() which uses grid() on self (splash frame uses pack()).
+        Once built, show main window properly sized.
         """
+        # Destroy the in-window splash frame FIRST so self is free
+        # for _build_ui() which uses grid() — pack + grid on same
+        # parent causes TclError.
+        if self._splash_frame:
+            try:
+                self._splash_frame.destroy()
+            except Exception:
+                pass
+            self._splash_frame = None
+
         self._build_ui()
         self.app_state._layout_ready = True
 
-        # Destroy splash immediately — no fade-out animation needed
-        # because the main window is rendered invisible first, then
-        # revealed fully painted (alpha 0→1 trick in _fade_in_main_window).
-        if self._splash:
-            try:
-                self._splash.destroy()
-            except Exception:
-                pass
-            self._splash = None
+        # Resize window to full size and ensure proper focus
+        # (window was small for the splash)
+        self._show_window()
 
-        # Show main window with pre-paint (alpha=0 → paint → alpha=1)
-        self._fade_in_main_window()
-
-        # Brief pause then run license check (window is already visible)
+        # Brief pause then run license check
         self.after(50, self._run_license_check)
 
     def _run_license_check(self) -> None:
@@ -364,7 +330,15 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         header = ctk.CTkFrame(self, corner_radius=0, fg_color=("#FFFFFF", "#1D1E1E"))
         header.grid(row=0, column=0, sticky="ew", padx=15, pady=(10, 5))
 
-        ctk.CTkLabel(header, text="🏛️", font=ctk.CTkFont(size=18)).pack(side="left", padx=(10, 2))
+        # App logo — load from PNG (16px instead of main app's 20px)
+        try:
+            from PIL import Image as PILImage
+            logo_path = resource_path("assets/icons/nrega.png")
+            pil_img = PILImage.open(logo_path)
+            logo_img = ctk.CTkImage(pil_img, size=(16, 16))
+            ctk.CTkLabel(header, image=logo_img, text="").pack(side="left", padx=(8, 2))
+        except Exception:
+            ctk.CTkLabel(header, text="🏛️", font=ctk.CTkFont(size=18)).pack(side="left", padx=(10, 2))
         ctk.CTkLabel(header, text=config.APP_NAME, font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
         ctk.CTkLabel(header, text=f"v{config.APP_VERSION}", font=ctk.CTkFont(size=10), text_color="gray60").pack(side="left", padx=(5, 0))
 
@@ -379,7 +353,9 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             ctk.CTkButton(
                 header, text=label,
                 width=80, height=28, corner_radius=6,
-                fg_color="transparent", hover_color=("gray90", "gray30"),
+                fg_color="transparent",
+                text_color=("#333333", "#D1D5DB"),
+                hover_color=("gray90", "gray30"),
                 command=cmd, font=ctk.CTkFont(size=11)
             ).pack(side="left", padx=2)
 
@@ -421,8 +397,15 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             row=1, column=0, sticky="ew", padx=10, pady=(0, 4)
         )
 
-        self.nav_scroll = LightweightScrollFrame(sidebar)
+        self.nav_scroll = ctk.CTkScrollableFrame(
+            sidebar,
+            corner_radius=0,
+            fg_color="transparent",
+            scrollbar_button_color=("#BDBDBD", "#555555"),
+            scrollbar_button_hover_color=("#9E9E9E", "#666666"),
+        )
         self.nav_scroll.grid(row=2, column=0, sticky="nsew")
+        _suppress_overscroll(self.nav_scroll)
 
         # Content area — single container that never gets destroyed
         self.content_area = ctk.CTkFrame(main, corner_radius=0)
@@ -438,26 +421,37 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         # Navigation buttons
         self._create_nav_buttons()
 
-        # Create resize overlay (after layout is built)
-        self._create_resize_overlay()
+        # NOTE: Resize overlay is disabled for now — it was causing
+        # click-interception issues on macOS (Configure event storms).
+        # self._create_resize_overlay()
 
         # --- Footer ---
-        footer = ctk.CTkFrame(self, height=32, corner_radius=0, fg_color=("#FFFFFF", "#2B2B2B"))
+        footer = ctk.CTkFrame(self, height=34, corner_radius=0, fg_color=("#FFFFFF", "#2B2B2B"))
         footer.grid(row=2, column=0, sticky="ew", padx=15, pady=(0, 10))
         footer.grid_propagate(False)
+        footer.grid_columnconfigure(0, weight=1)
 
+        # Left: status
         self.status_label = ctk.CTkLabel(footer, text="Ready", text_color="gray60", font=ctk.CTkFont(size=11))
-        self.status_label.pack(side="left", padx=10)
+        self.status_label.grid(row=0, column=0, sticky="w", padx=10)
 
+        # Center: Copyright
+        ctk.CTkLabel(
+            footer, text="© 2025 NREGA Bot",
+            font=ctk.CTkFont(size=10),
+            text_color=("gray50", "gray50")
+        ).grid(row=0, column=0, sticky="")
+
+        # Right: server status indicator
         self.server_status_indicator = ctk.CTkFrame(footer, width=8, height=8, corner_radius=4, fg_color="gray")
-        self.server_status_indicator.pack(side="right", padx=10)
+        self.server_status_indicator.grid(row=0, column=0, sticky="e", padx=10)
 
     def _create_nav_buttons(self) -> None:
         """Create sidebar navigation from lite_tab_config using emoji text icons."""
         self.nav_buttons.clear()
-        # Use .interior for LightweightScrollFrame — widgets must go inside the
-        # scrollable canvas area, not the outer wrapper frame.
-        nav_parent = self.nav_scroll.interior
+        # Use nav_scroll directly — CTkScrollableFrame supports
+        # placing CTkButton/CTkLabel widgets natively.
+        nav_parent = self.nav_scroll
         tabs = self._get_cached_tabs()
         
         for cat_name, cat_tabs in tabs.items():
@@ -544,53 +538,19 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                               text_color=("gray30", "gray80"),
                               font=ctk.CTkFont(size=12))
 
-    def _hide_splash(self) -> None:
-        """Legacy alias for _fade_in_main_window.
-        Safely destroys splash and shows main window with pre-paint.
+    def _show_window(self) -> None:
+        """Activate the fully-built window with proper macOS focus.
+        No geometry change needed — splash already set the final size.
+        On macOS, focus_force() is critical because focus_set() doesn't
+        always activate the window.
         """
-        if self._splash:
-            try:
-                self._splash.destroy()
-            except Exception:
-                pass
-            self._splash = None
-        self._fade_in_main_window()
+        self._initial_geometry_set = True  # Prevent CTk's 20ms timer from overriding our geometry
 
-    def _fade_in_main_window(self) -> None:
-        """Shows main window fully rendered — no flicker.
-        Uses alpha=0 → paint → alpha=1 trick so the user sees
-        a complete window in one frame.
-        """
-        work_x, work_y, work_w, work_h = 0, 0, self.winfo_screenwidth(), self.winfo_screenheight()
-        app_w = min(self.initial_width, work_w - 40)
-        app_h = min(self.initial_height, work_h - 40)
-        app_w = max(app_w, 850)
-        app_h = max(app_h, 600)
-
-        x = (work_w // 2) - (app_w // 2)
-        y = (work_h // 2) - (app_h // 2)
-
-        self.geometry(f'{app_w}x{app_h}+{x}+{y}')
-
-        # Step 1: Make visible but fully transparent
-        self.attributes("-alpha", 0.0)
-        self.deiconify()
-
-        # Step 2: Force tkinter to paint everything NOW while still invisible
-        # Two full paint cycles ensure layout calculation AND pixel composition
-        for _ in range(2):
-            self.update()
-            self.update_idletasks()
-
-        # Step 3: Now show the fully-rendered window (all widgets in one frame)
-        self.attributes("-alpha", 1.0)
-        self._window_shown = True  # Allow resize overlay after initial show
-        # Gentle focus — avoid focus_force() which can freeze on some Windows systems
-        try:
-            self.lift()
-            self.focus_set()
-        except Exception:
-            pass
+        self.deiconify()  # Already shown, but safe no-op
+        self.update()
+        self.focus_force()
+        self.lift()
+        self._window_shown = True
 
     def _on_licensed(self) -> None:
         """Set up UI for licensed user.
@@ -707,6 +667,45 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
     def get_user_downloads_path(self) -> str:
         return get_user_downloads_path()
+
+    def log_message(self, log, msg: str, level: str = "info") -> None:
+        """Append a timestamped message to a log textbox.
+        Safe to call with a destroyed widget.
+        """
+        try:
+            if not log.winfo_exists():
+                return
+        except Exception:
+            return
+        try:
+            log.configure(state="normal")
+            log.insert(tkinter.END, f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+            log.configure(state="disabled")
+            log.see(tkinter.END)
+        except Exception:
+            pass
+
+    def update_history(self, key: str, val: Any) -> None:
+        """Save an entry to usage history — needed by tabs extending BaseAutomationTab."""
+        self.history_manager.save_entry(key, val)
+
+    def remove_history(self, key: str, val: Any) -> None:
+        """Remove an entry from usage history."""
+        self.history_manager.remove_entry(key, val)
+
+    def clear_log(self, log) -> None:
+        """Clear all content from a log textbox. Safe to call with destroyed widget."""
+        try:
+            if not log.winfo_exists():
+                return
+        except Exception:
+            return
+        try:
+            log.configure(state="normal")
+            log.delete("1.0", tkinter.END)
+            log.configure(state="disabled")
+        except Exception:
+            pass
 
     def play_sound(self, sound_name: str) -> None:
         """Silent in Lite version — no sound playback."""
@@ -1007,58 +1006,6 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             pass
         interval = getattr(config, 'GC_INTERVAL_MS', 180000)
         self._gc_timer_id = self.after(interval, self._gc_collection_loop)
-
-    # ============================================================================
-    # RESIZE SMOOTHING — flat overlay masks canvas redraw flicker
-    # ============================================================================
-
-    def _create_resize_overlay(self) -> None:
-        """Create a persistent overlay to mask canvas redraws during resize."""
-        if self._resize_overlay:
-            return
-        self._resize_overlay = ctk.CTkFrame(
-            self, corner_radius=0,
-            fg_color=("#FFFFFF", "#2B2B2B")
-        )
-        # Bind Configure event to detect resize
-        self.bind("<Configure>", self._on_window_resize_detect, add="+")
-
-    def _on_window_resize_detect(self, event: Any = None) -> None:
-        """Detect window resize and show overlay to mask flicker.
-        Skips the very first Configure event (initial window paint)
-        so the overlay doesn't cover the freshly-painted window.
-        """
-        if not self._window_shown:
-            return
-        if event and event.widget is not self:
-            return
-        if not self._resize_overlay or not self._resize_overlay.winfo_exists():
-            return
-
-        if not self._is_resizing:
-            self._is_resizing = True
-            try:
-                self._resize_overlay.place(x=0, y=0, relwidth=1, relheight=1)
-                self._resize_overlay.tkraise()
-            except Exception:
-                pass
-
-        if self._resize_timer:
-            try:
-                self.after_cancel(self._resize_timer)
-            except Exception:
-                pass
-        self._resize_timer = self.after(150, self._on_window_resize_end)
-
-    def _on_window_resize_end(self) -> None:
-        """Hide resize overlay after resize completes."""
-        self._is_resizing = False
-        self._resize_timer = None
-        if self._resize_overlay and self._resize_overlay.winfo_exists():
-            try:
-                self._resize_overlay.lower()
-            except Exception:
-                pass
 
     def on_closing(self, force: bool = False) -> None:
         if force or messagebox.askokcancel("Quit", "Quit application?"):

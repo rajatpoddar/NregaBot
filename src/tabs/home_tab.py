@@ -8,7 +8,7 @@ import customtkinter as ctk
 import tkinter as tk
 import time
 from PIL import Image
-from src.utils import resource_path
+from src.utils import resource_path, _suppress_overscroll
 from src import config
 from src.ui_components import AfterTracker
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -31,7 +31,16 @@ class HomeTab(ctk.CTkFrame):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, fg_color="transparent")
         self.app = app_instance
-        self.pack(expand=True, fill="both")
+        # Geometry is managed by the caller (show_frame in lite_app/main_app)
+        # Do NOT call self.pack() or self.grid() here — it conflicts with
+        # the parent container's geometry manager.
+        # See: _tkinter.TclError: cannot use geometry manager pack inside
+        #      a frame that already has slaves managed by grid
+        #
+        # However, prevent pack propagration so HomeTab maintains the size
+        # assigned by the parent's grid manager and doesn't shrink to fit
+        # its packed children's minimal requested sizes.
+        self.pack_propagate(False)
         
         # AfterTracker for safe callback cleanup on tab destroy.
         # HomeTab extends CTkFrame directly (not BaseAutomationTab),
@@ -54,6 +63,7 @@ class HomeTab(ctk.CTkFrame):
         )
         self.scroll_container.pack(expand=True, fill="both", padx=5, pady=5)
         self.scroll_container.grid_columnconfigure(0, weight=1)
+        _suppress_overscroll(self.scroll_container)
 
         # Build sections
         self._build_welcome_section()

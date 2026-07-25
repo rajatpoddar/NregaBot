@@ -1,8 +1,11 @@
 # lite_tab_config.py
 # Lightweight tab configuration for NREGA Bot Lite.
 #
-# Only the most essential tabs are included — removes heavy/uncommon tabs
-# like Macro Manager, File Manager, Feedback, Sarkar Aapke Dwar, etc.
+# Only the most essential automation tabs are included — as specified:
+#   Muster Roll Generate, Mate / Mistri MR, MR Fill, MSR Process,
+#   Gen Wagelist, Send Wagelist, Duplicate MR, EMB Entry, EMB Verify,
+#   Physical Complete, Scheme Closing, Delete Work Allocation,
+#   Delete Demand, Workcode Extractor, EKYC Report, Login Automation
 #
 # Uses Unicode emoji characters instead of PNG image files for icons,
 # resulting in faster startup and lower memory usage.
@@ -16,7 +19,7 @@ from src.tab_config import _lazy_import
 def get_tabs_definition_lite(app: Any) -> Dict[str, Dict[str, Any]]:
     """
     Returns a MINIMAL set of tabs for the Lite version.
-    Only the most commonly used tabs are included.
+    Only the most commonly used automation tabs are included.
     Uses Unicode emoji characters instead of PNG image icons.
     """
     return {
@@ -30,27 +33,22 @@ def get_tabs_definition_lite(app: Any) -> Dict[str, Dict[str, Any]]:
 
         # 1. MR & Wage Management (essential MR operations)
         "MR & Wage Management": {
-            "Demand": {
-                "creation_func": _lazy_import("DemandTab", "src.tabs.demand_tab"),
-                "icon": "📋",
-                "key": "demand"
-            },
-            "Work Allocation": {
-                "creation_func": _lazy_import("WorkAllocationTab", "src.tabs.work_allocation_tab"),
-                "icon": "🔄",
-                "key": "work_allocation"
-            },
             "Muster Roll Gen": {
                 "creation_func": _lazy_import("MusterrollGenTab", "src.tabs.musterroll_gen_tab"),
                 "icon": "📄",
                 "key": "mr_gen"
+            },
+            "Mate / Mistri MR": {
+                "creation_func": _lazy_import("MateMrGenTab", "src.tabs.mate_mr_gen_tab"),
+                "icon": "🛠️",
+                "key": "mate_mr"
             },
             "MR Fill": {
                 "creation_func": _lazy_import("MrFillTab", "src.tabs.mr_fill_tab"),
                 "icon": "✏️",
                 "key": "mr_fill"
             },
-            "MR Payment": {
+            "MSR Process": {
                 "creation_func": _lazy_import("MsrTab", "src.tabs.msr_tab"),
                 "icon": "💰",
                 "key": "msr_payment"
@@ -65,54 +63,29 @@ def get_tabs_definition_lite(app: Any) -> Dict[str, Dict[str, Any]]:
                 "icon": "📤",
                 "key": "wagelist_send"
             },
-            "FTO Generation": {
-                "creation_func": _lazy_import("FtoGenerationTab", "src.tabs.fto_generation_tab"),
-                "icon": "💳",
-                "key": "fto_gen"
-            },
-            "Duplicate MR Print": {
+            "Duplicate MR": {
                 "creation_func": _lazy_import("DuplicateMrTab", "src.tabs.duplicate_mr_tab"),
                 "icon": "🖨️",
                 "key": "duplicate_mr"
             },
-            "Material Entry": {
-                "creation_func": _lazy_import("MaterialEntryTab", "src.tabs.material_entry_tab"),
-                "icon": "📦",
-                "key": "material_entry"
-            },
         },
 
-        # 2. JE & AE Approval (essential)
-        "JE & AE Approval": {
-            "eMB Entry": {
+        # 2. EMB Approvals
+        "EMB Approvals": {
+            "EMB Entry": {
                 "creation_func": _lazy_import("MbEntryTab", "src.tabs.mb_entry_tab"),
                 "icon": "📝",
                 "key": "mb_entry"
             },
-            "eMB Verify": {
+            "EMB Verify": {
                 "creation_func": _lazy_import("EmbVerifyTab", "src.tabs.emb_verify_tab"),
                 "icon": "✅",
                 "key": "emb_verify"
             },
         },
 
-        # 3. Schemes (essential)
-        "Schemes Related": {
-            "Work Code Gen": {
-                "creation_func": _lazy_import("WcGenTab", "src.tabs.wc_gen_tab"),
-                "icon": "🔢",
-                "key": "wc_gen"
-            },
-            "IF Editor": {
-                "creation_func": _lazy_import("IfEditTab", "src.tabs.if_edit_tab"),
-                "icon": "📝",
-                "key": "if_editor"
-            },
-            "Update Estimate": {
-                "creation_func": _lazy_import("UpdateEstimateTab", "src.tabs.update_estimate_tab"),
-                "icon": "💰",
-                "key": "update_estimate"
-            },
+        # 3. Schemes
+        "Schemes": {
             "Physical Complete": {
                 "creation_func": _lazy_import("PhysicalCompleteTab", "src.tabs.physical_complete_tab"),
                 "icon": "🏗️",
@@ -123,38 +96,19 @@ def get_tabs_definition_lite(app: Any) -> Dict[str, Dict[str, Any]]:
                 "icon": "🔒",
                 "key": "scheme_closing"
             },
-            "Add Activity": {
-                "creation_func": _lazy_import("AddActivityTab", "src.tabs.add_activity_tab"),
-                "icon": "➕",
-                "key": "add_activity"
+            "Delete Work Allocation": {
+                "creation_func": _lazy_import("DelWorkAllocTab", "src.tabs.del_work_alloc_tab"),
+                "icon": "🗑️",
+                "key": "del_work_alloc"
+            },
+            "Delete Demand": {
+                "creation_func": _lazy_import("DelDemandTab", "src.tabs.del_demand_tab"),
+                "icon": "🗑️",
+                "key": "del_demand"
             },
         },
 
-        # 4. Reports & Tracking (simplified)
-        "Reports & Tracking": {
-            "MR Tracking": {
-                "creation_func": _lazy_import("MrTrackingTab", "src.tabs.mr_tracking_tab"),
-                "icon": "🔍",
-                "key": "mr_tracking"
-            },
-            "Dashboard Report": {
-                "creation_func": _lazy_import("DashboardReportTab", "src.tabs.dashboard_report_tab"),
-                "icon": "📊",
-                "key": "dashboard_report"
-            },
-            "MIS Reports": {
-                "creation_func": _lazy_import("MisReportsTab", "src.tabs.mis_reports_tab"),
-                "icon": "📈",
-                "key": "mis_reports"
-            },
-            "Issued MR Details": {
-                "creation_func": _lazy_import("IssuedMrReportTab", "src.tabs.issued_mr_report_tab"),
-                "icon": "📋",
-                "key": "issued_mr_report"
-            },
-        },
-
-        # 5. Smart Tools (essential only)
+        # 4. Smart Tools
         "Smart Tools": {
             "Login Automation": {
                 "creation_func": _lazy_import("LoginAutomationTab", "src.tabs.login_automation_tab"),
@@ -166,9 +120,14 @@ def get_tabs_definition_lite(app: Any) -> Dict[str, Dict[str, Any]]:
                 "icon": "🔧",
                 "key": "wc_extractor"
             },
+            "EKYC Report": {
+                "creation_func": _lazy_import("EKycReportTab", "src.tabs.ekyc_report_tab"),
+                "icon": "📇",
+                "key": "ekyc_report"
+            },
         },
 
-        # 6. About (simplified)
+        # 5. About (simplified)
         "About": {
             "About": {
                 "creation_func": _lazy_import("AboutTab", "src.tabs.about_tab"),

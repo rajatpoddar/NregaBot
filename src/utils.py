@@ -59,6 +59,37 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
     _LOGGER_SETUP_DONE = True
     return logger
 
+def _suppress_overscroll(scroll_frame) -> None:
+    """Suppress macOS overscroll "bounce" on a CTkScrollableFrame.
+    On macOS, trackpad momentum scrolling fires events even after
+    content reaches the scroll boundary, causing 1-2s of visible
+    rubber-banding/dance. This snaps the canvas back to the boundary
+    on every MouseWheel event, instantly killing the bounce.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        canvas = scroll_frame._canvas
+        parent_frame = scroll_frame._parent_frame
+
+        def _fix_boundary(_event=None):
+            if not canvas.winfo_exists():
+                return
+            yview = canvas.yview()
+            if yview[0] <= 0.0:
+                canvas.yview_moveto(0.0)
+            if yview[1] >= 1.0:
+                canvas.yview_moveto(1.0)
+
+        # Bind AFTER CTk's handler (add="+") so we snap back after
+        # any scroll that went past the boundary.
+        # Only bind on parent_frame — canvas binding is redundant since
+        # CTk's handler is on parent_frame and triggers the canvas scroll.
+        parent_frame.bind("<MouseWheel>", _fix_boundary, add="+")
+    except Exception:
+        pass
+
+
 def get_logger() -> logging.Logger:
     """Get the application's root logger. Call setup_logging() first."""
     return logging.getLogger("nregabot")
