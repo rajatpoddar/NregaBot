@@ -22,7 +22,6 @@
 # ============================================================================
 
 import threading
-import time
 import os
 import webbrowser
 import sys
@@ -30,11 +29,10 @@ import json
 import logging
 import socket
 import gc
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import tkinter
-from tkinter import messagebox, ttk
+from tkinter import messagebox
 import customtkinter as ctk
 import requests
 
@@ -44,14 +42,11 @@ from src import lite_config
 lite_config.apply_overrides()
 
 # --- Lite-specific imports ---
-from src.ui_components import ToastNotification, CollapsibleFrame
-from src.managers.browser_manager import BrowserManager
+from src.ui_components import ToastNotification
 from src.managers.services import ServiceManager
-from src.managers.workflow_manager import WorkflowManager
 from src.lite_tab_config import get_tabs_definition_lite
 from src.managers.icon_manager import create_icon_manager
 from src.app.app_license import LicenseMixin
-from src.tabs.history_manager import HistoryManager
 from src.utils import (
     resource_path, get_data_path, get_user_downloads_path,
     get_config, save_config, validate_config,
@@ -82,6 +77,89 @@ validate_config()
 ctk.set_default_color_theme(resource_path(os.path.join("config", "theme.json")))
 ctk.set_appearance_mode("System")
 
+class LightweightScrollFrame(tkinter.Frame):
+    """Lightweight scrollable frame using tk.Canvas + tk.Frame.
+    Avoids the overhead of ctk.CTkScrollableFrame (which creates
+    a CTkCanvas + scrollbar inside). ~3x faster to create.
+
+    Use .interior as parent for scrollable content.
+
+    NOTE: Outer frame bg matches the CTk theme so there's no visible
+    color gap between the scroll area and the sidebar.
+    """
+    def __init__(self, parent: Any, **kwargs: Any) -> None:
+        # Resolve theme colors BEFORE calling tkinter.Frame.__init__
+        mode = ctk.get_appearance_mode()
+        canvas_bg = "#F3F4F6" if mode == "Light" else "#2B2B2B"
+        scrollbar_bg = "#E5E7EB" if mode == "Light" else "#333333"
+
+        # Set outer frame bg to match canvas — prevents gray rectangle
+        # in the dark-themed sidebar.
+        bg = kwargs.pop("bg", canvas_bg)
+        tkinter.Frame.__init__(self, parent, bg=canvas_bg, **kwargs)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_propagate(False)
+
+        # Create canvas and scrollbar
+        self.canvas = tkinter.Canvas(self, highlightthickness=0, borderwidth=0, bg=canvas_bg)
+        self.scrollbar = tkinter.Scrollbar(
+            self, orient="vertical",
+            command=self.canvas.yview,
+            bg=scrollbar_bg,
+            troughcolor=scrollbar_bg
+        )
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
+
+        # Interior frame that holds the actual content
+        self.interior = tkinter.Frame(self.canvas, bg=canvas_bg)
+        self.interior_id = self.canvas.create_window(
+            (0, 0), window=self.interior, anchor="nw"
+        )
+
+        # Bind events
+        self.interior.bind("<Configure>", self._on_interior_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+        self.canvas.bind("<Enter>", self._bind_mousewheel)
+        self.canvas.bind("<Leave>", self._unbind_mousewheel)
+
+    def _on_interior_configure(self, event: Any = None) -> None:
+        """Update scroll region when interior frame changes size."""
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event: Any = None) -> None:
+        """Resize interior to match canvas width."""
+        if event and self.interior_id:
+            try:
+                self.canvas.itemconfig(self.interior_id, width=event.width)
+            except Exception:
+                pass
+
+    def _bind_mousewheel(self, event: Any = None) -> None:
+        """Bind mousewheel to scroll."""
+        if sys.platform == "linux":
+            self.canvas.bind_all("<Button-4>", lambda e: self.canvas.yview_scroll(-3, "units"))
+            self.canvas.bind_all("<Button-5>", lambda e: self.canvas.yview_scroll(3, "units"))
+        else:
+            self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _unbind_mousewheel(self, event: Any = None) -> None:
+        """Unbind mousewheel when leaving."""
+        if sys.platform == "linux":
+            self.canvas.unbind_all("<Button-4>")
+            self.canvas.unbind_all("<Button-5>")
+        else:
+            self.canvas.unbind_all("<MouseWheel>")
+
+    def _on_mousewheel(self, event: Any = None) -> None:
+        """Scroll on mousewheel event."""
+        if event:
+            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+
 class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     """
     Lightweight version of NREGA Bot for low-end devices.
@@ -103,9 +181,9 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.withdraw()
         self.title(f"{config.APP_NAME}")
         
-        self.initial_width = 1000
-        self.initial_height = 750
-        self.minsize(850, 600)
+        self.initial_width = 920
+        self.initial_height = 680
+        self.minsize(800, 550)
         
         self.configure(bg=config.COLORS["bg_dark"])
         
@@ -113,7 +191,6 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.http_session = requests.Session()
         self.stop_events: Dict[str, Any] = {}
         self.tab_instances: Dict[str, Any] = {}
-        self.content_frames: Dict[str, Any] = {}
         self.active_automations: Set[str] = set()
         self.automation_threads: Dict[str, Any] = {}
         self.license_info: Dict[str, Any] = {}
@@ -133,31 +210,78 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.category_frames: Dict[str, Any] = {}
         # For compatibility with tab files accessing self.app.app_state.xxx
         self._app_state_fallback: Dict[str, Any] = {}
-        
-        # --- Services (must init BEFORE _get_machine_id since it depends on services) ---
+
+        # --- Lazy-init placeholders (created on first access) ---
+        self._browser_manager: Any = None
+        self._workflows: Any = None
+        self._history_manager: Any = None
+
+        # --- Services (must init BEFORE _get_machine_id) ---
         self.services = ServiceManager(self)
         self.machine_id: str = self._get_machine_id()
-        self.browser_manager = BrowserManager(self)
-        self.history_manager = HistoryManager(self.get_data_path)
-        self.workflows = WorkflowManager(self)
         self.sound_manager = None  # No sounds in Lite
-        
+
+        # --- Resize overlay (created after UI is built) ---
+        self._resize_overlay: Any = None
+        self._resize_timer: Any = None
+        self._is_resizing: bool = False
+        self._window_shown: bool = False  # Prevents overlay on initial paint
+
         # --- Icons (minimal set, for tab compatibility only) ---
         self.icon_images = create_icon_manager()
-        # No preload_essential() — Lite uses emoji text, not PNG images
-        
+
         # --- Splash (minimal, no animation) ---
         self._splash = self._create_splash()
         self._splash.update()
-        
+
         # --- GC ---
-        gc.set_threshold(500, 5, 3)
+        gc.set_threshold(*getattr(config, 'GC_THRESHOLD', (700, 10, 5)))
         gc.freeze()
-        
+
         # --- Start background init ---
-        threading.Thread(target=self._background_init, daemon=True).start()
-        
+        self.after(10, self._build_ui_on_main_thread)
+
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    # ============================================================================
+    # LAZY PROPERTIES — heavy managers are created only on first access
+    # ============================================================================
+
+    @property
+    def browser_manager(self) -> Any:
+        """Lazy-initialized BrowserManager."""
+        if self._browser_manager is None:
+            from src.managers.browser_manager import BrowserManager
+            self._browser_manager = BrowserManager(self)
+        return self._browser_manager
+
+    @browser_manager.setter
+    def browser_manager(self, value: Any) -> None:
+        self._browser_manager = value
+
+    @property
+    def workflows(self) -> Any:
+        """Lazy-initialized WorkflowManager."""
+        if self._workflows is None:
+            from src.managers.workflow_manager import WorkflowManager
+            self._workflows = WorkflowManager(self)
+        return self._workflows
+
+    @workflows.setter
+    def workflows(self, value: Any) -> None:
+        self._workflows = value
+
+    @property
+    def history_manager(self) -> Any:
+        """Lazy-initialized HistoryManager."""
+        if self._history_manager is None:
+            from src.tabs.history_manager import HistoryManager
+            self._history_manager = HistoryManager(self.get_data_path)
+        return self._history_manager
+
+    @history_manager.setter
+    def history_manager(self, value: Any) -> None:
+        self._history_manager = value
         
     def _create_splash(self) -> ctk.CTkToplevel:
         """Minimal splash screen — no animations, just branding."""
@@ -192,19 +316,31 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         
         return splash
 
-    def _background_init(self) -> None:
-        """Simple background init — no animations, just build UI."""
-        self.after(10, self._finish_startup)
-
-    def _finish_startup(self) -> None:
-        """Build the UI directly — no progressive rendering."""
+    def _build_ui_on_main_thread(self) -> None:
+        """Build the UI structure while splash is still visible.
+        Once built, destroy splash immediately and show main window.
+        """
         self._build_ui()
-        
-        # Hide splash FIRST so the main window is visible
-        # as a proper parent for the activation dialog (fixes blank screen)
-        self._hide_splash()
-        
-        # Use LicenseMixin's perform_license_check_flow pattern
+        self.app_state._layout_ready = True
+
+        # Destroy splash immediately — no fade-out animation needed
+        # because the main window is rendered invisible first, then
+        # revealed fully painted (alpha 0→1 trick in _fade_in_main_window).
+        if self._splash:
+            try:
+                self._splash.destroy()
+            except Exception:
+                pass
+            self._splash = None
+
+        # Show main window with pre-paint (alpha=0 → paint → alpha=1)
+        self._fade_in_main_window()
+
+        # Brief pause then run license check (window is already visible)
+        self.after(50, self._run_license_check)
+
+    def _run_license_check(self) -> None:
+        """Handle license validation after window is shown."""
         self.is_licensed = self.services.check_license()
         
         if self.is_licensed:
@@ -223,91 +359,106 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         """Simplified UI — header, sidebar, content area, footer."""
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        
-        # --- Header ---
-        header = ctk.CTkFrame(self, corner_radius=0, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_darker"]))
+
+        # --- Header (flattened — no redundant branding wrapper) ---
+        header = ctk.CTkFrame(self, corner_radius=0, fg_color=("#FFFFFF", "#1D1E1E"))
         header.grid(row=0, column=0, sticky="ew", padx=15, pady=(10, 5))
-        header.grid_columnconfigure(1, weight=1)
-        
-        # Logo + Name
-        branding = ctk.CTkFrame(header, fg_color="transparent")
-        branding.grid(row=0, column=0, sticky="w", padx=10, pady=5)
-        ctk.CTkLabel(branding, text="🏛️", font=ctk.CTkFont(size=18)).pack(side="left", padx=(0, 5))
-        ctk.CTkLabel(branding, text=config.APP_NAME, font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
-        ctk.CTkLabel(branding, text=f"v{config.APP_VERSION}", font=ctk.CTkFont(size=10), text_color="gray60").pack(side="left", padx=(5, 0))
-        
-        # Header action buttons — browsers + quick tools
-        controls = ctk.CTkFrame(header, fg_color="transparent")
-        controls.grid(row=0, column=2, sticky="e", padx=10)
-        
-        # Browser buttons with clear labels
-        header_actions = [
+
+        ctk.CTkLabel(header, text="🏛️", font=ctk.CTkFont(size=18)).pack(side="left", padx=(10, 2))
+        ctk.CTkLabel(header, text=config.APP_NAME, font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
+        ctk.CTkLabel(header, text=f"v{config.APP_VERSION}", font=ctk.CTkFont(size=10), text_color="gray60").pack(side="left", padx=(5, 0))
+
+        # Spacer pushes controls to the right
+        ctk.CTkLabel(header, text="", width=0).pack(side="left", fill="x", expand=True)
+
+        # Header action buttons
+        for label, cmd in [
             ("🌐 Chrome", self.launch_chrome_detached),
             ("🦊 Firefox", self.launch_firefox_managed),
-        ]
-        for label, cmd in header_actions:
-            btn = ctk.CTkButton(
-                controls, text=label,
-                width=90, height=30, corner_radius=8,
+        ]:
+            ctk.CTkButton(
+                header, text=label,
+                width=80, height=28, corner_radius=6,
                 fg_color="transparent", hover_color=("gray90", "gray30"),
-                command=cmd,
-                font=ctk.CTkFont(size=12)
-            )
-            btn.pack(side="left", padx=2)
-        
-        # Small separator
-        ctk.CTkFrame(controls, width=1, height=20, fg_color=("gray80", "gray50")).pack(side="left", padx=6)
-        
-        # Workcode Extractor quick-access button
-        self._header_wc_btn = ctk.CTkButton(
-            controls, text="🔧 Extract",
-            width=90, height=30, corner_radius=8,
+                command=cmd, font=ctk.CTkFont(size=11)
+            ).pack(side="left", padx=2)
+
+        ctk.CTkFrame(header, width=1, height=18, fg_color=("gray80", "gray50")).pack(side="left", padx=4)
+
+        ctk.CTkButton(
+            header, text="🔧 Extract",
+            width=80, height=28, corner_radius=6,
             fg_color=("#E8F5E9", "#2E7D32"),
             hover_color=("#C8E6C9", "#1B5E20"),
             text_color=("#2E7D32", "#A5D6A7"),
             command=lambda: self.show_frame("Workcode Extractor"),
-            font=ctk.CTkFont(size=12, weight="bold")
-        )
-        self._header_wc_btn.pack(side="left", padx=2)
-        
+            font=ctk.CTkFont(size=11, weight="bold")
+        ).pack(side="left", padx=2)
+
         # --- Main Layout ---
         main = ctk.CTkFrame(self, corner_radius=0)
         main.grid(row=1, column=0, sticky="nsew", padx=15, pady=(5, 5))
         main.grid_rowconfigure(0, weight=1)
         main.grid_columnconfigure(1, weight=1)
-        
-        # Sidebar
-        sidebar = ctk.CTkFrame(main, width=200, corner_radius=0, fg_color="transparent")
+
+        # Sidebar — lightweight scrollable nav
+        sidebar = ctk.CTkFrame(main, width=180, corner_radius=0, fg_color="transparent")
         sidebar.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
-        sidebar.grid_rowconfigure(1, weight=1)
-        
-        self.nav_scroll = ctk.CTkScrollableFrame(sidebar, fg_color="transparent", corner_radius=0)
-        self.nav_scroll.grid(row=1, column=0, sticky="nsew")
-        
-        # Content area
+        sidebar.grid_rowconfigure(2, weight=1)
+        sidebar.grid_propagate(False)
+
+        # Sidebar header
+        nav_header = ctk.CTkFrame(sidebar, fg_color="transparent")
+        nav_header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 2))
+        ctk.CTkLabel(
+            nav_header, text="📋  Navigation",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=("gray50", "gray55")
+        ).pack(side="left")
+
+        # Separator
+        ctk.CTkFrame(sidebar, height=1, fg_color=("gray80", "gray35")).grid(
+            row=1, column=0, sticky="ew", padx=10, pady=(0, 4)
+        )
+
+        self.nav_scroll = LightweightScrollFrame(sidebar)
+        self.nav_scroll.grid(row=2, column=0, sticky="nsew")
+
+        # Content area — single container that never gets destroyed
         self.content_area = ctk.CTkFrame(main, corner_radius=0)
         self.content_area.grid(row=0, column=1, sticky="nsew")
         self.content_area.grid_rowconfigure(0, weight=1)
         self.content_area.grid_columnconfigure(0, weight=1)
-        
+
+        self._tab_container = ctk.CTkFrame(self.content_area, corner_radius=0)
+        self._tab_container.grid(row=0, column=0, sticky="nsew")
+        self._tab_container.grid_rowconfigure(0, weight=1)
+        self._tab_container.grid_columnconfigure(0, weight=1)
+
         # Navigation buttons
         self._create_nav_buttons()
-        
+
+        # Create resize overlay (after layout is built)
+        self._create_resize_overlay()
+
         # --- Footer ---
-        footer = ctk.CTkFrame(self, height=35, corner_radius=0, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
+        footer = ctk.CTkFrame(self, height=32, corner_radius=0, fg_color=("#FFFFFF", "#2B2B2B"))
         footer.grid(row=2, column=0, sticky="ew", padx=15, pady=(0, 10))
         footer.grid_propagate(False)
-        
+
         self.status_label = ctk.CTkLabel(footer, text="Ready", text_color="gray60", font=ctk.CTkFont(size=11))
         self.status_label.pack(side="left", padx=10)
-        
+
         self.server_status_indicator = ctk.CTkFrame(footer, width=8, height=8, corner_radius=4, fg_color="gray")
         self.server_status_indicator.pack(side="right", padx=10)
 
     def _create_nav_buttons(self) -> None:
         """Create sidebar navigation from lite_tab_config using emoji text icons."""
         self.nav_buttons.clear()
-        tabs = get_tabs_definition_lite(self)
+        # Use .interior for LightweightScrollFrame — widgets must go inside the
+        # scrollable canvas area, not the outer wrapper frame.
+        nav_parent = self.nav_scroll.interior
+        tabs = self._get_cached_tabs()
         
         for cat_name, cat_tabs in tabs.items():
             if cat_name == "Dashboard":
@@ -316,7 +467,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                     emoji = data.get("icon", "")
                     btn_text = f"{emoji}  {name}" if emoji else name
                     btn = ctk.CTkButton(
-                        self.nav_scroll, text=btn_text,
+                        nav_parent, text=btn_text,
                         compound="left", anchor="w",
                         font=ctk.CTkFont(size=12, weight="bold"),
                         height=30, corner_radius=6,
@@ -328,11 +479,11 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                     btn.pack(fill="x", padx=5, pady=2)
                     self.nav_buttons[name] = btn
                 # Separator
-                ctk.CTkFrame(self.nav_scroll, height=1, fg_color=("gray85", "gray35")).pack(fill="x", padx=15, pady=5)
+                ctk.CTkFrame(nav_parent, height=1, fg_color=("gray85", "gray35")).pack(fill="x", padx=15, pady=5)
             else:
                 # Category label
                 ctk.CTkLabel(
-                    self.nav_scroll, text=cat_name,
+                    nav_parent, text=cat_name,
                     font=ctk.CTkFont(size=11, weight="bold"),
                     text_color=("gray50", "gray60")
                 ).pack(fill="x", padx=10, pady=(5, 2))
@@ -341,7 +492,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                     emoji = data.get("icon", "")
                     btn_text = f"{emoji}  {name}" if emoji else name
                     btn = ctk.CTkButton(
-                        self.nav_scroll, text=btn_text,
+                        nav_parent, text=btn_text,
                         compound="left", anchor="w",
                         font=ctk.CTkFont(size=12),
                         height=28, corner_radius=6,
@@ -354,27 +505,32 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                     self.nav_buttons[name] = btn
 
     def show_frame(self, page_name: str) -> None:
-        """Load and show a tab (lazy loading)."""
-        # Check if already loaded
-        if page_name in self.tab_instances and page_name in self.content_frames:
-            self.content_frames[page_name].tkraise()
+        """Load and show a tab (lazy loading) into reusable container.
+        No per-tab CTkFrame wrappers — saves memory and creation time.
+        """
+        # If already loaded, just raise the existing widget
+        if page_name in self.tab_instances:
+            self.tab_instances[page_name].tkraise()
             self._update_nav_highlight(page_name)
             return
-        
-        tabs = get_tabs_definition_lite(self)
+
+        # Load new tab into the reusable container
+        tabs = self._get_cached_tabs()
         for cat, tab_items in tabs.items():
             if page_name in tab_items:
-                frame = ctk.CTkFrame(self.content_area, corner_radius=0)
-                frame.grid(row=0, column=0, sticky="nsew")
-                
-                instance = tab_items[page_name]["creation_func"](frame, self)
-                instance.pack(expand=True, fill="both")
-                
-                self.content_frames[page_name] = frame
+                instance = tab_items[page_name]["creation_func"](self._tab_container, self)
+                instance.grid(row=0, column=0, sticky="nsew")
+
                 self.tab_instances[page_name] = instance
-                frame.tkraise()
+                instance.tkraise()
                 self._update_nav_highlight(page_name)
                 return
+
+    def _get_cached_tabs(self) -> Dict[str, Dict[str, Any]]:
+        """Return cached tab definitions — built once, reused forever."""
+        if self._tabs_cache is None:
+            self._tabs_cache = get_tabs_definition_lite(self)
+        return self._tabs_cache
 
     def _update_nav_highlight(self, page_name: str) -> None:
         """Highlight the active nav button."""
@@ -389,37 +545,62 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                               font=ctk.CTkFont(size=12))
 
     def _hide_splash(self) -> None:
-        """Destroy splash and show main window."""
+        """Legacy alias for _fade_in_main_window.
+        Safely destroys splash and shows main window with pre-paint.
+        """
         if self._splash:
             try:
                 self._splash.destroy()
             except Exception:
                 pass
             self._splash = None
-        
+        self._fade_in_main_window()
+
+    def _fade_in_main_window(self) -> None:
+        """Shows main window fully rendered — no flicker.
+        Uses alpha=0 → paint → alpha=1 trick so the user sees
+        a complete window in one frame.
+        """
         work_x, work_y, work_w, work_h = 0, 0, self.winfo_screenwidth(), self.winfo_screenheight()
         app_w = min(self.initial_width, work_w - 40)
         app_h = min(self.initial_height, work_h - 40)
         app_w = max(app_w, 850)
         app_h = max(app_h, 600)
-        
+
         x = (work_w // 2) - (app_w // 2)
         y = (work_h // 2) - (app_h // 2)
-        
+
         self.geometry(f'{app_w}x{app_h}+{x}+{y}')
+
+        # Step 1: Make visible but fully transparent
+        self.attributes("-alpha", 0.0)
         self.deiconify()
-        self.lift()
-        self.focus_force()
+
+        # Step 2: Force tkinter to paint everything NOW while still invisible
+        # Two full paint cycles ensure layout calculation AND pixel composition
+        for _ in range(2):
+            self.update()
+            self.update_idletasks()
+
+        # Step 3: Now show the fully-rendered window (all widgets in one frame)
+        self.attributes("-alpha", 1.0)
+        self._window_shown = True  # Allow resize overlay after initial show
+        # Gentle focus — avoid focus_force() which can freeze on some Windows systems
+        try:
+            self.lift()
+            self.focus_set()
+        except Exception:
+            pass
 
     def _on_licensed(self) -> None:
-        """Set up UI for licensed user."""
+        """Set up UI for licensed user.
+        Show Home directly — no About preload that could cause flicker.
+        About tab loads lazily when user clicks it.
+        """
         self.set_status("Ready")
-        self._show_frame_about()
-        # Update About tab's subscription details with current license info
-        about_tab = self.tab_instances.get("About")
-        if about_tab and hasattr(about_tab, 'update_subscription_details'):
-            about_tab.update_subscription_details(self.license_info)
         self.show_frame("Home")
+        # Start periodic GC collection after a short delay
+        self.after(5000, self._gc_collection_loop)
 
     def get_tabs_definition(self) -> Dict[str, Dict[str, Any]]:
         """Delegate to lite_tab_config - HomeTab and other tabs call this."""
@@ -796,11 +977,12 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     # Known state fields that may be accessed by tab files but aren't defined
     # on NregaBotLiteApp. If accessed, return None gracefully instead of
     # AttributeError.
-    _layout_ready: bool = True
+    _layout_ready: bool = False
     _history_window: Any = None
     _focus_validation_timer: Any = None
     _cached_style: Any = None
     _gc_timer_id: Any = None
+    _tabs_cache: Optional[Dict[str, Any]] = None
     update_info: Dict[str, Any] = None
     current_toast: Any = None
     announcement_label: Any = None
@@ -813,8 +995,79 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             return self.services.machine_id
         return "unknown"
 
+    def _gc_collection_loop(self) -> None:
+        """Periodic GC collection to prevent memory fragmentation
+        during long sessions. Runs every 3 minutes.
+        """
+        try:
+            collected = gc.collect()
+            if collected > 0:
+                logger.debug(f"GC collected {collected} objects")
+        except Exception:
+            pass
+        interval = getattr(config, 'GC_INTERVAL_MS', 180000)
+        self._gc_timer_id = self.after(interval, self._gc_collection_loop)
+
+    # ============================================================================
+    # RESIZE SMOOTHING — flat overlay masks canvas redraw flicker
+    # ============================================================================
+
+    def _create_resize_overlay(self) -> None:
+        """Create a persistent overlay to mask canvas redraws during resize."""
+        if self._resize_overlay:
+            return
+        self._resize_overlay = ctk.CTkFrame(
+            self, corner_radius=0,
+            fg_color=("#FFFFFF", "#2B2B2B")
+        )
+        # Bind Configure event to detect resize
+        self.bind("<Configure>", self._on_window_resize_detect, add="+")
+
+    def _on_window_resize_detect(self, event: Any = None) -> None:
+        """Detect window resize and show overlay to mask flicker.
+        Skips the very first Configure event (initial window paint)
+        so the overlay doesn't cover the freshly-painted window.
+        """
+        if not self._window_shown:
+            return
+        if event and event.widget is not self:
+            return
+        if not self._resize_overlay or not self._resize_overlay.winfo_exists():
+            return
+
+        if not self._is_resizing:
+            self._is_resizing = True
+            try:
+                self._resize_overlay.place(x=0, y=0, relwidth=1, relheight=1)
+                self._resize_overlay.tkraise()
+            except Exception:
+                pass
+
+        if self._resize_timer:
+            try:
+                self.after_cancel(self._resize_timer)
+            except Exception:
+                pass
+        self._resize_timer = self.after(150, self._on_window_resize_end)
+
+    def _on_window_resize_end(self) -> None:
+        """Hide resize overlay after resize completes."""
+        self._is_resizing = False
+        self._resize_timer = None
+        if self._resize_overlay and self._resize_overlay.winfo_exists():
+            try:
+                self._resize_overlay.lower()
+            except Exception:
+                pass
+
     def on_closing(self, force: bool = False) -> None:
         if force or messagebox.askokcancel("Quit", "Quit application?"):
+            # Cancel periodic GC timer
+            if self._gc_timer_id:
+                try:
+                    self.after_cancel(self._gc_timer_id)
+                except Exception:
+                    pass
             gc.collect()
             try:
                 if self.driver:
