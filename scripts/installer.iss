@@ -1,5 +1,10 @@
 ; NREGA Bot Inno Setup Script
 ; Version 3.0.7
+;
+; IMPORTANT: Inno Setup resolves all relative paths in this file
+; RELATIVE TO THIS FILE'S LOCATION (scripts/ directory).
+; Therefore ALL file paths must be prefixed with ..\ to point
+; to the project root where the actual files reside.
 
 ; The build script will override this version. This is a fallback.
 #define AppVersion "3.0.7"
@@ -8,6 +13,9 @@
 #define AppURL "https://nregabot.com"
 #define AppExeName "NREGA Bot.exe"
 #define OutputName "NREGABot-v" + AppVersion + "-Setup"
+
+; Root directory (parent of scripts/ where this .iss file lives)
+#define RootDir "..\"
 
 [Setup]
 ; This ID must be the SAME for all versions to ensure proper updates.
@@ -20,18 +28,18 @@ AppSupportURL={#AppURL}
 DefaultDirName={autopf64}\{#AppName}
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
-OutputDir=dist\installer
+OutputDir={#RootDir}dist\installer
 OutputBaseFilename={#OutputName}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
 UninstallDisplayIcon={app}\{#AppExeName}
-SetupIconFile=assets\app_icon.ico
-WizardImageFile=assets\wizard_image.bmp
-WizardSmallImageFile=assets\wizard_small_image.bmp
-LicenseFile=docs\license.txt
-InfoBeforeFile=docs\infobefore.txt
+SetupIconFile={#RootDir}assets\app_icon.ico
+WizardImageFile={#RootDir}assets\wizard_image.bmp
+WizardSmallImageFile={#RootDir}assets\wizard_small_image.bmp
+LicenseFile={#RootDir}docs\license.txt
+InfoBeforeFile={#RootDir}docs\infobefore.txt
 DisableReadyPage=yes
 CloseApplications=yes
 CloseApplicationsFilter=NREGA Bot.exe
@@ -44,9 +52,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Main executable
-Source: "dist\NREGA Bot\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#RootDir}dist\NREGA Bot\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 ; All supporting files from the onedir build (DLLs, assets, etc.)
-Source: "dist\NREGA Bot\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#RootDir}dist\NREGA Bot\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
