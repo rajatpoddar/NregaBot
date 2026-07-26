@@ -85,19 +85,19 @@ jobs:
       steps:
         - name: Checkout code
           uses: actions/checkout@v4
-  
+   
         - name: Set up Python 3.11
           uses: actions/setup-python@v5
           with:
             python-version: '3.11'
-  
+   
         - name: Install dependencies
           run: pip install -r requirements.txt
-  
+   
         - name: Create .env file
           run: echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" > .env
           shell: bash
-  
+   
         - name: Install Inno Setup
           run: choco install innosetup --yes
           shell: powershell
@@ -149,37 +149,83 @@ jobs:
             shutil.rmtree(temp_dir)
             print(f'Success: Created {zip_name}')
 
-        - name: Debug - List installer output directory
+        # ============ BUG FIX #1: Better debugging ============
+        - name: Debug - Complete dist directory tree
           shell: powershell
           run: |
-            Write-Host "=== dist/installer/ contents ==="
-            if (Test-Path "dist/installer") {
-              Get-ChildItem -Path "dist/installer" -Recurse | Select-Object Name, Length, LastWriteTime
-            } else {
-              Write-Host "[WARNING] dist/installer/ does NOT exist!"
-            }
-            Write-Host "=== dist/ *.exe files ==="
-            Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse | Select-Object Name, Length, FullName
-            Write-Host "=== dist/ *.zip files ==="
-            Get-ChildItem -Path "dist" -Filter "*.zip" | Select-Object Name, Length
-
-        - name: Verify installer EXE exists
-          shell: powershell
-          run: |
-            $installerDir = "dist\installer"
-            if (Test-Path $installerDir) {
-              $files = Get-ChildItem -Path $installerDir -Filter "*.exe"
-              if ($files.Count -gt 0) {
-                Write-Host "✅ Installer EXE found:"
-                $files | ForEach-Object { Write-Host "   - $($_.Name) ($($_.Length / 1MB) MB)" }
-              } else {
-                Write-Host "❌ FATAL ERROR: No .exe files found in dist/installer/"
-                Write-Host "Build failed. Installer was not created by Inno Setup."
-                exit 1
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host "DEBUG: Complete dist/ directory structure" -ForegroundColor Cyan
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host ""
+            
+            if (Test-Path "dist") {
+              Get-ChildItem -Path "dist" -Recurse | ForEach-Object {
+                $relativePath = $_.FullName.Replace((Get-Item "dist").FullName, "")
+                $indent = "  " * ([regex]::Matches($relativePath, "\\").Count)
+                if ($_.PSIsContainer) {
+                  Write-Host "$indent📁 $($_.Name)/" -ForegroundColor Yellow
+                } else {
+                  $size = if ($_.Length -gt 1MB) { "$([math]::Round($_.Length / 1MB, 2)) MB" } else { "$([math]::Round($_.Length / 1KB, 2)) KB" }
+                  Write-Host "$indent📄 $($_.Name) [$size]" -ForegroundColor Green
+                }
               }
             } else {
-              Write-Host "❌ FATAL ERROR: dist/installer/ directory does NOT exist!"
-              Write-Host "Inno Setup did not create the installer directory."
+              Write-Host "ERROR: dist/ directory does not exist!" -ForegroundColor Red
+            }
+            
+            Write-Host ""
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host "INSTALLER SEARCH" -ForegroundColor Cyan
+            Write-Host "========================================" -ForegroundColor Cyan
+            
+            $setupFiles = Get-ChildItem -Path "dist" -Filter "*Setup*.exe" -Recurse -ErrorAction SilentlyContinue
+            if ($setupFiles) {
+              Write-Host "✅ Found $($setupFiles.Count) Setup EXE file(s):" -ForegroundColor Green
+              $setupFiles | ForEach-Object { 
+                Write-Host "   - $($_.Name)" -ForegroundColor Green
+                Write-Host "     Path: $($_.FullName)" -ForegroundColor Gray
+              }
+            } else {
+              Write-Host "❌ NO Setup EXE files found!" -ForegroundColor Red
+            }
+
+        # ============ BUG FIX #2: Verify the installer was actually created ============
+        - name: Verify installer was created by Inno Setup
+          shell: powershell
+          run: |
+            Write-Host ""
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host "VERIFYING INSTALLER" -ForegroundColor Cyan
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host ""
+            
+            $setupFiles = Get-ChildItem -Path "dist" -Filter "*Setup*.exe" -Recurse -ErrorAction SilentlyContinue
+            
+            if ($setupFiles -and $setupFiles.Count -gt 0) {
+              Write-Host "✅ SUCCESS: Installer EXE created!" -ForegroundColor Green
+              Write-Host ""
+              $setupFiles | ForEach-Object { 
+                $size = [math]::Round($_.Length / 1MB, 2)
+                Write-Host "   📦 $($_.Name)" -ForegroundColor Green
+                Write-Host "      Size: $size MB" -ForegroundColor Green
+                Write-Host "      Created: $($_.CreationTime)" -ForegroundColor Gray
+              }
+              Write-Host ""
+            } else {
+              Write-Host "❌ FATAL ERROR: Installer EXE NOT found!" -ForegroundColor Red
+              Write-Host ""
+              Write-Host "This means Inno Setup failed to create the installer." -ForegroundColor Red
+              Write-Host "Check the build script output above for Inno Setup errors." -ForegroundColor Red
+              Write-Host ""
+              
+              $allExe = Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue
+              if ($allExe) {
+                Write-Host "Other .exe files found:" -ForegroundColor Yellow
+                $allExe | ForEach-Object { Write-Host "   - $($_.FullName)" -ForegroundColor Yellow }
+              } else {
+                Write-Host "No .exe files found anywhere in dist/" -ForegroundColor Red
+              }
+              
               exit 1
             }
 
@@ -190,14 +236,15 @@ jobs:
             $source = "dist\NREGA Bot\*"
             $dest = "dist\NREGABot-v${version}-Portable.zip"
             Compress-Archive -Path $source -DestinationPath $dest -Force
-            Write-Host "Created: $dest"
+            Write-Host "✅ Created: $dest"
 
+        # ============ BUG FIX #3: Use glob pattern that matches Setup*.exe ============
         - name: Upload Windows Artifacts
           uses: actions/upload-artifact@v4
           with:
             name: windows-builds
             path: |
-              dist/installer/*.exe
+              dist/*Setup*.exe
               dist/NREGABot-v*-Portable.zip
               dist/core_win_*.zip
               dist/NREGA Bot Lite.exe
@@ -272,26 +319,57 @@ jobs:
         with:
           path: artifacts/
 
-      - name: Debug - List downloaded artifacts
+      # ============ BUG FIX #4: Better artifact debugging ============
+      - name: Debug - Complete artifacts structure
         run: |
-          echo "=== Artifacts structure ==="
-          find artifacts/ -type f -exec ls -lh {} \;
+          echo "========================================" 
+          echo "DEBUG: Full artifacts/ directory structure"
+          echo "========================================"
+          find artifacts/ -type f -exec ls -lh {} \; | awk '{print $9, "(" $5 ")"}'
           echo ""
-          echo "=== All .exe files ==="
-          find artifacts/ -name "*.exe" -exec ls -lh {} \;
+          echo "========================================" 
+          echo "SEARCHING FOR Setup*.exe FILES"
+          echo "========================================"
+          SETUP_COUNT=$(find artifacts/ -name "*Setup*.exe" 2>/dev/null | wc -l)
+          echo "Setup EXE count: $SETUP_COUNT"
+          find artifacts/ -name "*Setup*.exe" -exec echo "✅ Found: {}" \;
+          echo ""
+          echo "========================================" 
+          echo "ALL .exe FILES"
+          echo "========================================"
+          find artifacts/ -name "*.exe" -exec echo "  - {}" \;
 
-      - name: Verify Setup.exe exists before release
+      # ============ BUG FIX #5: Verify Setup.exe before publishing ============
+      - name: Verify Setup.exe exists before creating release
         run: |
-          if find artifacts/ -name "*Setup.exe" -o -name "*Setup*.exe" 2>/dev/null | grep -q .; then
-            echo "✅ Setup.exe found in artifacts"
-            find artifacts/ -name "*Setup*.exe" -exec ls -lh {} \;
-          else
-            echo "❌ ERROR: Setup.exe NOT found in artifacts!"
-            echo "Available .exe files:"
-            find artifacts/ -name "*.exe" -exec ls -lh {} \;
+          echo "========================================" 
+          echo "VERIFICATION: Setup.exe must exist"
+          echo "========================================"
+          
+          SETUP_FILES=$(find artifacts/ -name "*Setup*.exe" 2>/dev/null)
+          
+          if [ -z "$SETUP_FILES" ]; then
+            echo "❌ FATAL: Setup.exe NOT FOUND in artifacts/"
+            echo ""
+            echo "Available files:"
+            find artifacts/ -type f
+            echo ""
+            echo "TROUBLESHOOTING:"
+            echo "1. Check that Inno Setup compiler found the .iss script"
+            echo "2. Check that dist/NREGA Bot directory exists"
+            echo "3. Check that required assets exist:"
+            echo "   - assets/app_icon.ico"
+            echo "   - assets/wizard_image.bmp"
+            echo "   - assets/wizard_small_image.bmp"
+            echo "   - docs/license.txt"
+            echo "   - docs/infobefore.txt"
             exit 1
+          else
+            echo "✅ Setup.exe found:"
+            echo "$SETUP_FILES"
           fi
 
+      # ============ BUG FIX #6: Use correct glob pattern in release files ============
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -299,6 +377,6 @@ jobs:
           body: ${{ needs.get-release-info.outputs.changelog }}
           tag_name: v${{ needs.get-release-info.outputs.version }}
           files: |
-            artifacts/windows-builds/*.exe
+            artifacts/windows-builds/*Setup*.exe
             artifacts/windows-builds/*.zip
             artifacts/linux-build/*
