@@ -114,6 +114,49 @@ REM --- Step 2: Run Inno Setup Compiler (MAIN app installer only) ---
 ECHO [STEP 2/3] Creating the MAIN installer with Inno Setup...
 ECHO.
 
+REM --- Verify that the PyInstaller dist directory exists ---
+if not exist "dist\NREGA Bot" (
+    ECHO.
+    ECHO !!!!!!! ERROR: dist\NREGA Bot directory NOT FOUND !!!!!!!
+    ECHO The PyInstaller build should have created this directory.
+    ECHO.
+    goto End
+)
+
+ECHO [DEBUG] dist\NREGA Bot directory found. Contents:
+dir "dist\NREGA Bot" /s /b | find /c /v "" > nul
+if errorlevel 1 (
+    dir "dist\NREGA Bot"
+) else (
+    dir "dist\NREGA Bot"
+)
+ECHO.
+
+REM --- Verify that required asset files exist ---
+ECHO [DEBUG] Checking required asset files...
+if not exist "assets\app_icon.ico" (
+    ECHO [ERROR] Missing: assets\app_icon.ico
+    goto End
+)
+if not exist "assets\wizard_image.bmp" (
+    ECHO [ERROR] Missing: assets\wizard_image.bmp
+    goto End
+)
+if not exist "assets\wizard_small_image.bmp" (
+    ECHO [ERROR] Missing: assets\wizard_small_image.bmp
+    goto End
+)
+if not exist "docs\license.txt" (
+    ECHO [ERROR] Missing: docs\license.txt
+    goto End
+)
+if not exist "docs\infobefore.txt" (
+    ECHO [ERROR] Missing: docs\infobefore.txt
+    goto End
+)
+ECHO [DEBUG] All required asset files found.
+ECHO.
+
 REM --- Find ISCC.exe across multiple possible locations ---
 set ISCC_FOUND=
 
@@ -145,6 +188,11 @@ if defined ISCC_FOUND (
     ECHO Found Inno Setup at: %ISCC_FOUND%
     ECHO.
     
+    REM Create the output directory if it doesn't exist
+    if not exist "dist\installer" mkdir "dist\installer"
+    ECHO Created dist\installer directory.
+    ECHO.
+    
     REM Use %%CD%%\dist\installer directly (not a temp variable) because CMD
     REM expands %%var%% at parse time — variables SET inside parenthesized
     REM blocks are NOT visible via %%var%% until AFTER the block ends.
@@ -154,16 +202,25 @@ if defined ISCC_FOUND (
     ECHO Running: %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts/installer.iss"
     ECHO.
     
-    %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts/installer.iss"
+    %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts\installer.iss"
     if errorlevel 1 (
         ECHO.
         ECHO !!!!!!! Inno Setup compilation FAILED. !!!!!!!
+        ECHO Check the output above for error messages.
         ECHO Main app installer not created, but portable build is in dist\%APP_NAME%\
         goto End
     )
     
     REM Verify installer was created at expected location
-    dir "%CD%\dist\installer\*.exe" 2>nul || ECHO [WARNING] No installer found
+    if exist "dist\installer\*.exe" (
+        ECHO.
+        ECHO ✅ Installer EXE created successfully:
+        dir "dist\installer\*.exe"
+    ) else (
+        ECHO.
+        ECHO [ERROR] Inno Setup completed but no .exe file was created in dist\installer\
+        goto End
+    )
 ) else (
     ECHO.
     ECHO !!!!!!! Inno Setup NOT FOUND !!!!!!!
