@@ -202,7 +202,7 @@ if defined ISCC_FOUND (
     ECHO Running: %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts\installer.iss"
     ECHO.
     
-    %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts\installer.iss"
+    %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir=%CD%\dist\installer "scripts\installer.iss"
     if errorlevel 1 (
         ECHO.
         ECHO !!!!!!! Inno Setup compilation FAILED. !!!!!!!
