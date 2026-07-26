@@ -172,7 +172,6 @@ jobs:
 
         # Verify installer EXE was created (log result, continue regardless)
         - name: Verify installer EXE
-          continue-on-error: true
           shell: powershell
           run: |
             $installerDir = "dist\installer"
@@ -182,12 +181,12 @@ jobs:
                 Write-Host "✅ Installer EXE found:"
                 $files | ForEach-Object { Write-Host "   - $($_.Name) ($($_.Length / 1MB) MB)" }
               } else {
-                Write-Warning "❌ No .exe files found in dist/installer/"
-                Write-Host "::error title=Installer Missing::Inno Setup compiled but no .exe was produced."
+                Write-Host "❌ ERROR: No .exe files found in dist/installer/"
+                exit 1
               }
             } else {
-              Write-Warning "❌ dist/installer/ directory does NOT exist!"
-              Write-Host "::error title=Installer Missing::Inno Setup wasn't found or compilation failed. Check build script logs above."
+              Write-Host "❌ ERROR: dist/installer/ directory does NOT exist!"
+              exit 1
             }
 
         # Create portable zip of the MAIN app (in case installer fails)
