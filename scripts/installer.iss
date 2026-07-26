@@ -23,7 +23,9 @@
 ; OutputDir override: build script can pass an ABSOLUTE path via /dInnoOutputDir=
 ; This avoids ambiguity about whether relative paths are resolved from script dir or working dir.
 #ifdef InnoOutputDir
-  #define SetupOutputDir InnoOutputDir
+  ; Use {#InnoOutputDir} to FORCE macro expansion of the symbol
+  ; (plain "#define X InnoOutputDir" sets X = literal text "InnoOutputDir", not its value!)
+  #define SetupOutputDir {#InnoOutputDir}
 #else
   #define SetupOutputDir RootDir + "dist\installer"
 #endif
