@@ -144,13 +144,25 @@ if not defined ISCC_FOUND (
 if defined ISCC_FOUND (
     ECHO Found Inno Setup at: %ISCC_FOUND%
     ECHO.
-    %ISCC_FOUND% /dAppVersion=%APP_VERSION% "scripts/installer.iss"
+    
+    REM Calculate absolute output directory for Inno Setup
+    REM (avoids ambiguity about whether relative paths are resolved from script dir or working dir)
+    set ISCC_OUTPUT_DIR=%CD%\dist\installer
+    ECHO ISCC output dir: %ISCC_OUTPUT_DIR%
+    ECHO.
+    ECHO Running: %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%ISCC_OUTPUT_DIR%" "scripts/installer.iss"
+    ECHO.
+    
+    %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%ISCC_OUTPUT_DIR%" "scripts/installer.iss"
     if errorlevel 1 (
         ECHO.
         ECHO !!!!!!! Inno Setup compilation FAILED. !!!!!!!
         ECHO Main app installer not created, but portable build is in dist\%APP_NAME%\
         goto End
     )
+    
+    REM Verify installer was created at expected location
+    dir "%ISCC_OUTPUT_DIR%\*.exe" 2>nul || ECHO [WARNING] No installer found in %ISCC_OUTPUT_DIR%
 ) else (
     ECHO.
     ECHO !!!!!!! Inno Setup NOT FOUND !!!!!!!

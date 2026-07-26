@@ -20,6 +20,14 @@
 ; Root directory (parent of scripts/ where this .iss file lives)
 #define RootDir "..\"
 
+; OutputDir override: build script can pass an ABSOLUTE path via /dInnoOutputDir=
+; This avoids ambiguity about whether relative paths are resolved from script dir or working dir.
+#ifdef InnoOutputDir
+  #define SetupOutputDir InnoOutputDir
+#else
+  #define SetupOutputDir RootDir + "dist\installer"
+#endif
+
 [Setup]
 ; This ID must be the SAME for all versions to ensure proper updates.
 AppId={{E6A5B0D1-2C3D-4E5F-8A9B-1C2D3E4F5A6B}}
@@ -31,7 +39,7 @@ AppSupportURL={#AppURL}
 DefaultDirName={autopf64}\{#AppName}
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
-OutputDir={#RootDir}dist\installer
+OutputDir="{#SetupOutputDir}"
 OutputBaseFilename={#OutputName}
 Compression=lzma2/ultra64
 SolidCompression=yes
