@@ -145,15 +145,16 @@ if defined ISCC_FOUND (
     ECHO Found Inno Setup at: %ISCC_FOUND%
     ECHO.
     
-    REM Calculate absolute output directory for Inno Setup
-    REM (avoids ambiguity about whether relative paths are resolved from script dir or working dir)
-    set ISCC_OUTPUT_DIR=%CD%\dist\installer
-    ECHO ISCC output dir: %ISCC_OUTPUT_DIR%
+    REM Use %%CD%%\dist\installer directly (not a temp variable) because CMD
+    REM expands %%var%% at parse time — variables SET inside parenthesized
+    REM blocks are NOT visible via %%var%% until AFTER the block ends.
+    REM %%CD%% is a CMD built-in that always reflects the current directory.
+    ECHO ISCC output dir: %CD%\dist\installer
     ECHO.
-    ECHO Running: %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%ISCC_OUTPUT_DIR%" "scripts/installer.iss"
+    ECHO Running: %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts/installer.iss"
     ECHO.
     
-    %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%ISCC_OUTPUT_DIR%" "scripts/installer.iss"
+    %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts/installer.iss"
     if errorlevel 1 (
         ECHO.
         ECHO !!!!!!! Inno Setup compilation FAILED. !!!!!!!
@@ -162,7 +163,7 @@ if defined ISCC_FOUND (
     )
     
     REM Verify installer was created at expected location
-    dir "%ISCC_OUTPUT_DIR%\*.exe" 2>nul || ECHO [WARNING] No installer found in %ISCC_OUTPUT_DIR%
+    dir "%CD%\dist\installer\*.exe" 2>nul || ECHO [WARNING] No installer found
 ) else (
     ECHO.
     ECHO !!!!!!! Inno Setup NOT FOUND !!!!!!!
