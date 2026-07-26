@@ -9,7 +9,7 @@
 ; The build script will override this version (via /dAppVersion=...).
 ; #ifndef ensures the command-line /d switch always takes precedence.
 #ifndef AppVersion
-#define AppVersion "3.0.0"
+#define AppVersion "3.0.7"
 #endif
 #define AppName "NREGA Bot"
 #define AppPublisher "PoddarSolutions"
