@@ -3,15 +3,14 @@ name: Create Application Release
 on:
   push:
     branches:
-      - main   # Runs automatically on every push to main
-  workflow_dispatch: {} # Allows manual trigger
+      - main
+  workflow_dispatch: {}
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # --- 0. Clean up old releases & cache before building new ones ---
   cleanup-old-releases:
     name: Clean Old Releases & Cache
     runs-on: ubuntu-latest
@@ -44,12 +43,11 @@ jobs:
       - name: Delete all existing GitHub Releases
         uses: dev-drprasad/delete-older-releases@v0.3.1
         with:
-          keep_latest: 0        # Delete ALL existing releases
-          delete_tags: true     # Also delete their git tags
+          keep_latest: 0
+          delete_tags: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # --- 1. Get Release Info ---
   get-release-info:
     name: Get Release Information
     needs: cleanup-old-releases
@@ -80,7 +78,6 @@ jobs:
           echo "$CHANGELOG_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-  # --- 2. Build for Windows (Main Loader + Lite App + Core Zip) ---
   build-windows:
       name: Build Windows (Main + Lite + Core)
       needs: get-release-info
@@ -105,7 +102,6 @@ jobs:
           run: choco install innosetup --yes
           shell: powershell
 
-        # Clean old build artifacts first
         - name: Clean old builds
           run: |
             if exist "dist" rmdir /s /q "dist"
@@ -113,14 +109,12 @@ jobs:
             mkdir dist
           shell: cmd
 
-        # Build both MAIN and LITE apps using the updated script
         - name: Run Windows build script
           run: |
             set APP_VERSION=${{ needs.get-release-info.outputs.version }}
             scripts\build_windows.bat
           shell: cmd
 
-        # Create Secure Windows Core Zip (compiled .pyc)
         - name: Create Secure Core Zip (Windows)
           shell: python
           run: |
@@ -155,7 +149,6 @@ jobs:
             shutil.rmtree(temp_dir)
             print(f'Success: Created {zip_name}')
 
-        # Debug: List dist/installer/ contents before artifact upload
         - name: Debug - List installer output directory
           shell: powershell
           run: |
@@ -166,12 +159,11 @@ jobs:
               Write-Host "[WARNING] dist/installer/ does NOT exist!"
             }
             Write-Host "=== dist/ *.exe files ==="
-            Get-ChildItem -Path "dist" -Filter "*.exe" | Select-Object Name, Length
+            Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse | Select-Object Name, Length, FullName
             Write-Host "=== dist/ *.zip files ==="
             Get-ChildItem -Path "dist" -Filter "*.zip" | Select-Object Name, Length
 
-        # Verify installer EXE was created (log result, continue regardless)
-        - name: Verify installer EXE
+        - name: Verify installer EXE exists
           shell: powershell
           run: |
             $installerDir = "dist\installer"
@@ -181,15 +173,16 @@ jobs:
                 Write-Host "✅ Installer EXE found:"
                 $files | ForEach-Object { Write-Host "   - $($_.Name) ($($_.Length / 1MB) MB)" }
               } else {
-                Write-Host "❌ ERROR: No .exe files found in dist/installer/"
+                Write-Host "❌ FATAL ERROR: No .exe files found in dist/installer/"
+                Write-Host "Build failed. Installer was not created by Inno Setup."
                 exit 1
               }
             } else {
-              Write-Host "❌ ERROR: dist/installer/ directory does NOT exist!"
+              Write-Host "❌ FATAL ERROR: dist/installer/ directory does NOT exist!"
+              Write-Host "Inno Setup did not create the installer directory."
               exit 1
             }
 
-        # Create portable zip of the MAIN app (in case installer fails)
         - name: Create Main App Portable Zip
           shell: powershell
           run: |
@@ -210,7 +203,6 @@ jobs:
               dist/NREGA Bot Lite.exe
             retention-days: 1
 
-  # --- 3. Build for Linux (Portable Loader) ---
   build-linux:
     name: Build Linux Loader
     needs: get-release-info
@@ -268,7 +260,6 @@ jobs:
           path: dist/NREGABot-v${{ needs.get-release-info.outputs.version }}-Linux.tar.gz
           retention-days: 1
 
-  # --- 4. Publish Release ---
   publish-release:
     name: Publish GitHub Release
     needs: [get-release-info, build-windows, build-linux]
@@ -280,6 +271,26 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
+
+      - name: Debug - List downloaded artifacts
+        run: |
+          echo "=== Artifacts structure ==="
+          find artifacts/ -type f -exec ls -lh {} \;
+          echo ""
+          echo "=== All .exe files ==="
+          find artifacts/ -name "*.exe" -exec ls -lh {} \;
+
+      - name: Verify Setup.exe exists before release
+        run: |
+          if find artifacts/ -name "*Setup.exe" -o -name "*Setup*.exe" 2>/dev/null | grep -q .; then
+            echo "✅ Setup.exe found in artifacts"
+            find artifacts/ -name "*Setup*.exe" -exec ls -lh {} \;
+          else
+            echo "❌ ERROR: Setup.exe NOT found in artifacts!"
+            echo "Available .exe files:"
+            find artifacts/ -name "*.exe" -exec ls -lh {} \;
+            exit 1
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
