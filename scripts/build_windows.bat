@@ -199,7 +199,7 @@ if defined ISCC_FOUND (
     REM %%CD%% is a CMD built-in that always reflects the current directory.
     ECHO ISCC output dir: %CD%\dist\installer
     ECHO.
-    ECHO Running: %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts/installer.iss"
+    ECHO Running: %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts\installer.iss"
     ECHO.
     
     %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts\installer.iss"
