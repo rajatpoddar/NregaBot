@@ -170,6 +170,26 @@ jobs:
             Write-Host "=== dist/ *.zip files ==="
             Get-ChildItem -Path "dist" -Filter "*.zip" | Select-Object Name, Length
 
+        # Verify installer EXE was created (log result, continue regardless)
+        - name: Verify installer EXE
+          continue-on-error: true
+          shell: powershell
+          run: |
+            $installerDir = "dist\installer"
+            if (Test-Path $installerDir) {
+              $files = Get-ChildItem -Path $installerDir -Filter "*.exe"
+              if ($files.Count -gt 0) {
+                Write-Host "✅ Installer EXE found:"
+                $files | ForEach-Object { Write-Host "   - $($_.Name) ($($_.Length / 1MB) MB)" }
+              } else {
+                Write-Warning "❌ No .exe files found in dist/installer/"
+                Write-Host "::error title=Installer Missing::Inno Setup compiled but no .exe was produced."
+              }
+            } else {
+              Write-Warning "❌ dist/installer/ directory does NOT exist!"
+              Write-Host "::error title=Installer Missing::Inno Setup wasn't found or compilation failed. Check build script logs above."
+            }
+
         # Create portable zip of the MAIN app (in case installer fails)
         - name: Create Main App Portable Zip
           shell: powershell

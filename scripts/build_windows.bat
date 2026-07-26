@@ -14,6 +14,8 @@ SET INNO_SETUP_COMPILER="%ProgramFiles%\Inno Setup 6\ISCC.exe"
 SET INNO_SETUP_COMPILER_X86="%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
 REM Chocolatey's own lib path (fallback for different install locations)
 SET INNO_SETUP_CHOCO="%ProgramData%\chocolatey\lib\innosetup\tools\ISCC.exe"
+REM Chocolatey shim path (most reliable for GH Actions)
+SET INNO_SETUP_CHOCO_SHIM="%ProgramData%\chocolatey\bin\ISCC.exe"
 
 ECHO ######################################################
 ECHO.
@@ -112,24 +114,36 @@ REM --- Step 2: Run Inno Setup Compiler (MAIN app installer only) ---
 ECHO [STEP 2/3] Creating the MAIN installer with Inno Setup...
 ECHO.
 
-REM Try primary path (%%ProgramFiles%% - chocolatey default)
+REM --- Find ISCC.exe across multiple possible locations ---
 set ISCC_FOUND=
+
 if exist %INNO_SETUP_COMPILER% (
     set ISCC_FOUND=%INNO_SETUP_COMPILER%
 ) else (
-    REM Try fallback path (%%ProgramFiles(x86)%% - manual install)
     if exist %INNO_SETUP_COMPILER_X86% (
         set ISCC_FOUND=%INNO_SETUP_COMPILER_X86%
     ) else (
-        REM Try Chocolatey lib path (alternative install location)
         if exist %INNO_SETUP_CHOCO% (
             set ISCC_FOUND=%INNO_SETUP_CHOCO%
+        ) else (
+            if exist %INNO_SETUP_CHOCO_SHIM% (
+                set ISCC_FOUND=%INNO_SETUP_CHOCO_SHIM%
+            )
         )
+    )
+)
+
+REM If still not found, search PATH using where.exe (handles Chocolatey shims & custom installs)
+REM NOTE: Wrap %%a in quotes to handle paths with spaces (e.g. "C:\Program Files\...")
+if not defined ISCC_FOUND (
+    for /f "delims=" %%a in ('where ISCC.exe 2^>nul') do (
+        set ISCC_FOUND="%%a"
     )
 )
 
 if defined ISCC_FOUND (
     ECHO Found Inno Setup at: %ISCC_FOUND%
+    ECHO.
     %ISCC_FOUND% /dAppVersion=%APP_VERSION% "scripts/installer.iss"
     if errorlevel 1 (
         ECHO.
@@ -138,12 +152,17 @@ if defined ISCC_FOUND (
         goto End
     )
 ) else (
-    ECHO Inno Setup not found at any path. Skipping installer creation.
+    ECHO.
+    ECHO !!!!!!! Inno Setup NOT FOUND !!!!!!!
     ECHO Checked:
     ECHO   - %INNO_SETUP_COMPILER%
     ECHO   - %INNO_SETUP_COMPILER_X86%
     ECHO   - %INNO_SETUP_CHOCO%
-    ECHO Main app portable build is in dist\%APP_NAME%\
+    ECHO   - %INNO_SETUP_CHOCO_SHIM%
+    ECHO   - PATH (via where ISCC.exe)
+    ECHO.
+    ECHO Main app installer NOT created.
+    ECHO Portable build is available at: dist\%APP_NAME%\
     goto End
 )
 

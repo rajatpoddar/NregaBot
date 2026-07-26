@@ -442,7 +442,7 @@ IF_EDIT_CONFIG: Dict[str, object] = {
 }
 
 WC_GEN_CONFIG: Dict[str, object] = {
-    "url": "https://mnregaweb2.dord.gov.in/netnrega/work_entry.aspx",
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/work_entry.aspx",
     "defaults": {
         "master_category": "B", "work_category": "Construction of house", "beneficiary_type": "Individual",
         "activity_type": "Construction/Plantation/Development/Reclamation", "work_type": "Construction of PMAY /State House",
@@ -453,9 +453,9 @@ WC_GEN_CONFIG: Dict[str, object] = {
 }
 
 FTO_GEN_CONFIG: Dict[str, str] = {
-    "login_url": "https://mnregaweb3.nic.in/Netnrega/FTO/Login.aspx?&level=HomeACGP&state_code=34",
-    "aadhaar_fto_url": "https://mnregaweb3.nic.in/netnrega/FTO/ftoverify_aadhar.aspx",
-    "top_up_fto_url": "https://mnregaweb3.nic.in/netnrega/FTO/ftoverify_aadhar.aspx?wg_topup=S",
+    "login_url": "https://vbgramgde2.dord.gov.in/vbgramg/FTO/Login.aspx?&level=HomeACGP&state_code=34",
+    "aadhaar_fto_url": "https://vbgramgde2.dord.gov.in/vbgramg/FTO/ftoverify_aadhar.aspx",
+    "top_up_fto_url": "https://vbgramgde2.dord.gov.in/vbgramg/FTO/ftoverify_aadhar.aspx?wg_topup=S",
     # --- NEW DELETION URLS ---
     # Note: Removed 'Digest' as it is session specific.
     "delete_url_1": "https://mnregaweb3.nic.in/netnrega/FTO/Fto_ds_po.aspx?cate=Z", 
@@ -531,7 +531,7 @@ NMMS_ATTENDANCE_CONFIG: Dict[str, str] = {
 
 # --- MIS Reports Configuration ---
 MIS_REPORTS_CONFIG: Dict[str, str] = {
-    "base_url": "https://nreganarep.nic.in/netnrega/MISreport4.aspx"
+    "base_url": "https://vbgramgrep.dord.gov.in/VBGRAMG/MISreport.aspx"
 }
 
 # --- NEW: MR Fill (Attendance) Configuration ---
@@ -555,7 +555,7 @@ DEL_DEMAND_CONFIG: Dict[str, str] = {
 
 MATERIAL_ENTRY_CONFIG: Dict[str, str] = {
     # Replace with the exact base url used for material entry from your PO login
-    "url": "https://nregade4.dord.gov.in/Netnrega/billdetail.aspx" 
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/billdetail.aspx" 
 }
 
 # --- Delete Applicant Configuration ---

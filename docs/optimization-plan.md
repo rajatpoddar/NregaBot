@@ -286,6 +286,8 @@
 | 2026-07-25 | Replace CTkScrollableFrame with LightweightScrollFrame (buggy - reverted) | 2.1b | ⚠️ Reverted | LightweightScrollFrame (tk.Canvas + tk.Frame) broke CTkButton events and scrolling. **Reverted to CTkScrollableFrame** with optimized settings. |
 | 2026-07-25 | Fix HomeTab `self.pack()` causing TclError | — | ✅ Done | Removed `self.pack()` from HomeTab.__init__, added `pack_propagate(False)` |
 | 2026-07-25 | Fix sidebar navigation scrolling & CTkButton clicks | 2.1b | ✅ Fixed | Replaced custom LightweightScrollFrame with optimized CTkScrollableFrame. Mousewheel + CTkButton events now work correctly. |
+| 2026-07-26 | Set `corner_radius=0` on remaining structural sub-frames (splash spacers, nav_header, right_frame, bar_frame) | 2.2a | ✅ Done | All persistent transparent wrapper frames now have explicit corner_radius=0 to eliminate canvas overhead |
+| 2026-07-26 | Add startup timing telemetry (`__init__` → Home visible) | 8.1a | ✅ Done | `_time_ms()`, `_log_startup_timing()`, `_log_startup_summary()` with per-step logs + full summary |
 
 ---
 
@@ -293,8 +295,8 @@
 
 | Priority | Task | Phase | Est. Time |
 |----------|------|-------|-----------|
-| P1 | Set `corner_radius=0` on remaining structural frames | 2.2a | 3 min |
-| P2 | Add startup timing telemetry (log `__init__` → `Home visible`) | 8.1a | 5 min |
+| P1 | ~~Set `corner_radius=0` on remaining structural frames~~ | 2.2a | ✅ Done |
+| P2 | ~~Add startup timing telemetry (log `__init__` → `Home visible`)~~ | 8.1a | ✅ Done |
 | P3 | Show skeleton/placeholder on tab click for fast UX feedback | 3.2a | 15 min |
 | P4 | Move remaining module-level imports into methods | 6.1a | 10 min |
 | P5 | Simplify COLORS dict for Lite (strip unused entries) | 2.3a | 10 min |
