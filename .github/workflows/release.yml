@@ -6,31 +6,10 @@ on:
       - main   # Runs automatically on every push to main
   workflow_dispatch: {} # Allows manual trigger
 
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  # --- 0. Clean Old Releases ---
-  cleanup-old-releases:
-    name: Clean Old Releases & Cache
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: write
-    steps:
-      - name: Delete all existing GitHub Releases
-        uses: dev-drprasad/delete-older-releases@v0.3.1
-        with:
-          keep_latest: 0
-          delete_tags: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   # --- 1. Get Release Info ---
   get-release-info:
     name: Get Release Information
-    needs: cleanup-old-releases
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
@@ -133,6 +112,15 @@ jobs:
               dist/NREGA Bot Lite.exe
             retention-days: 1
 
+        - name: Debug - List Windows build outputs
+          shell: powershell
+          run: |
+            Write-Host "=== Files in dist/ ===" -ForegroundColor Cyan
+            Get-ChildItem -Path "dist" -Recurse -File | ForEach-Object {
+              $rel = $_.FullName.Replace((Get-Location).Path + "\", "")
+              Write-Host "  $rel ($([math]::Round($_.Length/1KB,2)) KB)" -ForegroundColor Green
+            }
+
   # --- 3. Build for Linux (Portable Loader) ---
   build-linux:
     name: Build Linux Loader
@@ -199,10 +187,23 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
+
+      - name: Delete existing release & tag (ensure fresh release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: v${{ needs.get-release-info.outputs.version }}
+        run: |
+          # Delete release if exists
+          gh release delete "$TAG_NAME" --yes 2>/dev/null || echo "No existing release for $TAG_NAME"
+          # Delete tag if exists
+          git push origin :refs/tags/"$TAG_NAME" 2>/dev/null || echo "No existing tag for $TAG_NAME"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -211,6 +212,11 @@ jobs:
           body: ${{ needs.get-release-info.outputs.changelog }}
           tag_name: v${{ needs.get-release-info.outputs.version }}
           files: |
-            artifacts/windows-builds/*.exe
-            artifacts/windows-builds/*.zip
-            artifacts/linux-build/*
+            artifacts/windows-builds/**/*.exe
+            artifacts/windows-builds/**/*.zip
+            artifacts/linux-build/**/*
+
+      - name: Debug - List downloaded artifacts
+        run: |
+          echo "=== Downloaded Artifacts ==="
+          find artifacts/ -type f -exec ls -lh {} \;
