@@ -84,6 +84,7 @@ class NavMixin:
             "About": "emoji_about",
             "Settings": "emoji_tools",
             "Feedback": "emoji_feedback",
+            "WhatsApp Chat": "whatsapp",
         }
 
         for widget in header_parent.winfo_children(): widget.destroy()

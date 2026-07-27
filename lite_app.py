@@ -36,6 +36,7 @@ import tkinter
 from tkinter import messagebox
 import customtkinter as ctk
 import requests
+import subprocess
 
 
 
@@ -109,6 +110,9 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     def __init__(self) -> None:
         super().__init__()
         
+        # Check if launched from lite_loader.py — skip splash + redundant update check
+        self._from_loader = os.environ.pop('LITE_LOADER_ACTIVE', None) == '1'
+
         # macOS Tk bug: withdraw+deiconify on main window breaks mouse event
         # delivery. On macOS we keep the window visible from the start with an
         # in-window splash. On Windows we withdraw during build for smooth launch.
@@ -172,7 +176,21 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self._final_x = (sw // 2) - (self._final_w // 2)
         self._final_y = (sh // 2) - (self._final_h // 2)
 
-        if self._on_windows:
+        if self._from_loader:
+            # Launched from lite_loader.py — show a compact splash during UI build.
+            # Main window appears only after UI is ready (in _build_ui_on_main_thread).
+            # Platform-specific: Windows uses Toplevel + withdraw, macOS uses in-window
+            # frame (withdraw+deiconify on macOS permanently breaks mouse events).
+            if self._on_windows:
+                self.withdraw()
+                self._splash_window = self._create_splash_toplevel()
+            else:
+                self._splash_window = self._create_splash_frame()
+                self._splash_window.pack(expand=True, fill="both")
+                self.deiconify()
+                self.update()
+            self._splash_window.update()
+        elif self._on_windows:
             # Windows: build UI completely while withdrawn for jank-free reveal
             self.withdraw()
             self._splash_window = self._create_splash_toplevel()
@@ -235,13 +253,12 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self._history_manager = value
         
     def _create_splash_toplevel(self) -> ctk.CTkToplevel:
-        """Create a Toplevel splash window for smooth launch on Windows.
-        The main window stays withdrawn during UI build, so we use a
-        separate splash window for visual feedback.
+        """Create a Toplevel splash matching the main app's loader design.
+        Compact size, same branding — "NREGA Bot" + "VB-G-RAM-G Portal Support".
         """
         splash = ctk.CTkToplevel(self)
         splash.overrideredirect(True)
-        w, h = 380, 260
+        w, h = 380, 250
         sw, sh = splash.winfo_screenwidth(), splash.winfo_screenheight()
         x, y = (sw // 2) - (w // 2), (sh // 2) - (h // 2)
         splash.geometry(f'{w}x{h}+{int(x)}+{int(y)}')
@@ -250,31 +267,38 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         # Flag to stop splash animation when window is destroyed
         splash._running = True
 
-        outer = ctk.CTkFrame(splash, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]),
-                             corner_radius=16, border_width=0)
-        outer.pack(fill="both", expand=True, padx=0, pady=0)
+        # Outer card (matching main loader: corner_radius=20, border_width=2)
+        outer = ctk.CTkFrame(splash,
+                             fg_color=("#FFFFFF", "#2B2B2B"),
+                             corner_radius=20, border_width=2,
+                             border_color=("#E2E8F0", "#404040"))
+        outer.pack(fill="both", expand=True, padx=4, pady=4)
 
         inner = ctk.CTkFrame(outer, fg_color="transparent")
-        inner.pack(expand=True, fill="both", padx=30, pady=22)
+        inner.pack(expand=True, fill="both", padx=24, pady=18)
 
-        ctk.CTkLabel(inner, text="\U0001f3db\ufe0f", font=ctk.CTkFont(size=36)).pack(pady=(5, 10))
-        ctk.CTkLabel(
-            inner, text=f"{config.APP_NAME}",
-            font=ctk.CTkFont(family="Helvetica Neue", size=24, weight="bold"),
-            text_color=(config.COLORS["text_dark"], config.COLORS["text_white"])
-        ).pack()
-        ctk.CTkLabel(
-            inner, text="Lightweight Edition",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            text_color=(config.COLORS["blue_hover"], config.COLORS["blue_light"])
-        ).pack(pady=(2, 18))
+        # Emoji logo
+        ctk.CTkLabel(inner, text="🏛️", font=ctk.CTkFont(size=28)).pack(pady=(4, 2))
 
+        # App title — exactly like main loader: "NREGA Bot"
+        ctk.CTkLabel(inner, text="NREGA Bot",
+                     font=ctk.CTkFont(family="Helvetica Neue", size=22, weight="bold"),
+                     text_color=("#1E293B", "#F1F5F9")
+                     ).pack(pady=(2, 1))
+
+        # Tagline — exactly like main loader: "VB-G-RAM-G Portal Support"
+        ctk.CTkLabel(inner, text="VB-G-RAM-G Portal Support",
+                     font=ctk.CTkFont(family="Helvetica Neue", size=11),
+                     text_color=("#3B82F6", "#60A5FA")
+                     ).pack(pady=(0, 14))
+
+        # Animated dots
         splash.dots_label = ctk.CTkLabel(
             inner, text="Loading",
-            font=ctk.CTkFont(size=12),
-            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
+            font=ctk.CTkFont(family="Helvetica Neue", size=11),
+            text_color=("#64748B", "#94A3B8")
         )
-        splash.dots_label.pack(pady=(0, 0))
+        splash.dots_label.pack()
 
         def _splash_animate():
             try:
@@ -292,75 +316,86 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                 splash._running = False
         _splash_animate()
 
-        ctk.CTkLabel(
-            inner, text=f"v{config.APP_VERSION}",
-            font=ctk.CTkFont(size=13, weight="bold"),
-            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
-        ).pack(side="bottom", pady=(0, 5))
+        # Version footer
+        ctk.CTkLabel(inner, text=f"v{config.APP_VERSION.replace('-LITE','')} \u00b7 NregaBot.com",
+                     font=ctk.CTkFont(family="Helvetica Neue", size=9),
+                     text_color=("#CBD5E1", "#475569")
+                     ).pack(side="bottom", pady=(0, 2))
 
         splash.lift()
         splash.attributes("-topmost", True)
         return splash
 
     def _create_splash_frame(self) -> ctk.CTkFrame:
-        """Create a polished in-window splash — shown while UI loads.
-        Uses all pack() (no place/grid mix) for consistent layout
-        across platforms. Centered branding, subtle loading bar.
+        """Create a compact in-window splash matching the main app's loader design.
+        Uses a centered card — "NREGA Bot" + "VB-G-RAM-G Portal Support".
         """
         splash = ctk.CTkFrame(self, corner_radius=0,
                               fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
 
-        # Top spacer pushes center content down
-        ctk.CTkFrame(splash, fg_color="transparent").pack(expand=True, fill="both")
+        # Compact centered card (matching main loader style)
+        card_w, card_h = 360, 230
+        card = ctk.CTkFrame(splash, corner_radius=20,
+                            fg_color=("#FFFFFF", "#2B2B2B"),
+                            border_width=2,
+                            border_color=("#E2E8F0", "#404040"),
+                            width=card_w, height=card_h)
+        card.place(relx=0.5, rely=0.5, anchor="center")
+        card.pack_propagate(False)
 
-        # Center branding block
-        ctk.CTkLabel(
-            splash, text="🏛️",
-            font=ctk.CTkFont(size=36)
-        ).pack()
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(expand=True, fill="both", padx=22, pady=16)
 
-        ctk.CTkLabel(
-            splash, text=config.APP_NAME,
-            font=ctk.CTkFont(family="Helvetica Neue", size=24, weight="bold"),
-            text_color=(config.COLORS["text_dark"], config.COLORS["text_white"])
-        ).pack(pady=(8, 2))
+        # Emoji logo
+        ctk.CTkLabel(inner, text="🏛️", font=ctk.CTkFont(size=26)).pack(pady=(4, 2))
 
-        ctk.CTkLabel(
-            splash, text="Lightweight Edition",
-            font=ctk.CTkFont(size=12),
-            text_color=(config.COLORS["blue_hover"], config.COLORS["blue_light"])
-        ).pack()
+        # App title — "NREGA Bot" (no "Lite" branding on splash)
+        ctk.CTkLabel(inner, text="NREGA Bot",
+                     font=ctk.CTkFont(family="Helvetica Neue", size=20, weight="bold"),
+                     text_color=("#1E293B", "#F1F5F9")
+                     ).pack(pady=(2, 1))
 
-        # Bottom spacer keeps content centered
-        ctk.CTkFrame(splash, fg_color="transparent").pack(expand=True, fill="both")
+        # Tagline — "VB-G-RAM-G Portal Support"
+        ctk.CTkLabel(inner, text="VB-G-RAM-G Portal Support",
+                     font=ctk.CTkFont(family="Helvetica Neue", size=11),
+                     text_color=("#3B82F6", "#60A5FA")
+                     ).pack(pady=(0, 12))
 
-        # Loading bar just above bottom
-        bar_frame = ctk.CTkFrame(splash, fg_color="transparent")
-        bar_frame.pack(side="bottom", fill="x", padx=40, pady=(0, 22))
-
-        progress = ctk.CTkProgressBar(
-            bar_frame, height=3, corner_radius=2,
-            mode="indeterminate",
-            fg_color=("#E5E7EB", "#374151"),
-            progress_color=(config.COLORS["blue_hover"], config.COLORS["blue_light"])
+        # Animated dots
+        self._frame_dots_lbl = ctk.CTkLabel(
+            inner, text="Loading",
+            font=ctk.CTkFont(family="Helvetica Neue", size=11),
+            text_color=("#64748B", "#94A3B8")
         )
-        progress.pack(fill="x")
-        progress.start()
+        self._frame_dots_lbl.pack()
+        self._animate_frame_dots()
 
-        # Version at very bottom
-        ctk.CTkLabel(
-            splash, text=f"v{config.APP_VERSION}",
-            font=ctk.CTkFont(size=10),
-            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
-        ).pack(side="bottom", pady=(0, 6))
+        # Version footer
+        ctk.CTkLabel(inner, text=f"v{config.APP_VERSION.replace('-LITE','')} \u00b7 NregaBot.com",
+                     font=ctk.CTkFont(family="Helvetica Neue", size=9),
+                     text_color=("#CBD5E1", "#475569")
+                     ).pack(side="bottom", pady=(0, 2))
 
         return splash
+
+    def _animate_frame_dots(self) -> None:
+        """Animate the in-window splash dots."""
+        if not self._frame_dots_lbl or not self._frame_dots_lbl.winfo_exists():
+            return
+        d = "." * ((getattr(self, '_frame_dot_idx', 0) % 4) + 1)
+        self._frame_dot_idx = getattr(self, '_frame_dot_idx', 0) + 1
+        try:
+            self._frame_dots_lbl.configure(text=f"Loading{d}")
+            self.after(120, self._animate_frame_dots)
+        except Exception:
+            pass
 
     def _build_ui_on_main_thread(self) -> None:
         """Build the UI structure.
         On macOS: destroy in-window splash first, build UI, then show window.
         On Windows: destroy Toplevel splash, build UI, then reveal main window.
         
+        When launched from lite_loader.py, splash is already skipped in __init__.
         Preloads the Home tab in-place so the content area is fully populated
         when the window first appears — no flickering.
         """
@@ -375,6 +410,8 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             except Exception:
                 pass
             self._splash_window = None
+            # Stop in-window splash dots animation (for macOS _create_splash_frame)
+            self._frame_dots_lbl = None
 
         self._build_ui()
 
@@ -718,9 +755,16 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         """Set up UI for licensed user.
         Show Home directly — no About preload that could cause flicker.
         About tab loads lazily when user clicks it.
+        
+        Starts background services: update check (skipped when launched from
+        lite_loader.py since the loader already handled it), GC collection.
+        Server status is updated by validate_on_server (started from check_license).
         """
         self.set_status("Ready")
         self.show_frame("Home")
+        # Start background services (skip update check if loader already did it)
+        if not self._from_loader:
+            self.check_for_updates_background()
         # Start periodic GC collection after a short delay
         self.after(5000, self._gc_collection_loop)
 
@@ -1143,12 +1187,103 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.services.check_for_updates_background()
 
     def show_update_prompt(self, version: str) -> None:
-        """Show update notification and switch to Updates tab."""
-        if messagebox.askyesno("Update", f"Version {version} available. View?"):
-            self.show_frame("About")
-            about_tab = self.tab_instances.get("About")
-            if about_tab and hasattr(about_tab, 'tab_view'):
-                about_tab.tab_view.set("Updates")
+        """Auto-download and install update — exactly like the main app's loader.
+        Shows a progress dialog, downloads in background, then applies the update
+        and restarts. No user interaction required beyond the initial notification.
+        """
+        info = self.update_info
+        if not info or not info.get('url'):
+            self.show_toast("Update failed: No download URL", "error")
+            return
+
+        url = info['url']
+        is_smart = info.get('is_smart_update', False)
+
+        # ── Progress dialog ──
+        win = ctk.CTkToplevel(self)
+        win.title(f"Updating {config.APP_SHORT_NAME}")
+        win.attributes("-topmost", True)
+        win.resizable(False, False)
+
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        w, h = 360, 140
+        x, y = (sw // 2) - (w // 2), (sh // 2) - (h // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+        win.transient(self)
+        win.grab_set()
+
+        outer = ctk.CTkFrame(win, fg_color="transparent")
+        outer.pack(expand=True, fill="both", padx=18, pady=18)
+
+        status_lbl = ctk.CTkLabel(
+            outer, text=f"⬇️  Downloading v{version}...",
+            font=ctk.CTkFont(size=13), anchor="w"
+        )
+        status_lbl.pack(fill="x", pady=(0, 10))
+
+        prog_bar = ctk.CTkProgressBar(outer, height=8, corner_radius=4)
+        prog_bar.pack(fill="x")
+        prog_bar.set(0)
+
+        pct_lbl = ctk.CTkLabel(
+            outer, text="0%",
+            font=ctk.CTkFont(size=11), text_color="gray50"
+        )
+        pct_lbl.pack(pady=(6, 0))
+
+        def _download_thread():
+            try:
+                filename = url.split('/')[-1]
+                dl_path = os.path.join(get_user_downloads_path(), filename)
+
+                with requests.get(url, stream=True, timeout=60) as r:
+                    r.raise_for_status()
+                    total = int(r.headers.get('content-length', 0))
+                    downloaded = 0
+                    unknown_size = total == 0
+                    if unknown_size:
+                        self.after(0, lambda: prog_bar.configure(mode="indeterminate"))
+                        self.after(0, lambda: prog_bar.start())
+                        self.after(0, lambda: pct_lbl.configure(text="Downloading..."))
+                    with open(dl_path, 'wb') as f:
+                        for chunk in r.iter_content(8192):
+                            if chunk:
+                                f.write(chunk)
+                                if not unknown_size:
+                                    downloaded += len(chunk)
+                                    pct = downloaded / total
+                                    pct_int = int(pct * 100)
+                                    self.after(0, lambda v=pct: prog_bar.set(v))
+                                    self.after(0, lambda v=pct_int: pct_lbl.configure(text=f"{v}%"))
+
+                self.after(0, lambda: status_lbl.configure(text="🔧  Installing update..."))
+
+                if is_smart and url.endswith(".zip"):
+                    def _do_apply():
+                        if win.winfo_exists():
+                            win.destroy()
+                        self._apply_smart_update(dl_path)
+                    self.after(500, _do_apply)
+                else:
+                    def _do_open():
+                        if win.winfo_exists():
+                            win.destroy()
+                        if sys.platform == "win32":
+                            os.startfile(dl_path)
+                        else:
+                            subprocess.call(["open", dl_path])
+                        self.after(1000, os._exit, 0)
+                    self.after(500, _do_open)
+
+            except Exception as e:
+                def _show_error():
+                    if not win.winfo_exists():
+                        return
+                    status_lbl.configure(text=f"❌  Download failed: {str(e)[:60]}", text_color="red")
+                    win.after(3000, lambda: win.destroy() if win.winfo_exists() else None)
+                self.after(0, _show_error)
+
+        threading.Thread(target=_download_thread, daemon=True).start()
 
     def download_and_install_update(self, url: str, version: str) -> None:
         """Download and install an update."""
@@ -1247,11 +1382,32 @@ del "%~f0" & exit
             messagebox.showerror("Update Error", f"Failed to apply smart update:\n{e}")
 
     def _update_about_tab_info(self) -> None:
-        """Update About tab's subscription and version info after server response."""
+        """Update About tab's subscription, version info, and header server status."""
         about_tab = self.tab_instances.get("About")
         if about_tab:
+            # --- Update subscription details ---
             if hasattr(about_tab, 'update_subscription_details'):
                 about_tab.update_subscription_details(self.license_info)
+
+            # --- Update header server status (above Account Management) ---
+            # The header initially shows "Checking..." and is ONLY updated by
+            # set_server_status() which runs from background validate_on_server.
+            # If validate_on_server hasn't completed yet, the label stays stuck.
+            # Here we optimistically update it based on cached license data.
+            if self.license_info and self.license_info.get('key'):
+                try:
+                    if (hasattr(about_tab, 'server_status_label') and
+                        about_tab.server_status_label.winfo_exists() and
+                        about_tab.server_status_label.cget("text") == "Checking..."):
+                        about_tab.server_status_label.configure(text="Connected")
+                    if (hasattr(about_tab, 'server_dot') and
+                        about_tab.server_dot.winfo_exists() and
+                        about_tab.server_dot.cget("fg_color") == "gray"):
+                        about_tab.server_dot.configure(fg_color="green")
+                except Exception:
+                    pass
+
+            # --- Update version info ---
             info = self.update_info
             if info and info.get('status') == 'available':
                 try:
@@ -1275,13 +1431,23 @@ del "%~f0" & exit
                 except Exception:
                     pass
             else:
-                # Only show "Check failed" for explicit error status, not initial "Checking..."
                 status = info.get('status') if info else ''
                 if status == 'error':
                     try:
                         about_tab.latest_version_label.configure(text="Latest Version: Check failed")
                         about_tab.update_button.configure(text="Check for Updates", state="normal",
                                                            command=about_tab.check_for_updates)
+                    except Exception:
+                        pass
+                elif status == 'Checking...':
+                    # Still in initial 'Checking...' state — update check wasn't triggered.
+                    # Show "Not checked yet" so user knows they can click the button.
+                    try:
+                        about_tab.latest_version_label.configure(text="Latest Version: Not checked yet")
+                        about_tab.update_button.configure(
+                            text="Check for Updates", state="normal",
+                            command=about_tab.check_for_updates
+                        )
                     except Exception:
                         pass
 

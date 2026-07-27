@@ -282,9 +282,9 @@ def get_tabs_definition(app: Any) -> Dict[str, Dict[str, Any]]:
                 "creation_func": _lazy_import("SettingsTab", "src.tabs.settings_tab"),
                 "icon": app.icon_images.get("settings")
             },
-            "Feedback": {
-                "creation_func": _lazy_import("FeedbackTab", "src.tabs.feedback_tab"),
-                "icon": app.icon_images.get("emoji_feedback")
+            "WhatsApp Chat": {
+                "creation_func": _lazy_import("WhatsAppChatTab", "src.tabs.whatsapp_chat_tab"),
+                "icon": app.icon_images.get("whatsapp")
             },
         }
     }

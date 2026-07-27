@@ -92,7 +92,7 @@ pyinstaller --noconfirm --clean --windowed --name "${LITE_APP_NAME}" \
 --hidden-import=PIL \
 --collect-submodules=src.managers \
 --collect-submodules=src.tabs \
-lite_app.py
+lite_loader.py
 
 # --- 7a. Sign MAIN App (Gatekeeper Fix) ---
 echo "Signing MAIN app..."

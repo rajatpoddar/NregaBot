@@ -153,19 +153,23 @@ CONFIG_FILE: str = get_data_path('config.json')
 def parse_version(version_str: str) -> tuple:
     """
     A7: Parse a semver-like version string into a comparable tuple of integers.
+    Strips pre-release suffixes (e.g. -LITE, -beta, -rc1) for clean comparison.
     Replaces 'packaging.version.parse' to remove the external dependency.
     
     Examples:
-        '3.0.6' -> (3, 0, 6)
-        '3.0'   -> (3, 0)
-        ''       -> (0,)
+        '3.0.7'      -> (3, 0, 7)
+        '3.0.7-LITE' -> (3, 0, 7)
+        '3.0'        -> (3, 0)
+        ''           -> (0,)
     
     Usage:
         if parse_version(latest) > parse_version(config.APP_VERSION):
             # newer version available
     """
     try:
-        parts = version_str.strip().split('.')
+        # Strip pre-release suffix (e.g. 3.0.7-LITE -> 3.0.7)
+        clean = version_str.strip().split('-')[0]
+        parts = clean.split('.')
         return tuple(int(p) if p.isdigit() else 0 for p in parts)
     except (ValueError, AttributeError):
         return (0,)

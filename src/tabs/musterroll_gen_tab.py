@@ -32,9 +32,8 @@ class MusterrollGenTab(BaseAutomationTab):
         self.output_dir = ""
         self.current_session_files = []
         
-        self.panchayat_after_id = None 
-        self._load_mapping_data() 
-        
+        self._load_mapping_data()
+
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
         self._create_widgets()
@@ -56,11 +55,9 @@ class MusterrollGenTab(BaseAutomationTab):
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=(15,0))
         self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app,
-            history_key="location_panchayat")
+            history_key="location_panchayat",
+            command=self._on_panchayat_selected)
         self.panchayat_entry.grid(row=0, column=1, columnspan=3, sticky='ew', padx=15, pady=(15,0))
-        self.panchayat_entry.bind("<KeyRelease>", self._on_panchayat_change_debounced, add="+")
-        
-
         
         # --- Start Date ---
         ctk.CTkLabel(controls_frame, text="तारीख से (DD/MM/YYYY):").grid(row=2, column=0, sticky='w', padx=15, pady=5)
@@ -212,10 +209,12 @@ class MusterrollGenTab(BaseAutomationTab):
         if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     def _load_mapping_data(self):
+        """Load panchayat→staff mapping from JSON, normalizing keys to lowercase for case-insensitive lookup."""
         if os.path.exists(self.mapping_file):
             try:
                 with open(self.mapping_file, 'r') as f:
-                    self.mapping_data = json.load(f)
+                    raw = json.load(f)
+                self.mapping_data = {k.strip().lower(): v for k, v in raw.items()}
             except Exception:
                 self.mapping_data = {}
 
@@ -229,11 +228,9 @@ class MusterrollGenTab(BaseAutomationTab):
         except Exception as e:
             print(f"Error saving mapping: {e}")
 
-    def _on_panchayat_change_debounced(self, event=None):
-        if self.panchayat_after_id:
-            self.after_cancel(self.panchayat_after_id)
-        if event and event.keysym in ("Up", "Down", "Return", "Enter", "Tab"): return
-        self.panchayat_after_id = self.after(300, self._auto_fill_staff)
+    def _on_panchayat_selected(self, value):
+        """Called when panchayat is selected from dropdown — auto-fills staff from mapping."""
+        self._auto_fill_staff()
 
     def _auto_fill_staff(self):
         current_panchayat = self.panchayat_entry.get().strip().lower()
@@ -242,6 +239,29 @@ class MusterrollGenTab(BaseAutomationTab):
             if self.staff_entry.get().strip() != saved_staff:
                 self.staff_entry.delete(0, tkinter.END)
                 self.staff_entry.insert(0, saved_staff)
+    def _validate_date_not_too_old(self, date_str: str) -> bool:
+        """Check if the start date is not more than 2 days before current date.
+        Returns True if valid, False if too old."""
+        try:
+            start_date = datetime.strptime(date_str, "%d/%m/%Y")
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            days_diff = (today - start_date).days
+            if days_diff > 2:
+                messagebox.showwarning(
+                    "Date Too Old",
+                    f"Start date ({date_str}) is {days_diff} days before today.\n\n"
+                    f"Automation cannot start with a date this old.\n"
+                    f"Please update the start date to within the last 2 days."
+                )
+                return False
+            return True
+        except ValueError:
+            messagebox.showwarning(
+                "Invalid Date",
+                f"Start date '{date_str}' is not valid. Please use DD/MM/YYYY format."
+            )
+            return False
+
     def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -257,9 +277,15 @@ class MusterrollGenTab(BaseAutomationTab):
         self.success_label.configure(text="Success: 0")
         self.skipped_label.configure(text="Skipped/Failed: 0")
         
+        start_date = self.start_date_entry.get().strip()
+        
+        # Validate start date is not too old
+        if not self._validate_date_not_too_old(start_date):
+            return
+        
         inputs = {
             'panchayat': self.panchayat_entry.get().strip(), 
-            'start_date': self.start_date_entry.get().strip(), 
+            'start_date': start_date, 
             'end_date': self.end_date_entry.get().strip(), 
             'designation': self.designation_combobox.get().strip(), 
             'staff': self.staff_entry.get().strip(), 

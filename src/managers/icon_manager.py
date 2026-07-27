@@ -33,7 +33,8 @@ class LazyIconManager:
                     self._cache[name] = img
                     return img
                 except Exception as e:
-                    print(f"Warning: Could not load icon '{name}': {e}")
+                    import logging
+                    logging.getLogger(__name__).warning(f"Icon load failed '{name}' from {path}: {e}")
                     self._cache[name] = default
                     return default
         return default
@@ -53,7 +54,7 @@ class LazyIconManager:
         essential: List[str] = [
             "chrome", "edge", "firefox", "extractor_icon", "emoji_login_automation",
             "sound_on", "minimize", "theme_system", "theme_light", "theme_dark",
-            "history", "emoji_file_manager", "whatsapp", "feedback", "nrega", "home_icon",
+            "history", "emoji_file_manager", "feedback", "nrega", "home_icon",
         ]
         for name in essential:
             self.get(name)

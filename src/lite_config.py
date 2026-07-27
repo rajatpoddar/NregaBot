@@ -27,7 +27,6 @@ _LITE_OVERRIDES = {
     "ENABLE_MACROS": False,
     "ENABLE_FILE_MANAGER": False,
     "ENABLE_FEEDBACK": False,
-    "ENABLE_AUTO_UPDATE_CHECK": False,
 
     # Simplified splash screen
     "ENABLE_SPLASH_ANIMATION": False,

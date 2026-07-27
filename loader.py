@@ -149,6 +149,7 @@ class ModernSplashScreen(ctk.CTk):
         ).pack(side="bottom", pady=(0, 5))
 
         # ---------- START ANIMATIONS ----------
+        self._anim_after_id = None
         self._animate_dots()
 
         # ---------- BACKGROUND UPDATE THREAD ----------
@@ -165,7 +166,7 @@ class ModernSplashScreen(ctk.CTk):
         self._dot_index += 1
         try:
             self.dots_label.configure(text=f"Loading{dots}")
-            self.after(450, self._animate_dots)
+            self._anim_after_id = self.after(450, self._animate_dots)
         except Exception:
             pass
 
@@ -316,8 +317,17 @@ class ModernSplashScreen(ctk.CTk):
             return False
 
     def launch_main_app(self):
-        """Cleanly closes splash and transitions to main app."""
+        """Cleanly closes splash and transitions to main app.
+        Uses withdraw() instead of destroy() to keep the Tk interpreter alive
+        so main_app.py can create its own CTk window afterwards.
+        """
         self.is_destroyed = True
+        if self._anim_after_id:
+            try:
+                self.after_cancel(self._anim_after_id)
+            except Exception:
+                pass
+            self._anim_after_id = None
         self.withdraw()
         self.quit()
 

@@ -10,7 +10,8 @@ APP_DESCRIPTION: str = "A comprehensive tool for managing NREGA tasks efficientl
 APP_AUTHOR: str = "Rajat Poddar"
 APP_AUTHOR_EMAIL: str = "Rajatpoddar@outlook.com"
 APP_VERSION: str = "3.0.7"
-LICENSE_SERVER_URL: str = "https://license.nregabot.com"
+import os
+LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://license.nregabot.com')
 MAIN_WEBSITE_URL: str = "https://nregabot.com"
 SUPPORT_EMAIL: str = "nregabot@gmail.com"
 
@@ -583,7 +584,6 @@ PHYSICAL_COMPLETE_CONFIG: Dict[str, str] = {
 # parsing for frequently-accessed values. The cache is populated lazily.
 # ============================================================================
 
-import os
 import json
 from typing import Any, Optional
 from src.utils import get_data_path

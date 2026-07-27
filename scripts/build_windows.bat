@@ -61,7 +61,7 @@ REM --- Step 1b: Build LITE App ---
 ECHO [STEP 1b/2] Building LITE app with PyInstaller...
 ECHO.
 
-pyinstaller --noconfirm --windowed --onefile ^
+pyinstaller --noconfirm --windowed --onedir ^
 --name %LITE_APP_NAME% ^
 --icon="assets/app_icon.ico" ^
 --add-data="assets:assets" ^
@@ -75,7 +75,7 @@ pyinstaller --noconfirm --windowed --onefile ^
 --hidden-import=PIL ^
 --collect-submodules=src.managers ^
 --collect-submodules=src.tabs ^
-lite_app.py
+lite_loader.py
 
 REM Check if PyInstaller failed
 if errorlevel 1 (

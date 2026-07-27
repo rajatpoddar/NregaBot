@@ -20,7 +20,7 @@ logger = get_logger()
 
 class DropdownSelect(ctk.CTkFrame):
     """
-    A clean dropdown selector that looks and behaves like CTkOptionMenu.
+    A professional dropdown selector that looks like a native combobox.
 
     Features:
     - Click to open dropdown, click item to select
@@ -34,28 +34,35 @@ class DropdownSelect(ctk.CTkFrame):
     """
 
     # ── Color constants (light, dark) ──
-    COL_BG = ("#E8E8E8", "#2D2D2D")
-    COL_HOVER = ("#BFDBFE", "#3B82F6")      # Blue hover (MR category style)
-    COL_HOVER_TEXT = ("#1E40AF", "white")    # Text on blue hover
-    COL_TEXT = ("gray20", "gray80")
-    COL_PLACEHOLDER = ("gray45", "gray55")
+    COL_BG = ("#FFFFFF", "#2D2D2D")          # Clean white / dark
+    COL_BORDER = ("#D0D0D0", "#555555")       # Subtle border
+    COL_BORDER_FOCUS = ("#3B82F6", "#60A5FA") # Blue border on hover/open
+    COL_ARROW_BG = ("#F5F5F5", "#3A3A3A")     # Arrow area bg
+    COL_ARROW_HOVER = ("#E8E8E8", "#4A4A4A")  # Arrow area hover
+    COL_HOVER = ("#BFDBFE", "#3B82F6")        # Blue hover (popup items)
+    COL_TEXT = ("gray10", "gray90")
+    COL_PLACEHOLDER = ("gray45", "gray60")
     COL_SETTINGS_TEXT = ("#2563EB", "#60A5FA")
     COL_SETTINGS_BG = ("#DBEAFE", "#1E3A5F")
-    COL_SETTINGS_HOVER = ("#BFDBFE", "#2563EB")
-    COL_POPUP_BG = ("gray90", "gray20")
+    COL_POPUP_BG = ("#FFFFFF", "#2D2D2D")
+    COL_POPUP_BORDER = ("#D0D0D0", "#4A4A4A")
 
-    ITEM_H = 32
+    ITEM_H = 34
     SETTINGS_LABEL = "⚙️  Set in Settings"
+    ARROW_TEXT = "▼"
 
     def __init__(self, parent, suggestions_list=None, app_instance=None,
                  history_key=None, command=None, show_settings_option=True,
                  filter_func=None, **kwargs):
         width = kwargs.pop('width', 160)
-        height = kwargs.pop('height', 30)
+        height = kwargs.pop('height', 32)
         corner_radius = kwargs.pop('corner_radius', 6)
         font = kwargs.pop('font', ctk.CTkFont(size=13))
 
-        super().__init__(parent, width=width, height=height, fg_color="transparent")
+        super().__init__(parent, width=width, height=height,
+                         fg_color=self.COL_BG,
+                         border_width=1, border_color=self.COL_BORDER,
+                         corner_radius=corner_radius)
         self._command = command
         self.grid_propagate(False)
 
@@ -63,29 +70,50 @@ class DropdownSelect(ctk.CTkFrame):
         self.history_key = history_key
         self.suggestions = list(suggestions_list) if suggestions_list else []
         self._show_settings_option = show_settings_option
-        self.filter_func = filter_func  # Optional: function() -> list for dynamic filtering
+        self.filter_func = filter_func
         self._popup: Optional[ctk.CTkToplevel] = None
         self._selected: str = ""
+        self._corner_radius = corner_radius
+        self._disabled = False
 
-        # ── Dropdown trigger button ──
-        self._btn = ctk.CTkButton(
-            self,
+        # ── Inner layout (text on left, arrow on right) ──
+        inner = ctk.CTkFrame(self, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=1, pady=1)
+
+        # Left: text label
+        self._label = ctk.CTkLabel(
+            inner,
             text="",
             anchor="w",
-            fg_color=self.COL_BG,
             text_color=self.COL_PLACEHOLDER,
-            hover_color=self.COL_HOVER,
-            corner_radius=corner_radius,
-            height=height,
             font=font,
-            command=self._toggle,
-            **{k: v for k, v in kwargs.items() if k in ('width',)}
         )
-        self._btn.pack(fill="both", expand=True)
+        self._label.pack(side="left", fill="x", expand=True, padx=(10, 4))
 
-        # ── Keyboard bindings ──
-        self._btn.bind("<Down>", lambda e: self._show(), add="+")
-        self._btn.bind("<Return>", lambda e: self._show(), add="+")
+        # Right: arrow button
+        self._arrow_btn = ctk.CTkButton(
+            inner,
+            text=self.ARROW_TEXT,
+            width=28,
+            fg_color=self.COL_ARROW_BG,
+            hover_color=self.COL_ARROW_HOVER,
+            text_color=self.COL_TEXT,
+            font=ctk.CTkFont(size=10),
+            corner_radius=4,
+            command=self._toggle,
+        )
+        self._arrow_btn.pack(side="right", padx=(0, 3), pady=3)
+
+        # Make the label clickable too
+        self._inner = inner
+
+        # Store bound callbacks so we can unbind/rebind on disable
+        self._bindings_active = True
+        self._bind_click()
+
+        # ── Keyboard bindings on label ──
+        self._label.bind("<Down>", lambda e: self._show(), add="+")
+        self._label.bind("<Return>", lambda e: self._show(), add="+")
 
         self._update_display()
 
@@ -94,20 +122,49 @@ class DropdownSelect(ctk.CTkFrame):
     # ────────────────────────────────────────────────────────────────
 
     def _update_display(self):
-        """Update button text based on state."""
+        """Update label text based on state."""
         has_data = bool([s for s in self.suggestions if s])
         if self._selected:
-            self._btn.configure(text=self._selected, text_color=self.COL_TEXT)
+            self._label.configure(text=self._selected, text_color=self.COL_TEXT)
         elif has_data:
-            self._btn.configure(text="▾  Select...", text_color=self.COL_PLACEHOLDER)
+            self._label.configure(text="Select...", text_color=self.COL_PLACEHOLDER)
         else:
-            self._btn.configure(text="▾  Click to select", text_color=self.COL_PLACEHOLDER)
+            self._label.configure(text="Click to select", text_color=self.COL_PLACEHOLDER)
+
+    def _set_focused_style(self, focused: bool):
+        """Toggle border color on open/hover."""
+        color = self.COL_BORDER_FOCUS if focused else self.COL_BORDER
+        try:
+            self.configure(border_color=color)
+        except Exception:
+            pass
 
     # ────────────────────────────────────────────────────────────────
     # POPUP MANAGEMENT
     # ────────────────────────────────────────────────────────────────
+    def _bind_click(self):
+        """Bind click events to open dropdown (unbinds first to prevent duplicates)."""
+        try:
+            self._label.unbind("<Button-1>")
+            self._inner.unbind("<Button-1>")
+        except Exception:
+            pass
+        self._label.bind("<Button-1>", lambda e: self._toggle())
+        self._inner.bind("<Button-1>", lambda e: self._toggle())
+        self._bindings_active = True
+
+    def _unbind_click(self):
+        """Remove click bindings (used when disabled)."""
+        try:
+            self._label.unbind("<Button-1>")
+            self._inner.unbind("<Button-1>")
+        except Exception:
+            pass
+        self._bindings_active = False
 
     def _toggle(self):
+        if self._disabled:
+            return
         if self._popup and self._popup.winfo_exists():
             self._hide()
         else:
@@ -115,10 +172,14 @@ class DropdownSelect(ctk.CTkFrame):
 
     def _show(self):
         """Build and show the dropdown popup."""
+        if self._disabled:
+            return
         if self._popup and self._popup.winfo_exists():
             return
 
-        # Refresh suggestions — use filter_func if provided, else history_manager
+        self._set_focused_style(True)
+
+        # Refresh suggestions
         if self.filter_func:
             try:
                 fresh = self.filter_func()
@@ -134,7 +195,7 @@ class DropdownSelect(ctk.CTkFrame):
             except Exception:
                 pass
 
-        # Dedup case-insensitively but preserve original case for display
+        # Build sorted, deduped items
         seen = set()
         items = []
         for s in sorted((x for x in self.suggestions if x), key=str.lower):
@@ -151,40 +212,43 @@ class DropdownSelect(ctk.CTkFrame):
             if self._show_settings_option:
                 items = [self.SETTINGS_LABEL]
 
-        # ── Create popup toplevel ──
+        # ── Create popup ──
         self._popup = ctk.CTkToplevel(self)
         self._popup.overrideredirect(True)
-        # NOTE: Do NOT call transient() — it breaks click event delivery to
-        # the main window after the popup is destroyed. overrideredirect + 
-        # transient has a known Tk bug where mouse clicks stop working in
-        # the main window until you click outside the application.
         self._popup.attributes("-topmost", True)
 
-        # Position below button
         try:
             x = self.winfo_rootx()
-            y = self.winfo_rooty() + self.winfo_height()
+            y = self.winfo_rooty() + self.winfo_height() - 1
             w = max(self.winfo_width(), 180)
         except Exception:
             self._popup = None
+            self._set_focused_style(False)
             return
 
-        popup_h = len(items) * self.ITEM_H + 4
+        popup_h = len(items) * self.ITEM_H + 6
         screen_h = self.winfo_screenheight()
         if y + popup_h > screen_h:
             y = self.winfo_rooty() - popup_h
-            if y < 20:
-                y = 20
+            if y < 30:
+                y = 30
 
         self._popup.geometry(f"{w}x{popup_h}+{x}+{y}")
 
-        # ── Container frame ──
-        frame = ctk.CTkFrame(self._popup, fg_color=self.COL_POPUP_BG, corner_radius=6)
+        # ── Popup container with border/shadow effect ──
+        frame = ctk.CTkFrame(
+            self._popup,
+            fg_color=self.COL_POPUP_BG,
+            border_width=1,
+            border_color=self.COL_POPUP_BORDER,
+            corner_radius=self._corner_radius,
+        )
         frame.pack(fill="both", expand=True)
 
-        # ── Create item buttons ──
-        for item in items:
+        # ── Item buttons ──
+        for i, item in enumerate(items):
             is_settings = (item == self.SETTINGS_LABEL)
+            top_pad = 2 if i == 0 else 0
             btn = ctk.CTkButton(
                 frame,
                 text=item,
@@ -194,21 +258,22 @@ class DropdownSelect(ctk.CTkFrame):
                 hover_color=self.COL_HOVER,
                 corner_radius=0,
                 height=self.ITEM_H,
-                font=ctk.CTkFont(size=13, weight="bold"),
+                font=ctk.CTkFont(size=13),
                 command=lambda v=item: self._select(v),
             )
-            btn.pack(fill="x")
+            btn.pack(fill="x", padx=1, pady=(top_pad, 0))
 
-        # When button loses focus (user clicks nav/elsewhere), hide popup
-        self._btn.bind("<FocusOut>", self._on_btn_focusout, add="+")
+        # Hide on focus loss
+        self._label.bind("<FocusOut>", self._on_focusout, add="+")
+        self._arrow_btn.bind("<FocusOut>", self._on_focusout, add="+")
 
-    def _on_btn_focusout(self, event):
-        """When the dropdown button loses focus, hide popup after a delay
-        so that a click on a popup item registers first."""
+    def _on_focusout(self, event):
+        """Hide popup after delay so item click registers first."""
         self.after(350, self._safe_hide)
 
     def _hide(self):
-        """Destroy the popup immediately and unbind FocusOut."""
+        """Destroy the popup immediately."""
+        self._set_focused_style(False)
         if self._popup:
             try:
                 self._popup.destroy()
@@ -216,12 +281,15 @@ class DropdownSelect(ctk.CTkFrame):
                 pass
             self._popup = None
         try:
-            self._btn.unbind("<FocusOut>", self._on_btn_focusout)
+            self._label.unbind("<FocusOut>", self._on_focusout)
+        except Exception:
+            pass
+        try:
+            self._arrow_btn.unbind("<FocusOut>", self._on_focusout)
         except Exception:
             pass
 
     def _safe_hide(self):
-        """Hide popup if it still exists (used after delay)."""
         if self._popup and self._popup.winfo_exists():
             self._hide()
 
@@ -233,8 +301,7 @@ class DropdownSelect(ctk.CTkFrame):
         """Handle user selecting an item from the dropdown."""
         self._hide()
 
-        # Force focus back to main window — _hide() alone doesn't restore
-        # it, and transient() was removed because it breaks click delivery.
+        # Restore focus
         try:
             tl = self.winfo_toplevel()
             if tl.winfo_exists():
@@ -255,9 +322,8 @@ class DropdownSelect(ctk.CTkFrame):
                     pass
             return
 
-        # Store and display the selection
         self._selected = value
-        self._btn.configure(text=value, text_color=self.COL_TEXT)
+        self._update_display()
 
         # Save to history
         if self.history_key and self.app and hasattr(self.app, 'update_history'):
@@ -266,51 +332,56 @@ class DropdownSelect(ctk.CTkFrame):
             except Exception:
                 pass
 
-        # Call command callback if provided
+        # Call command callback
         if self._command:
             try:
                 self._command(value)
             except Exception:
                 pass
 
-        # Trigger any bound events
+        # Trigger bound events
         try:
             self.event_generate("<<DropdownSelect>>")
         except Exception:
             pass
 
     # ────────────────────────────────────────────────────────────────
-    # COMPATIBILITY METHODS — match CTkEntry / AutocompleteEntry API
+    # COMPATIBILITY METHODS
     # ────────────────────────────────────────────────────────────────
 
     def get(self) -> str:
-        """Return currently selected value (empty string if none)."""
         return self._selected
 
     def delete(self, first=0, last=None):
-        """Clear the current selection (matches CTkEntry.delete API)."""
         self._selected = ""
         self._update_display()
 
     def insert(self, index, value: str):
-        """Set a value programmatically (matches CTkEntry.insert API)."""
         if value:
             self._selected = value
-            self._btn.configure(text=self._selected, text_color=self.COL_TEXT)
             self._update_display()
 
     def configure(self, **kwargs):
-        """Pass relevant config to internal button, rest to frame."""
-        btn_keys = {'state', 'fg_color', 'text_color', 'hover_color', 'font'}
+        # Handle state="disabled" / state="normal" — disable entire widget
+        if 'state' in kwargs:
+            state = kwargs.pop('state')
+            self._disabled = (state == 'disabled')
+            self._arrow_btn.configure(state=state)
+            if self._disabled:
+                self._unbind_click()
+                self._label.configure(text_color=("#AAAAAA", "#666666"))
+            else:
+                self._bind_click()
+                self._update_display()
+
+        # Pass remaining visual kwargs to arrow button
+        btn_keys = {'fg_color', 'text_color', 'hover_color', 'font'}
         btn_kwargs = {k: kwargs.pop(k) for k in list(kwargs.keys()) if k in btn_keys}
         if btn_kwargs:
-            self._btn.configure(**btn_kwargs)
+            self._arrow_btn.configure(**btn_kwargs)
         super().configure(**kwargs)
 
-
     def set(self, value: str):
-        """Direct setter — matches CTkComboBox.set() / CTkOptionMenu.set() API.
-        Clears current selection and inserts the given value."""
         self.delete(0, 'end')
         if value:
             self.insert(0, value)
@@ -318,29 +389,13 @@ class DropdownSelect(ctk.CTkFrame):
 
 # ════════════════════════════════════════════════════════════════════
 # CENTRALIZED DROPDOWN FACTORY
-# Use this to create a consistent dropdown across the entire app.
 # ════════════════════════════════════════════════════════════════════
 
 def create_dropdown(parent, suggestions_list=None, app_instance=None,
                     history_key=None, command=None, width=160,
                     placeholder_text=None, show_settings_option=True,
                     **kwargs):
-    """Create a consistent DropdownSelect widget across the entire app.
-    
-    All dropdowns should use this factory for a uniform look and feel.
-    Supports CTkComboBox, CTkEntry, and AutocompleteEntry replacement.
-    
-    Args:
-        parent: Parent widget
-        suggestions_list: List of items to show in dropdown
-        app_instance: App instance for history_manager access
-        history_key: Key for saving/loading from history
-        command: Callback when item is selected (receives selected value)
-        width: Widget width
-        placeholder_text: Placeholder text when nothing selected
-        show_settings_option: Show "⚙️ Set in Settings" option (default True)
-        **kwargs: Passed to DropdownSelect.__init__
-    """
+    """Create a consistent DropdownSelect widget across the entire app."""
     return AutocompleteEntry(
         parent,
         suggestions_list=suggestions_list or [],
@@ -354,22 +409,14 @@ def create_dropdown(parent, suggestions_list=None, app_instance=None,
 
 
 # ────────────────────────────────────────────────────────────────────
-# ALIAS — AutocompleteEntry is now DropdownSelect
-# All tabs that import AutocompleteEntry will get this new widget.
-# Lite app monkey-patches this same way via lite_app.py.
+# ALIASES
 # ────────────────────────────────────────────────────────────────────
 
 class AutocompleteEntry(DropdownSelect):
-    """Alias for DropdownSelect — replaces old typing-based autocomplete.
-    
-    All existing tab imports of AutocompleteEntry now get a clean dropdown.
-    Lite app monkey-patch in lite_app.py maps AutocompleteEntry → LiteDropdown,
-    which is also this class (kept as alias for clarity).
-    """
+    """Alias for DropdownSelect — old code compatibility."""
     pass
 
 
-# LiteDropdown alias — used by lite_app.py monkey-patch
 class LiteDropdown(DropdownSelect):
     """Alias for DropdownSelect used by the lite app monkey-patch."""
     pass

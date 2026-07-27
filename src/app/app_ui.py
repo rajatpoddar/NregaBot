@@ -71,7 +71,7 @@ class UIMixin:
         announcement_frame.grid(row=0, column=1, sticky="ew", padx=20)
         announcement_frame.grid_propagate(False)
 
-        self.announcement_label = MarqueeLabel(announcement_frame, text="Connecting to server...", width=300)
+        self.announcement_label = MarqueeLabel(announcement_frame, text="Welcome to NREGA Bot! Loading...", width=300)
         self.announcement_label.pack(fill="both", expand=True, pady=5)
 
         controls_frame = ctk.CTkFrame(header, fg_color="transparent")
