@@ -6,10 +6,31 @@ on:
       - main   # Runs automatically on every push to main
   workflow_dispatch: {} # Allows manual trigger
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # --- 0. Clean Old Releases ---
+  cleanup-old-releases:
+    name: Clean Old Releases & Cache
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Delete all existing GitHub Releases
+        uses: dev-drprasad/delete-older-releases@v0.3.1
+        with:
+          keep_latest: 0
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # --- 1. Get Release Info ---
   get-release-info:
     name: Get Release Information
+    needs: cleanup-old-releases
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
@@ -193,4 +214,3 @@ jobs:
             artifacts/windows-builds/*.exe
             artifacts/windows-builds/*.zip
             artifacts/linux-build/*
-            config/version.json
