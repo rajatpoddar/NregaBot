@@ -43,14 +43,14 @@ class ResendRejectedWgTab(BaseAutomationTab):
         ctk.CTkLabel(controls_frame, text="Financial Year:").grid(row=0, column=0, padx=15, pady=10, sticky="w")
         current_year = datetime.now().year
         year_options = [f"{year}-{year+1}" for year in range(current_year + 1, current_year - 10, -1)]
-        self.fin_year_combobox = ctk.CTkComboBox(controls_frame, values=year_options)
+        self.fin_year_combobox = AutocompleteEntry(controls_frame, suggestions_list=year_options)
         default_year = f"{current_year}-{current_year+1}" if datetime.now().month >= 4 else f"{current_year-1}-{current_year}"
-        self.fin_year_combobox.set(default_year)
+        self.fin_year_combobox.insert(0, default_year)
         self.fin_year_combobox.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
 
         # Panchayat Selection
         ctk.CTkLabel(controls_frame, text="Panchayat (optional):").grid(row=1, column=0, padx=15, pady=(5,0), sticky="w")
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), app_instance=self.app, history_key="panchayat_name")
+        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, history_key="location_panchayat")
         self.panchayat_entry.grid(row=1, column=1, padx=15, pady=(5,0), sticky="ew")
         
         self.process_all_var = tkinter.BooleanVar()
@@ -174,20 +174,20 @@ class ResendRejectedWgTab(BaseAutomationTab):
             else:
                 if inputs['panchayat'] in panchayat_options:
                     panchayats_to_process = [inputs['panchayat']]
-                    self.app.update_history("panchayat_name", inputs['panchayat'])
+                    self.app.update_history("location_panchayat", inputs['panchayat'])
                 else:
                     messagebox.showerror("Panchayat Not Found", f"The Panchayat '{inputs['panchayat']}' was not found for the selected year.")
                     return
 
             total_panchayats = len(panchayats_to_process)
-            for i, panchayat_name in enumerate(panchayats_to_process):
+            for i, location_panchayat in enumerate(panchayats_to_process):
                 if self.app.stop_events[self.automation_key].is_set():
                     self.app.log_message(self.log_display, "🛑 Stop signal received.", "warning")
                     break
                 
-                self.app.after(0, self.update_status, f"Processing {i+1}/{total_panchayats}: {panchayat_name}", (i+1)/total_panchayats)
-                self.app.log_message(self.log_display, f"\n--- Processing {panchayat_name} ---", "info")
-                self._process_single_panchayat(driver, wait, panchayat_name)
+                self.app.after(0, self.update_status, f"Processing {i+1}/{total_panchayats}: {location_panchayat}", (i+1)/total_panchayats)
+                self.app.log_message(self.log_display, f"\n--- Processing {location_panchayat} ---", "info")
+                self._process_single_panchayat(driver, wait, location_panchayat)
 
         except Exception as e:
             self.app.log_message(self.log_display, f"A critical error occurred: {e}", "error")
@@ -201,7 +201,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
                 self.app.after(0, lambda: messagebox.showinfo("Automation Complete", "Rejected wagelist process has finished."))
             self.app.after(0, self.app.set_status, "Automation Finished")
     
-    def _process_single_panchayat(self, driver, wait, panchayat_name):
+    def _process_single_panchayat(self, driver, wait, location_panchayat):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -211,15 +211,15 @@ class ResendRejectedWgTab(BaseAutomationTab):
         try:
             html_element = driver.find_element(By.TAG_NAME, 'html')
             panchayat_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanch"))))
-            self._select_by_text_case_insensitive(panchayat_dropdown, panchayat_name)
-            self.app.log_message(self.log_display, f"   - Selected {panchayat_name}, waiting for page to update...")
+            self._select_by_text_case_insensitive(panchayat_dropdown, location_panchayat)
+            self.app.log_message(self.log_display, f"   - Selected {location_panchayat}, waiting for page to update...")
 
             try:
                 wait.until(EC.staleness_of(html_element))
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanch")))
             except TimeoutException:
                 self.app.log_message(self.log_display, "   - ERROR: Page failed to load after selecting Panchayat. Server may be slow. Skipping.", "error")
-                self._log_result(panchayat_name, "Failed", "Page load timeout")
+                self._log_result(location_panchayat, "Failed", "Page load timeout")
                 driver.refresh()
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlstFinyear")))
                 return
@@ -230,7 +230,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
 
             if no_records_elements:
                 self.app.log_message(self.log_display, "   - Result: No records found to process.", "info")
-                self._log_result(panchayat_name, "Skipped", "No records found")
+                self._log_result(location_panchayat, "Skipped", "No records found")
                 return
 
             # If records exist, proceed
@@ -247,14 +247,14 @@ class ResendRejectedWgTab(BaseAutomationTab):
             
             status = "Success" if "successfully" in result_text.lower() else "Info"
             self.app.log_message(self.log_display, f"   - Result: {result_text}", "success" if status == "Success" else "info")
-            self._log_result(panchayat_name, status, result_text)
+            self._log_result(location_panchayat, status, result_text)
             
             time.sleep(1.5)  # Brief wait for postback to begin
 
         except Exception as e:
             error_msg = f"An unexpected error occurred: {str(e).splitlines()[0]}"
             self.app.log_message(self.log_display, f"   - ERROR: {error_msg}", "error")
-            self._log_result(panchayat_name, "Failed", error_msg)
+            self._log_result(location_panchayat, "Failed", error_msg)
 
     def _log_result(self, panchayat, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")

@@ -15,6 +15,7 @@ from src import config
 from src.tab_config import get_tabs_definition
 from src.ui_components import CollapsibleFrame, SkeletonLoader
 from src.utils import resource_path, get_config, save_config, get_logger
+from src.tabs.autocomplete_widget import AutocompleteEntry
 
 logger = get_logger()
 
@@ -124,23 +125,14 @@ class NavMixin:
         if self.app_state.last_selected_category not in categories:
             self.app_state.last_selected_category = "All Automations"
         
-        self.category_filter_menu = ctk.CTkOptionMenu(
-            header_parent, 
-            values=categories, 
+        self.category_filter_menu = AutocompleteEntry(
+            header_parent,
+            suggestions_list=categories,
             command=self._on_category_filter_change,
-            height=26, 
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="normal"),
-            fg_color=("#F3F4F6", "#333333"),
-            button_color=("#E5E7EB", "#4B5563"),
-            button_hover_color=("#D1D5DB", "#6B7280"),
-            text_color=("#374151", "#D1D5DB"),
-            dropdown_fg_color=("#FFFFFF", "#2B2B2B"),
-            dropdown_text_color=("#374151", "#D1D5DB"),
-            dropdown_hover_color=("#F3F4F6", "#374151"),
-            anchor="w",
-            corner_radius=8
+            width=180, height=28,
+            show_settings_option=False,
         )
-        self.category_filter_menu.set(self.app_state.last_selected_category)
+        self.category_filter_menu.insert(0, self.app_state.last_selected_category)
         self.category_filter_menu.pack(fill="x", pady=(5, 5), padx=5)
 
         # Category colors matching the Home page card colors

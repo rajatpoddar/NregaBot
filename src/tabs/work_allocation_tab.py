@@ -55,9 +55,9 @@ class WorkAllocationTab(BaseAutomationTab):
         # --- Row 0: Panchayat Name ---
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
         self.panchayat_entry = AutocompleteEntry(controls_frame,
-                                                 suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+                                                 suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
                                                  app_instance=self.app,
-                                                 history_key="panchayat_name")
+                                                 history_key="location_panchayat")
         self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
 
         # --- Row 1: Work Category ---
@@ -275,7 +275,7 @@ class WorkAllocationTab(BaseAutomationTab):
             inputs['allocation_map'] = None 
 
         if inputs['panchayat_name']:
-            self.app.update_history("panchayat_name", inputs['panchayat_name'])
+            self.app.update_history("location_panchayat", inputs['panchayat_name'])
         self._save_inputs(inputs)
         
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))

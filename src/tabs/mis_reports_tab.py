@@ -71,15 +71,24 @@ class MisReportsTab(BaseAutomationTab):
         settings_container.grid_columnconfigure(1, weight=1)
         
         ctk.CTkLabel(settings_container, text="State:").grid(row=0, column=0, sticky='w', padx=15, pady=5)
-        self.state_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("mis_state"), app_instance=self.app, history_key="mis_state")
+        self.state_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("location_state"), app_instance=self.app, history_key="location_state",
+                                             command=self._make_parent_callback("location_state", [
+                                                 (self.district_entry, "location_district"),
+                                                 (self.block_entry, "location_block"),
+                                             ]))
         self.state_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(settings_container, text="District:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
-        self.district_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("mis_district"), app_instance=self.app, history_key="mis_district")
+        self.district_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("location_district"), app_instance=self.app, history_key="location_district",
+                                                filter_func=self._make_filter_func("location_district", "location_state", self.state_entry),
+                                                command=self._make_parent_callback("location_district", [
+                                                    (self.block_entry, "location_block"),
+                                                ]))
         self.district_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
         
         ctk.CTkLabel(settings_container, text="Block:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
-        self.block_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("mis_block"), app_instance=self.app, history_key="mis_block")
+        self.block_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("location_block"), app_instance=self.app, history_key="location_block",
+                                             filter_func=self._make_filter_func("location_block", "location_district", self.district_entry))
         self.block_entry.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
 
         # Checkbox list for reports
@@ -179,7 +188,7 @@ class MisReportsTab(BaseAutomationTab):
             messagebox.showwarning("Input Error", "State, District, Block, and at least one Report are required."); return
         
         self.save_inputs({'state': inputs['state'], 'district': inputs['district'], 'block': inputs['block']})
-        self.app.update_history("mis_state", inputs['state']); self.app.update_history("mis_district", inputs['district']); self.app.update_history("mis_block", inputs['block'])
+        self.app.update_history("location_state", inputs['state']); self.app.update_history("location_district", inputs['district']); self.app.update_history("location_block", inputs['block'])
         
         # --- NEW: Create suggested directory structure ---
         try:

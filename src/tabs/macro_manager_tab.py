@@ -116,7 +116,7 @@ class MacroManagerTab(BaseAutomationTab):
             # --- UI For Bulk Demand ---
             ctk.CTkLabel(self.input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
             
-            p_entry = AutocompleteEntry(self.input_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), app_instance=self.app, width=200)
+            p_entry = AutocompleteEntry(self.input_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, width=200)
             p_entry.grid(row=0, column=1, padx=10, pady=5, sticky="w")
             self.bulk_inputs['panchayat'] = p_entry
 
@@ -145,7 +145,7 @@ class MacroManagerTab(BaseAutomationTab):
             ctk.CTkLabel(self.input_frame, text="Target Panchayat(s):").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
             
             # Re-create the standard target entry
-            self.target_entry = AutocompleteEntry(self.input_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), app_instance=self.app, width=200)
+            self.target_entry = AutocompleteEntry(self.input_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, width=200)
             self.target_entry.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
             
             btn_frame = ctk.CTkFrame(self.input_frame, fg_color="transparent")

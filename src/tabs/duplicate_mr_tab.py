@@ -73,9 +73,9 @@ class DuplicateMrTab(BaseAutomationTab):
 
         ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=10, sticky="w")
         self.panchayat_entry = AutocompleteEntry(input_frame,
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app, 
-            history_key="panchayat_name")
+            history_key="location_panchayat")
         self.panchayat_entry.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
 
         ctk.CTkLabel(input_frame, text="Output Action:").grid(row=1, column=0, padx=15, pady=10, sticky="w")
@@ -159,7 +159,7 @@ class DuplicateMrTab(BaseAutomationTab):
         self.scale_label.configure(text=f"{int(value)}%")
 
     def _load_history(self):
-        panchayat_history = self.app.history_manager.get_suggestions("panchayat_name")
+        panchayat_history = self.app.history_manager.get_suggestions("location_panchayat")
         if not hasattr(self.panchayat_entry, 'suggestions'):
              self.panchayat_entry.suggestions = []
         self.panchayat_entry.suggestions.extend(panchayat_history)
@@ -180,17 +180,17 @@ class DuplicateMrTab(BaseAutomationTab):
             return
             
         work_codes = [line.strip() for line in work_codes_raw.splitlines() if line.strip()]
-        self.app.history_manager.save_entry("panchayat_name", panchayat)
+        self.app.history_manager.save_entry("location_panchayat", panchayat)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(panchayat, work_codes, action, orientation, scale))
 
     # --- NEW HELPER METHOD ---
-    def _get_output_dir(self, panchayat_name):
+    def _get_output_dir(self, location_panchayat):
         """Creates and returns the structured output directory."""
         try:
             # Sanitize panchayat name
-            safe_panchayat_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
-            if not safe_panchayat_name:
-                safe_panchayat_name = "Unknown_Panchayat"
+            safe_location_panchayat = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
+            if not safe_location_panchayat:
+                safe_location_panchayat = "Unknown_Panchayat"
                 
             # Get date for folder name
             date_str = datetime.now().strftime('%Y-%m-%d')
@@ -199,7 +199,7 @@ class DuplicateMrTab(BaseAutomationTab):
             # NregaBot > Duplicate_MR_Output > Panchayat Name > Date
             output_dir = os.path.join(
                 self.app.get_nregabot_path("DuplicateMR_Output"),
-                safe_panchayat_name,
+                safe_location_panchayat,
                 date_str
             )
             os.makedirs(output_dir, exist_ok=True)
@@ -209,7 +209,7 @@ class DuplicateMrTab(BaseAutomationTab):
             messagebox.showerror("Directory Error", f"Could not create output directory: {e}")
             return None
         
-    def load_data_from_report(self, workcodes: str, panchayat_name: str):
+    def load_data_from_report(self, workcodes: str, location_panchayat: str):
         """Loads data from a report tab (like Issued MR Details)."""
         # Clear existing data
         self.panchayat_entry.delete(0, "end")
@@ -217,12 +217,12 @@ class DuplicateMrTab(BaseAutomationTab):
         self.work_codes_textbox.delete("1.0", "end")
         
         # Insert new data
-        self.panchayat_entry.insert(0, panchayat_name)
+        self.panchayat_entry.insert(0, location_panchayat)
         self.work_codes_textbox.insert("1.0", workcodes)
         self.work_codes_textbox.configure(state="disabled")
         
         # Update history
-        self.app.history_manager.save_entry("panchayat_name", panchayat_name)
+        self.app.history_manager.save_entry("location_panchayat", location_panchayat)
         
         # Switch to the work codes tab
         for tab_name in self.master.children:

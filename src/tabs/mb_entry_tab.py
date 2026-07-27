@@ -91,7 +91,7 @@ class MbEntryTab(BaseAutomationTab):
         config_frame.grid_columnconfigure((1, 3), weight=1)
         
         # --- Form Fields ---
-        self.panchayat_entry = self._create_autocomplete_field(config_frame, "panchayat_name", "Panchayat Name", 0, 0)
+        self.panchayat_entry = self._create_autocomplete_field(config_frame, "location_panchayat", "Panchayat Name", 0, 0)
         self.panchayat_entry.bind("<KeyRelease>", self._on_panchayat_change_debounced)
         
         # --- MB No. with Auto Checkbox ---
@@ -311,7 +311,7 @@ class MbEntryTab(BaseAutomationTab):
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self._load_inputs()
-            self.config_vars['panchayat_name'].set("") 
+            self.config_vars['location_panchayat'].set("") 
             self.work_codes_text.configure(state="normal")
             self.work_codes_text.delete("1.0", tkinter.END)
             self.work_codes_text.configure(state="disabled")
@@ -369,7 +369,7 @@ class MbEntryTab(BaseAutomationTab):
         if not self.auto_mb_no_var.get() and not cfg.get("measurement_book_no"):
             messagebox.showwarning("Input Error", "MB No. field is required when 'Auto' is unchecked.")
             return
-        required_fields = ["panchayat_name", "page_no", "unit_cost", "default_pit_count", "mate_name"]
+        required_fields = ["location_panchayat", "page_no", "unit_cost", "default_pit_count", "mate_name"]
         if any(not cfg.get(key) for key in required_fields):
             messagebox.showwarning("Input Error", "All configuration fields must be filled out.")
             return
@@ -383,7 +383,7 @@ class MbEntryTab(BaseAutomationTab):
             if not proceed:
                 return
             self.app.log_message(self.log_display, "ℹ️ No work codes provided. Will process all works from dropdown.")
-        self._save_mapping_pair(cfg['panchayat_name'], cfg['mate_name'])
+        self._save_mapping_pair(cfg['location_panchayat'], cfg['mate_name'])
         self._save_inputs(cfg)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(cfg, work_codes_raw))
     
@@ -420,7 +420,7 @@ class MbEntryTab(BaseAutomationTab):
                 return
 
             if not self.app.stop_events[self.automation_key].is_set():
-                self.app.update_history("panchayat_name", cfg['panchayat_name'])
+                self.app.update_history("location_panchayat", cfg['location_panchayat'])
                 mate_key = self._get_current_mate_key()
                 for mate in mate_names_list: self.app.update_history(mate_key, mate)
             
@@ -464,7 +464,7 @@ class MbEntryTab(BaseAutomationTab):
 
     def _log_result(self, cfg, work_code, status, details, work_name="-", mr_no="-", mr_period="-"):
         timestamp = datetime.now().strftime("%H:%M:%S")
-        panchayat = cfg.get('panchayat_name', '-')
+        panchayat = cfg.get('location_panchayat', '-')
         tags = ('failed',) if 'success' not in status.lower() else ()
         values = (panchayat, work_code, work_name, mr_no, mr_period, status, details, timestamp)
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
@@ -489,8 +489,8 @@ class MbEntryTab(BaseAutomationTab):
             try:
                 panchayat_dropdown = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
                 selected_option = Select(panchayat_dropdown).first_selected_option
-                if selected_option.text.strip() != cfg['panchayat_name']:
-                    self._select_by_text_case_insensitive(Select(panchayat_dropdown), cfg['panchayat_name'])
+                if selected_option.text.strip() != cfg['location_panchayat']:
+                    self._select_by_text_case_insensitive(Select(panchayat_dropdown), cfg['location_panchayat'])
                     wait.until(EC.staleness_of(panchayat_dropdown))
                     wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
             except Exception as e: logger.debug("MBEntry: Panchayat select wait failed: %s", e)
@@ -623,8 +623,8 @@ class MbEntryTab(BaseAutomationTab):
                 EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch'))
             )
             selected_option = Select(panchayat_dropdown).first_selected_option
-            if selected_option.text.strip() != cfg['panchayat_name']:
-                Select(panchayat_dropdown).select_by_visible_text(cfg['panchayat_name'])
+            if selected_option.text.strip() != cfg['location_panchayat']:
+                Select(panchayat_dropdown).select_by_visible_text(cfg['location_panchayat'])
                 wait.until(EC.staleness_of(panchayat_dropdown))
                 wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
         except Exception:

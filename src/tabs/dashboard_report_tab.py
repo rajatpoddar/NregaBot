@@ -74,26 +74,41 @@ class DashboardReportTab(BaseAutomationTab):
         # --- Input Fields ---
         ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
         self.state_entry = AutocompleteEntry(controls_frame, 
-                                             suggestions_list=self.app.history_manager.get_suggestions("dashboard_state"),
-                                             app_instance=self.app, history_key="dashboard_state")
+                                             suggestions_list=self.app.history_manager.get_suggestions("location_state"),
+                                             app_instance=self.app, history_key="location_state",
+                                             command=self._make_parent_callback("location_state", [
+                                                 (self.district_entry, "location_district"),
+                                                 (self.block_entry, "location_block"),
+                                                 (self.panchayat_entry, "location_panchayat"),
+                                             ]))
         self.state_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
 
         ctk.CTkLabel(controls_frame, text="District:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
         self.district_entry = AutocompleteEntry(controls_frame, 
-                                                suggestions_list=self.app.history_manager.get_suggestions("dashboard_district"),
-                                                app_instance=self.app, history_key="dashboard_district")
+                                                suggestions_list=self.app.history_manager.get_suggestions("location_district"),
+                                                app_instance=self.app, history_key="location_district",
+                                                filter_func=self._make_filter_func("location_district", "location_state", self.state_entry),
+                                                command=self._make_parent_callback("location_district", [
+                                                    (self.block_entry, "location_block"),
+                                                    (self.panchayat_entry, "location_panchayat"),
+                                                ]))
         self.district_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Block:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
         self.block_entry = AutocompleteEntry(controls_frame, 
-                                             suggestions_list=self.app.history_manager.get_suggestions("dashboard_block"),
-                                             app_instance=self.app, history_key="dashboard_block")
+                                             suggestions_list=self.app.history_manager.get_suggestions("location_block"),
+                                             app_instance=self.app, history_key="location_block",
+                                             filter_func=self._make_filter_func("location_block", "location_district", self.district_entry),
+                                             command=self._make_parent_callback("location_block", [
+                                                 (self.panchayat_entry, "location_panchayat"),
+                                             ]))
         self.block_entry.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
         self.panchayat_entry = AutocompleteEntry(controls_frame, 
-                                                 suggestions_list=self.app.history_manager.get_suggestions("dashboard_panchayat"),
-                                                 app_instance=self.app, history_key="dashboard_panchayat")
+                                                 suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
+                                                 app_instance=self.app, history_key="location_panchayat",
+                                                 filter_func=self._make_filter_func("location_panchayat", "location_block", self.block_entry))
         self.panchayat_entry.grid(row=3, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Delay Column:").grid(row=4, column=0, sticky='w', padx=15, pady=5)
@@ -104,10 +119,10 @@ class DashboardReportTab(BaseAutomationTab):
             "Pending for I sig FTO in T+7 days",
             "Pending for II sig FTO in T+8 days"
         ]
-        self.delay_column_entry = ctk.CTkComboBox(controls_frame, values=self.delay_column_options)
+        self.delay_column_entry = AutocompleteEntry(controls_frame, suggestions_list=self.delay_column_options)
         self.delay_column_entry.grid(row=4, column=1, sticky='ew', padx=15, pady=5)
         if self.delay_column_options:
-            self.delay_column_entry.set(self.delay_column_options[0])
+            self.delay_column_entry.insert(0, self.delay_column_options[0])
 
         action_frame = self._create_action_buttons(parent_frame=controls_frame)
         action_frame.grid(row=5, column=0, columnspan=2, pady=10)
@@ -203,10 +218,10 @@ class DashboardReportTab(BaseAutomationTab):
             messagebox.showwarning("Input Error", "All fields are required."); return
         
         self.save_inputs(inputs)
-        self.app.update_history("dashboard_state", inputs['state'])
-        self.app.update_history("dashboard_district", inputs['district'])
-        self.app.update_history("dashboard_block", inputs['block'])
-        self.app.update_history("dashboard_panchayat", inputs['panchayat'])
+        self.app.update_history("location_state", inputs['state'])
+        self.app.update_history("location_district", inputs['district'])
+        self.app.update_history("location_block", inputs['block'])
+        self.app.update_history("location_panchayat", inputs['panchayat'])
         
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 

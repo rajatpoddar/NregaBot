@@ -276,11 +276,15 @@ class DemandTab(BaseAutomationTab):
 
         # --- Row 0: State and Panchayat ---
         ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, padx=(10, 5), pady=5, sticky="w")
-        self.state_combobox = ctk.CTkComboBox(controls_frame, values=list(config.STATE_DEMAND_CONFIG.keys()))
+        self.state_combobox = AutocompleteEntry(
+            controls_frame,
+            suggestions_list=list(config.STATE_DEMAND_CONFIG.keys()),
+            app_instance=self.app,
+        )
         self.state_combobox.grid(row=0, column=1, padx=(0, 10), pady=5, sticky="ew")
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=2, padx=(0, 5), pady=5, sticky="w")
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat"))
+        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
         # Ensure clicks inside the scrollable parent propagate correctly to this entry
         self.panchayat_entry.bind("<Button-1>", lambda e: self.panchayat_entry.focus_set(), add="+")
@@ -1315,7 +1319,7 @@ class DemandTab(BaseAutomationTab):
         self.set_ui_state(running=True) # Disable UI elements
 
         # --- 3. Save History and Group Data ---
-        self.app.history_manager.save_entry("panchayat", panchayat); self.app.history_manager.save_entry("demand_days", days_str)
+        self.app.history_manager.save_entry("location_panchayat", panchayat); self.app.history_manager.save_entry("demand_days", days_str)
         self.save_inputs({
             "state": state, 
             "panchayat": panchayat, 
@@ -1363,7 +1367,7 @@ class DemandTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         """Resets all inputs, selections, and logs on the tab."""
         if not messagebox.askokcancel("Reset?", "Clear inputs, selections, logs?"): return
-        self.state_combobox.set("")
+        self.state_combobox.delete(0, 'end')
         self.panchayat_entry.delete(0, 'end')
         self.days_entry.delete(0, 'end')
         self.search_entry.delete(0, 'end')
@@ -2081,7 +2085,7 @@ class DemandTab(BaseAutomationTab):
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, 'r') as f: data = json.load(f)
-                self.state_combobox.set(data.get('state', '')); self.panchayat_entry.insert(0, data.get('panchayat', ''))
+                self.state_combobox.delete(0, 'end'); self.state_combobox.insert(0, data.get('state', '')); self.panchayat_entry.insert(0, data.get('panchayat', ''))
                 days_to_set = data.get('days', days_to_set)
                 work_key_to_set = data.get('work_key_for_allocation', '')
                 

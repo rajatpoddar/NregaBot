@@ -172,6 +172,7 @@ class DeleteApplicantTab(BaseAutomationTab):
         self.data_tree.column("village", width=130)
         self.data_tree.column("abps", width=70, anchor="center")
         self.data_tree.column("ekyc", width=70, anchor="center")
+        self.data_tree.tag_configure('selected', background='#FFCCCC', foreground='#1E293B')
         self.data_tree.bind("<ButtonRelease-1>", self._on_tree_click)
         self.data_tree.grid(row=0, column=0, sticky="nsew", padx=10, pady=5)
         vsb = ttk.Scrollbar(dt, orient="vertical", command=self.data_tree.yview)
@@ -235,9 +236,11 @@ class DeleteApplicantTab(BaseAutomationTab):
             if item in self.selected_items:
                 self.selected_items.discard(item)
                 self.data_tree.set(item, "select", "☐")
+                self.data_tree.item(item, tags=())
             else:
                 self.selected_items.add(item)
                 self.data_tree.set(item, "select", "☑")
+                self.data_tree.item(item, tags=('selected',))
             self._update_sel_count()
 
     def _update_sel_count(self):
@@ -260,6 +263,12 @@ class DeleteApplicantTab(BaseAutomationTab):
             text_color=config.COLORS["green_del_app"] if sel > 0 else ("gray50", "gray60"))
 
     def select_all(self):
+        for item in self.data_tree.get_children():
+            self.selected_items.add(item)
+            self.data_tree.set(item, "select", "☑")
+            self.data_tree.item(item, tags=('selected',))
+        self._update_sel_count()
+
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -278,6 +287,12 @@ class DeleteApplicantTab(BaseAutomationTab):
         self._update_sel_count()
 
     def deselect_all(self):
+        for item in self.data_tree.get_children():
+            self.selected_items.discard(item)
+            self.data_tree.set(item, "select", "☐")
+            self.data_tree.item(item, tags=())
+        self._update_sel_count()
+
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait

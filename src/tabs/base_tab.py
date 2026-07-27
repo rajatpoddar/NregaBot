@@ -712,6 +712,51 @@ class BaseAutomationTab(ctk.CTkFrame):
                 return True
         return False
     
+    # ────────────────────────────────────────────────────────────────
+    # LOCATION HIERARCHY HELPERS
+    # ────────────────────────────────────────────────────────────────
+
+    # Mapping: location_key → (parent_key, [child_keys_to_clear])
+    _HIERARCHY_CLEAR = {
+        "location_state":    (None, ["location_district", "location_block", "location_panchayat"]),
+        "location_district": ("location_state", ["location_block", "location_panchayat"]),
+        "location_block":    ("location_district", ["location_panchayat"]),
+        "location_panchayat":("location_block", []),
+        "location_village":  ("location_panchayat", []),
+    }
+
+    def _make_filter_func(self, child_key: str, parent_key: str, parent_entry: Any):
+        """
+        Create a filter function for a child dropdown that filters by parent value.
+        Usage: filter_func=self._make_filter_func("location_district", "location_state", self.state_entry)
+        """
+        def _filter():
+            parent_val = parent_entry.get().strip() if parent_entry else ""
+            return self.app.history_manager.get_filtered_suggestions(
+                child_key, parent_key, parent_val
+            )
+        return _filter
+
+    def _make_parent_callback(self, my_key: str, child_entries: list):
+        """
+        Create a command callback for when a location value is selected.
+        Clears child entries when parent changes so old child values don't
+        appear orphaned.
+        
+        child_entries: list of (entry_widget, child_key) tuples to clear
+        
+        Note: Hierarchy relationships (parent→child) are built via the
+        Settings tab — automation tabs are consumers only.
+        """
+        def _on_parent_selected(value):
+            # Clear all dependent child entries
+            for entry, _ in child_entries:
+                try:
+                    entry.delete(0, 'end')
+                except Exception:
+                    pass
+        return _on_parent_selected
+
     def _apply_appearance_mode(self, theme_color_tuple: Any) -> str:
         if isinstance(theme_color_tuple, (tuple, list)):
             if ctk.get_appearance_mode().lower() == "light": return theme_color_tuple[0]

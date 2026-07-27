@@ -54,9 +54,9 @@ class MusterrollGenTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure((1,3), weight=1)
         
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=(15,0))
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app,
-            history_key="panchayat_name")
+            history_key="location_panchayat")
         self.panchayat_entry.grid(row=0, column=1, columnspan=3, sticky='ew', padx=15, pady=(15,0))
         self.panchayat_entry.bind("<KeyRelease>", self._on_panchayat_change_debounced, add="+")
         
@@ -82,7 +82,7 @@ class MusterrollGenTab(BaseAutomationTab):
         
         ctk.CTkLabel(controls_frame, text="Select Designation:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
         designation_options = ["Junior Engineer--BP", "Assistant Engineer--BP", "Technical Assistant--BP", "Acrited Engineer(AE)--GP", "Junior Engineer--GP", "Technical Assistant--GP"]
-        self.designation_combobox = ctk.CTkComboBox(controls_frame, values=designation_options)
+        self.designation_combobox = AutocompleteEntry(controls_frame, suggestions_list=designation_options)
         self.designation_combobox.grid(row=3, column=1, sticky='ew', padx=(15,5), pady=5)
         
         ctk.CTkLabel(controls_frame, text="Select Technical Staff:").grid(row=3, column=2, sticky='w', padx=10, pady=5)
@@ -90,8 +90,8 @@ class MusterrollGenTab(BaseAutomationTab):
         self.staff_entry.grid(row=3, column=3, sticky='ew', padx=(5,15), pady=5)
         
         ctk.CTkLabel(controls_frame, text="Output Action:").grid(row=4, column=0, sticky='w', padx=15, pady=5)
-        self.output_action_combobox = ctk.CTkComboBox(controls_frame, values=["Save as PDF", "Print"])
-        self.output_action_combobox.set("Save as PDF")
+        self.output_action_combobox = AutocompleteEntry(controls_frame, suggestions_list=["Save as PDF", "Print"])
+        self.output_action_combobox.insert(0, "Save as PDF")
         self.output_action_combobox.grid(row=4, column=1, sticky='ew', padx=(15,5), pady=5)
         
         self.save_to_cloud_var = tkinter.BooleanVar(value=True) 
@@ -386,12 +386,12 @@ class MusterrollGenTab(BaseAutomationTab):
             self.app.log_message(self.log_display, error_msg, "error")
             self.app.after(0, lambda: messagebox.showwarning("Print Error", error_msg))
 
-    def _get_output_dir(self, panchayat_name):
+    def _get_output_dir(self, location_panchayat):
         try:
-            safe_panchayat_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
-            if not safe_panchayat_name: safe_panchayat_name = "Unknown_Panchayat"
+            safe_location_panchayat = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
+            if not safe_location_panchayat: safe_location_panchayat = "Unknown_Panchayat"
             date_str = datetime.now().strftime('%Y-%m-%d')
-            output_dir = os.path.join(self.app.get_nregabot_path("PDF_Output/MR_Output"), safe_panchayat_name, date_str)
+            output_dir = os.path.join(self.app.get_nregabot_path("PDF_Output/MR_Output"), safe_location_panchayat, date_str)
             os.makedirs(output_dir, exist_ok=True)
             return output_dir
         except Exception as e:
@@ -432,7 +432,7 @@ class MusterrollGenTab(BaseAutomationTab):
                 self.app.after(0, self.set_ui_state, False)
                 return
             
-            self.app.update_history("panchayat_name", inputs['panchayat'])
+            self.app.update_history("location_panchayat", inputs['panchayat'])
             self.app.update_history("staff_name", inputs['staff'])
 
             items_to_process = self._get_items_to_process(driver, wait, inputs)
@@ -471,7 +471,7 @@ class MusterrollGenTab(BaseAutomationTab):
         else:
             messagebox.showinfo("Task Finished", summary)
 
-    def _validate_panchayat(self, driver, wait, panchayat_name):
+    def _validate_panchayat(self, driver, wait, location_panchayat):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -484,8 +484,8 @@ class MusterrollGenTab(BaseAutomationTab):
             self.app.log_message(self.log_display, "Validating Panchayat name...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
             panchayat_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "exe_agency"))))
-            if not self._select_by_text_case_insensitive(panchayat_dropdown, config.AGENCY_PREFIX + panchayat_name):
-                error_msg = f"Panchayat name '{panchayat_name}' not found on the website. Please check spelling."
+            if not self._select_by_text_case_insensitive(panchayat_dropdown, config.AGENCY_PREFIX + location_panchayat):
+                error_msg = f"Panchayat name '{location_panchayat}' not found on the website. Please check spelling."
                 if "macro" in self.app.active_automations:
                     self.app.log_message(self.log_display, f"Skipping: {error_msg}", "error")
                     return False
@@ -868,7 +868,7 @@ class MusterrollGenTab(BaseAutomationTab):
         
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
 
-    def _upload_to_cloud(self, file_path, panchayat_name):
+    def _upload_to_cloud(self, file_path, location_panchayat):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -891,9 +891,9 @@ class MusterrollGenTab(BaseAutomationTab):
                 files = {'file': (filename, f, 'application/pdf')}
                 
                 date_folder = datetime.now().strftime('%Y-%m-%d')
-                safe_panchayat_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
+                safe_location_panchayat = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
                 
-                relative_path = f'Muster_Rolls/{date_folder}/{safe_panchayat_name}/{filename}'
+                relative_path = f'Muster_Rolls/{date_folder}/{safe_location_panchayat}/{filename}'
                 
                 data = {
                     'parent_id': '', 
@@ -948,8 +948,8 @@ class MusterrollGenTab(BaseAutomationTab):
         from selenium.common.exceptions import UnexpectedAlertPresentException
         from selenium import webdriver
         if not self.results_tree.get_children(): messagebox.showinfo("No Data", "No results to export."); return None, None
-        panchayat_name = self.panchayat_entry.get().strip()
-        if not panchayat_name: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
+        location_panchayat = self.panchayat_entry.get().strip()
+        if not location_panchayat: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
         
         filter_option = self.export_filter_menu.get()
         data_to_export = []
@@ -961,7 +961,7 @@ class MusterrollGenTab(BaseAutomationTab):
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)
         if not data_to_export: messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
 
-        safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
+        safe_name = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {"Image (.jpg)": { "ext": ".jpg", "types": [("JPEG Image", "*.jpg")]}, "PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
         filename = f"MR_Gen_Report_{safe_name}_{timestamp}{details['ext']}"

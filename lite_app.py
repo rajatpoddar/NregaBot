@@ -57,6 +57,13 @@ from src.utils import (
     setup_logging, get_logger, _suppress_overscroll
 )
 
+# --- Replace AutocompleteEntry with LiteDropdown for the lite app ---
+# Every tab that imports AutocompleteEntry from autocomplete_widget will get
+# LiteDropdown instead — a read-only dropdown with NO typing/autocomplete.
+# This is a clean monkey-patch that requires zero changes to tab files.
+from src.tabs import autocomplete_widget as _acw
+_acw.AutocompleteEntry = _acw.LiteDropdown
+
 # --- Windows DPI Awareness ---
 if config.OS_SYSTEM == "Windows":
     import ctypes
@@ -102,11 +109,10 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     def __init__(self) -> None:
         super().__init__()
         
-        # NOTE: CTk.__init__ already calls self.withdraw() internally.
-        # We do NOT call self.withdraw() again — macOS has a known Tk bug
-        # where withdraw+deiconify breaks mouse event delivery.
-        # Instead, the splash is built as an internal Frame that covers
-        # the window until the real UI is ready.
+        # macOS Tk bug: withdraw+deiconify on main window breaks mouse event
+        # delivery. On macOS we keep the window visible from the start with an
+        # in-window splash. On Windows we withdraw during build for smooth launch.
+        self._on_windows = config.OS_SYSTEM == "Windows"
 
         self.title(f"{config.APP_NAME}")
         
@@ -120,6 +126,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.http_session = requests.Session()
         self.stop_events: Dict[str, Any] = {}
         self.tab_instances: Dict[str, Any] = {}
+        self.content_frames: Dict[str, Any] = {}  # Per-tab wrapper frames (like main app)
         self.active_automations: Set[str] = set()
         self.automation_threads: Dict[str, Any] = {}
         self.license_info: Dict[str, Any] = {}
@@ -137,6 +144,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.nav_buttons: Dict[str, Any] = {}
         self.button_to_category_frame: Dict[str, Any] = {}
         self.category_frames: Dict[str, Any] = {}
+        self._last_active_nav: Optional[str] = None  # Track for fast highlight update
         # For compatibility with tab files accessing self.app.app_state.xxx
         self._app_state_fallback: Dict[str, Any] = {}
 
@@ -156,25 +164,26 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         # --- Icons (minimal set, for tab compatibility only) ---
         self.icon_images = create_icon_manager()
 
-        # --- Splash frame (in-window, not a Toplevel child) ---
-        # macOS Tk bug: a Toplevel child of a withdrawn parent can break
-        # event delivery to the main window. Using a Frame instead avoids
-        # this entirely.
-        self._splash_frame = self._create_splash_frame()
-        self._splash_frame.pack(expand=True, fill="both")
-
-        # Show splash at FINAL app size — prevents visible resize flicker
-        # when UI replaces the splash later.
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
         self._final_w = min(self.initial_width, sw - 40)
         self._final_h = min(self.initial_height, sh - 40)
         self._final_w = max(self._final_w, 850)
         self._final_h = max(self._final_h, 600)
-        fx = (sw // 2) - (self._final_w // 2)
-        fy = (sh // 2) - (self._final_h // 2)
-        self.geometry(f'{self._final_w}x{self._final_h}+{int(fx)}+{int(fy)}')
-        self.deiconify()
-        self.update()
+        self._final_x = (sw // 2) - (self._final_w // 2)
+        self._final_y = (sh // 2) - (self._final_h // 2)
+
+        if self._on_windows:
+            # Windows: build UI completely while withdrawn for jank-free reveal
+            self.withdraw()
+            self._splash_window = self._create_splash_toplevel()
+            self._splash_window.update()
+        else:
+            # macOS: in-window splash to avoid withdraw/deiconify bug
+            self._splash_window = self._create_splash_frame()
+            self._splash_window.pack(expand=True, fill="both")
+            self.geometry(f'{self._final_w}x{self._final_h}+{self._final_x}+{self._final_y}')
+            self.deiconify()
+            self.update()
 
         # --- GC ---
         gc.set_threshold(*getattr(config, 'GC_THRESHOLD', (700, 10, 5)))
@@ -225,6 +234,74 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     def history_manager(self, value: Any) -> None:
         self._history_manager = value
         
+    def _create_splash_toplevel(self) -> ctk.CTkToplevel:
+        """Create a Toplevel splash window for smooth launch on Windows.
+        The main window stays withdrawn during UI build, so we use a
+        separate splash window for visual feedback.
+        """
+        splash = ctk.CTkToplevel(self)
+        splash.overrideredirect(True)
+        w, h = 380, 260
+        sw, sh = splash.winfo_screenwidth(), splash.winfo_screenheight()
+        x, y = (sw // 2) - (w // 2), (sh // 2) - (h // 2)
+        splash.geometry(f'{w}x{h}+{int(x)}+{int(y)}')
+        splash.configure(fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
+
+        # Flag to stop splash animation when window is destroyed
+        splash._running = True
+
+        outer = ctk.CTkFrame(splash, fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]),
+                             corner_radius=16, border_width=0)
+        outer.pack(fill="both", expand=True, padx=0, pady=0)
+
+        inner = ctk.CTkFrame(outer, fg_color="transparent")
+        inner.pack(expand=True, fill="both", padx=30, pady=22)
+
+        ctk.CTkLabel(inner, text="\U0001f3db\ufe0f", font=ctk.CTkFont(size=36)).pack(pady=(5, 10))
+        ctk.CTkLabel(
+            inner, text=f"{config.APP_NAME}",
+            font=ctk.CTkFont(family="Helvetica Neue", size=24, weight="bold"),
+            text_color=(config.COLORS["text_dark"], config.COLORS["text_white"])
+        ).pack()
+        ctk.CTkLabel(
+            inner, text="Lightweight Edition",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=(config.COLORS["blue_hover"], config.COLORS["blue_light"])
+        ).pack(pady=(2, 18))
+
+        splash.dots_label = ctk.CTkLabel(
+            inner, text="Loading",
+            font=ctk.CTkFont(size=12),
+            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
+        )
+        splash.dots_label.pack(pady=(0, 0))
+
+        def _splash_animate():
+            try:
+                if not splash._running or not splash.winfo_exists():
+                    return
+                d = "." * ((getattr(splash, '_dot_count', 0) % 4) + 1)
+                splash._dot_count = getattr(splash, '_dot_count', 0) + 1
+                try:
+                    splash.dots_label.configure(text=f"Loading{d}")
+                except Exception:
+                    splash._running = False
+                    return
+                splash.after(120, _splash_animate)
+            except Exception:
+                splash._running = False
+        _splash_animate()
+
+        ctk.CTkLabel(
+            inner, text=f"v{config.APP_VERSION}",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
+        ).pack(side="bottom", pady=(0, 5))
+
+        splash.lift()
+        splash.attributes("-topmost", True)
+        return splash
+
     def _create_splash_frame(self) -> ctk.CTkFrame:
         """Create a polished in-window splash — shown while UI loads.
         Uses all pack() (no place/grid mix) for consistent layout
@@ -281,25 +358,45 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
     def _build_ui_on_main_thread(self) -> None:
         """Build the UI structure.
-        First destroy the splash frame so it doesn't conflict with
-        _build_ui() which uses grid() on self (splash frame uses pack()).
-        Once built, show main window properly sized.
+        On macOS: destroy in-window splash first, build UI, then show window.
+        On Windows: destroy Toplevel splash, build UI, then reveal main window.
+        
+        Preloads the Home tab in-place so the content area is fully populated
+        when the window first appears — no flickering.
         """
-        # Destroy the in-window splash frame FIRST so self is free
-        # for _build_ui() which uses grid() — pack + grid on same
-        # parent causes TclError.
-        if self._splash_frame:
+        # Stop splash animation first (avoids after() timer firing on dead window)
+        if self._splash_window:
             try:
-                self._splash_frame.destroy()
+                self._splash_window._running = False
             except Exception:
                 pass
-            self._splash_frame = None
+            try:
+                self._splash_window.destroy()
+            except Exception:
+                pass
+            self._splash_window = None
 
         self._build_ui()
+
+        # Preload Home tab directly into _tab_container
+        if "Home" not in self.tab_instances:
+            tabs = self._get_cached_tabs()
+            for cat, tab_items in tabs.items():
+                if "Home" in tab_items:
+                    try:
+                        frame = ctk.CTkFrame(self._tab_container, corner_radius=0)
+                        frame.grid(row=0, column=0, sticky="nsew")
+                        instance = tab_items["Home"]["creation_func"](frame, self)
+                        instance.pack(expand=True, fill="both")
+                        self.content_frames["Home"] = frame
+                        self.tab_instances["Home"] = instance
+                    except Exception as e:
+                        logger.debug("Failed to preload Home tab: %s", e)
+                    break
+
         self.app_state._layout_ready = True
 
-        # Resize window to full size and ensure proper focus
-        # (window was small for the splash)
+        # Show the fully-built main window
         self._show_window()
 
         # Brief pause then run license check
@@ -529,30 +626,42 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                     self.nav_buttons[name] = btn
 
     def show_frame(self, page_name: str) -> None:
-        """Load and show a tab (lazy loading) into reusable container.
-        No per-tab CTkFrame wrappers — saves memory and creation time.
+        """Load and show a tab (lazy loading).
+        
+        Lite version: simplified tab switching without skeleton loaders.
+        - Cached tabs: raises the wrapper frame immediately
+        - New tabs: creates in-place without intermediate loading frames
         """
-        # If already loaded, just raise the existing widget
+        # If already loaded, just raise the existing wrapper frame
         if page_name in self.tab_instances:
-            self.tab_instances[page_name].tkraise()
+            frame = self.content_frames.get(page_name)
+            if frame and frame.winfo_exists():
+                frame.tkraise()
             self._update_nav_highlight(page_name)
             return
 
-        # Load new tab into the reusable container
-        tabs = self._get_cached_tabs()
-        for cat, tab_items in tabs.items():
-            if page_name in tab_items:
-                instance = tab_items[page_name]["creation_func"](self._tab_container, self)
-                instance.grid(row=0, column=0, sticky="nsew")
+        # Load new tab directly — no skeleton, no deferral, no flicker
+        try:
+            tabs = self._get_cached_tabs()
+            for cat, tab_items in tabs.items():
+                if page_name in tab_items:
+                    frame = ctk.CTkFrame(self._tab_container, corner_radius=0)
+                    frame.grid(row=0, column=0, sticky="nsew")
 
-                self.tab_instances[page_name] = instance
-                instance.tkraise()
-                self._update_nav_highlight(page_name)
-                
-                # Lite fix: Update About tab subscription data when first loaded
-                if page_name == "About" and self.license_info:
-                    self._update_about_tab_info()
-                return
+                    instance = tab_items[page_name]["creation_func"](frame, self)
+                    instance.pack(expand=True, fill="both")
+
+                    self.content_frames[page_name] = frame
+                    self.tab_instances[page_name] = instance
+
+                    frame.tkraise()
+                    self._update_nav_highlight(page_name)
+
+                    if page_name == "About" and self.license_info:
+                        self._update_about_tab_info()
+                    break
+        except Exception as e:
+            logger.error("Error loading tab %s: %s", page_name, e)
 
     def _get_cached_tabs(self) -> Dict[str, Dict[str, Any]]:
         """Return cached tab definitions — built once, reused forever."""
@@ -561,27 +670,46 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         return self._tabs_cache
 
     def _update_nav_highlight(self, page_name: str) -> None:
-        """Highlight the active nav button."""
-        for name, btn in self.nav_buttons.items():
-            if name == page_name:
-                btn.configure(fg_color=("#E3F2FD", "#374151"),
-                              text_color=("#1565C0", "#60A5FA"),
-                              font=ctk.CTkFont(size=12, weight="bold"))
-            else:
+        """Highlight the active nav button.
+        Only updates the previously-active and newly-active buttons
+        instead of iterating ALL buttons — reduces layout churn on Windows.
+        """
+        # Reset previous active button (if different)
+        if self._last_active_nav and self._last_active_nav != page_name:
+            btn = self.nav_buttons.get(self._last_active_nav)
+            if btn:
                 btn.configure(fg_color="transparent",
                               text_color=("gray30", "gray80"),
                               font=ctk.CTkFont(size=12))
 
-    def _show_window(self) -> None:
-        """Activate the fully-built window with proper macOS focus.
-        No geometry change needed — splash already set the final size.
-        On macOS, focus_force() is critical because focus_set() doesn't
-        always activate the window.
-        """
-        self._initial_geometry_set = True  # Prevent CTk's 20ms timer from overriding our geometry
+        # Highlight new active button
+        btn = self.nav_buttons.get(page_name)
+        if btn:
+            btn.configure(fg_color=("#E3F2FD", "#374151"),
+                          text_color=("#1565C0", "#60A5FA"),
+                          font=ctk.CTkFont(size=12, weight="bold"))
 
-        self.deiconify()  # Already shown, but safe no-op
-        self.update()
+        self._last_active_nav = page_name
+
+    def _show_window(self) -> None:
+        """Activate the fully-built window.
+        On Windows: window was withdrawn, so deiconify reveals it for the
+        first time with all widgets already laid out (no flicker).
+        On macOS: window was already visible with in-window splash, so
+        deiconify is a safe no-op; just ensure focus.
+        
+        Uses a single update() call for Windows — reduces flicker from
+        multiple paint cycles.
+        """
+        self._initial_geometry_set = True  # Prevent CTk's 20ms timer from overriding
+
+        if self._on_windows:
+            self.geometry(f'{self._final_w}x{self._final_h}+{self._final_x}+{self._final_y}')
+            self.deiconify()
+            self.update()  # Single paint cycle — enough on Windows
+        else:
+            self.deiconify()  # Safe no-op on macOS
+
         self.focus_force()
         self.lift()
         self._window_shown = True
@@ -725,6 +853,18 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     def set_server_status(self, is_connected: bool) -> None:
         if self.server_status_indicator:
             self.server_status_indicator.configure(fg_color="green" if is_connected else "red")
+        # Also update About tab's header banner if loaded
+        about_tab = self.tab_instances.get("About")
+        if about_tab:
+            color = "green" if is_connected else "red"
+            text = "Connected" if is_connected else "Disconnected"
+            try:
+                if hasattr(about_tab, 'server_dot') and about_tab.server_dot.winfo_exists():
+                    about_tab.server_dot.configure(fg_color=color)
+                if hasattr(about_tab, 'server_status_label') and about_tab.server_status_label.winfo_exists():
+                    about_tab.server_status_label.configure(text=text)
+            except Exception:
+                pass
 
     def show_toast(self, message: str, kind: str = "success", duration: int = 3000) -> None:
         """Simple toast notification."""
@@ -790,6 +930,39 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     def play_sound(self, sound_name: str) -> None:
         """Silent in Lite version — no sound playback."""
         pass
+
+    # ============================================================================
+    # WORKFLOW DELEGATION METHODS
+    # These are called by various tabs (e.g. MrTrackingTab._run_mr_payment)
+    # and delegate to WorkflowManager just like the full app's NavMixin.
+    # ============================================================================
+
+    def switch_to_if_edit_with_data(self, data):
+        self.workflows.switch_to_if_edit_with_data(data)
+
+    def run_work_allocation_from_demand(self, p_name, w_key):
+        self.workflows.run_work_allocation_from_demand(p_name, w_key)
+
+    def switch_to_msr_tab_with_data(self, wc, p_name):
+        self.workflows.switch_to_msr_tab_with_data(wc, p_name)
+
+    def switch_to_emb_entry_with_data(self, wc, p_name):
+        self.workflows.switch_to_emb_entry_with_data(wc, p_name)
+
+    def switch_to_mr_fill_with_data(self, wc, p_name):
+        self.workflows.switch_to_mr_fill_with_data(wc, p_name)
+
+    def switch_to_mr_tracking_for_abps(self, location_data=None):
+        self.workflows.switch_to_mr_tracking_for_abps(location_data)
+
+    def switch_to_duplicate_mr_with_data(self, wc, p_name):
+        self.workflows.switch_to_duplicate_mr_with_data(wc, p_name)
+
+    def switch_to_zero_mr_tab_with_data(self, data_list):
+        self.workflows.switch_to_zero_mr_tab_with_data(data_list)
+
+    def send_wagelist_data_and_switch_tab(self, start, end, auto_start=False):
+        self.workflows.send_wagelist_data_and_switch_tab(start, end, auto_start=auto_start)
 
     # ============================================================================
     # LITE ACTIVATION — Override the full version's show_activation_window
@@ -981,6 +1154,98 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         """Download and install an update."""
         self.services.download_and_install_update(url, version)
 
+    def _apply_smart_update(self, zip_path: str) -> None:
+        """Apply a smart (in-place) update from a downloaded zip file.
+        Extracts the zip over the existing installation, then restarts.
+        Called by ServiceManager when is_smart_update is True.
+        """
+        import zipfile
+        import shutil
+        import subprocess
+
+        if sys.platform == "darwin":
+            try:
+                from appdirs import user_data_dir
+                local_dir = user_data_dir("NREGABot", "PoddarSolutions")
+                core_zip_path = os.path.join(local_dir, "core.zip")
+                version_file = os.path.join(local_dir, "core_version.json")
+
+                if os.path.exists(core_zip_path):
+                    os.remove(core_zip_path)
+                shutil.copy2(zip_path, core_zip_path)
+
+                try:
+                    new_ver = self.update_info.get('version', '0.0.0')
+                    with open(version_file, 'w') as f:
+                        json.dump({"version": new_ver}, f)
+                except Exception:
+                    pass
+
+                try:
+                    os.remove(zip_path)
+                except Exception:
+                    pass
+
+                messagebox.showinfo("Update Ready",
+                                    "Update applied successfully.\nThe application will now restart.")
+                self.on_closing(force=True)
+                subprocess.Popen([sys.executable])
+                sys.exit(0)
+
+            except Exception as e:
+                messagebox.showerror("Update Error", f"Failed to apply update:\n{e}")
+                return
+
+        # Windows path — extract zip, create updater.bat, restart
+        extract_dir = os.path.join(self.get_data_path(), "update_temp")
+        if os.path.exists(extract_dir):
+            shutil.rmtree(extract_dir)
+        os.makedirs(extract_dir)
+
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+
+            current_exe = sys.executable
+            app_dir = os.path.dirname(current_exe)
+
+            if not getattr(sys, 'frozen', False):
+                messagebox.showinfo("Dev Mode",
+                                    "Update extracted to 'update_temp'. Cannot auto-restart in dev mode.")
+                return
+
+            messagebox.showinfo("Update Ready", "Application will restart to apply changes.")
+
+            batch_script_path = os.path.join(self.get_data_path(), "updater.bat")
+            script_content = f"""
+@echo off
+title Updating NREGA Bot Lite...
+echo Waiting for application to close...
+timeout /t 2 /nobreak > NUL
+
+echo Installing updates...
+xcopy /s /y "{extract_dir}\\*" "{app_dir}\\"
+
+echo Cleaning up...
+rmdir /s /q "{extract_dir}"
+del "{zip_path}"
+
+echo Restarting Application...
+start "" "{current_exe}"
+
+echo Done.
+del "%~f0" & exit
+"""
+            with open(batch_script_path, "w") as bat:
+                bat.write(script_content)
+            os.startfile(batch_script_path)
+
+            self.on_closing(force=True)
+            sys.exit(0)
+
+        except Exception as e:
+            messagebox.showerror("Update Error", f"Failed to apply smart update:\n{e}")
+
     def _update_about_tab_info(self) -> None:
         """Update About tab's subscription and version info after server response."""
         about_tab = self.tab_instances.get("About")
@@ -1009,6 +1274,16 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                                                        command=about_tab.check_for_updates)
                 except Exception:
                     pass
+            else:
+                # Only show "Check failed" for explicit error status, not initial "Checking..."
+                status = info.get('status') if info else ''
+                if status == 'error':
+                    try:
+                        about_tab.latest_version_label.configure(text="Latest Version: Check failed")
+                        about_tab.update_button.configure(text="Check for Updates", state="normal",
+                                                           command=about_tab.check_for_updates)
+                    except Exception:
+                        pass
 
     def _apply_feature_flags(self) -> None:
         """Apply global_disabled_features and trial_restricted_features to nav buttons."""

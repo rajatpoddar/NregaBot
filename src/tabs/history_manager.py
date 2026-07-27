@@ -143,10 +143,41 @@ class HistoryManager:
                 return [row[0] for row in rows]
             except: return []
 
+    def get_filtered_suggestions(self, field_key: str, parent_key: str, parent_value: str) -> list:
+        """Get suggestions filtered by parent-child hierarchy.
+        
+        If hierarchy data exists for the given parent, returns only children
+        that belong to that parent. Falls back to all suggestions if no
+        hierarchy data is found.
+        """
+        if not parent_value:
+            return self.get_suggestions(field_key)
+        try:
+            from src.location_hierarchy import get_hierarchy, HIERARCHY_TYPES, TYPE_TO_PREFIX
+            # Determine parent type and child type from keys
+            # field_key = "location_district", parent_key = "location_state"
+            child_prefix = field_key.replace("location_", "").replace("mr_track_", "").replace("dashboard_", "").replace("mis_", "").replace("issued_mr_", "")
+            parent_prefix = parent_key.replace("location_", "").replace("mr_track_", "").replace("dashboard_", "").replace("mis_", "").replace("issued_mr_", "")
+            # Map prefixes to type names
+            prefix_to_type = {v.lower(): k for k, v in TYPE_TO_PREFIX.items()}
+            child_type = prefix_to_type.get(child_prefix, "")
+            parent_type = prefix_to_type.get(parent_prefix, "")
+            if child_type and parent_type:
+                hier = get_hierarchy()
+                children = hier.get_children(parent_type, parent_value, child_type)
+                if children:
+                    return children
+        except Exception:
+            pass
+        return self.get_suggestions(field_key)
+
     def save_entry(self, field_key: str, value: str):
         if not value or not field_key: return 
         # Auto-uppercase panchayat, state, district, block keys for consistent display
         uppercase_keys = {
+            # Shared location keys
+            "location_panchayat", "location_state", "location_district", "location_block",
+            "location_village",
             # Panchayat keys
             "panchayat_name", "panchayat", "dashboard_panchayat",
             "mr_track_panchayat", "issued_mr_panchayat", "audit_panchayat_respond",

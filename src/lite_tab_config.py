@@ -132,8 +132,12 @@ def get_tabs_definition_lite(app: Any) -> Dict[str, Dict[str, Any]]:
             },
         },
 
-        # 5. About (simplified)
-        "About": {
+        # 5. Settings & About
+        "Settings & About": {
+            "Settings": {
+                "creation_func": _lazy_import("SettingsTab", "src.tabs.settings_tab"),
+                "icon": "⚙️"
+            },
             "About": {
                 "creation_func": _lazy_import("AboutTab", "src.tabs.about_tab"),
                 "icon": "ℹ️"

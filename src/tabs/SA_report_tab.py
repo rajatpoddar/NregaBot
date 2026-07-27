@@ -38,7 +38,7 @@ class SAReportTab(BaseAutomationTab):
 
         # --- Input Fields for the NEW page ---
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("audit_panchayat_respond"), app_instance=self.app, history_key="audit_panchayat_respond")
+        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, history_key="location_panchayat")
         self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
         ctk.CTkLabel(controls_frame, text="On PO LOGIN, go to D23 > Social Audit View, then start the automation. Stay on that page.", text_color="gray50").grid(row=1, column=1, sticky='w', padx=15, pady=(0,10))
 
@@ -46,12 +46,12 @@ class SAReportTab(BaseAutomationTab):
         ctk.CTkLabel(controls_frame, text="Audit Conducted in:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
         current_year = datetime.now().year
         years = [f"{year}-{year+1}" for year in range(current_year, current_year - 8, -1)]
-        self.year_entry = ctk.CTkComboBox(controls_frame, values=years)
+        self.year_entry = AutocompleteEntry(controls_frame, suggestions_list=years)
         self.year_entry.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Issue Status:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
         status_options = ["Pending", "Closed"]
-        self.status_entry = ctk.CTkComboBox(controls_frame, values=status_options)
+        self.status_entry = AutocompleteEntry(controls_frame, suggestions_list=status_options)
         self.status_entry.grid(row=3, column=1, sticky='ew', padx=15, pady=5)
 
         action_frame = self._create_action_buttons(parent_frame=controls_frame)
@@ -102,8 +102,8 @@ class SAReportTab(BaseAutomationTab):
         try:
             current_year = datetime.now().year
             default_year = f"{current_year}-{current_year+1}"
-            self.year_entry.set(default_year)
-            self.status_entry.set("Pending")
+            self.year_entry.delete(0, 'end'); self.year_entry.insert(0, default_year)
+            self.status_entry.delete(0, 'end'); self.status_entry.insert(0, "Pending")
         except Exception as e: logger.debug("SA: Could not set default status: %s", e)
         
         # Clear Treeview
@@ -120,7 +120,7 @@ class SAReportTab(BaseAutomationTab):
         inputs = {'panchayat': self.panchayat_entry.get().strip(), 'year': self.year_entry.get().strip(), 'status': self.status_entry.get().strip()}
         if not all(inputs.values()): messagebox.showwarning("Input Error", "All fields are required."); return
         
-        self.app.update_history("audit_panchayat_respond", inputs['panchayat'])
+        self.app.update_history("location_panchayat", inputs['panchayat'])
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):

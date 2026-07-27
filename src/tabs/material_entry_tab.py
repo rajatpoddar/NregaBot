@@ -178,9 +178,9 @@ class MaterialEntryTab(BaseAutomationTab):
         self.panchayat_entry = AutocompleteEntry(
             input_frame,
             placeholder_text="Leave blank for GP Login",
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app,
-            history_key="panchayat_name"
+            history_key="location_panchayat"
         )
         self.panchayat_entry.grid(row=0, column=1, columnspan=3, padx=15, pady=5, sticky="ew")
 

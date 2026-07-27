@@ -48,7 +48,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
         # Panchayat input field
         ctk.CTkLabel(config_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=15)
-        self.panchayat_entry = AutocompleteEntry(config_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), app_instance=self.app, history_key="panchayat_name")
+        self.panchayat_entry = AutocompleteEntry(config_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, history_key="location_panchayat")
         self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=15)
         
         # Verify Amount input field
@@ -173,7 +173,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
         work_codes = [line.strip() for line in self.work_codes_text.get("1.0", "end-1c").splitlines() if line.strip()]
         
-        self.app.update_history("panchayat_name", panchayat)
+        self.app.update_history("location_panchayat", panchayat)
         for wc in work_codes:
             self.app.update_history("work_code", wc)
 
@@ -370,8 +370,8 @@ class EmbVerifyTab(BaseAutomationTab):
         from selenium.common.exceptions import UnexpectedAlertPresentException
         from selenium import webdriver
         if not self.results_tree.get_children(): messagebox.showinfo("No Data", "No results to export."); return None, None
-        panchayat_name = self.panchayat_entry.get().strip()
-        if not panchayat_name: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
+        location_panchayat = self.panchayat_entry.get().strip()
+        if not location_panchayat: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
         
         filter_option = self.export_filter_menu.get()
         data_to_export = []
@@ -383,7 +383,7 @@ class EmbVerifyTab(BaseAutomationTab):
             elif filter_option == "Failed Only" and not ("SUCCESS" in status or "VERIFIED" in status): data_to_export.append(row_values)
         if not data_to_export: messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
 
-        safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
+        safe_name = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {"PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
         filename = f"eMB_Verify_Report_{safe_name}_{timestamp}{details['ext']}"

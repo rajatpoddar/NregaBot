@@ -8,6 +8,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 from src import config
 from .base_tab import BaseAutomationTab
+from .autocomplete_widget import AutocompleteEntry
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -47,12 +48,20 @@ class LoginAutomationTab(BaseAutomationTab):
         
         # 2. District
         ctk.CTkLabel(form_frame, text="District Name:", font=ctk.CTkFont(size=13)).grid(row=1, column=0, sticky='w', padx=15, pady=10)
-        self.district_input = ctk.CTkEntry(form_frame, width=250, placeholder_text="e.g. GAYA")
+        self.district_input = AutocompleteEntry(
+            form_frame,
+            suggestions_list=self.app.history_manager.get_suggestions("location_district"),
+            width=250,
+            app_instance=self.app, history_key="location_district")
         self.district_input.grid(row=1, column=1, padx=15, pady=10, sticky='w')
         
         # 3. Block
         ctk.CTkLabel(form_frame, text="Block Name:", font=ctk.CTkFont(size=13)).grid(row=2, column=0, sticky='w', padx=15, pady=10)
-        self.block_input = ctk.CTkEntry(form_frame, width=250, placeholder_text="e.g. MANPUR")
+        self.block_input = AutocompleteEntry(
+            form_frame,
+            suggestions_list=self.app.history_manager.get_suggestions("location_block"),
+            width=250,
+            app_instance=self.app, history_key="location_block")
         self.block_input.grid(row=2, column=1, padx=15, pady=10, sticky='w')
         
         # --- Buttons ---
@@ -103,14 +112,20 @@ class LoginAutomationTab(BaseAutomationTab):
         return 'user_location_pref.json'
 
     def save_credentials(self):
-        data = {
-            "district": self.district_input.get().strip(),
-            "block": self.block_input.get().strip()
-        }
+        district = self.district_input.get().strip()
+        block = self.block_input.get().strip()
+        data = {"district": district, "block": block}
         try:
-            with open(self.get_creds_path(), 'w') as f: json.dump(data, f)
+            with open(self.get_creds_path(), 'w') as f:
+                json.dump(data, f)
+            # Also save to shared history so Settings data is updated
+            if district:
+                self.app.update_history("location_district", district)
+            if block:
+                self.app.update_history("location_block", block)
             messagebox.showinfo("Success", "Location Preferences Saved!")
-        except Exception as e: messagebox.showerror("Error", f"Could not save: {str(e)}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not save: {str(e)}")
 
     def load_credentials(self):
         path = self.get_creds_path()

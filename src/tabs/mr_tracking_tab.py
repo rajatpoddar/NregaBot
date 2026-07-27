@@ -86,27 +86,42 @@ class MrTrackingTab(BaseAutomationTab):
         # --- Row 0: State & District ---
         ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=10)
         self.state_entry = AutocompleteEntry(controls_frame, 
-                                             suggestions_list=self.app.history_manager.get_suggestions("mr_track_state"),
-                                             app_instance=self.app, history_key="mr_track_state")
+                                             suggestions_list=self.app.history_manager.get_suggestions("location_state"),
+                                             app_instance=self.app, history_key="location_state",
+                                             command=self._make_parent_callback("location_state", [
+                                                 (self.district_entry, "location_district"),
+                                                 (self.block_entry, "location_block"),
+                                                 (self.panchayat_entry, "location_panchayat"),
+                                             ]))
         self.state_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=10)
 
         ctk.CTkLabel(controls_frame, text="District:").grid(row=0, column=2, sticky='w', padx=(15, 5), pady=10)
         self.district_entry = AutocompleteEntry(controls_frame, 
-                                                suggestions_list=self.app.history_manager.get_suggestions("mr_track_district"),
-                                                app_instance=self.app, history_key="mr_track_district")
+                                                suggestions_list=self.app.history_manager.get_suggestions("location_district"),
+                                                app_instance=self.app, history_key="location_district",
+                                                filter_func=self._make_filter_func("location_district", "location_state", self.state_entry),
+                                                command=self._make_parent_callback("location_district", [
+                                                    (self.block_entry, "location_block"),
+                                                    (self.panchayat_entry, "location_panchayat"),
+                                                ]))
         self.district_entry.grid(row=0, column=3, sticky='ew', padx=(5, 15), pady=10)
 
         # --- Row 1: Block & Panchayat ---
         ctk.CTkLabel(controls_frame, text="Block:").grid(row=1, column=0, sticky='w', padx=(15, 5), pady=5)
         self.block_entry = AutocompleteEntry(controls_frame, 
-                                             suggestions_list=self.app.history_manager.get_suggestions("mr_track_block"),
-                                             app_instance=self.app, history_key="mr_track_block")
+                                             suggestions_list=self.app.history_manager.get_suggestions("location_block"),
+                                             app_instance=self.app, history_key="location_block",
+                                             filter_func=self._make_filter_func("location_block", "location_district", self.district_entry),
+                                             command=self._make_parent_callback("location_block", [
+                                                 (self.panchayat_entry, "location_panchayat"),
+                                             ]))
         self.block_entry.grid(row=1, column=1, sticky='ew', padx=5, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=1, column=2, sticky='w', padx=(15, 5), pady=5)
         self.panchayat_entry = AutocompleteEntry(controls_frame, 
-                                                 suggestions_list=self.app.history_manager.get_suggestions("mr_track_panchayat"),
-                                                 app_instance=self.app, history_key="mr_track_panchayat")
+                                                 suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
+                                                 app_instance=self.app, history_key="location_panchayat",
+                                                 filter_func=self._make_filter_func("location_panchayat", "location_block", self.block_entry))
         self.panchayat_entry.grid(row=1, column=3, sticky='ew', padx=(5, 15), pady=5)
 
         # --- Row 2: Filter Checkboxes (Compact Text) ---
@@ -333,10 +348,10 @@ class MrTrackingTab(BaseAutomationTab):
             messagebox.showwarning("Input Error", "State, District, Block, and Panchayat are required."); return
         
         self.save_inputs(inputs)
-        self.app.update_history("mr_track_state", inputs['state'])
-        self.app.update_history("mr_track_district", inputs['district'])
-        self.app.update_history("mr_track_block", inputs['block'])
-        self.app.update_history("mr_track_panchayat", inputs['panchayat'])
+        self.app.update_history("location_state", inputs['state'])
+        self.app.update_history("location_district", inputs['district'])
+        self.app.update_history("location_block", inputs['block'])
+        self.app.update_history("location_panchayat", inputs['panchayat'])
         
         driver = self.app.get_driver()
         if not driver:

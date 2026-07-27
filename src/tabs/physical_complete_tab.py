@@ -61,9 +61,9 @@ class PhysicalCompleteTab(BaseAutomationTab):
         ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
         self.panchayat_entry = AutocompleteEntry(
             input_frame, 
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app,
-            history_key="panchayat_name"
+            history_key="location_panchayat"
         )
         self.panchayat_entry.grid(row=0, column=1, columnspan=3, padx=15, pady=(15, 5), sticky="ew")
 
@@ -213,7 +213,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             return
 
         self._save_inputs(inputs)
-        self.app.update_history("panchayat_name", inputs["panchayat"])
+        self.app.update_history("location_panchayat", inputs["panchayat"])
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
@@ -494,8 +494,8 @@ class PhysicalCompleteTab(BaseAutomationTab):
         from selenium import webdriver
         if not self.results_tree.get_children(): 
             messagebox.showinfo("No Data", "No results to export."); return None, None
-        panchayat_name = self.panchayat_entry.get().strip()
-        if not panchayat_name: 
+        location_panchayat = self.panchayat_entry.get().strip()
+        if not location_panchayat: 
             messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
         
         filter_option = self.export_filter_menu.get()
@@ -510,7 +510,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         if not data_to_export: 
             messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
 
-        safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
+        safe_name = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {"Image (.jpg)": { "ext": ".jpg", "types": [("JPEG Image", "*.jpg")]}, "PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
         filename = f"Physical_Complete_Report_{safe_name}_{timestamp}{details['ext']}"

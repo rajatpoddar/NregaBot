@@ -54,9 +54,9 @@ class SchemeClosingTab(BaseAutomationTab):
         ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
         self.panchayat_entry = AutocompleteEntry(
             input_frame, 
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app,
-            history_key="panchayat_name"
+            history_key="location_panchayat"
         )
         self.panchayat_entry.grid(row=0, column=1, columnspan=3, padx=15, pady=(15, 5), sticky="ew")
 
@@ -283,7 +283,7 @@ class SchemeClosingTab(BaseAutomationTab):
         self._save_inputs(inputs)
         
         # --- ADDED: Save inputs to history ---
-        self.app.update_history("panchayat_name", inputs["panchayat"])
+        self.app.update_history("location_panchayat", inputs["panchayat"])
         self.app.update_history("staff_name", inputs["measured_name"])
         # ---
         
@@ -563,8 +563,8 @@ class SchemeClosingTab(BaseAutomationTab):
         from selenium.common.exceptions import NoAlertPresentException
         from selenium import webdriver
         if not self.results_tree.get_children(): messagebox.showinfo("No Data", "No results to export."); return None, None
-        panchayat_name = self.panchayat_entry.get().strip()
-        if not panchayat_name: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
+        location_panchayat = self.panchayat_entry.get().strip()
+        if not location_panchayat: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
         
         filter_option = self.export_filter_menu.get()
         data_to_export = []
@@ -576,7 +576,7 @@ class SchemeClosingTab(BaseAutomationTab):
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)
         if not data_to_export: messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
 
-        safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
+        safe_name = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {"Image (.jpg)": { "ext": ".jpg", "types": [("JPEG Image", "*.jpg")]}, "PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
         filename = f"Scheme_Closing_Report_{safe_name}_{timestamp}{details['ext']}"

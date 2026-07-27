@@ -46,9 +46,9 @@ class MsrTab(BaseAutomationTab):
         ctk.CTkLabel(panchayat_frame, text="Panchayat Name", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         self.panchayat_entry = AutocompleteEntry(
             panchayat_frame, 
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app, # <-- ADD THIS LINE
-            history_key="panchayat_name" # <-- ADD THIS LINE
+            history_key="location_panchayat" # <-- ADD THIS LINE
         )
         self.panchayat_entry.pack(fill='x', pady=(5,0))
 
@@ -111,11 +111,11 @@ class MsrTab(BaseAutomationTab):
         self.results_tree.configure(yscroll=scrollbar.set); scrollbar.grid(row=1, column=1, sticky='ns')
         self.style_treeview(self.results_tree); self._setup_treeview_sorting(self.results_tree)
     
-    def load_data_from_mr_tracking(self, workcodes, panchayat_name: str):
+    def load_data_from_mr_tracking(self, workcodes, location_panchayat: str):
         """Public method to receive data from other tabs."""
         # Set Panchayat Name
         self.panchayat_entry.delete(0, tkinter.END)
-        self.panchayat_entry.insert(0, panchayat_name)
+        self.panchayat_entry.insert(0, location_panchayat)
         
         # Determine how to display workcodes (Handle List or String)
         display_text = ""
@@ -132,7 +132,7 @@ class MsrTab(BaseAutomationTab):
         
         # Log info
         count = len(display_text.splitlines()) if display_text else 0
-        self.app.log_message(self.log_display, f"Loaded {count} workcodes and panchayat '{panchayat_name}' from MR Tracking.", "info")
+        self.app.log_message(self.log_display, f"Loaded {count} workcodes and panchayat '{location_panchayat}' from MR Tracking.", "info")
 
     def _on_format_change(self, selected_format):
         """Disables the filter menu for CSV format as it exports all data."""
@@ -200,7 +200,7 @@ class MsrTab(BaseAutomationTab):
         self.app.log_message(self.log_display, "Starting MSR processing...")
         self.app.after(0, self.app.set_status, "Running MSR Payment...")
         
-        panchayat_name = self.panchayat_entry.get().strip()
+        location_panchayat = self.panchayat_entry.get().strip()
         verify_amount_str = self.verify_amount_entry.get().strip()
         
         self.work_key_text.configure(state="normal") # Enable to read
@@ -220,12 +220,12 @@ class MsrTab(BaseAutomationTab):
             
             try:
                 panchayat_select_element = WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.NAME, "ddlPanchayat")))
-                if not panchayat_name: messagebox.showerror("Input Error", "Panchayat name is required for Block Login."); self.app.after(0, self.set_ui_state, False); return
+                if not location_panchayat: messagebox.showerror("Input Error", "Panchayat name is required for Block Login."); self.app.after(0, self.set_ui_state, False); return
                 panchayat_select = Select(panchayat_select_element)
-                match = next((opt.text for opt in panchayat_select.options if panchayat_name.strip().lower() in opt.text.lower()), None)
-                if not match: raise ValueError(f"Panchayat '{panchayat_name}' not found.")
+                match = next((opt.text for opt in panchayat_select.options if location_panchayat.strip().lower() in opt.text.lower()), None)
+                if not match: raise ValueError(f"Panchayat '{location_panchayat}' not found.")
                 panchayat_select.select_by_visible_text(match)
-                self.app.update_history("panchayat_name", panchayat_name)
+                self.app.update_history("location_panchayat", location_panchayat)
                 self.app.log_message(self.log_display, f"Successfully selected Panchayat: {match}", "success"); time.sleep(2)
             except TimeoutException: self.app.log_message(self.log_display, "Panchayat selection not found/required (GP Login). Proceeding...", "info")
 
@@ -426,15 +426,15 @@ class MsrTab(BaseAutomationTab):
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
         export_format = self.export_format_menu.get()
-        panchayat_name = self.panchayat_entry.get().strip()
+        location_panchayat = self.panchayat_entry.get().strip()
 
         # Ensure Panchayat name is provided for the filename
-        if not panchayat_name:
+        if not location_panchayat:
             messagebox.showwarning("Input Needed", "Please enter a Panchayat Name to include in the report filename.", parent=self)
             return
 
         if "CSV" in export_format:
-            safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
+            safe_name = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             default_filename = f"MSR_Report_{safe_name}_{timestamp}.csv"
             self.export_treeview_to_csv(self.results_tree, default_filename)
@@ -461,8 +461,8 @@ class MsrTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         all_items = self.results_tree.get_children()
         if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
-        panchayat_name = self.panchayat_entry.get().strip()
-        if not panchayat_name: messagebox.showwarning("Input Needed", "Please enter a Panchayat Name for the report title."); return None, None
+        location_panchayat = self.panchayat_entry.get().strip()
+        if not location_panchayat: messagebox.showwarning("Input Needed", "Please enter a Panchayat Name for the report title."); return None, None
 
         filter_option = self.export_filter_menu.get()
         data_to_export = []
@@ -474,7 +474,7 @@ class MsrTab(BaseAutomationTab):
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)
         if not data_to_export: messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
 
-        safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
+        safe_name = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
         file_details = {

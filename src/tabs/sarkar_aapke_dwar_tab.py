@@ -6,6 +6,7 @@ import json
 import os, time, csv, re, sys, subprocess
 from datetime import datetime
 from .base_tab import BaseAutomationTab
+from .autocomplete_widget import AutocompleteEntry
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -108,8 +109,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         # 2. Scheme Type Dropdown
         ctk.CTkLabel(settings_frame, text="Scheme Type:").grid(row=2, column=0, sticky="w", padx=10, pady=2)
         scheme_types = ["Service Focus Area"] 
-        self.scheme_type_combobox = ctk.CTkComboBox(settings_frame, values=scheme_types, width=300)
-        self.scheme_type_combobox.set("Service Focus Area")
+        self.scheme_type_combobox = AutocompleteEntry(settings_frame, suggestions_list=scheme_types, width=300)
+        self.scheme_type_combobox.insert(0, "Service Focus Area")
         self.scheme_type_combobox.grid(row=2, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
         # 3. Scheme/Service Dropdown
@@ -130,7 +131,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             "झारखंड राज्य सेवा देने की गारंटी अधिनियम 2011 से जुड़ी अन्य सेवाएं",
             "अन्य लोक कल्याणकारी योजनाएँ (Other Welfare Schemes)"
         ]
-        self.service_combobox = ctk.CTkComboBox(settings_frame, values=service_options, width=300)
+        self.service_combobox = AutocompleteEntry(settings_frame, suggestions_list=service_options, width=300)
         self.service_combobox.grid(row=3, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
         # 4. Scheme Remarks

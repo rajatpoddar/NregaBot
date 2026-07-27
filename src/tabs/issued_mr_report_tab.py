@@ -81,26 +81,41 @@ class IssuedMrReportTab(BaseAutomationTab):
         # --- Input Fields ---
         ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
         self.state_entry = AutocompleteEntry(controls_frame, 
-                                             suggestions_list=self.app.history_manager.get_suggestions("issued_mr_state"),
-                                             app_instance=self.app, history_key="issued_mr_state")
+                                             suggestions_list=self.app.history_manager.get_suggestions("location_state"),
+                                             app_instance=self.app, history_key="location_state",
+                                             command=self._make_parent_callback("location_state", [
+                                                 (self.district_entry, "location_district"),
+                                                 (self.block_entry, "location_block"),
+                                                 (self.panchayat_entry, "location_panchayat"),
+                                             ]))
         self.state_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
 
         ctk.CTkLabel(controls_frame, text="District:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
         self.district_entry = AutocompleteEntry(controls_frame, 
-                                                suggestions_list=self.app.history_manager.get_suggestions("issued_mr_district"),
-                                                app_instance=self.app, history_key="issued_mr_district")
+                                                suggestions_list=self.app.history_manager.get_suggestions("location_district"),
+                                                app_instance=self.app, history_key="location_district",
+                                                filter_func=self._make_filter_func("location_district", "location_state", self.state_entry),
+                                                command=self._make_parent_callback("location_district", [
+                                                    (self.block_entry, "location_block"),
+                                                    (self.panchayat_entry, "location_panchayat"),
+                                                ]))
         self.district_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Block:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
         self.block_entry = AutocompleteEntry(controls_frame, 
-                                             suggestions_list=self.app.history_manager.get_suggestions("issued_mr_block"),
-                                             app_instance=self.app, history_key="issued_mr_block")
+                                             suggestions_list=self.app.history_manager.get_suggestions("location_block"),
+                                             app_instance=self.app, history_key="location_block",
+                                             filter_func=self._make_filter_func("location_block", "location_district", self.district_entry),
+                                             command=self._make_parent_callback("location_block", [
+                                                 (self.panchayat_entry, "location_panchayat"),
+                                             ]))
         self.block_entry.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
         self.panchayat_entry = AutocompleteEntry(controls_frame, 
-                                                 suggestions_list=self.app.history_manager.get_suggestions("issued_mr_panchayat"),
-                                                 app_instance=self.app, history_key="issued_mr_panchayat")
+                                                 suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
+                                                 app_instance=self.app, history_key="location_panchayat",
+                                                 filter_func=self._make_filter_func("location_panchayat", "location_block", self.block_entry))
         self.panchayat_entry.grid(row=3, column=1, sticky='ew', padx=15, pady=5)
 
         action_frame = self._create_action_buttons(parent_frame=controls_frame)

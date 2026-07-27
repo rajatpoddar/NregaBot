@@ -75,9 +75,9 @@ class MrFillTab(BaseAutomationTab):
         self.panchayat_entry = AutocompleteEntry(
             panchayat_frame, 
             textvariable=self.panchayat_var, # Link to variable
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app,
-            history_key="panchayat_name"
+            history_key="location_panchayat"
         )
         self.panchayat_entry.pack(fill='x', pady=(5,0))
         ctk.CTkLabel(panchayat_frame, text="e.g., Palojori (skip if using GP login)", text_color="gray50").pack(anchor='w')

@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from src import config
 from .base_tab import BaseAutomationTab
+from .autocomplete_widget import AutocompleteEntry
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class WagelistSendTab(BaseAutomationTab):
@@ -43,9 +44,9 @@ class WagelistSendTab(BaseAutomationTab):
         current_year = datetime.now().year
         year_options = [f"{year}-{year+1}" for year in range(current_year + 1, current_year - 10, -1)]
         
-        self.fin_year_combobox = ctk.CTkComboBox(settings_container, values=year_options)
+        self.fin_year_combobox = AutocompleteEntry(settings_container, suggestions_list=year_options)
         default_year = f"{current_year}-{current_year+1}" if datetime.now().month >= 4 else f"{current_year-1}-{current_year}"
-        self.fin_year_combobox.set(default_year)
+        self.fin_year_combobox.insert(0, default_year)
         self.fin_year_combobox.grid(row=0, column=1, padx=(0, 15), pady=10, sticky="ew")
 
         # --- NEW: Wagelist Range Selection ---

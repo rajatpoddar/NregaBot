@@ -43,11 +43,11 @@ class AbpsVerifyTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure((1, 3), weight=1)
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=0, sticky="w", padx=15, pady=(15, 5))
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), app_instance=self.app, history_key="panchayat_name")
+        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, history_key="location_panchayat")
         self.panchayat_entry.grid(row=0, column=1, sticky="ew", padx=(0, 15), pady=(15, 5))
 
         ctk.CTkLabel(controls_frame, text="Village:").grid(row=0, column=2, sticky="w", padx=15, pady=(15, 5))
-        self.village_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("village_name"))
+        self.village_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_village"))
         self.village_entry.grid(row=0, column=3, sticky="ew", padx=(0, 15), pady=(15, 5))
 
         # --- Note for auto-mode ---
@@ -174,7 +174,7 @@ class AbpsVerifyTab(BaseAutomationTab):
                 # Use Presence Check
                 panchayat_select = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']")))
                 self._select_by_text_case_insensitive(Select(panchayat_select), panchayat)
-                self.app.update_history("panchayat_name", panchayat)
+                self.app.update_history("location_panchayat", panchayat)
                 time.sleep(1)
             except Exception:
                  try:
@@ -207,8 +207,8 @@ class AbpsVerifyTab(BaseAutomationTab):
                 self.app.log_message(self.log_display, f"\n--- Processing Village {i+1}/{len(villages_to_process)}: {current_village} ---")
                 
                 try:
-                    Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, village_css)))).select_by_visible_text(current_village)
-                    self.app.update_history("village_name", current_village)
+                    self._select_by_text_case_insensitive(Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, village_css)))), current_village)
+                    self.app.update_history("location_village", current_village)
                     
                     table_xpath = "//table[contains(@id, 'gvData')]"
                     try:

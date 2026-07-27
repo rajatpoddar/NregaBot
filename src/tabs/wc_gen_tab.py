@@ -76,7 +76,7 @@ class WcGenTab(BaseAutomationTab):
         profile_frame.grid(row=1, column=0, columnspan=2, sticky='ew', padx=10)
         profile_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(profile_frame, text="Config Profile:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.profile_combobox = ctk.CTkComboBox(profile_frame, values=[], command=self._load_profile)
+        self.profile_combobox = AutocompleteEntry(profile_frame, suggestions_list=[], command=self._load_profile)
         self.profile_combobox.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         self.profile_name_entry = ctk.CTkEntry(profile_frame, placeholder_text="Enter new profile name to save")
         self.profile_name_entry.grid(row=1, column=1, padx=5, pady=(5,10), sticky="ew")
@@ -93,9 +93,9 @@ class WcGenTab(BaseAutomationTab):
         ctk.CTkLabel(panchayat_frame, text="Panchayat:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
         self.panchayat_entry = AutocompleteEntry(
             panchayat_frame,
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app,
-            history_key="panchayat_name"
+            history_key="location_panchayat"
         )
         self.panchayat_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         self.load_button = ctk.CTkButton(panchayat_frame, text="Load Categories from Website", command=self._start_category_loading_thread)
@@ -480,7 +480,7 @@ class WcGenTab(BaseAutomationTab):
         if not panchayat:
             messagebox.showwarning("Input Required", "Please enter a Panchayat Name first.")
             return
-        self.app.update_history("panchayat_name", panchayat)
+        self.app.update_history("location_panchayat", panchayat)
         self.load_button.configure(state="disabled", text="Loading...")
         threading.Thread(target=self._load_initial_categories, daemon=True).start()
 
@@ -787,7 +787,7 @@ class WcGenTab(BaseAutomationTab):
         select_and_wait("ContentPlaceHolder1_ddlpanch", form_config['panchayat_name'])
         
         village_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlvillage")))
-        Select(village_select).select_by_visible_text(village_name)
+        self._select_by_text_case_insensitive(Select(village_select), village_name)
         
         pdf_path = form_config.get('undertaking_pdf')
         if pdf_path and os.path.exists(pdf_path):

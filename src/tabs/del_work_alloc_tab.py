@@ -61,9 +61,9 @@ class DelWorkAllocTab(BaseAutomationTab):
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=15)
         self.panchayat_entry = AutocompleteEntry(
             controls_frame, 
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app,
-            history_key="panchayat_name"
+            history_key="location_panchayat"
         )
         self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=15)
 
@@ -201,7 +201,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         # Parse multiple dates
         target_dates = [d.strip() for d in from_dates_raw.split(',') if d.strip()]
         
-        self.app.update_history("panchayat_name", panchayat)
+        self.app.update_history("location_panchayat", panchayat)
         
         # Start Thread
         self.app.start_automation_thread(

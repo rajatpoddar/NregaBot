@@ -7,6 +7,7 @@ from datetime import datetime
 from collections import defaultdict
 from src import config
 from .base_tab import BaseAutomationTab
+from .autocomplete_widget import AutocompleteEntry
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class IfEditTab(BaseAutomationTab):
@@ -70,7 +71,7 @@ class IfEditTab(BaseAutomationTab):
         mode_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(mode_frame, text="Automation Mode:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
         # --- MODIFIED: Added new automation mode ---
-        self.automation_mode_combo = ctk.CTkComboBox(mode_frame, values=["Full Process (All Pages)", "Page 2 & 3 Only", "Page 3 Only (Activities/Materials)"])
+        self.automation_mode_combo = AutocompleteEntry(mode_frame, suggestions_list=["Full Process (All Pages)", "Page 2 & 3 Only", "Page 3 Only (Activities/Materials)"])
         self.automation_mode_combo.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
         self.ui_fields['automation_mode'] = self.automation_mode_combo
 
@@ -79,7 +80,7 @@ class IfEditTab(BaseAutomationTab):
         profile_frame.grid(row=1, column=0, sticky='ew', padx=5, pady=5)
         profile_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(profile_frame, text="Configuration Profile:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
-        self.profile_combobox = ctk.CTkComboBox(profile_frame, values=[], command=self._load_profile)
+        self.profile_combobox = AutocompleteEntry(profile_frame, suggestions_list=[], command=self._load_profile)
         self.profile_combobox.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
         self.profile_name_entry = ctk.CTkEntry(profile_frame, placeholder_text="Enter new profile name to save")
         self.profile_name_entry.grid(row=1, column=1, padx=15, pady=5, sticky="ew")
@@ -155,7 +156,7 @@ class IfEditTab(BaseAutomationTab):
         if widget_type == 'entry':
             widget = ctk.CTkEntry(parent, **kwargs)
         elif widget_type == 'combo':
-            widget = ctk.CTkComboBox(parent, values=values or [], **kwargs)
+            widget = AutocompleteEntry(parent, suggestions_list=values or [], **kwargs)
         widget.grid(row=row, column=col+1, sticky="ew", padx=15, pady=5)
         self.ui_fields[key] = widget
 
@@ -266,7 +267,7 @@ class IfEditTab(BaseAutomationTab):
                 widget = self.ui_fields[key]
                 if isinstance(widget, ctk.CTkEntry):
                     widget.delete(0, tkinter.END); widget.insert(0, value)
-                elif isinstance(widget, ctk.CTkComboBox):
+                elif isinstance(widget, (ctk.CTkComboBox, AutocompleteEntry)):
                      widget.set(value)
         
         # Set defaults for new fields
@@ -336,7 +337,7 @@ class IfEditTab(BaseAutomationTab):
                 field = self.ui_fields[key]
                 if isinstance(field, ctk.CTkEntry):
                     field.delete(0, tkinter.END); field.insert(0, value)
-                elif isinstance(field, ctk.CTkComboBox):
+                elif isinstance(field, (ctk.CTkComboBox, AutocompleteEntry)):
                     field.set(value)
                 elif isinstance(field, ctk.CTkSwitch):
                     if value == 1: field.select()

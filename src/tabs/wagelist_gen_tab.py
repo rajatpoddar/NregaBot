@@ -70,9 +70,9 @@ class WagelistGenTab(BaseAutomationTab):
         ctk.CTkLabel(controls_frame, text=f"Agency Name ({config.AGENCY_PREFIX}...):").grid(row=0, column=0, sticky='w', padx=15, pady=(15,0))
         self.agency_entry = AutocompleteEntry(
             controls_frame, 
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app, 
-            history_key="panchayat_name"
+            history_key="location_panchayat"
         )
         self.agency_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=(15,0))
         
@@ -210,7 +210,7 @@ class WagelistGenTab(BaseAutomationTab):
             messagebox.showwarning("Input Error", "Please enter an Agency/Panchayat name.")
             return
 
-        self.app.update_history("panchayat_name", agency)
+        self.app.update_history("location_panchayat", agency)
         
         # We pass it as a list [agency] so the looping logic in run_automation_logic handles it correctly
         # This keeps it compatible with both manual run and macro run.

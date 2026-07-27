@@ -6,6 +6,7 @@ import json
 import os, time, csv, re
 import threading
 from .base_tab import BaseAutomationTab
+from .autocomplete_widget import AutocompleteEntry
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -65,8 +66,8 @@ class SadUpdateTab(BaseAutomationTab):
         action_container.pack(fill="x", pady=5)
         
         ctk.CTkLabel(action_container, text="Select Action:").pack(side="left", padx=10)
-        self.action_combobox = ctk.CTkComboBox(action_container, values=["Dispose", "Reject", "In Progress", "Pending"], width=200)
-        self.action_combobox.set("Dispose") 
+        self.action_combobox = AutocompleteEntry(action_container, suggestions_list=["Dispose", "Reject", "In Progress", "Pending"], width=200)
+        self.action_combobox.insert(0, "Dispose")
         self.action_combobox.pack(side="left", padx=5)
 
         # --- Main TabView (Inputs + Results + Logs) ---

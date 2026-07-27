@@ -65,9 +65,9 @@ class EKycReportTab(BaseAutomationTab):
             input_frame, 
             width=140, 
             placeholder_text="Leave empty for ALL",
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app,
-            history_key="panchayat_name"
+            history_key="location_panchayat"
         )
         self.panchayat_entry.grid(row=0, column=1, padx=5, pady=10)
 
@@ -77,18 +77,17 @@ class EKycReportTab(BaseAutomationTab):
             input_frame, 
             width=140, 
             placeholder_text="Leave empty for ALL",
-            suggestions_list=self.app.history_manager.get_suggestions("village_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_village"),
             app_instance=self.app,
-            history_key="village_name"
+            history_key="location_village"
         )
         self.village_entry.grid(row=0, column=3, padx=5, pady=10)
 
         # Filter Dropdown
         ctk.CTkLabel(input_frame, text="Filter:").grid(row=0, column=4, padx=(10, 5), pady=10, sticky="w")
         self.filter_var = ctk.StringVar(value="All")
-        self.filter_cb = ctk.CTkComboBox(input_frame, variable=self.filter_var, 
-                                         values=["All", "Verified (Yes)", "Not Verified (No)"], width=130,
-                                         command=self.apply_filter_visuals)
+        self.filter_cb = AutocompleteEntry(input_frame, suggestions_list=["All", "Verified (Yes)", "Not Verified (No)"], width=130,
+                                            command=self.apply_filter_visuals)
         self.filter_cb.grid(row=0, column=5, padx=5, pady=10)
 
         note_label = ctk.CTkLabel(self, text="ℹ️ Note: Leave Panchayat empty for ALL panchayats to scan all.", 
@@ -272,7 +271,7 @@ class EKycReportTab(BaseAutomationTab):
             
             if panchayat_target:
                 panchayats_to_process.append(panchayat_target)
-                self.app.update_history("panchayat_name", panchayat_target)
+                self.app.update_history("location_panchayat", panchayat_target)
             else:
                 self.update_status("Fetching panchayat list...")
                 try:
@@ -320,7 +319,7 @@ class EKycReportTab(BaseAutomationTab):
 
                 if village_target:
                     villages_to_process.append(village_target)
-                    self.app.update_history("village_name", village_target)
+                    self.app.update_history("location_village", village_target)
                 else:
                     self.update_status(f"Fetching village list for {p_name}...")
                     try:
@@ -389,7 +388,7 @@ class EKycReportTab(BaseAutomationTab):
             self.app.after(0, self.set_common_ui_state, False)
             self.app.after(0, self._safe_update_status, "Ready")
 
-    def scrape_current_table(self, driver, panchayat_name, village_name):
+    def scrape_current_table(self, driver, location_panchayat, location_village):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -407,7 +406,7 @@ class EKycReportTab(BaseAutomationTab):
         try:
             page_one_link = driver.find_elements(By.XPATH, "//a[text()='1']")
             if page_one_link:
-                self.app.log_message(self.log_display, f"Resetting to Page 1 for {village_name}...", "info")
+                self.app.log_message(self.log_display, f"Resetting to Page 1 for {location_village}...", "info")
                 old_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_gvData")
                 driver.execute_script("arguments[0].click();", page_one_link[0])
                 try: WebDriverWait(driver, 10).until(EC.staleness_of(old_table))
@@ -419,7 +418,7 @@ class EKycReportTab(BaseAutomationTab):
             if self.app.stop_events[self.automation_key].is_set(): return
 
             if "No Record Found" in driver.page_source:
-                self.app.log_message(self.log_display, f"No records in {village_name}.", "warning")
+                self.app.log_message(self.log_display, f"No records in {location_village}.", "warning")
                 break
 
             try:
@@ -453,15 +452,15 @@ class EKycReportTab(BaseAutomationTab):
                         clean_jc = "".join(jc.split()).lower()
                         clean_name = "".join(name.split()).lower()
                         
-                        unique_key = f"{panchayat_name}|{village_name}|{clean_jc}|{clean_name}"
+                        unique_key = f"{location_panchayat}|{location_village}|{clean_jc}|{clean_name}"
                         
                         if unique_key in self.scraped_keys: continue
                         self.scraped_keys.add(unique_key)
                         # -----------------------
 
                         record = {
-                            "panchayat": panchayat_name,
-                            "village": village_name,
+                            "panchayat": location_panchayat,
+                            "village": location_village,
                             "jobcard": jc, "name": name, "abps": abps, "ekyc": ekyc
                         }
                         self.all_scraped_data.append(record)
@@ -474,7 +473,7 @@ class EKycReportTab(BaseAutomationTab):
             next_page_num = current_page_num + 1
             try:
                 next_link = driver.find_element(By.XPATH, f"//a[contains(@href, 'Page${next_page_num}')]")
-                self.update_status(f"Loading {village_name} - Page {next_page_num}...")
+                self.update_status(f"Loading {location_village} - Page {next_page_num}...")
                 old_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_gvData")
                 
                 driver.execute_script("arguments[0].click();", next_link)

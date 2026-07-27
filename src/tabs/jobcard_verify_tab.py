@@ -46,11 +46,11 @@ class JobcardVerifyTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure(1, weight=1)
         
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=10)
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"), app_instance=self.app, history_key="panchayat_name")
+        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, history_key="location_panchayat")
         self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=10)
         
         ctk.CTkLabel(controls_frame, text="Village Name:").grid(row=1, column=0, sticky='w', padx=15, pady=10)
-        self.village_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("village_name"))
+        self.village_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_village"))
         self.village_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=10)
 
         # Checkbox Frame
@@ -236,18 +236,18 @@ class JobcardVerifyTab(BaseAutomationTab):
             else:
                 villages_to_process.append(inputs['village'])
 
-            self.app.update_history("panchayat_name", inputs['panchayat'])
+            self.app.update_history("location_panchayat", inputs['panchayat'])
 
-            for village_name in villages_to_process:
+            for location_village in villages_to_process:
                 if self.app.stop_events[self.automation_key].is_set():
                     self.app.log_message(self.log_display, "🛑 Stop signal received.", "warning"); break
                 
-                self.app.log_message(self.log_display, f"\n--- Processing Village: {village_name} ---")
-                self.app.after(0, self.update_status, f"Processing Village: {village_name}")
-                self.app.update_history("village_name", village_name)
+                self.app.log_message(self.log_display, f"\n--- Processing Village: {location_village} ---")
+                self.app.after(0, self.update_status, f"Processing Village: {location_village}")
+                self.app.update_history("location_village", location_village)
                 
                 html_element = driver.find_element(By.TAG_NAME, "html")
-                Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlVillage")))).select_by_visible_text(village_name)
+                self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlVillage")))), location_village)
                 wait.until(EC.staleness_of(html_element))
                 
                 try:

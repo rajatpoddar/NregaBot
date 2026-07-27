@@ -62,9 +62,9 @@ class MateMrGenTab(BaseAutomationTab):
             row=0, column=0, sticky='w', padx=15, pady=(15, 0))
         self.panchayat_entry = AutocompleteEntry(
             controls_frame,
-            suggestions_list=self.app.history_manager.get_suggestions("panchayat_name"),
+            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
             app_instance=self.app,
-            history_key="panchayat_name")
+            history_key="location_panchayat")
         self.panchayat_entry.grid(row=0, column=1, columnspan=3, sticky='ew', padx=15, pady=(15, 0))
 
 
@@ -111,9 +111,9 @@ class MateMrGenTab(BaseAutomationTab):
         # Row 4 – Output action
         ctk.CTkLabel(controls_frame, text="Output Action:").grid(
             row=4, column=0, sticky='w', padx=15, pady=5)
-        self.output_action_combobox = ctk.CTkComboBox(
-            controls_frame, values=["Save as PDF", "Print"])
-        self.output_action_combobox.set("Save as PDF")
+        self.output_action_combobox = AutocompleteEntry(
+            controls_frame, suggestions_list=["Save as PDF", "Print"])
+        self.output_action_combobox.insert(0, "Save as PDF")
         self.output_action_combobox.grid(row=4, column=1, sticky='ew', padx=(15, 5), pady=5)
 
         # Row 5 – Orientation & Scale
@@ -367,7 +367,7 @@ class MateMrGenTab(BaseAutomationTab):
             messagebox.showwarning("Input Error", "'No. of MRs to Print' must be a number.")
             return
 
-        self.app.update_history("panchayat_name", inputs['panchayat'])
+        self.app.update_history("location_panchayat", inputs['panchayat'])
         inputs['work_codes'] = [
             line.strip() for line in inputs['work_codes_raw'].split('\n') if line.strip()]
         inputs['auto_mode'] = not bool(inputs['work_codes'])
@@ -434,9 +434,9 @@ class MateMrGenTab(BaseAutomationTab):
     # ------------------------------------------------------------------ #
     #  Output directory                                                   #
     # ------------------------------------------------------------------ #
-    def _get_output_dir(self, panchayat_name):
+    def _get_output_dir(self, location_panchayat):
         try:
-            safe = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
+            safe = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
             if not safe:
                 safe = "Unknown_Panchayat"
             date_str = datetime.now().strftime('%Y-%m-%d')
@@ -487,7 +487,7 @@ class MateMrGenTab(BaseAutomationTab):
                 self.app.after(0, self.set_ui_state, False)
                 return
 
-            self.app.update_history("panchayat_name", inputs['panchayat'])
+            self.app.update_history("location_panchayat", inputs['panchayat'])
 
             items_to_process = self._get_items_to_process(driver, wait, inputs)
             session_skip_list = set()
@@ -536,7 +536,7 @@ class MateMrGenTab(BaseAutomationTab):
     # ------------------------------------------------------------------ #
     #  Panchayat validation                                               #
     # ------------------------------------------------------------------ #
-    def _validate_panchayat(self, driver, wait, panchayat_name):
+    def _validate_panchayat(self, driver, wait, location_panchayat):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -544,8 +544,8 @@ class MateMrGenTab(BaseAutomationTab):
         from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
         from selenium.webdriver.common.keys import Keys
         from selenium import webdriver
-        """If panchayat_name is empty, skip validation and return True."""
-        if not panchayat_name:
+        """If location_panchayat is empty, skip validation and return True."""
+        if not location_panchayat:
             self.app.log_message(self.log_display, "Panchayat not provided — skipping validation.")
             return True
         try:
@@ -553,9 +553,9 @@ class MateMrGenTab(BaseAutomationTab):
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
             panchayat_dropdown = Select(
                 wait.until(EC.presence_of_element_located((By.ID, "exe_agency"))))
-            target = config.AGENCY_PREFIX + panchayat_name
+            target = config.AGENCY_PREFIX + location_panchayat
             if target not in [opt.text for opt in panchayat_dropdown.options]:
-                err = (f"Panchayat '{panchayat_name}' not found on the portal. "
+                err = (f"Panchayat '{location_panchayat}' not found on the portal. "
                        "Please check spelling.")
                 if "macro" in self.app.active_automations:
                     self.app.log_message(self.log_display, f"Skipping: {err}", "error")
@@ -1064,8 +1064,8 @@ class MateMrGenTab(BaseAutomationTab):
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "No results to export.")
             return None, None
-        panchayat_name = self.panchayat_entry.get().strip()
-        if not panchayat_name:
+        location_panchayat = self.panchayat_entry.get().strip()
+        if not location_panchayat:
             messagebox.showwarning("Input Needed", "Panchayat Name is required for report title.")
             return None, None
 
@@ -1086,7 +1086,7 @@ class MateMrGenTab(BaseAutomationTab):
             return None, None
 
         safe_name = "".join(
-            c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
+            c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {
             "PDF (.pdf)": {"ext": ".pdf", "types": [("PDF Document", "*.pdf")]},
