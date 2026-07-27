@@ -3,54 +3,13 @@ name: Create Application Release
 on:
   push:
     branches:
-      - main
-  workflow_dispatch: {}
-
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: true
+      - main   # Runs automatically on every push to main
+  workflow_dispatch: {} # Allows manual trigger
 
 jobs:
-  cleanup-old-releases:
-    name: Clean Old Releases & Cache
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: write
-    steps:
-      - name: Clear GitHub Actions Cache
-        uses: actions/github-script@v7
-        with:
-          script: |
-            try {
-              const caches = await github.rest.actions.getActionsCacheList({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-              });
-              for (const cache of caches.data.actions_caches) {
-                await github.rest.actions.deleteActionsCacheById({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  cache_id: cache.id,
-                });
-                console.log(`Deleted cache: ${cache.key} (${cache.id})`);
-              }
-              console.log(`Cleared ${caches.data.actions_caches.length} caches.`);
-            } catch (error) {
-              console.log(`Cache cleanup skipped: ${error.message}`);
-            }
-
-      - name: Delete all existing GitHub Releases
-        uses: dev-drprasad/delete-older-releases@v0.3.1
-        with:
-          keep_latest: 0
-          delete_tags: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+  # --- 1. Get Release Info ---
   get-release-info:
     name: Get Release Information
-    needs: cleanup-old-releases
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
@@ -73,11 +32,12 @@ jobs:
         id: get_changelog
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
-          CHANGELOG_BODY=$(jq -r --arg VERSION "$VERSION" '.changelog[$VERSION] | .[] | "- \(.)"' config/version.json)
+          CHANGELOG_BODY=$(jq -r --arg VERSION "$VERSION" '.changelog[$VERSION] | .[] | "- \\(.)"' config/version.json)
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+  # --- 2. Build for Windows (Loader EXE + Lite EXE + Secure Win Core Zip) ---
   build-windows:
       name: Build Windows (Main + Lite + Core)
       needs: get-release-info
@@ -85,58 +45,51 @@ jobs:
       steps:
         - name: Checkout code
           uses: actions/checkout@v4
-   
+  
         - name: Set up Python 3.11
           uses: actions/setup-python@v5
           with:
             python-version: '3.11'
-   
+  
         - name: Install dependencies
           run: pip install -r requirements.txt
-   
+  
         - name: Create .env file
           run: echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" > .env
           shell: bash
-   
+  
         - name: Install Inno Setup
           run: choco install innosetup --yes
           shell: powershell
-
-        - name: Clean old builds
-          run: |
-            if exist "dist" rmdir /s /q "dist"
-            if exist "build" rmdir /s /q "build"
-            mkdir dist
-          shell: cmd
-
+  
         - name: Run Windows build script
           run: |
             set APP_VERSION=${{ needs.get-release-info.outputs.version }}
             scripts\build_windows.bat
           shell: cmd
-
+  
         - name: Create Secure Core Zip (Windows)
           shell: python
           run: |
             import os, shutil, zipfile, compileall
-
+            
             version = '${{ needs.get-release-info.outputs.version }}'
             zip_name = f'dist/core_win_v{version}.zip'
             temp_dir = 'dist/core_temp_win'
-
+            
             if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
-
+            
             def ignore_func(dir, files):
                 ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', '.vscode', 'web', 'docs', 'scripts', 'backups']]
                 if os.path.basename(dir) == 'assets':
                     if 'screenshots' in files:
                         ignored.append('screenshots')
                 return ignored
-
+            
             shutil.copytree('.', temp_dir, ignore=ignore_func)
             print('Compiling Windows Core (Py3.11)...')
             compileall.compile_dir(temp_dir, force=True, legacy=True)
-
+            
             with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zf:
                 for root, dirs, files in os.walk(temp_dir):
                     for file in files:
@@ -145,111 +98,21 @@ jobs:
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, temp_dir)
                         zf.write(full_path, rel_path)
-
+            
             shutil.rmtree(temp_dir)
             print(f'Success: Created {zip_name}')
 
-        # ============ BUG FIX #1: Better debugging ============
-        - name: Debug - Complete dist directory tree
-          shell: powershell
-          run: |
-            Write-Host "========================================" -ForegroundColor Cyan
-            Write-Host "DEBUG: Complete dist/ directory structure" -ForegroundColor Cyan
-            Write-Host "========================================" -ForegroundColor Cyan
-            Write-Host ""
-            
-            if (Test-Path "dist") {
-              Get-ChildItem -Path "dist" -Recurse | ForEach-Object {
-                $relativePath = $_.FullName.Replace((Get-Item "dist").FullName, "")
-                $indent = "  " * ([regex]::Matches($relativePath, "\\").Count)
-                if ($_.PSIsContainer) {
-                  Write-Host "$indent📁 $($_.Name)/" -ForegroundColor Yellow
-                } else {
-                  $size = if ($_.Length -gt 1MB) { "$([math]::Round($_.Length / 1MB, 2)) MB" } else { "$([math]::Round($_.Length / 1KB, 2)) KB" }
-                  Write-Host "$indent📄 $($_.Name) [$size]" -ForegroundColor Green
-                }
-              }
-            } else {
-              Write-Host "ERROR: dist/ directory does not exist!" -ForegroundColor Red
-            }
-            
-            Write-Host ""
-            Write-Host "========================================" -ForegroundColor Cyan
-            Write-Host "INSTALLER SEARCH" -ForegroundColor Cyan
-            Write-Host "========================================" -ForegroundColor Cyan
-            
-            $setupFiles = Get-ChildItem -Path "dist" -Filter "*Setup*.exe" -Recurse -ErrorAction SilentlyContinue
-            if ($setupFiles) {
-              Write-Host "✅ Found $($setupFiles.Count) Setup EXE file(s):" -ForegroundColor Green
-              $setupFiles | ForEach-Object { 
-                Write-Host "   - $($_.Name)" -ForegroundColor Green
-                Write-Host "     Path: $($_.FullName)" -ForegroundColor Gray
-              }
-            } else {
-              Write-Host "❌ NO Setup EXE files found!" -ForegroundColor Red
-            }
-
-        # ============ BUG FIX #2: Verify the installer was actually created ============
-        - name: Verify installer was created by Inno Setup
-          shell: powershell
-          run: |
-            Write-Host ""
-            Write-Host "========================================" -ForegroundColor Cyan
-            Write-Host "VERIFYING INSTALLER" -ForegroundColor Cyan
-            Write-Host "========================================" -ForegroundColor Cyan
-            Write-Host ""
-            
-            $setupFiles = Get-ChildItem -Path "dist" -Filter "*Setup*.exe" -Recurse -ErrorAction SilentlyContinue
-            
-            if ($setupFiles -and $setupFiles.Count -gt 0) {
-              Write-Host "✅ SUCCESS: Installer EXE created!" -ForegroundColor Green
-              Write-Host ""
-              $setupFiles | ForEach-Object { 
-                $size = [math]::Round($_.Length / 1MB, 2)
-                Write-Host "   📦 $($_.Name)" -ForegroundColor Green
-                Write-Host "      Size: $size MB" -ForegroundColor Green
-                Write-Host "      Created: $($_.CreationTime)" -ForegroundColor Gray
-              }
-              Write-Host ""
-            } else {
-              Write-Host "❌ FATAL ERROR: Installer EXE NOT found!" -ForegroundColor Red
-              Write-Host ""
-              Write-Host "This means Inno Setup failed to create the installer." -ForegroundColor Red
-              Write-Host "Check the build script output above for Inno Setup errors." -ForegroundColor Red
-              Write-Host ""
-              
-              $allExe = Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue
-              if ($allExe) {
-                Write-Host "Other .exe files found:" -ForegroundColor Yellow
-                $allExe | ForEach-Object { Write-Host "   - $($_.FullName)" -ForegroundColor Yellow }
-              } else {
-                Write-Host "No .exe files found anywhere in dist/" -ForegroundColor Red
-              }
-              
-              exit 1
-            }
-
-        - name: Create Main App Portable Zip
-          shell: powershell
-          run: |
-            $version = "${{ needs.get-release-info.outputs.version }}"
-            $source = "dist\NREGA Bot\*"
-            $dest = "dist\NREGABot-v${version}-Portable.zip"
-            Compress-Archive -Path $source -DestinationPath $dest -Force
-            Write-Host "✅ Created: $dest"
-
-        # ============ BUG FIX #3: Use glob pattern that matches Setup*.exe ============
         - name: Upload Windows Artifacts
           uses: actions/upload-artifact@v4
           with:
             name: windows-builds
             path: |
-              dist/*Setup*.exe
-              dist/NREGABot-v*-Portable.zip
+              dist/installer/*.exe
               dist/core_win_*.zip
               dist/NREGA Bot Lite.exe
             retention-days: 1
 
+  # --- 3. Build for Linux (Portable Loader) ---
   build-linux:
     name: Build Linux Loader
     needs: get-release-info
@@ -307,6 +170,7 @@ jobs:
           path: dist/NREGABot-v${{ needs.get-release-info.outputs.version }}-Linux.tar.gz
           retention-days: 1
 
+  # --- 4. Publish Release ---
   publish-release:
     name: Publish GitHub Release
     needs: [get-release-info, build-windows, build-linux]
@@ -319,57 +183,6 @@ jobs:
         with:
           path: artifacts/
 
-      # ============ BUG FIX #4: Better artifact debugging ============
-      - name: Debug - Complete artifacts structure
-        run: |
-          echo "========================================" 
-          echo "DEBUG: Full artifacts/ directory structure"
-          echo "========================================"
-          find artifacts/ -type f -exec ls -lh {} \; | awk '{print $9, "(" $5 ")"}'
-          echo ""
-          echo "========================================" 
-          echo "SEARCHING FOR Setup*.exe FILES"
-          echo "========================================"
-          SETUP_COUNT=$(find artifacts/ -name "*Setup*.exe" 2>/dev/null | wc -l)
-          echo "Setup EXE count: $SETUP_COUNT"
-          find artifacts/ -name "*Setup*.exe" -exec echo "✅ Found: {}" \;
-          echo ""
-          echo "========================================" 
-          echo "ALL .exe FILES"
-          echo "========================================"
-          find artifacts/ -name "*.exe" -exec echo "  - {}" \;
-
-      # ============ BUG FIX #5: Verify Setup.exe before publishing ============
-      - name: Verify Setup.exe exists before creating release
-        run: |
-          echo "========================================" 
-          echo "VERIFICATION: Setup.exe must exist"
-          echo "========================================"
-          
-          SETUP_FILES=$(find artifacts/ -name "*Setup*.exe" 2>/dev/null)
-          
-          if [ -z "$SETUP_FILES" ]; then
-            echo "❌ FATAL: Setup.exe NOT FOUND in artifacts/"
-            echo ""
-            echo "Available files:"
-            find artifacts/ -type f
-            echo ""
-            echo "TROUBLESHOOTING:"
-            echo "1. Check that Inno Setup compiler found the .iss script"
-            echo "2. Check that dist/NREGA Bot directory exists"
-            echo "3. Check that required assets exist:"
-            echo "   - assets/app_icon.ico"
-            echo "   - assets/wizard_image.bmp"
-            echo "   - assets/wizard_small_image.bmp"
-            echo "   - docs/license.txt"
-            echo "   - docs/infobefore.txt"
-            exit 1
-          else
-            echo "✅ Setup.exe found:"
-            echo "$SETUP_FILES"
-          fi
-
-      # ============ BUG FIX #6: Use correct glob pattern in release files ============
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -377,6 +190,7 @@ jobs:
           body: ${{ needs.get-release-info.outputs.changelog }}
           tag_name: v${{ needs.get-release-info.outputs.version }}
           files: |
-            artifacts/windows-builds/*Setup*.exe
+            artifacts/windows-builds/*.exe
             artifacts/windows-builds/*.zip
             artifacts/linux-build/*
+            config/version.json

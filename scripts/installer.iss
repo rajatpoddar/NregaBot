@@ -1,13 +1,6 @@
 ; NREGA Bot Inno Setup Script
 ; Version defined by build script via /dAppVersion=
-;
-; IMPORTANT: Inno Setup resolves all relative paths in this file
-; RELATIVE TO THIS FILE'S LOCATION (scripts/ directory).
-; Therefore ALL file paths must be prefixed with ..\ to point
-; to the project root where the actual files reside.
 
-; The build script will override this version (via /dAppVersion=...).
-; #ifndef ensures the command-line /d switch always takes precedence.
 #ifndef AppVersion
 #define AppVersion "3.0.7"
 #endif
@@ -17,16 +10,9 @@
 #define AppExeName "NREGA Bot.exe"
 #define OutputName "NREGABot-v" + AppVersion + "-Setup"
 
-; Root directory (parent of scripts/ where this .iss file lives)
+; Since this .iss file is in scripts/, paths are relative to scripts/.
+; Use RootDir to point to the project root directory.
 #define RootDir "..\"
-
-; OutputDir override: build script can pass an ABSOLUTE path via /dInnoOutputDir=
-; This avoids ambiguity about whether relative paths are resolved from script dir or working dir.
-#ifdef InnoOutputDir
-  #define SetupOutputDir InnoOutputDir
-#else
-  #define SetupOutputDir RootDir + "dist\installer"
-#endif
 
 [Setup]
 ; This ID must be the SAME for all versions to ensure proper updates.
@@ -39,7 +25,7 @@ AppSupportURL={#AppURL}
 DefaultDirName={autopf64}\{#AppName}
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
-OutputDir={#SetupOutputDir}
+OutputDir={#RootDir}dist\installer
 OutputBaseFilename={#OutputName}
 Compression=lzma2/ultra64
 SolidCompression=yes

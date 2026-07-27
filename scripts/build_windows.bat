@@ -9,38 +9,16 @@ IF "%APP_VERSION%"=="" SET APP_VERSION="0.0.0"
 
 SET APP_NAME="NREGA Bot"
 SET LITE_APP_NAME="NREGA Bot Lite"
-REM Chocolatey installs Inno Setup to %%ProgramFiles%% (C:\Program Files)
-SET INNO_SETUP_COMPILER="%ProgramFiles%\Inno Setup 6\ISCC.exe"
-SET INNO_SETUP_COMPILER_X86="%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
-REM Chocolatey's own lib path (fallback for different install locations)
-SET INNO_SETUP_CHOCO="%ProgramData%\chocolatey\lib\innosetup\tools\ISCC.exe"
-REM Chocolatey shim path (most reliable for GH Actions)
-SET INNO_SETUP_CHOCO_SHIM="%ProgramData%\chocolatey\bin\ISCC.exe"
 
 ECHO ######################################################
 ECHO.
-ECHO  Building %APP_NAME% v%APP_VERSION% (Loader System)...
+ECHO  Building %APP_NAME% v%APP_VERSION% (Loader System) + %LITE_APP_NAME%...
 ECHO.
 ECHO ######################################################
 ECHO.
-
-REM --- Clean previous builds ---
-ECHO [STEP 0/3] Cleaning old builds...
-if exist "dist\%APP_NAME%" rmdir /s /q "dist\%APP_NAME%"
-if exist "dist\%LITE_APP_NAME%" rmdir /s /q "dist\%LITE_APP_NAME%"
-if exist "dist\installer" rmdir /s /q "dist\installer"
-if exist "build" rmdir /s /q "build"
-ECHO Old builds cleaned.
-ECHO.
-
-REM ==============================================================
-REM !!! IMPORTANT: PyInstaller 6.x+ uses : as separator on ALL  !!!
-REM !!! platforms, including Windows. Old ; separator no longer !!!
-REM !!! works. Use forward slashes in paths for consistency.    !!!
-REM ==============================================================
 
 REM --- Step 1a: Build MAIN App (Loader) ---
-ECHO [STEP 1a/3] Building MAIN app with PyInstaller...
+ECHO [STEP 1a/2] Building MAIN app with PyInstaller...
 ECHO.
 
 pyinstaller --noconfirm --windowed --onedir ^
@@ -80,7 +58,7 @@ ECHO MAIN app PyInstaller build successful.
 ECHO.
 
 REM --- Step 1b: Build LITE App ---
-ECHO [STEP 1b/3] Building LITE app with PyInstaller...
+ECHO [STEP 1b/2] Building LITE app with PyInstaller...
 ECHO.
 
 pyinstaller --noconfirm --windowed --onefile ^
@@ -110,129 +88,23 @@ ECHO.
 ECHO LITE app PyInstaller build successful.
 ECHO.
 
-REM --- Step 2: Run Inno Setup Compiler (MAIN app installer only) ---
-ECHO [STEP 2/3] Creating the MAIN installer with Inno Setup...
+REM --- Step 2: Create installer with Inno Setup (MAIN app only) ---
+ECHO [STEP 2/2] Creating the MAIN installer with Inno Setup...
 ECHO.
 
-REM --- Verify that the PyInstaller dist directory exists ---
-if not exist "dist\NREGA Bot" (
-    ECHO.
-    ECHO !!!!!!! ERROR: dist\NREGA Bot directory NOT FOUND !!!!!!!
-    ECHO The PyInstaller build should have created this directory.
-    ECHO.
-    goto End
+REM Check if the Inno Setup compiler exists (Local Machine Check)
+if not exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" (
+    if not exist "C:\Program Files\Inno Setup 6\ISCC.exe" (
+        ECHO Warning: Inno Setup default path not found. Assuming configured in PATH or GitHub Action.
+    )
 )
 
-ECHO [DEBUG] dist\NREGA Bot directory found. Contents:
-dir "dist\NREGA Bot" /s /b | find /c /v "" > nul
+REM Agar GitHub Action me hain, to ISCC command path me hota hai
+ISCC /dAppVersion=%APP_VERSION% "scripts\installer.iss"
+
 if errorlevel 1 (
-    dir "dist\NREGA Bot"
-) else (
-    dir "dist\NREGA Bot"
-)
-ECHO.
-
-REM --- Verify that required asset files exist ---
-ECHO [DEBUG] Checking required asset files...
-if not exist "assets\app_icon.ico" (
-    ECHO [ERROR] Missing: assets\app_icon.ico
-    goto End
-)
-if not exist "assets\wizard_image.bmp" (
-    ECHO [ERROR] Missing: assets\wizard_image.bmp
-    goto End
-)
-if not exist "assets\wizard_small_image.bmp" (
-    ECHO [ERROR] Missing: assets\wizard_small_image.bmp
-    goto End
-)
-if not exist "docs\license.txt" (
-    ECHO [ERROR] Missing: docs\license.txt
-    goto End
-)
-if not exist "docs\infobefore.txt" (
-    ECHO [ERROR] Missing: docs\infobefore.txt
-    goto End
-)
-ECHO [DEBUG] All required asset files found.
-ECHO.
-
-REM --- Find ISCC.exe across multiple possible locations ---
-set ISCC_FOUND=
-
-if exist %INNO_SETUP_COMPILER% (
-    set ISCC_FOUND=%INNO_SETUP_COMPILER%
-) else (
-    if exist %INNO_SETUP_COMPILER_X86% (
-        set ISCC_FOUND=%INNO_SETUP_COMPILER_X86%
-    ) else (
-        if exist %INNO_SETUP_CHOCO% (
-            set ISCC_FOUND=%INNO_SETUP_CHOCO%
-        ) else (
-            if exist %INNO_SETUP_CHOCO_SHIM% (
-                set ISCC_FOUND=%INNO_SETUP_CHOCO_SHIM%
-            )
-        )
-    )
-)
-
-REM If still not found, search PATH using where.exe (handles Chocolatey shims & custom installs)
-REM NOTE: Wrap %%a in quotes to handle paths with spaces (e.g. "C:\Program Files\...")
-if not defined ISCC_FOUND (
-    for /f "delims=" %%a in ('where ISCC.exe 2^>nul') do (
-        set ISCC_FOUND="%%a"
-    )
-)
-
-if defined ISCC_FOUND (
-    ECHO Found Inno Setup at: %ISCC_FOUND%
     ECHO.
-    
-    REM Create the output directory if it doesn't exist
-    if not exist "dist\installer" mkdir "dist\installer"
-    ECHO Created dist\installer directory.
-    ECHO.
-    
-    REM Use %%CD%%\dist\installer directly (not a temp variable) because CMD
-    REM expands %%var%% at parse time — variables SET inside parenthesized
-    REM blocks are NOT visible via %%var%% until AFTER the block ends.
-    REM %%CD%% is a CMD built-in that always reflects the current directory.
-    ECHO ISCC output dir: %CD%\dist\installer
-    ECHO.
-    ECHO Running: %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir="%CD%\dist\installer" "scripts\installer.iss"
-    ECHO.
-    
-    %ISCC_FOUND% /dAppVersion=%APP_VERSION% /dInnoOutputDir=%CD%\dist\installer "scripts\installer.iss"
-    if errorlevel 1 (
-        ECHO.
-        ECHO !!!!!!! Inno Setup compilation FAILED. !!!!!!!
-        ECHO Check the output above for error messages.
-        ECHO Main app installer not created, but portable build is in dist\%APP_NAME%\
-        goto End
-    )
-    
-    REM Verify installer was created at expected location
-    if exist "dist\installer\*.exe" (
-        ECHO.
-        ECHO ✅ Installer EXE created successfully:
-        dir "dist\installer\*.exe"
-    ) else (
-        ECHO.
-        ECHO [ERROR] Inno Setup completed but no .exe file was created in dist\installer\
-        goto End
-    )
-) else (
-    ECHO.
-    ECHO !!!!!!! Inno Setup NOT FOUND !!!!!!!
-    ECHO Checked:
-    ECHO   - %INNO_SETUP_COMPILER%
-    ECHO   - %INNO_SETUP_COMPILER_X86%
-    ECHO   - %INNO_SETUP_CHOCO%
-    ECHO   - %INNO_SETUP_CHOCO_SHIM%
-    ECHO   - PATH (via where ISCC.exe)
-    ECHO.
-    ECHO Main app installer NOT created.
-    ECHO Portable build is available at: dist\%APP_NAME%\
+    ECHO !!!!!!! Inno Setup compilation FAILED. !!!!!!!
     goto End
 )
 
