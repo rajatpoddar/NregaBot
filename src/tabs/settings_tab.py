@@ -23,6 +23,12 @@ from src.ui_components import AfterTracker
 from src.location_hierarchy import get_hierarchy, HIERARCHY_TYPES, TYPE_TO_PREFIX
 from src.tabs.activity_log_tab import ActivityLogTab
 
+# Selenium imports (used in _scrape_from_website)
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select, WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+
 logger = get_logger()
 
 
@@ -403,11 +409,6 @@ class SettingsTab(ctk.CTkFrame):
         Har panchayat ko select karta hai, uske villages scrape karta hai,
         aur Panchayat→Village hierarchy build karta hai.
         """
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-
         self._scrape_btn.configure(state="disabled", text="⏳ Scraping...")
         self._scrape_status.configure(text="⏳ Browser connect ho raha hai...")
 

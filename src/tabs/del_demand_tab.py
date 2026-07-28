@@ -9,6 +9,8 @@ from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class DelDemandTab(BaseAutomationTab):
     """
     Tab for automating the deletion of Demands on the VB-G-RAM-G portal.
@@ -28,12 +30,6 @@ class DelDemandTab(BaseAutomationTab):
         self._create_widgets()
     def _create_widgets(self) -> None:
         # --- Section 1: Input Controls ---
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         controls_frame.grid_columnconfigure(1, weight=1)
@@ -117,12 +113,6 @@ class DelDemandTab(BaseAutomationTab):
         self.panchayat_menu.configure(state=state)
         self.village_menu.configure(state=state)
     def start_automation(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         panchayat = self.panchayat_var.get().strip()
         village = self.village_var.get().strip()
 
@@ -130,8 +120,7 @@ class DelDemandTab(BaseAutomationTab):
             messagebox.showwarning("Input Error", "Panchayat Name is required.")
             return
 
-        for item in self.results_tree.get_children():
-            self.results_tree.delete(item)
+        self.safe_tree_clear()
 
         self.app.update_history("location_panchayat", panchayat)
         if village:
@@ -144,12 +133,6 @@ class DelDemandTab(BaseAutomationTab):
         )
 
     def run_automation_logic(self, target_panchayat, target_village):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         
@@ -214,7 +197,7 @@ class DelDemandTab(BaseAutomationTab):
             # 3. Iterate through Villages
             total_v = len(villages_to_process)
             for i, v_name in enumerate(villages_to_process):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log_warning("⏹️ Automation stopped by user.")
                     break
 
@@ -287,7 +270,7 @@ class DelDemandTab(BaseAutomationTab):
                     elif 'skip' in st:
                         skip_count += 1
 
-            final_msg = "Finished" if not self.app.stop_events[self.automation_key].is_set() else "Stopped"
+            final_msg = "Finished" if not self.is_stopped() else "Stopped"
             self.app.after(0, self.update_status, final_msg, 1.0)
             self.log_info("{'='*50}")
             self.log_info(f"📊 Delete Demand: ✅ {success_count} deleted, ❌ {fail_count} failed, ⏭️ {skip_count} skipped (of {total_v} villages)")
@@ -299,12 +282,6 @@ class DelDemandTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def _process_village(self, driver, wait, panchayat, location_village):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         try:
             # Re-find dropdown (to avoid stale element after postbacks)
             village_dd_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
@@ -327,12 +304,6 @@ class DelDemandTab(BaseAutomationTab):
 
             def page_settled(d):
                 # Confirm dropdown selection took effect
-                # ---- Lazy imports ----
-                from selenium.webdriver.common.by import By
-                from selenium.webdriver.support.ui import Select, WebDriverWait
-                from selenium.webdriver.support import expected_conditions as EC
-                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-                from selenium import webdriver
                 try:
                     dd = Select(d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"))
                     if dd.first_selected_option.text.strip() != location_village:
@@ -483,4 +454,4 @@ class DelDemandTab(BaseAutomationTab):
     def _log_result(self, panchayat, village, applicant_info, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")
         values = (timestamp, panchayat, village, applicant_info, status, details)
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=values))
+        self.safe_tree_insert(values)

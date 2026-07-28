@@ -10,13 +10,10 @@ from src import config
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class FtoGenerationTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait, Select
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoAlertPresentException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="fto_gen")
         self.automation_has_run = False 
         self.stored_location_data = {} 
@@ -32,18 +29,6 @@ class FtoGenerationTab(BaseAutomationTab):
         self._create_widgets()
         self._load_saved_path()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         # Main container
         controls_frame = ctk.CTkFrame(self)
@@ -139,18 +124,6 @@ class FtoGenerationTab(BaseAutomationTab):
     # ============================================================================
 
     def _browse_firefox(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         path = filedialog.askopenfilename(
             title="Select Old Firefox Executable",
             filetypes=[("Executable Files", "*.exe")]
@@ -201,18 +174,6 @@ class FtoGenerationTab(BaseAutomationTab):
         threading.Thread(target=_thread, daemon=True).start()
 
     def _save_path(self, path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.app.update_history("old_firefox_path", path)
 
     def _load_saved_path(self):
@@ -247,45 +208,21 @@ class FtoGenerationTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_generation_logic)
 
     def start_delete_automation(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         if not messagebox.askyesno("Confirm Delete", "This will delete the FIRST FTO in the dropdown.\n\nEnsure you want to proceed."):
             return
         self.app.start_automation_thread(self.automation_key + "_del", self.run_delete_logic)
 
     def _log_result(self, r_type, status, info):
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(r_type, status, info, datetime.now().strftime("%H:%M:%S"))))
+        self.safe_tree_insert((r_type, status, info, datetime.now().strftime("%H:%M:%S")))
 
     # ============================================================================
     # GENERATION LOGIC (WITH FIXED SCRAPING) - UNTOUCHED
     # ============================================================================
 
     def run_generation_logic(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
-        self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
+        self.safe_tree_clear()
         self.update_status("Starting Generation...", 0)
         
         success_count = 0
@@ -323,18 +260,6 @@ class FtoGenerationTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def _process_verification_page(self, driver, wait, url, name):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         try:
             self.log_info(f"🌐 Navigating to {name}...")
             driver.get(url)
@@ -342,7 +267,6 @@ class FtoGenerationTab(BaseAutomationTab):
             # --- SCRAPE LOCATION DATA IMMEDIATELY ---
             if not self.stored_location_data: 
                 self._scrape_location_from_page(driver)
-            # ----------------------------------------
 
             wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_wage_list_verify")))
             
@@ -380,34 +304,10 @@ class FtoGenerationTab(BaseAutomationTab):
             return False
 
     def _scrape_location_from_page(self, driver):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Helper to scrape District, Block, Panchayat from TABLE CELLS (Not IDs)."""
         try:
             self.log_info("Capturing location info...")            
             def get_text_by_xpath(label):
-                # ---- Lazy imports ----
-                from selenium.webdriver.common.by import By
-                from selenium.webdriver.support.ui import Select, WebDriverWait
-                from selenium.webdriver.support import expected_conditions as EC
-                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-                from selenium.common.exceptions import NoAlertPresentException
-                from selenium import webdriver
-                import openpyxl
-                from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-                from openpyxl.utils import get_column_letter
-                from openpyxl.worksheet.page import PageMargins
-                from openpyxl.drawing.image import Image as XLImage
                 try:
                     # Finds <td> containing "District" and gets text
                     elem = driver.find_element(By.XPATH, f"//td[contains(text(), '{label}')]")
@@ -443,18 +343,6 @@ class FtoGenerationTab(BaseAutomationTab):
     # ============================================================================
     
     def run_delete_logic(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.update_status("Starting Deletion...", 0)
@@ -481,18 +369,6 @@ class FtoGenerationTab(BaseAutomationTab):
             self.app.after(0, self.update_status, "Ready", 1.0)
 
     def _process_deletion_page(self, driver, wait, url, log_name):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         try:
             self.log_info(f"Navigating to {log_name}...")
             driver.get(url)

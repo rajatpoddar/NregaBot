@@ -11,6 +11,8 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 # --- Cloud File Picker Toplevel Window ---
@@ -19,11 +21,6 @@ class CloudFilePicker(ctk.CTkToplevel):
     A Toplevel window to select a file from the user's cloud storage.
     """
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException, UnexpectedAlertPresentException
-        from selenium.webdriver.common.keys import Keys
         """
         Initializes the Toplevel window for the cloud file picker.
         """
@@ -105,19 +102,6 @@ class CloudFilePicker(ctk.CTkToplevel):
             self.after(0, self.status_label.configure, {"text": f"Error: {e}"})
 
     def _populate_list(self, files):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Populates the scrollable frame with buttons for each file/folder.
         """
@@ -230,19 +214,6 @@ class DemandTab(BaseAutomationTab):
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         """
         Creates all the UI elements (buttons, entries, frames) for the tab.
@@ -461,19 +432,6 @@ class DemandTab(BaseAutomationTab):
         self._setup_results_treeview()
 
     def _select_all_applicants(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Selects all valid (no *) applicants, up to 400."""
         if not self.all_applicants_data:
             return
@@ -489,19 +447,6 @@ class DemandTab(BaseAutomationTab):
         self._update_selection_summary()
         self.log_info(f"Selected all {selected_count} valid applicants.")
     def _select_custom_number(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Selects a custom number of applicants from the top of the list.
         """
@@ -543,19 +488,6 @@ class DemandTab(BaseAutomationTab):
         self._update_jc_header_counters()
 
     def _clear_processed_selection(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Deselects ONLY successfully processed applicants.
         Keeps 'Failed' or 'Skipped' applicants selected for easy retry.
@@ -595,19 +527,6 @@ class DemandTab(BaseAutomationTab):
         self._update_jc_header_counters()
 
     def _select_csv_from_computer(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Opens a file dialog to select a local CSV and processes it."""
         path = filedialog.askopenfilename(title="Select Demand CSV", filetypes=[("CSV", "*.csv")])
         if not path:
@@ -615,19 +534,6 @@ class DemandTab(BaseAutomationTab):
         self._process_csv_data(path)
 
     def _process_csv_data(self, path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Reads a CSV file and populates the self.all_applicants_data list.
         Updated to read 'Allocation Work Code' column.
@@ -774,19 +680,6 @@ class DemandTab(BaseAutomationTab):
             ).start()
 
     def _download_and_process_work_key_csv_thread(self, file_id, filename):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Handles the download and processing of the work key CSV in a background thread.
         """
@@ -865,24 +758,9 @@ class DemandTab(BaseAutomationTab):
                 self.allocation_work_key_menu.configure(values=self.work_key_list if self.work_key_list else [""])
             self.app.after(0, clear_ui_keys)
 
-    # -----------------------------------------------------------------------
     # APPLICANT SELECTION — new fast approach
-    # -----------------------------------------------------------------------
 
     def _quick_select_jcs(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Parses the quick-select entry (e.g. '1/5, 12/44, 10/150') and selects
         all valid members of those job cards from the loaded CSV.
@@ -929,19 +807,6 @@ class DemandTab(BaseAutomationTab):
         self._refresh_search_results()
 
     def _refresh_search_results(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Shows matching applicants in the right-hand search results panel.
         Only activates when 2+ characters are typed.
@@ -965,19 +830,6 @@ class DemandTab(BaseAutomationTab):
             var = ctk.StringVar(value="on" if row.get('_selected') else "off")
 
             def _toggle(data=row, v=var):
-                # ---- Lazy imports ----
-                from selenium.webdriver.common.by import By
-                from selenium.webdriver.support.ui import Select, WebDriverWait
-                from selenium.webdriver.support import expected_conditions as EC
-                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-                from selenium.webdriver.common.keys import Keys
-                from selenium.common.exceptions import UnexpectedAlertPresentException
-                from selenium import webdriver
-                import openpyxl
-                from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-                from openpyxl.utils import get_column_letter
-                from openpyxl.worksheet.page import PageMargins
-                from openpyxl.drawing.image import Image as XLImage
                 data['_selected'] = (v.get() == "on")
                 self._refresh_selected_jc_panel()
                 self._update_selection_summary()
@@ -998,19 +850,6 @@ class DemandTab(BaseAutomationTab):
                          text_color="gray").pack(anchor="w", padx=6, pady=2)
 
     def _refresh_selected_jc_panel(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Redraws the left panel showing all currently selected JCs
         with applicant count and a ✕ remove button.
@@ -1054,19 +893,6 @@ class DemandTab(BaseAutomationTab):
             ).grid(row=0, column=1, padx=(0, 4), pady=4)
 
     def _deselect_jc(self, jc):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Removes all selections for a given job card."""
         for app_data in self.all_applicants_data:
             if app_data.get('Job card number') == jc:
@@ -1088,38 +914,12 @@ class DemandTab(BaseAutomationTab):
         pass  # no longer used
 
     def _on_applicant_select(self, applicant_data, new_state):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Updates master data and refreshes panels."""
         applicant_data['_selected'] = (new_state == "on")
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
 
     def _update_selection_summary(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Updates the label showing the count of selected applicants and unique job cards.
         """
@@ -1212,19 +1012,6 @@ class DemandTab(BaseAutomationTab):
             self.selected_file_path = file_path
     
     def set_automation_inputs(self, panchayat_name, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Updated: Loads CSV and selects applicants IMMEDIATELY (Synchronously).
         Removes timing delays to prevent 'Select applicants' error.
@@ -1248,19 +1035,6 @@ class DemandTab(BaseAutomationTab):
             print(f"Error: File path not found: {file_path}")
             self.log_error(f"Macro Error: File not found {file_path}")
     def start_automation(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Validates all user inputs and starts the main automation thread
         using the app's built-in thread manager (which plays sound).
@@ -1337,19 +1111,6 @@ class DemandTab(BaseAutomationTab):
             args=args_tuple
         )
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Resets all inputs, selections, and logs on the tab."""
         if not messagebox.askokcancel("Reset?", "Clear inputs, selections, logs?"): return
         self.state_var.set("")
@@ -1390,19 +1151,6 @@ class DemandTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
 
     def _process_demand(self, state, panchayat, user_days, demand_from, work_start, grouped, base_url, work_key_for_allocation):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         The main automation function that runs in a thread.
         Updated to handle intelligent handoff (Granular Allocation).
@@ -1462,7 +1210,7 @@ class DemandTab(BaseAutomationTab):
             total_v, proc_v = len(grouped), 0
             for vc, jcs_in_v in grouped.items():
                 proc_v += 1
-                if self.app.stop_events[self.automation_key].is_set(): break
+                if self.is_stopped(): break
                 try:
                     self.app.after(0, self.app.set_status, f"V {proc_v}/{total_v}: Selecting Village {vc}...")
                     self.app.after(0, self.app.log_message, self.log_display, f"--- Village {proc_v}/{total_v} (Code: {vc}) ---")
@@ -1479,7 +1227,7 @@ class DemandTab(BaseAutomationTab):
                     total_jc, proc_jc = len(jcs_in_v), 0
                     for jc, apps in jcs_in_v.items():
                         proc_jc += 1
-                        if self.app.stop_events[self.automation_key].is_set(): break
+                        if self.is_stopped(): break
                         
                         # This updates the *internal* tab status
                         self.app.after(0, self.update_status, f"V {proc_v}/{total_v}, JC {proc_jc}/{total_jc}", (proc_v-1 + proc_jc/total_jc)/total_v)
@@ -1494,7 +1242,7 @@ class DemandTab(BaseAutomationTab):
                          for app_data_err in apps_err: self.app.after(0, self._update_results_tree, (jc_err, app_data_err.get('Name of Applicant'), f"Skipped (Village Error)"))
                     continue 
 
-            if not self.app.stop_events[self.automation_key].is_set():
+            if not self.is_stopped():
                 self.app.after(0, self.app.log_message, self.log_display, "✅ All processed.")
 
         except Exception as e:
@@ -1506,7 +1254,7 @@ class DemandTab(BaseAutomationTab):
             final_tab_status = "Finished" 
             final_progress = 1.0
             
-            if self.app.stop_events[self.automation_key].is_set():
+            if self.is_stopped():
                 self.app.after(0, self.app.log_message, self.log_display, "Stopped by user.", "warning")
                 final_status_text = "Stopped"
                 final_tab_status = "Stopped"
@@ -1516,7 +1264,7 @@ class DemandTab(BaseAutomationTab):
                 final_progress = 0.0
             else:
                 # --- INTELLIGENT HANDOFF LOGIC ---
-                if not self.app.stop_events[self.automation_key].is_set():
+                if not self.is_stopped():
                     
                     # 1. Identify successful applicants
                     successful_names = set()
@@ -1552,7 +1300,6 @@ class DemandTab(BaseAutomationTab):
                         self.app.after(500, self.app.run_work_allocation_from_demand, panchayat, work_key_for_allocation)
                     else:
                         self.app.after(100, lambda: self.app.log_message(self.log_display, "📊 Demand automation finished."))
-                # ---------------------------------
 
                 self.app.after(0, self._clear_processed_selection)
             
@@ -1562,25 +1309,12 @@ class DemandTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, final_status_text)
             self.app.after(0, self.update_status, final_tab_status, final_progress)
             
-            if not self.app.stop_events[self.automation_key].is_set() and 'e' not in locals():
+            if not self.is_stopped() and 'e' not in locals():
                  self.app.after(5000, lambda: self.app.set_status("Ready")) 
                  self.app.after(5000, lambda: self.update_status("Ready", 0.0))
 
     # --- Helper Function for Background Execution (Add this above _process_single_job_card) ---
     def safe_js_fill(self, driver, element, value):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Fills an input using JavaScript and triggers all necessary events 
         (input, change, blur) to simulate real user interaction.
@@ -1609,37 +1343,11 @@ class DemandTab(BaseAutomationTab):
                                  days_worked_ids, jc_ids, grid_ids, btn_ids,
                                  err_msg_ids,
                                  base_url, state): 
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Handles the selenium logic for processing a single job card.
         """
 
         def get_worked_days_ultra_fast():
-            # ---- Lazy imports ----
-            from selenium.webdriver.common.by import By
-            from selenium.webdriver.support.ui import Select, WebDriverWait
-            from selenium.webdriver.support import expected_conditions as EC
-            from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-            from selenium.webdriver.common.keys import Keys
-            from selenium.common.exceptions import UnexpectedAlertPresentException
-            from selenium import webdriver
-            import openpyxl
-            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-            from openpyxl.utils import get_column_letter
-            from openpyxl.worksheet.page import PageMargins
-            from openpyxl.drawing.image import Image as XLImage
             try:
                 days_el = WebDriverWait(driver, 1.0).until(EC.presence_of_element_located((By.ID, days_worked_ids[0])))
                 worked_str = days_el.get_attribute("innerText").strip()
@@ -1648,19 +1356,6 @@ class DemandTab(BaseAutomationTab):
             except Exception: return 0
 
         def fill_demand_data(days_distribution): 
-            # ---- Lazy imports ----
-            from selenium.webdriver.common.by import By
-            from selenium.webdriver.support.ui import Select, WebDriverWait
-            from selenium.webdriver.support import expected_conditions as EC
-            from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-            from selenium.webdriver.common.keys import Keys
-            from selenium.common.exceptions import UnexpectedAlertPresentException
-            from selenium import webdriver
-            import openpyxl
-            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-            from openpyxl.utils import get_column_letter
-            from openpyxl.worksheet.page import PageMargins
-            from openpyxl.drawing.image import Image as XLImage
             nonlocal filled, processed
             applicants_not_found = set(targets) 
             fill_success = False
@@ -1697,7 +1392,7 @@ class DemandTab(BaseAutomationTab):
 
             # --- PASS 2: FILLING ---
             for target_name, days_to_fill in days_distribution.items():
-                if self.app.stop_events[self.automation_key].is_set(): return False
+                if self.is_stopped(): return False
                 
                 if days_to_fill == 0:
                     processed.add(target_name); applicants_not_found.discard(target_name); fill_success = True; continue
@@ -1979,19 +1674,6 @@ class DemandTab(BaseAutomationTab):
         self.results_tree.yview_moveto(1)
 
     def _retry_failed_applicants(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Re-selects all applicants who are marked as 'failed' in the
         results table, so the user can run the automation again for them.
@@ -2076,7 +1758,6 @@ class DemandTab(BaseAutomationTab):
         # --- FIX: Use delete/insert ---
         self.demand_date_entry.delete(0, "end")
         self.demand_date_entry.insert(0, date_to_set)
-        # ------------------------------
         
         self.days_entry.delete(0, 'end')
         self.days_entry.insert(0, days_to_set)
@@ -2084,19 +1765,6 @@ class DemandTab(BaseAutomationTab):
         self.allocation_work_key_var.set(work_key_to_set)
 
     def _clear_selection(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Clears the current selection of all applicants."""
         if not any(a.get('_selected', False) for a in self.all_applicants_data):
             self.log_info("No selection.")
@@ -2116,19 +1784,6 @@ class DemandTab(BaseAutomationTab):
             self.export_filter_menu.configure(state="normal")
 
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Central function to handle exporting results to PDF or CSV.
         """
@@ -2159,19 +1814,6 @@ class DemandTab(BaseAutomationTab):
             self._handle_pdf_export(data, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Gathers data from Treeview based on filters (Success/Failed) and asks user for save path.
         """
@@ -2227,19 +1869,6 @@ class DemandTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
 
     def _handle_pdf_export(self, data, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Handles the generation of the PDF report."""
         try:
             # Treeview columns: ("#", "Job Card No", "Applicant Name", "Status")

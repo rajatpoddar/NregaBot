@@ -11,6 +11,8 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 class MrFillTab(BaseAutomationTab):
@@ -20,14 +22,6 @@ class MrFillTab(BaseAutomationTab):
     marks specified holiday columns, and then saves.
     """
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException, TimeoutException, NoAlertPresentException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException, TimeoutException, NoAlertPresentException
         super().__init__(parent, app_instance, automation_key="mr_fill")
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
         
@@ -48,18 +42,6 @@ class MrFillTab(BaseAutomationTab):
         self._create_widgets()
         self._load_inputs() # Load saved inputs on startup
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         """Creates all the UI elements for the tab."""
         
@@ -201,18 +183,6 @@ class MrFillTab(BaseAutomationTab):
         self.export_filter_menu.configure(state=state)
         if state == "normal": self._on_format_change(self.export_format_menu.get())
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Resets the form to its default state."""
         if messagebox.askokcancel("Reset Form?", "Clear all inputs, results, and logs?"):
             self._load_inputs() # Load saved inputs
@@ -247,21 +217,9 @@ class MrFillTab(BaseAutomationTab):
     # Inside tabs/mr_fill_tab.py
 
     def run_automation_logic(self, cfg, work_keys):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Main automation logic that runs in a separate thread."""
         self.app.after(0, self.set_ui_state, True)
-        self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
+        self.safe_tree_clear()
         self.app.clear_log(self.log_display)
         self.log_info("Starting MR Fill (Attendance) processing...")
         self.app.after(0, self.app.set_status, "Running MR Fill...")
@@ -289,7 +247,7 @@ class MrFillTab(BaseAutomationTab):
             # --- 4. Work Key Loop ---
             total = len(work_keys)
             for i, work_key in enumerate(work_keys, 1):
-                if self.app.stop_events[self.automation_key].is_set(): 
+                if self.is_stopped(): 
                     self.app.log_message(self.log_display, "Automation stopped by user.", "warning"); break
                 
                 self.app.after(0, self.update_status, f"Processing {i}/{total}: {work_key}", (i/total))
@@ -297,7 +255,7 @@ class MrFillTab(BaseAutomationTab):
                 # PASSING PANCHAYAT NAME HERE to handle re-selection if page reloads
                 self._process_single_work_code(driver, wait, work_key, holiday_cols, is_manual_mode, panchayat_name)
                 
-            if not self.app.stop_events[self.automation_key].is_set(): 
+            if not self.is_stopped(): 
                 self.log_info("📊 Automation finished. Check the 'Results' tab for details.")        
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
@@ -309,18 +267,6 @@ class MrFillTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _ensure_panchayat_selected(self, driver, wait, panchayat_name):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Helper to check and select Panchayat if it's not already selected."""
         if not panchayat_name: return # Skip if GP Login (empty name)
 
@@ -344,18 +290,6 @@ class MrFillTab(BaseAutomationTab):
             pass # Ignore errors for GP login scenarios
 
     def _process_single_work_code(self, driver, wait, work_key, holiday_cols, is_manual_mode, panchayat_name):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Processes a single work code with improved error handling for 'MR Already Filled'.
         """
@@ -433,7 +367,7 @@ class MrFillTab(BaseAutomationTab):
             if "No Future Dates Plz" in driver.page_source:
                 # Confirm it is the error message
                 try:
-                    driver.find_element(By.XPATH, "//*[contains(text(), 'No Future Dates Plz')]")
+                    self._find(driver, By.XPATH, "//*[contains(text(), 'No Future Dates Plz')]")
                     raise ValueError("MR Already Filled")
                 except NoSuchElementException:
                     pass # Text might exist elsewhere, ignore if not in an element we expect
@@ -560,21 +494,9 @@ class MrFillTab(BaseAutomationTab):
         timestamp = datetime.now().strftime("%H:%M:%S")
         
         self.log_info(f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}", level=level)        
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_key, mr_no, status.upper(), details, timestamp), tags=(tag,)))
+        self.safe_tree_insert((work_key, mr_no, status.upper(), details, timestamp), (tag,))
 
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Exports the data in the results tree to PDF or CSV."""
         export_format = self.export_format_menu.get()
         panchayat_name = self.panchayat_var.get() # Get from variable
@@ -597,18 +519,6 @@ class MrFillTab(BaseAutomationTab):
             self._handle_pdf_export(data, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Filters data based on UI selection and gets a save file path from the user."""
         all_items = self.results_tree.get_children()
         if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
@@ -638,18 +548,6 @@ class MrFillTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Generates the PDF report."""
         try:
             headers = self.results_tree['columns']

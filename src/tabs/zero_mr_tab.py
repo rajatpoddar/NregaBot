@@ -11,30 +11,16 @@ from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class ZeroMrTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException, StaleElementReferenceException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="zero_mr")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
 
         # Frame for all user input controls
         controls_frame = ctk.CTkFrame(self)
@@ -133,14 +119,6 @@ class ZeroMrTab(BaseAutomationTab):
         self.export_filter_menu.configure(state=state)
         if state == "normal": self._on_format_change(self.export_format_menu.get())
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         self.panchayat_var.set("")
         self.work_list_text.delete("1.0", tkinter.END)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
@@ -149,14 +127,6 @@ class ZeroMrTab(BaseAutomationTab):
         self.log_info("Form has been reset.")
         self.app.after(0, self.app.set_status, "Ready")
     def start_automation(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         self.app.clear_log(self.log_display)
 
@@ -200,14 +170,6 @@ class ZeroMrTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Starting Zero MR...")
         self.log_info("Starting Zero MR automation...")
@@ -271,7 +233,7 @@ class ZeroMrTab(BaseAutomationTab):
             # --- Process each item ---
             total_items = len(inputs['work_items'])
             for i, (work_key, msr_no) in enumerate(inputs['work_items']):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log_warning("Stop signal received.")
                     break
                 
@@ -287,23 +249,20 @@ class ZeroMrTab(BaseAutomationTab):
             messagebox.showerror("Critical Error", error_msg)
             self.app.after(0, self.app.set_status, "Error")
         finally:
+            # Count success/fail from results_tree
+            success_count = sum(1 for item in self.results_tree.get_children() if 'success' in str(self.results_tree.item(item)['values'][2]).lower())
+            fail_count = sum(1 for item in self.results_tree.get_children() if 'success' not in str(self.results_tree.item(item)['values'][2]).lower())
+            total_count = success_count + fail_count
+            self.log_info(f"📊 Zero MR Complete: ✅ {success_count} generated, ❌ {fail_count} failed (of {total_count} total)")
             self.app.after(0, self.set_ui_state, False)
             final_status = "Automation Finished"
-            if self.app.stop_events[self.automation_key].is_set():
+            if self.is_stopped():
                 final_status = "Automation Stopped"
             self.app.after(0, self.app.set_status, final_status)
             self.app.after(0, self.update_status, final_status, 1.0)
             self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 {final_status}"))
 
     def _process_single_item(self, driver, wait, work_key, msr_no):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         try:
             self.log_info(f"   - Processing Key: {work_key}, MSR: {msr_no}")
             
@@ -329,14 +288,6 @@ class ZeroMrTab(BaseAutomationTab):
             # Instead of just waiting for *any* options, we wait until an option 
             # containing our 'work_key' actually appears. This prevents reading stale data.
             def work_code_option_present(d):
-                # ---- Lazy imports ----
-                from selenium.webdriver.common.by import By
-                from selenium.webdriver.support.ui import Select, WebDriverWait
-                from selenium.webdriver.support import expected_conditions as EC
-                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-                from selenium.webdriver.common.keys import Keys
-                from selenium.common.exceptions import NoAlertPresentException
-                from selenium import webdriver
                 try:
                     select_elem = d.find_element(By.ID, "ddlworkcode")
                     # Get all options. Using find_elements is safer/faster than Select.options loop for simple text check
@@ -407,14 +358,6 @@ class ZeroMrTab(BaseAutomationTab):
             self.log_info("   - Waiting for result message...")
             
             def message_or_error_visible(d):
-                # ---- Lazy imports ----
-                from selenium.webdriver.common.by import By
-                from selenium.webdriver.support.ui import Select, WebDriverWait
-                from selenium.webdriver.support import expected_conditions as EC
-                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-                from selenium.webdriver.common.keys import Keys
-                from selenium.common.exceptions import NoAlertPresentException
-                from selenium import webdriver
                 msg = d.find_elements(By.ID, "lblmsg")
                 err = d.find_elements(By.ID, "ValidationSummary1")
                 if msg and msg[0].is_displayed() and msg[0].text.strip(): return msg[0]
@@ -445,14 +388,6 @@ class ZeroMrTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"   - FAILED: {error_msg}", "error")
             self._log_result(work_key, msr_no, "Failed", error_msg)
     def retry_logic_handler(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         """
         Custom Retry Logic for Work Allocation.
         Extracts failed Work Keys from the results tree and restarts automation
@@ -512,17 +447,9 @@ class ZeroMrTab(BaseAutomationTab):
         timestamp = datetime.now().strftime("%H:%M:%S")
         values = (truncate_workcode(work_key), msr_no, status, details, timestamp)
         tags = ('failed',) if 'success' not in status.lower() else ()
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
+        self.safe_tree_insert(values, tags)
 
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         export_format = self.export_format_menu.get()
         panchayat_name = self.panchayat_var.get().strip()
 
@@ -544,14 +471,6 @@ class ZeroMrTab(BaseAutomationTab):
             self._handle_pdf_export(data, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         all_items = self.results_tree.get_children()
         if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
         
@@ -576,14 +495,6 @@ class ZeroMrTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         try:
             headers = self.results_tree['columns']
             col_widths = [40, 40, 40, 130, 40] # Adjusted widths for A4 Landscape
@@ -617,8 +528,7 @@ class ZeroMrTab(BaseAutomationTab):
         # Clear current form and results
         self.panchayat_var.set("")
         self.work_list_text.delete("1.0", tkinter.END)
-        for item in self.results_tree.get_children():
-            self.results_tree.delete(item)
+        self.safe_tree_clear()
 
         # Get the first panchayat from the list
         target_panchayat = data_list[0].get("panchayat")

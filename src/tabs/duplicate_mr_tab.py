@@ -15,34 +15,13 @@ from .base_tab import BaseAutomationTab
 from src.utils import truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class DuplicateMrTab(BaseAutomationTab):
     """
     A tab for automating the process of re-printing Muster Rolls (MRs) for multiple work codes.
     """
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, NoSuchElementException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, NoSuchElementException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, NoSuchElementException
         super().__init__(parent, app_instance, automation_key="duplicate_mr")
         
         self.grid_columnconfigure(0, weight=1)
@@ -54,14 +33,6 @@ class DuplicateMrTab(BaseAutomationTab):
         self.current_panchayat = ""
         self.output_dir = "" # <-- ADDED
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium import webdriver
 
         main_container = ctk.CTkFrame(self, fg_color="transparent")
         main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
@@ -188,7 +159,7 @@ class DuplicateMrTab(BaseAutomationTab):
 
     def _log_result(self, work_code, msr_no, status):
         timestamp = time.strftime("%H:%M:%S")
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, truncate_workcode(work_code), msr_no, status)))
+        self.safe_tree_insert((timestamp, truncate_workcode(work_code), msr_no, status))
     def start_automation(self) -> None:
         panchayat = self.panchayat_var.get().strip()
         work_codes_raw = self.work_codes_textbox.get("1.0", "end").strip()
@@ -290,7 +261,7 @@ class DuplicateMrTab(BaseAutomationTab):
 
         try:
             for work_code in work_codes:
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     break
                 self.log_info(f"--- Processing Work Code: {work_code} ---")
                 self._process_single_work_code(driver, work_code, action, panchayat, orientation, scale)
@@ -303,24 +274,24 @@ class DuplicateMrTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _show_completion_dialog(self):
-        final_message = "Duplicate MR process has finished."
+        # Count success/fail from results_tree
+        # Status values: "Saved as PDF" (success), "PDF Save Failed", "Timeout", "No MSRs found", etc.
+        success_count = sum(1 for item in self.results_tree.get_children() if 'saved' in str(self.results_tree.item(item)['values'][3]).lower())
+        fail_count = sum(1 for item in self.results_tree.get_children() if 'saved' not in str(self.results_tree.item(item)['values'][3]).lower())
+        total_count = success_count + fail_count
+        
+        # Log structured summary first
+        self.log_info(f"📊 Duplicate MR Complete: ✅ {success_count} saved, ❌ {fail_count} failed (of {total_count} total)")
+        
+        final_message = f"Duplicate MR process has finished.\n✅ {success_count} saved, ❌ {fail_count} failed"
         # --- UPDATED PATH CHECK ---
         if self.output_dir and os.path.exists(self.output_dir) and any(os.scandir(self.output_dir)):
             if messagebox.askyesno("Complete", f"{final_message}\n\nDo you want to open the output folder?"):
                 self.app.open_folder(self.output_dir)
         else:
             self.log_info(f"📊 {final_message}")
-            # --- END ---
 
     def _process_single_work_code(self, driver, work_code, action, panchayat, orientation, scale):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium import webdriver
         wait = WebDriverWait(driver, 40)
         url = config.DUPLICATE_MR_CONFIG["url"]
         try:
@@ -328,7 +299,7 @@ class DuplicateMrTab(BaseAutomationTab):
             if not msr_options: return
 
             for i, msr_no in enumerate(msr_options):
-                if self.app.stop_events[self.automation_key].is_set(): break
+                if self.is_stopped(): break
                 
                 self.log_info(f"--- Processing MSR {i+1}/{len(msr_options)}: {msr_no} ---")                
                 driver.get(url)
@@ -391,14 +362,6 @@ class DuplicateMrTab(BaseAutomationTab):
             self._log_result(work_code, "N/A", "Unexpected Error")
 
     def _get_msr_list(self, driver, wait, work_code, panchayat, url):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium import webdriver
         """Helper to get list of MSRs (Background Safe)."""
         self.log_info(f"Getting MSR list for Work Code: {work_code}")
         try:
@@ -437,14 +400,6 @@ class DuplicateMrTab(BaseAutomationTab):
 
     # --- FUNCTION SIGNATURE UPDATED ---
     def _save_mr_as_pdf(self, driver, work_code, msr_no, orientation, scale, output_dir):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium import webdriver
         try:
             safe_work_code = work_code.split('/')[-1][-6:]
             filename = f"MR_{safe_work_code}_{msr_no}.pdf"
@@ -564,14 +519,6 @@ class DuplicateMrTab(BaseAutomationTab):
     def set_ui_state(self, running: bool):
         if not self._is_alive():
             return
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium import webdriver
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.panchayat_menu.configure(state=state)
@@ -582,21 +529,12 @@ class DuplicateMrTab(BaseAutomationTab):
         self.merge_pdfs_button.configure(state=state) # <-- ADDED
         self.export_csv_button.configure(state=state) # <-- ADDED
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure?"):
             self.panchayat_var.set("")
             self.work_codes_textbox.delete("1.0", "end")
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0)
-            for item in self.results_tree.get_children():
-                self.results_tree.delete(item)
+            self.safe_tree_clear()
             self.orientation_var.set("Landscape")
             self.scale_slider.set(75)
             self.scale_label.configure(text="75%")
@@ -604,14 +542,6 @@ class DuplicateMrTab(BaseAutomationTab):
 
     # --- NEW MERGE PDFS METHOD ---
     def merge_saved_pdfs(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium import webdriver
         self.log_info("Starting PDF merge...")        
         # 1. Get current output directory
         panchayat = self.panchayat_var.get().strip()
@@ -670,14 +600,6 @@ class DuplicateMrTab(BaseAutomationTab):
         )
 
     def _run_merge_logic(self, file_list, output_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.common.action_chains import ActionChains
-        from selenium import webdriver
         """The actual PDF merging logic that runs in a thread."""
         self.app.after(0, self.set_ui_state, True)
         self.log_info(f"Merging {len(file_list)} files...")

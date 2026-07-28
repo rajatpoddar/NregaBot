@@ -10,16 +10,10 @@ from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class ResendRejectedWgTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException
         super().__init__(parent, app_instance, automation_key="resend_wg")
         
         self.grid_columnconfigure(0, weight=1)
@@ -27,12 +21,6 @@ class ResendRejectedWgTab(BaseAutomationTab):
         
         self._create_widgets()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
 
         # Frame for user controls
         controls_frame = ctk.CTkFrame(self)
@@ -110,12 +98,6 @@ class ResendRejectedWgTab(BaseAutomationTab):
         if running:
              self.panchayat_menu.configure(state="disabled")
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "This will clear all inputs and results."):
             self.panchayat_var.set("")
             self.process_all_var.set(False)
@@ -143,12 +125,6 @@ class ResendRejectedWgTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Running Resend Rejected WG...")
         self.log_info("🚀 Starting Rejected Wagelist Automation...")
@@ -184,7 +160,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
 
             total_panchayats = len(panchayats_to_process)
             for i, location_panchayat in enumerate(panchayats_to_process):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log_warning("⏹️ Automation stopped by user.")
                     break
                 
@@ -212,7 +188,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
                     elif 'skip' in st:
                         skip_count += 1
 
-            stopped = self.app.stop_events[self.automation_key].is_set()
+            stopped = self.is_stopped()
             final_msg = "Process stopped by user." if stopped else "✅ Automation complete."
             self.app.after(0, self.update_status, final_msg, 1.0)
             self.app.after(0, self.set_ui_state, False)
@@ -223,12 +199,6 @@ class ResendRejectedWgTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _process_single_panchayat(self, driver, wait, location_panchayat):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         try:
             html_element = driver.find_element(By.TAG_NAME, 'html')
             panchayat_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanch"))))
@@ -278,4 +248,4 @@ class ResendRejectedWgTab(BaseAutomationTab):
     def _log_result(self, panchayat, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")
         values = (timestamp, panchayat, status, details)
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=values))
+        self.safe_tree_insert(values)

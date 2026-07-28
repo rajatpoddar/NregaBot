@@ -19,6 +19,8 @@ from src import config
 from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from ._imports import *  # noqa: F403,F401
 PROFILES_FILE = os.path.join(os.path.dirname(__file__), "..", "assets", "material_profiles.json")
 MAX_MATERIAL_ROWS = 15
 DEFAULT_MATERIAL_ROWS = 2
@@ -77,16 +79,6 @@ class MaterialEntryTab(BaseAutomationTab):
         self.profile_var.set(name)
         messagebox.showinfo("Saved", f"Profile '{name}' saved successfully.", parent=self)
     def _load_selected_profile(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium.common.exceptions import ElementNotInteractableException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
         name = self.profile_var.get()
         if not name or name not in self._profiles:
             messagebox.showwarning("No Profile", "Select a valid profile to load.", parent=self)
@@ -112,16 +104,6 @@ class MaterialEntryTab(BaseAutomationTab):
             self.materials_ui[i]["qty"].delete(0, "end")
             self.materials_ui[i]["gst"].set("0")
     def _delete_selected_profile(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium.common.exceptions import ElementNotInteractableException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
         name = self.profile_var.get()
         if not name or name not in self._profiles:
             messagebox.showwarning("No Profile", "Select a valid profile to delete.", parent=self)
@@ -139,16 +121,6 @@ class MaterialEntryTab(BaseAutomationTab):
     # =========================================================================
     def _create_widgets(self) -> None:
         # Outer scrollable container
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium.common.exceptions import ElementNotInteractableException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
         outer = ctk.CTkScrollableFrame(self, fg_color="transparent")
         outer.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         outer.grid_columnconfigure(0, weight=1)
@@ -310,16 +282,6 @@ class MaterialEntryTab(BaseAutomationTab):
     # DYNAMIC MATERIAL ROWS
     # =========================================================================
     def _add_material_row(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium.common.exceptions import ElementNotInteractableException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
         if len(self.materials_ui) >= MAX_MATERIAL_ROWS:
             messagebox.showwarning("Limit Reached", f"Maximum {MAX_MATERIAL_ROWS} rows allowed.", parent=self)
             return
@@ -344,16 +306,6 @@ class MaterialEntryTab(BaseAutomationTab):
         self._update_row_count_label()
         self._recalculate_totals()
     def _remove_material_row(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium.common.exceptions import ElementNotInteractableException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
         if len(self.materials_ui) <= 1:
             messagebox.showwarning("Cannot Remove", "At least one material row must remain.", parent=self)
             return
@@ -423,16 +375,6 @@ class MaterialEntryTab(BaseAutomationTab):
             return
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium.common.exceptions import ElementNotInteractableException
-        from selenium.common.exceptions import WebDriverException
-        from selenium import webdriver
         self.app.after(0, self.set_common_ui_state, True)
         self.app.clear_log(self.log_display)
         driver = self.app.get_driver()
@@ -445,7 +387,7 @@ class MaterialEntryTab(BaseAutomationTab):
         fail_count = 0
         try:
             for i, task in enumerate(inputs["tasks"]):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log_warning("⚠ Automation stopped by user.")
                     break
                 work_key = task['work_key']
@@ -649,14 +591,13 @@ class MaterialEntryTab(BaseAutomationTab):
     def _log_result(self, work_key, bill_no, status, details):
         ts = datetime.now().strftime("%H:%M:%S")
         tags = ('success',) if 'success' in status.lower() else ('failed',) if 'failed' in status.lower() else ()
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(ts, truncate_workcode(work_key), bill_no, status, details), tags=tags))
+        self.safe_tree_insert((ts, truncate_workcode(work_key), bill_no, status, details), tags)
     def reset_ui(self) -> None:
         super().reset_ui()
         self.vendor_code_entry.delete(0, "end")
         self.bill_date_entry.delete(0, "end")
         self.batch_textbox.delete("1.0", "end")
-        for item in self.results_tree.get_children():
-            self.results_tree.delete(item)
+        self.safe_tree_clear()
         for mat in self.materials_ui:
             mat["name"].delete(0, "end")
             mat["rate"].delete(0, "end")

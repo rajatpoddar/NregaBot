@@ -11,32 +11,14 @@ from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class MsrTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException, TimeoutException, NoAlertPresentException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException, TimeoutException, NoAlertPresentException
         super().__init__(parent, app_instance, automation_key="msr")
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
@@ -155,18 +137,6 @@ class MsrTab(BaseAutomationTab):
     def start_automation(self) -> None:
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic)
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         if messagebox.askokcancel("Reset Form?", "Clear all inputs, results, and logs?"):
             self.panchayat_var.set("")
             self.verify_amount_entry.delete(0, tkinter.END); self.verify_amount_entry.insert(0, "300")
@@ -178,20 +148,8 @@ class MsrTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
             
     def run_automation_logic(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
-        self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
+        self.safe_tree_clear()
         self.app.clear_log(self.log_display)
         self.log_info("Starting MSR processing...")
         self.app.after(0, self.app.set_status, "Running MSR Payment...")
@@ -226,7 +184,7 @@ class MsrTab(BaseAutomationTab):
             except TimeoutException: self.log_info("Panchayat selection not found/required (GP Login). Proceeding...")
             total = len(work_keys)
             for i, work_key in enumerate(work_keys, 1):
-                if self.app.stop_events[self.automation_key].is_set(): self.app.log_message(self.log_display, "Automation stopped by user.", "warning"); break
+                if self.is_stopped(): self.app.log_message(self.log_display, "Automation stopped by user.", "warning"); break
                 # --- MODIFICATION ---
                 status_msg = f"Processing {i}/{total}: {work_key}"
                 progress = (i / total)
@@ -235,11 +193,16 @@ class MsrTab(BaseAutomationTab):
                 # --- END MODIFICATION ---
                 self._process_single_work_code(driver, wait, work_key, verify_amount)
                 
-            if not self.app.stop_events[self.automation_key].is_set(): self.log_info("📊 Automation finished. Check the 'Results' tab for details.")
+            if not self.is_stopped(): self.log_info("📊 Automation finished. Check the 'Results' tab for details.")
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
             messagebox.showerror("MSR Error", f"An error occurred: {e}")
         finally:
+            # Count success/fail from results_tree
+            success_count = sum(1 for item in self.results_tree.get_children() if 'success' in str(self.results_tree.item(item)['values'][1]).lower())
+            fail_count = sum(1 for item in self.results_tree.get_children() if 'success' not in str(self.results_tree.item(item)['values'][1]).lower())
+            total_count = success_count + fail_count
+            self.log_info(f"📊 MSR Processing Complete: ✅ {success_count} Success, ❌ {fail_count} Failed (of {total_count} total)")
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Automation Finished.", 1.0)
             self.app.after(0, self.app.set_status, "Automation Finished")
@@ -253,18 +216,6 @@ class MsrTab(BaseAutomationTab):
         self.retry_failed_automation(self.work_key_text)
 
     def _process_single_work_code(self, driver, wait, work_key, verify_amount):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Processes a single work code for MSR payment.
         Includes robust waiting for Slow Internet (Wait for Postback).
@@ -403,22 +354,10 @@ class MsrTab(BaseAutomationTab):
         tags = ('success',) if 'success' in status.lower() else ('failed',)
         
         # Insert into table with the correct tag
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_key, status.upper(), details, timestamp), tags=tags))
+        self.safe_tree_insert((work_key, status.upper(), details, timestamp), tags)
 
     # --- NEW: Central Export Function ---
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         export_format = self.export_format_menu.get()
         location_panchayat = self.panchayat_var.get().strip()
 
@@ -441,18 +380,6 @@ class MsrTab(BaseAutomationTab):
             self._handle_pdf_export(data, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         all_items = self.results_tree.get_children()
         if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
         location_panchayat = self.panchayat_var.get().strip()
@@ -482,18 +409,6 @@ class MsrTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Handles the generation of the improved PDF report for MSR."""
         try:
             headers = self.results_tree['columns']

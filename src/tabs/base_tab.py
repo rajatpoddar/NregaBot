@@ -15,7 +15,9 @@ logger = get_logger()
 
 # Module-level imports for selenium and openpyxl (P4: moved from lazy imports in method bodies)
 from selenium.common.exceptions import NoSuchWindowException, WebDriverException
-from selenium.webdriver.support.ui import Select
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select, WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 
 # A2: Import extracted components from their own modules
@@ -926,8 +928,55 @@ class BaseAutomationTab(ctk.CTkFrame):
             messagebox.showerror("Extraction Error", f"An error occurred during extraction: {e}", parent=self)
 
     # ────────────────────────────────────────────────────────────────
-    # CASE-INSENSITIVE DROPDOWN SELECTION HELPER
+    # DROPDOWN SELECTION HELPERS (P6.2, P6.3)
     # ────────────────────────────────────────────────────────────────
+
+    def select_dropdown(self, driver: Any, element_id: str, value: str,
+                        by: Any = None, timeout: int = 15,
+                        case_insensitive: bool = True) -> Any:
+        """
+        Wait for dropdown, select by visible text (case-insensitive by default).
+
+        Before:
+            self._select_by_text_case_insensitive(
+                Select(wait.until(EC.element_to_be_clickable((By.ID, STATE_ID)))),
+                inputs['state'])
+
+        After:
+            self.select_dropdown(driver, STATE_ID, inputs['state'])
+
+        Args:
+            driver: WebDriver instance
+            element_id: ID attribute of the select element
+            value: Visible text to select
+            by: Selector strategy (default By.ID)
+            timeout: WebDriverWait timeout in seconds
+            case_insensitive: If True, use case-insensitive matching (default True)
+
+        Returns:
+            The Select element, or None if not found
+        """
+        if by is None:
+            by = By.ID
+        wait = WebDriverWait(driver, timeout)
+        select = Select(wait.until(EC.element_to_be_clickable((by, element_id))))
+        if case_insensitive:
+            self._select_by_text_case_insensitive(select, value)
+        else:
+            select.select_by_visible_text(value)
+        return select
+
+    def _find(self, driver: Any, by: Any, selector: str) -> Any:
+        """Shorthand for driver.find_element(by, selector).
+
+        Before:
+            self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
+
+        After:
+            self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
+        """
+        return driver.find_element(by, selector)
+
     @staticmethod
     def _select_by_text_case_insensitive(select_element: Any, target_text: str) -> bool:
         """
@@ -1014,6 +1063,58 @@ class BaseAutomationTab(ctk.CTkFrame):
     def log_info(self, msg: str) -> None:
         """Log an info message with ℹ️ prefix."""
         self.app.log_message(self.log_display, f"ℹ️ {msg}", "info")
+
+    # ────────────────────────────────────────────────────────────────
+    # STOP EVENT HELPER (P6.1)
+    # ────────────────────────────────────────────────────────────────
+
+    def is_stopped(self) -> bool:
+        """Check if the stop event has been set for this automation.
+
+        Before (55 chars):
+            if self.app.stop_events[self.automation_key].is_set():
+
+        After (18 chars):
+            if self.is_stopped():
+        """
+        return self.app.stop_events[self.automation_key].is_set()
+
+    # ────────────────────────────────────────────────────────────────
+    # STANDARDIZED TREE HELPERS (P5.2, P5.3)
+    # ────────────────────────────────────────────────────────────────
+
+    def safe_tree_insert(self, values: tuple, tags: tuple = ()) -> None:
+        """Thread-safe results_tree insert. Called from background threads.
+
+        Before:
+            self.app.after(0, lambda: self.results_tree.insert("", "end",
+                values=(work_code, status, details, timestamp), tags=tags))
+
+        After:
+            self.safe_tree_insert((work_code, status, details, timestamp), tags)
+        """
+        if not self._is_alive():
+            return
+        if not hasattr(self, 'results_tree') or self.results_tree is None:
+            return
+        self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
+
+    def safe_tree_clear(self) -> None:
+        """Thread-safe results_tree clear. Called from background threads.
+
+        Before:
+            for item in self.results_tree.get_children():
+                self.results_tree.delete(item)
+
+        After:
+            self.safe_tree_clear()
+        """
+        if not self._is_alive():
+            return
+        if not hasattr(self, 'results_tree') or self.results_tree is None:
+            return
+        self.app.after(0, lambda: [self.results_tree.delete(item)
+                                     for item in self.results_tree.get_children()])
 
     def _apply_appearance_mode(self, theme_color_tuple: Any) -> str:
         if isinstance(theme_color_tuple, (tuple, list)):

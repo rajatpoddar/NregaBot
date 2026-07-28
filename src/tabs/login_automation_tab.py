@@ -9,15 +9,12 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 class LoginAutomationTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.support.ui import Select
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import StaleElementReferenceException
         super().__init__(parent, app_instance, "login_automation")
         
         # --- Main Layout ---
@@ -170,17 +167,6 @@ class LoginAutomationTab(BaseAutomationTab):
         t.start()
 
     def run_login_automation(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
 
         fin_year = self.current_financial_year
 
@@ -238,17 +224,6 @@ class LoginAutomationTab(BaseAutomationTab):
             messagebox.showerror("Automation Error", f"Error: {str(e)}")
 
     def _safe_select(self, wait, xpath, text, wait_for_options=False):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         for _ in range(3):
             try:
                 elem = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))

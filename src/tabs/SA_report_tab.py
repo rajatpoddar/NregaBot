@@ -12,23 +12,15 @@ from .base_tab import BaseAutomationTab
 logger = get_logger()
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class SAReportTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="social_audit_respond")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
 
         # Frame for all user input controls
         controls_frame = ctk.CTkFrame(self)
@@ -111,15 +103,8 @@ class SAReportTab(BaseAutomationTab):
         except Exception as e: logger.debug("SA: Could not set default status: %s", e)
         
         # Clear Treeview
-        for item in self.results_tree.get_children():
-            self.results_tree.delete(item)
+        self.safe_tree_clear()
     def start_automation(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         inputs = {'panchayat': self.panchayat_var.get().strip(), 'year': self.year_var.get(), 'status': self.status_var.get()}
         if not all(inputs.values()): messagebox.showwarning("Input Error", "All fields are required."); return
@@ -128,12 +113,6 @@ class SAReportTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True); self.app.clear_log(self.log_display); self.log_info("Starting SA View/Respond Issue automation...")
         try:
             driver = self.app.get_driver();
@@ -141,7 +120,7 @@ class SAReportTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20); url = "https://mnregaweb2.nic.in/netnrega/SocialAuditFindings/SA-ViewRespond-Issue.aspx"; driver.get(url)
             PANCHAYAT_ID, YEAR_ID, STATUS_ID, GET_DETAILS_BTN_ID, RESULTS_TABLE_ID, SPINNER_ID = ("ContentPlaceHolder1_ddlPanchayat", "ContentPlaceHolder1_ddlAuditConduct", "ContentPlaceHolder1_ddlStatus", "ContentPlaceHolder1_btnFilterData", "ContentPlaceHolder1_grd_IssueDetails", "ContentPlaceHolder1_UpdateProgress1")
 
-            self.log_info(f"Selecting Panchayat: {inputs['panchayat']}"); self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, PANCHAYAT_ID)))), inputs['panchayat']); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
+            self.log_info(f"Selecting Panchayat: {inputs['panchayat']}"); self.select_dropdown(driver, PANCHAYAT_ID, inputs['panchayat']); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
             self.log_info(f"Selecting Year: {inputs['year']}"); Select(wait.until(EC.element_to_be_clickable((By.ID, YEAR_ID)))).select_by_visible_text(inputs['year']); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
             self.log_info(f"Selecting Status: {inputs['status']}"); Select(wait.until(EC.element_to_be_clickable((By.ID, STATUS_ID)))).select_by_visible_text(inputs['status'])
             self.log_info("Fetching details...");
@@ -154,7 +133,7 @@ class SAReportTab(BaseAutomationTab):
 
             table = wait.until(EC.presence_of_element_located((By.ID, RESULTS_TABLE_ID))); total_rows = len(table.find_elements(By.XPATH, ".//tr[position()>1]")); self.log_info(f"Found {total_rows} records.")
             for i in range(total_rows):
-                if self.app.stop_events[self.automation_key].is_set(): self.log_warning("Stop signal received."); break
+                if self.is_stopped(): self.log_warning("Stop signal received."); break
                 
                 # --- UPDATE: Better Status ---
                 status_msg = f"Processing row {i+1}/{total_rows}"
@@ -189,7 +168,7 @@ class SAReportTab(BaseAutomationTab):
                         issue_count += 1
             
             self.app.after(0, self.set_ui_state, False); self.app.after(0, self.update_status, "Automation Finished", 1.0); self.app.after(0, self.app.set_status, "Automation Finished")
-            if not self.app.stop_events[self.automation_key].is_set():
+            if not self.is_stopped():
                 total_issues = issue_count + closed_count
                 self.app.after(100, lambda: self.app.log_message(self.log_display, f"\n{'='*50}\n📊 Social Audit Summary: {total_issues} issues found (⏳ {issue_count} pending, ✅ {closed_count} closed)\n{'='*50}"))
             
@@ -198,12 +177,6 @@ class SAReportTab(BaseAutomationTab):
             self.app.after(5000, lambda: self.update_status("Ready", 0.0))
 
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "There are no results to export.")
             return
@@ -274,12 +247,6 @@ class SAReportTab(BaseAutomationTab):
                 messagebox.showinfo("Success", f"PDF report saved successfully to:\n{file_path}")
         
     def generate_report_pdf(self, data, headers, col_widths, title, date_str, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         """
         Overrides base method to use Unicode font, add footer, adjust formatting, 
         and correctly handle row wrapping and page breaks.

@@ -13,29 +13,17 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 class AbpsVerifyTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="abps_verify")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
 
         # --- Controls Frame ---
         controls_frame = ctk.CTkFrame(self)
@@ -118,12 +106,6 @@ class AbpsVerifyTab(BaseAutomationTab):
     def set_ui_state(self, running: bool):
         if not self._is_alive():
             return
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         self.panchayat_menu.configure(state=state)
@@ -138,32 +120,19 @@ class AbpsVerifyTab(BaseAutomationTab):
             return
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(panchayat, village))
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self.panchayat_var.set("")
             self.village_var.set("")
-            for item in self.results_tree.get_children():
-                self.results_tree.delete(item)
+            self.safe_tree_clear()
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
             self.log_info("Form has been reset.")
             self.app.after(0, self.app.set_status, "Ready")
 
     def run_automation_logic(self, panchayat, village):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
-        self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
+        self.safe_tree_clear()
         self.log_info("Starting ABPS Verification...")
         self.app.after(0, self.app.set_status, "Running ABPS Verification...")
 
@@ -218,7 +187,7 @@ class AbpsVerifyTab(BaseAutomationTab):
 
             # --- VILLAGE LOOP ---
             for i, current_village in enumerate(villages_to_process):
-                if self.app.stop_events[self.automation_key].is_set(): break
+                if self.is_stopped(): break
                 self.log_info(f"--- Processing Village {i+1}/{len(villages_to_process)}: {current_village} ---")
                 try:
                     self._select_by_text_case_insensitive(Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, village_css)))), current_village)
@@ -233,11 +202,11 @@ class AbpsVerifyTab(BaseAutomationTab):
 
                     page_number = 1
                     while True:
-                        if self.app.stop_events[self.automation_key].is_set(): break
+                        if self.is_stopped(): break
                         self.log_info(f"Scanning page {page_number}...")                        
                         page_processed_count = 0
                         while True:
-                            if self.app.stop_events[self.automation_key].is_set(): break
+                            if self.is_stopped(): break
 
                             unprocessed_rows_xpath = f"//table[contains(@id, 'gvData')]/tbody/tr[position()>1 and .//input[contains(@id, 'btn_showuid')]]"
                             potential_rows = driver.find_elements(By.XPATH, unprocessed_rows_xpath)
@@ -296,7 +265,7 @@ class AbpsVerifyTab(BaseAutomationTab):
                                     session_processed_jobcards.add(unique_key)
                                     page_processed_count += 1
                         
-                        if self.app.stop_events[self.automation_key].is_set(): break
+                        if self.is_stopped(): break
                         
                         if page_processed_count > 0:
                             self.log_info("Saving all verified records for this page...")                            
@@ -347,7 +316,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         
         log_level = 'success' if tags == ('success',) else 'error' if tags == ('failed',) else 'info'
         self.log_info(f"📋 {job_card} ({app_name}): {status}", level=log_level)
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(job_card, app_name, status, timestamp), tags=tags))
+        self.safe_tree_insert((job_card, app_name, status, timestamp), tags)
 
     def _show_abps_summary(self):
         """Show professional summary after ABPS verification finishes."""
@@ -362,12 +331,6 @@ class AbpsVerifyTab(BaseAutomationTab):
         if total > 0:
             self.log_info(f"📊 ABPS Verification Complete: {summary}")
     def export_to_pdf(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         """Exports the current Treeview results to a Professional PDF using base_tab utility."""
         
         # 1. Check if there is data

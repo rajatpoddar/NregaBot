@@ -13,18 +13,10 @@ from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class WorkAllocationTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException, StaleElementReferenceException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="work_allocation")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -39,14 +31,6 @@ class WorkAllocationTab(BaseAutomationTab):
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
 
         # Frame for all user input controls
         controls_frame = ctk.CTkFrame(self)
@@ -161,14 +145,6 @@ class WorkAllocationTab(BaseAutomationTab):
         self.export_filter_menu.configure(state=state)
         if state == "normal": self._on_format_change(self.export_format_menu.get())
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         self.panchayat_var.set("")
         self.work_list_text.delete("1.0", tkinter.END)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
@@ -231,14 +207,6 @@ class WorkAllocationTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
     def start_automation(self) -> None:
         # Default start from UI (Bulk Mode or CSV Mode)
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         self.app.clear_log(self.log_display)
 
@@ -278,14 +246,6 @@ class WorkAllocationTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def _wait_for_settle(self, driver, long_wait, action_name=""):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         """
         Waits for the 'Please Wait...' overlay to disappear.
         Handles cases where the overlay is very fast or doesn't appear at all.
@@ -308,14 +268,6 @@ class WorkAllocationTab(BaseAutomationTab):
         time.sleep(0.5)
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Starting Work Allocation...")
         self.log_info("Starting Work Allocation automation...")
@@ -366,7 +318,7 @@ class WorkAllocationTab(BaseAutomationTab):
             
             total_items = len(work_keys)
             for i, work_key in enumerate(work_keys):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log_warning("Stop signal received.")
                     break
                 
@@ -389,7 +341,7 @@ class WorkAllocationTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Error")
         finally:
             self.app.after(0, self.set_ui_state, False)
-            final_status = "Automation Stopped" if self.app.stop_events[self.automation_key].is_set() else ("Finished with Errors" if self.has_failures else "Automation Finished")
+            final_status = "Automation Stopped" if self.is_stopped() else ("Finished with Errors" if self.has_failures else "Automation Finished")
             self.app.after(0, self.app.set_status, final_status)
             self.app.after(0, self.update_status, final_status, 1.0)
             
@@ -398,14 +350,6 @@ class WorkAllocationTab(BaseAutomationTab):
                 self.app.after(100, lambda: getattr(messagebox, f"show{kind}")("Complete", f"{final_status}. Check results."))
 
     def _process_single_work_key(self, driver, wait, work_key, target_applicants=None, save_wait=None): 
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         """
         Processing logic. Updated to skip saving if no labourers are found in granular mode.
         """
@@ -487,7 +431,6 @@ class WorkAllocationTab(BaseAutomationTab):
                     # Assuming 'skipped' tag maps to yellow in base_tab.
                     self._log_result(work_key, selected_work_code_text, "Skipped", msg)
                     return 
-                # ---------------------------------------------
 
             # --- Step 6: Click Save (with 5 MIN WAIT) ---
             self.log_info("   - Clicking 'Save' (Timeout set to 5 mins)...")
@@ -524,14 +467,6 @@ class WorkAllocationTab(BaseAutomationTab):
             self._log_result(work_key, selected_work_code_text, "Failed", error_msg)
 
     def _load_demand_csv(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         """Loads the Demand CSV and groups workers by Work Code."""
         file_path = filedialog.askopenfilename(
             title="Select Demand CSV",
@@ -592,9 +527,8 @@ class WorkAllocationTab(BaseAutomationTab):
         elif 'failed' in status.lower() or 'error' in status.lower() or 'timeout' in status.lower():
             self.has_failures = True
             tags = ('failed',)
-        # --------------------------
         
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
+        self.safe_tree_insert(values, tags)
     def retry_logic_handler(self) -> None:
         """
         Custom Retry Logic for Work Allocation.
@@ -644,14 +578,6 @@ class WorkAllocationTab(BaseAutomationTab):
         self.start_automation()
 
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         export_format = self.export_format_menu.get()
         panchayat_name = self.panchayat_var.get().strip()
 
@@ -673,14 +599,6 @@ class WorkAllocationTab(BaseAutomationTab):
             self._handle_pdf_export(data, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         all_items = self.results_tree.get_children()
         if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
         
@@ -705,14 +623,6 @@ class WorkAllocationTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         try:
             headers = self.results_tree['columns']
             col_widths = [40, 70, 40, 70, 40] # Adjusted widths

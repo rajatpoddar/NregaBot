@@ -9,19 +9,12 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 class SarkarAapkeDwarTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        import openpyxl
         super().__init__(parent, app_instance, automation_key="sad_auto")
         self.config_file = self.app.get_data_path("sad_inputs.json")
         
@@ -34,18 +27,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         # --- Configuration Frame ---
         controls_frame = ctk.CTkFrame(self)
@@ -265,18 +246,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.scheme_remarks_entry.configure(state=state)
 
     def browse_file(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         file_path = filedialog.askopenfilename(filetypes=[("Excel/CSV Files", "*.csv *.xlsx"), ("Excel Files", "*.xlsx")])
         if file_path:
             self.file_path_entry.delete(0, tkinter.END)
@@ -284,18 +253,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             self._update_remarks_state(True) # Disable UI remarks
 
     def clear_file_selection(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.file_path_entry.delete(0, tkinter.END)
         self._update_remarks_state(False) # Enable UI remarks
 
@@ -315,18 +272,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             except Exception as e:
                 messagebox.showerror("Error", f"Could not save file: {e}")
     def start_automation(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         inputs = {
             'file_path': self.file_path_entry.get().strip(),
             'app_remarks': self.app_remarks_entry.get().strip(),
@@ -348,24 +293,11 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.success_count = 0
         self.fail_count = 0
         self.summary_label.configure(text="Success: 0 | Failed: 0")
-        for item in self.results_tree.get_children():
-            self.results_tree.delete(item)
+        self.safe_tree_clear()
             
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def _read_file_data(self, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """Reads data from CSV (robust) or Excel."""
         data = []
         if file_path.lower().endswith(".xlsx"):
@@ -394,18 +326,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             raise Exception("Failed to read CSV.")
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.tab_view.set("Results")
@@ -432,18 +352,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             self.app.after(0, self.progress_bar.set, 0)
 
     def _run_bulk_mode(self, driver, wait, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         try:
             data = self._read_file_data(inputs['file_path'])
         except Exception as e:
@@ -456,7 +364,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         
         self.log_info(f"Loaded {total} records.")
         for i, row in enumerate(data):
-            if self.app.stop_events[self.automation_key].is_set(): break
+            if self.is_stopped(): break
             
             applicant_name = row.get("Applicant Name", "").strip()
             status_msg = f"Processing {i+1}/{total}: {applicant_name}"
@@ -467,7 +375,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
 
             row_scheme_remark = row.get("Scheme Remarks", "").strip()
             final_scheme_remark = row_scheme_remark if row_scheme_remark else inputs['scheme_remarks']
-            # ---------------------------------------------
             
             self.app.after(0, self.app.set_status, status_msg)
             self.app.after(0, self.progress_bar.set, (i+1)/total)
@@ -534,7 +441,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
 
                 # 3. Submit & Extract Ack No
                 try:
-                    driver.find_element(By.XPATH, "//button[contains(., 'Add Service')]").click()
+                    self._find(driver, By.XPATH, "//button[contains(., 'Add Service')]").click()
                     time.sleep(1.0)  # Short wait after click
                     wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Create Application')]"))).click()
                     
@@ -566,7 +473,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         self.log_warning(f"Popup Error: {e}")
                     # Reset form for next entry
                     try:
-                        driver.find_element(By.XPATH, "//button[contains(., 'Reset')]").click()
+                        self._find(driver, By.XPATH, "//button[contains(., 'Reset')]").click()
                         time.sleep(1.0)  # Short wait after click
                     except: driver.refresh(); time.sleep(2)
 
@@ -579,22 +486,10 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                 driver.refresh(); time.sleep(3)
 
     def _run_monitor_mode(self, driver, wait, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.log_info("Monitor Mode Active. Waiting for form...")
         last_log_time = 0
 
-        while not self.app.stop_events[self.automation_key].is_set():
+        while not self.is_stopped():
             try:
                 curr_url = driver.current_url
                 if "application/create" not in curr_url and "application/createBackLog" not in curr_url:
@@ -649,7 +544,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         if inputs['scheme_remarks']: self._safe_send_keys(driver, "schemeRemarks", inputs['scheme_remarks'])
                         
                         try:
-                            driver.find_element(By.XPATH, "//button[contains(., 'Add Service')]").click()
+                            self._find(driver, By.XPATH, "//button[contains(., 'Add Service')]").click()
                             # Monitor mode just fills service, it doesn't submit final app,                            # so we don't get Ack No. here.
                             self._log_result(app_name, inputs['scheme_remarks'], "Success", "Service Added")
                         except Exception as e:
@@ -664,18 +559,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             except Exception: time.sleep(1)
 
     def _safe_send_keys(self, driver, element_name, value):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         if not value: return
         try:
             elem = driver.find_element(By.NAME, element_name)
@@ -683,18 +566,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         except Exception as e:
             logger.debug("SAD: _safe_send_keys failed for %s: %s", element_name, e)
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.file_path_entry.delete(0, tkinter.END)
         self.app_remarks_entry.delete(0, tkinter.END)
         self.scheme_type_var.set("Service Focus Area")
@@ -714,18 +585,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             logger.warning("SAD: Failed to save inputs: %s", e)
 
     def load_inputs(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r') as f:
@@ -747,35 +606,11 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             logger.warning("SAD: Failed to load inputs: %s", e)
 
     def clear_file_selection(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.file_path_entry.delete(0, tkinter.END)
         self._update_remarks_state(False) # Enable UI remarks
 
     # --- Export Logic ---
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         export_format = self.export_format_menu.get()
         if "CSV" in export_format:
             self.export_treeview_to_csv(self.results_tree, "sad_entry_results.csv")
@@ -793,18 +628,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "No results to export.")
             return None, None
@@ -841,18 +664,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
 
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         title = f"Sarkar Aapke Dwar Report"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)

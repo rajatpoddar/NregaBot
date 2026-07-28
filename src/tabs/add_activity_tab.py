@@ -10,38 +10,17 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 class AddActivityTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import NoSuchElementException, TimeoutException, UnexpectedAlertPresentException, StaleElementReferenceException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import NoSuchElementException, TimeoutException, UnexpectedAlertPresentException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="add_activity")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         # Frame for controls and action buttons
         top_frame = ctk.CTkFrame(self)
@@ -144,19 +123,6 @@ class AddActivityTab(BaseAutomationTab):
         # Pass the inputs to the automation logic
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(work_keys, unit_price, quantity))
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self.work_keys_text.configure(state="normal")
             self.work_keys_text.delete("1.0", tkinter.END)
@@ -167,30 +133,16 @@ class AddActivityTab(BaseAutomationTab):
             self.quantity_entry.delete(0, tkinter.END)
             self.quantity_entry.insert(0, defaults['quantity'])
             
-            for item in self.results_tree.get_children():
-                self.results_tree.delete(item)
+            self.safe_tree_clear()
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
             self.log_info("Form has been reset.")
             self.app.after(0, self.app.set_status, "Ready")
 
     def run_automation_logic(self, work_keys, unit_price, quantity):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
-        self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
+        self.safe_tree_clear()
         self.log_info("Starting 'Add Activity' automation...")
         self.app.after(0, self.app.set_status, "Running Add Activity...")
 
@@ -201,7 +153,7 @@ class AddActivityTab(BaseAutomationTab):
 
             total = len(work_keys)
             for i, work_key in enumerate(work_keys):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log_warning("Automation stopped.")
                     break
                 self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {work_key}", (i+1) / total)
@@ -225,7 +177,7 @@ class AddActivityTab(BaseAutomationTab):
             tags = ('success',)
         elif 'fail' in status_lower or 'error' in status_lower:
             tags = ('failed',)
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_key, status, details, timestamp), tags=tags))
+        self.safe_tree_insert((work_key, status, details, timestamp), tags)
 
     def _show_add_activity_summary(self, work_keys):
         """Show professional summary after automation finishes.
@@ -246,19 +198,6 @@ class AddActivityTab(BaseAutomationTab):
         self.retry_failed_automation(self.work_keys_text)
 
     def _process_single_work_key(self, driver, work_key, unit_price, quantity):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Processes a single work key.
         OPTIMIZED: Uses Staleness Check to ensure page refresh before selecting Work Code.

@@ -15,22 +15,12 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 class EKycReportTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         super().__init__(parent, app_instance, "ekyc_report")
         
         if self.automation_key not in self.app.stop_events:
@@ -42,17 +32,6 @@ class EKycReportTab(BaseAutomationTab):
         self.load_inputs()
 
     def _setup_ui(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         # --- 1. Input Section ---
         input_frame = ctk.CTkFrame(self)
@@ -230,17 +209,6 @@ class EKycReportTab(BaseAutomationTab):
         self.stats_text.configure(text="\n".join(lines))
 
     def run_process(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         try:
             panchayat_target = self.panchayat_var.get().strip()
             village_target = self.village_var.get().strip()
@@ -290,7 +258,7 @@ class EKycReportTab(BaseAutomationTab):
             total_panchayats = len(panchayats_to_process)
             
             for p_idx, p_name in enumerate(panchayats_to_process, 1):
-                if self.app.stop_events[self.automation_key].is_set(): break
+                if self.is_stopped(): break
                 
                 self.update_status(f"Processing Panchayat {p_idx}/{total_panchayats}: {p_name}")
                 self.log_info(f"{'='*50}\nSelecting Panchayat: {p_name}\n{'='*50}")
@@ -353,7 +321,7 @@ class EKycReportTab(BaseAutomationTab):
                 total_villages = len(villages_to_process)
                 
                 for v_idx, v_name in enumerate(villages_to_process, 1):
-                    if self.app.stop_events[self.automation_key].is_set(): break
+                    if self.is_stopped(): break
                     
                     self.update_status(f"[{p_name}] Village {v_idx}/{total_villages}: {v_name}")
                     self.log_info(f"  Selecting Village: {v_name}")                    
@@ -393,21 +361,15 @@ class EKycReportTab(BaseAutomationTab):
         except Exception as e:
             self.app.after(0, self.handle_error, e)
         finally:
+            # Log completion summary
+            total = len(self.all_scraped_data)
+            done = sum(1 for r in self.all_scraped_data if 'yes' in r['ekyc'].lower()) if self.all_scraped_data else 0
+            pending = total - done
+            self.log_info(f"📊 eKYC Scan Complete: 📝 {total} records, ✅ {done} eKYC done, ❌ {pending} pending")
             self.app.after(0, self.set_common_ui_state, False)
             self.app.after(0, self._safe_update_status, "Ready")
 
     def scrape_current_table(self, driver, location_panchayat, location_village):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         current_page_num = 1
         
         # Reset to Page 1
@@ -423,7 +385,7 @@ class EKycReportTab(BaseAutomationTab):
             logger.debug("Failed to wait for table staleness: %s", e)
 
         while True:
-            if self.app.stop_events[self.automation_key].is_set(): return
+            if self.is_stopped(): return
 
             if "No Record Found" in driver.page_source:
                 self.log_warning(f"No records in {location_village}.")
@@ -449,7 +411,6 @@ class EKycReportTab(BaseAutomationTab):
                         # --- FIX: GARBAGE/PAGINATION ROW FILTER ---
                         # "1", "2" jaise page numbers ko filter karne ke liye length check
                         if len(jc) < 5: continue 
-                        # ------------------------------------------
 
                         name = cols[3].text.strip()
                         abps = cols[-2].text.strip()
@@ -464,7 +425,6 @@ class EKycReportTab(BaseAutomationTab):
                         
                         if unique_key in self.scraped_keys: continue
                         self.scraped_keys.add(unique_key)
-                        # -----------------------
 
                         record = {
                             "panchayat": location_panchayat,
@@ -519,17 +479,6 @@ class EKycReportTab(BaseAutomationTab):
         for r in self.all_scraped_data: self.check_and_insert_to_tree(r)
 
     def export_professional_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         if not self.all_scraped_data: return
 
         # --- 1. Stats Calculation (per-Panchayat) ---

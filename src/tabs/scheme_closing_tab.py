@@ -16,13 +16,10 @@ from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class SchemeClosingTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException
         super().__init__(parent, app_instance, automation_key="scheme_closing")
         
         self.grid_columnconfigure(0, weight=1)
@@ -33,14 +30,6 @@ class SchemeClosingTab(BaseAutomationTab):
         self._create_widgets()
         self._load_saved_inputs()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
 
         main_container = ctk.CTkFrame(self, fg_color="transparent")
         main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
@@ -120,7 +109,6 @@ class SchemeClosingTab(BaseAutomationTab):
             offvalue=False
         )
         self.skip_confirm_checkbox.pack(side="left", padx=(20, 0))
-        # ----------------------------------------------------
 
         # Action Buttons (Row 1 of Main Container)
         action_frame = self._create_action_buttons(main_container)
@@ -244,14 +232,6 @@ class SchemeClosingTab(BaseAutomationTab):
             self.completion_date_entry.delete(0, "end")
             self.completion_date_entry.insert(0, date_val)
     def start_automation(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         inputs = self._get_inputs()
         
         required_fields = ["panchayat", "work_category", "area", "measured_by", "measured_name", "cert_no_start", "completion_date", "work_codes"]
@@ -275,14 +255,6 @@ class SchemeClosingTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
@@ -304,7 +276,7 @@ class SchemeClosingTab(BaseAutomationTab):
 
             total_codes = len(inputs["work_codes"])
             for i, work_code in enumerate(inputs["work_codes"]):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log_warning("⏹️ Automation stopped by user.")
                     break
                 
@@ -338,17 +310,9 @@ class SchemeClosingTab(BaseAutomationTab):
     def _log_result(self, work_code, status, details):
         timestamp = time.strftime("%H:%M:%S")
         tags = ('failed',) if 'success' not in status.lower() else ()
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, truncate_workcode(work_code), status, details), tags=tags))
+        self.safe_tree_insert((timestamp, truncate_workcode(work_code), status, details), tags)
 
     def _process_single_work_code(self, driver, inputs, work_code, cert_no):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         wait = WebDriverWait(driver, 20)
         long_wait = WebDriverWait(driver, 35)
         url = "https://nregade4.dord.gov.in/netnrega/compwork.aspx"
@@ -398,8 +362,8 @@ class SchemeClosingTab(BaseAutomationTab):
             long_wait.until(EC.presence_of_element_located((By.XPATH, f"//select[@id='ctl00_ContentPlaceHolder1_Ddlmeasured']/option[text()='{inputs['measured_name']}']")))
             Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_Ddlmeasured")).select_by_visible_text(inputs["measured_name"])
             
-            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_txtccNo").send_keys(str(cert_no))
-            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_txtcc_dt").send_keys(inputs["completion_date"])
+            self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_txtccNo").send_keys(str(cert_no))
+            self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_txtcc_dt").send_keys(inputs["completion_date"])
 
             # --- NEW: Check for the optional 'Excavation(cum)' field and fill it if empty ---
             try:
@@ -429,7 +393,7 @@ class SchemeClosingTab(BaseAutomationTab):
                 if not messagebox.askyesno("Confirm Scheme Closing", confirm_text):
                     return "Cancelled", "User cancelled the operation."
 
-            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
+            self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
             
             try:
                 alert_wait = WebDriverWait(driver, 5)
@@ -463,14 +427,6 @@ class SchemeClosingTab(BaseAutomationTab):
             self.log_error(f"   - An unexpected error occurred: {error_message}")
             return "Failed", f"An unexpected error occurred: {error_message}"
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure? This will clear all inputs."):
             self.panchayat_var.set("")
             self.work_category_var.set("Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers")
@@ -483,8 +439,7 @@ class SchemeClosingTab(BaseAutomationTab):
             self.completion_date_entry.delete(0, "end")
             
             self.work_codes_textbox.delete("1.0", "end")
-            for item in self.results_tree.get_children():
-                self.results_tree.delete(item)
+            self.safe_tree_clear()
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0)
             self.app.after(0, self.app.set_status, "Ready")
@@ -509,14 +464,6 @@ class SchemeClosingTab(BaseAutomationTab):
         if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         export_format = self.export_format_menu.get()
         if "CSV" in export_format:
             self.export_treeview_to_csv(self.results_tree, "scheme_closing_results.csv")
@@ -533,14 +480,6 @@ class SchemeClosingTab(BaseAutomationTab):
             self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         if not self.results_tree.get_children(): messagebox.showinfo("No Data", "No results to export."); return None, None
         location_panchayat = self.panchayat_var.get().strip()
         if not location_panchayat: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
@@ -563,14 +502,6 @@ class SchemeClosingTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         title = f"Scheme Closing Report: {self.panchayat_var.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)

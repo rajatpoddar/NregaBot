@@ -16,18 +16,10 @@ from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class PhysicalCompleteTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, NoAlertPresentException
         super().__init__(parent, app_instance, automation_key="physical_complete")
         
         self.grid_columnconfigure(0, weight=1)
@@ -40,14 +32,6 @@ class PhysicalCompleteTab(BaseAutomationTab):
         self._create_widgets()
         self._load_saved_inputs()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
 
         main_container = ctk.CTkFrame(self, fg_color="transparent")
         main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
@@ -192,14 +176,6 @@ class PhysicalCompleteTab(BaseAutomationTab):
             self.panchayat_var.set(data.get("panchayat", ""))
             self.work_category_var.set(data.get("work_category", "Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers"))
     def start_automation(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         inputs = self._get_inputs()
         if not inputs["panchayat"] or not inputs["work_category"] or not inputs["work_codes"]:
             messagebox.showwarning("Input Required", "Panchayat, Work Category, and at least one Work Code are required.")
@@ -210,14 +186,6 @@ class PhysicalCompleteTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
@@ -239,7 +207,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             success_count, fail_count = 0, 0
 
             for i, work_code in enumerate(inputs["work_codes"]):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log_warning("⏹️ Automation stopped by user.")
                     break
                 
@@ -277,17 +245,9 @@ class PhysicalCompleteTab(BaseAutomationTab):
     def _log_result(self, work_code, status, details):
         timestamp = time.strftime("%H:%M:%S")
         tags = ('failed',) if 'success' not in status.lower() else ()
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, truncate_workcode(work_code), status, details), tags=tags))
+        self.safe_tree_insert((timestamp, truncate_workcode(work_code), status, details), tags)
 
     def _process_single_work_code(self, driver, inputs, work_code):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         wait = WebDriverWait(driver, 20)
         url = config.PHYSICAL_COMPLETE_CONFIG["url"]
         
@@ -352,7 +312,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             asset_desc_input.send_keys("Completed")
             
             self.log_info("   - Saving Physical Completion...")
-            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
+            self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
             
             try:
                 alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
@@ -417,19 +377,10 @@ class PhysicalCompleteTab(BaseAutomationTab):
         else:
             messagebox.showinfo("Forwarded Successfully", f"{len(work_codes)} successful work codes 'Scheme Closing' tab mein bhej diye gaye hain.")
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure? This will clear all inputs."):
             self.panchayat_var.set("")
             self.work_codes_textbox.delete("1.0", "end")
-            for item in self.results_tree.get_children():
-                self.results_tree.delete(item)
+            self.safe_tree_clear()
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0)
             self.app.after(0, self.app.set_status, "Ready")
@@ -450,14 +401,6 @@ class PhysicalCompleteTab(BaseAutomationTab):
         if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         export_format = self.export_format_menu.get()
         if "CSV" in export_format:
             self.export_treeview_to_csv(self.results_tree, "physical_complete_results.csv")
@@ -474,14 +417,6 @@ class PhysicalCompleteTab(BaseAutomationTab):
             self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
 
     def _get_filtered_data_and_filepath(self, export_format):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         if not self.results_tree.get_children(): 
             messagebox.showinfo("No Data", "No results to export."); return None, None
         location_panchayat = self.panchayat_entry.get().strip()
@@ -508,14 +443,6 @@ class PhysicalCompleteTab(BaseAutomationTab):
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import NoAlertPresentException
-        from selenium import webdriver
         title = f"Physical Complete Report: {self.panchayat_entry.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)

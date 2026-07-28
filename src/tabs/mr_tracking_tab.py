@@ -20,24 +20,13 @@ from .base_tab import BaseAutomationTab
 from src import config  # <-- Make sure config is imported
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
+import pandas as pd
+from webdriver_manager.chrome import ChromeDriverManager
+
 class MrTrackingTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        import pandas as pd
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        import pandas as pd
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="mr_tracking")
         
         self.grid_columnconfigure(0, weight=1)
@@ -60,20 +49,6 @@ class MrTrackingTab(BaseAutomationTab):
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        import pandas as pd
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
 
         # Frame for all user input controls
         controls_frame = ctk.CTkFrame(self)
@@ -285,21 +260,6 @@ class MrTrackingTab(BaseAutomationTab):
         self._on_filter_check_changed()
 
     def reset_ui(self, reset_all_filters=True):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         if reset_all_filters:
             self.pending_only_var.set(0)
             self.abps_pending_var.set(0)
@@ -315,21 +275,6 @@ class MrTrackingTab(BaseAutomationTab):
         
 
     def start_automation(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.run_mr_payment_button.pack_forget() 
         self.run_emb_entry_button.pack_forget() 
         self.run_zero_mr_button.pack_forget() 
@@ -367,21 +312,6 @@ class MrTrackingTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.app.set_status, "Starting MR Tracking...") 
         self.app.after(0, self.update_status, "Initializing...", 0.0) 
         self.app.clear_log(self.log_display)
@@ -422,21 +352,6 @@ class MrTrackingTab(BaseAutomationTab):
                 woh event fire nahi karta. Isliye yahan select ke baad manually
                 dropdown ki option count check ki jaati hai.
                 """
-                # ---- Lazy imports ----
-                from selenium.webdriver.common.by import By
-                from selenium.webdriver.support.ui import Select, WebDriverWait
-                from selenium.webdriver.support import expected_conditions as EC
-                from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-                from selenium import webdriver
-                from selenium.webdriver.chrome.options import Options as ChromeOptions
-                from selenium.webdriver.chrome.service import Service as ChromeService
-                from webdriver_manager.chrome import ChromeDriverManager
-                import pandas as pd
-                import openpyxl
-                from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-                from openpyxl.utils import get_column_letter
-                from openpyxl.worksheet.page import PageMargins
-                from openpyxl.drawing.image import Image as XLImage
                 self.app.after(0, self.app.set_status, f"Waiting for {step_name}...")
                 self.app.after(0, self.update_status, f"Waiting for {step_name}...", progress)
                 self.log_info(f"⏳ Waiting for '{step_name}' dropdown ({dropdown_id}) to populate via postback...")
@@ -467,12 +382,12 @@ class MrTrackingTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, f"Selecting Block: {inputs['block']}")
             self.app.after(0, self.update_status, "Selecting Block...", 0.35)
             self.log_info(f"Selecting Block: {inputs['block']}")
-            self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, BLOCK_ID)))), inputs['block'])
+            self.select_dropdown(driver, BLOCK_ID, inputs['block'])
             
             self.app.after(0, self.app.set_status, f"Selecting Panchayat: {inputs['panchayat']}")
             self.app.after(0, self.update_status, "Selecting Panchayat...", 0.45)
             self.log_info(f"Selecting Panchayat: {inputs['panchayat']}")
-            self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, PANCH_ID)))), inputs['panchayat'])
+            self.select_dropdown(driver, PANCH_ID, inputs['panchayat'])
             
             self.app.after(0, self.app.set_status, "Setting filter...")
             self.app.after(0, self.update_status, "Setting filter...", 0.5)
@@ -510,7 +425,7 @@ class MrTrackingTab(BaseAutomationTab):
             abps_pending_mrs = [] 
             
             for i, row in enumerate(rows):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log_warning("Stop signal received.")
                     break
                 
@@ -573,7 +488,7 @@ class MrTrackingTab(BaseAutomationTab):
                 if is_pending_filling:
                     pending_filling_count += 1
 
-            if self.app.stop_events[self.automation_key].is_set():
+            if self.is_stopped():
                  self.log_warning("Automation stopped by user.")
                  self.success_message = None 
                  return 
@@ -595,7 +510,7 @@ class MrTrackingTab(BaseAutomationTab):
                 self.log_info(f"Found {len(wagelists_to_search)} unique wagelists to scan.")                
                 total_wl = len(wagelists_to_search)
                 for i, (wagelist_no, mr_list) in enumerate(wagelists_to_search.items()):
-                    if self.app.stop_events[self.automation_key].is_set(): break
+                    if self.is_stopped(): break
                     
                     progress = 0.8 + ( (i + 1) / total_wl ) * 0.2
                     status_msg = f"Scanning Wagelist {i+1}/{total_wl} ({wagelist_no})"
@@ -640,19 +555,19 @@ class MrTrackingTab(BaseAutomationTab):
             # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
             self.app.after(0, self.set_ui_state, False) 
             
-            final_app_status = "Automation Stopped" if self.app.stop_events[self.automation_key].is_set() else \
+            final_app_status = "Automation Stopped" if self.is_stopped() else \
                               ("Automation Finished" if hasattr(self, 'success_message') and self.success_message else "Automation Failed")
-            final_tab_status = "Stopped" if self.app.stop_events[self.automation_key].is_set() else \
+            final_tab_status = "Stopped" if self.is_stopped() else \
                               ("Finished" if hasattr(self, 'success_message') and self.success_message else "Failed")
 
             self.app.after(0, self.app.set_status, final_app_status)
             self.app.after(0, self.update_status, final_tab_status, 1.0)
 
-            if not self.app.stop_events[self.automation_key].is_set():
+            if not self.is_stopped():
                  self.app.after(5000, lambda: self.app.set_status("Ready")) 
                  self.app.after(5000, lambda: self.update_status("Ready", 0.0)) 
 
-            if hasattr(self, 'success_message') and self.success_message and not self.app.stop_events[self.automation_key].is_set():
+            if hasattr(self, 'success_message') and self.success_message and not self.is_stopped():
                 self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 MR Tracking Complete: {self.success_message}"))
                 
                 if inputs.get('zero_mr_filter', False):
@@ -662,21 +577,6 @@ class MrTrackingTab(BaseAutomationTab):
                     self.app.after(0, lambda: self.run_emb_entry_button.pack(side="left", padx=(10, 0)))
 
     def _search_wagelist_for_pending_abps(self, driver, wait, inputs, wagelist_no, mr_list, main_window_handle):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         try:
             self.log_info(f"   Opening homesearch tab for {wagelist_no}...")
             driver.execute_script("window.open(arguments[0], '_blank');", "https://mnregaweb4.nic.in/netnrega/homesearch.htm")
@@ -718,7 +618,7 @@ class MrTrackingTab(BaseAutomationTab):
             keyword_box.send_keys(wagelist_no)
             
             self.log_info("   Clicking 'GO'...")
-            driver.find_element(By.XPATH, "//input[@value='GO']").click()
+            self._find(driver, By.XPATH, "//input[@value='GO']").click()
 
             self.log_info("   Waiting for search result popup...")
             wait.until(EC.number_of_windows_to_be(3))
@@ -890,21 +790,6 @@ class MrTrackingTab(BaseAutomationTab):
         return summary
 
     def _export_pendency_excel(self, summary_data):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         if not summary_data: return
         
         # 1. Prepare Data with SL NO and Calculation
@@ -1152,21 +1037,6 @@ class MrTrackingTab(BaseAutomationTab):
             messagebox.showwarning("Empty", "There are no workcodes to copy.", parent=self)
 
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "There are no results to export.")
             return
@@ -1291,21 +1161,6 @@ class MrTrackingTab(BaseAutomationTab):
             messagebox.showinfo("Success", f"ABPS Excel report saved successfully to:\n{file_path}")
 
     def _save_to_excel(self, data, headers, full_title, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         try:
             df = pd.DataFrame(data, columns=headers)
             with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
@@ -1338,21 +1193,6 @@ class MrTrackingTab(BaseAutomationTab):
             return False
 
     def generate_report_pdf(self, data, headers, col_widths, title, date_str, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         class PDFWithFooter(FPDF):
             def footer(self):
                 self.set_y(-15) 
@@ -1437,21 +1277,6 @@ class MrTrackingTab(BaseAutomationTab):
             return False
 
     def _save_to_png(self, data, headers, title, date_str, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options as ChromeOptions
-        from selenium.webdriver.chrome.service import Service as ChromeService
-        from webdriver_manager.chrome import ChromeDriverManager
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         try:
             try:
                 font_path_regular = resource_path("assets/fonts/NotoSansDevanagari-Regular.ttf")

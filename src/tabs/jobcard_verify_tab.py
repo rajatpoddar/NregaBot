@@ -10,6 +10,8 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 def resource_path(relative_path):
@@ -19,14 +21,6 @@ def resource_path(relative_path):
 
 class JobcardVerifyTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import NoSuchElementException, TimeoutException
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import NoSuchElementException, TimeoutException
         super().__init__(parent, app_instance, automation_key="jc_verify")
         self.photo_folder_path = ""
         self.pref_file = os.path.join(os.path.abspath("."), "jc_verify_prefs.json") 
@@ -34,12 +28,6 @@ class JobcardVerifyTab(BaseAutomationTab):
         self._create_widgets()
         self._load_saved_preferences()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
 
         controls_frame = ctk.CTkFrame(self)
         controls_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
@@ -150,24 +138,12 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.village_menu.configure(state="normal")
 
     def select_photo_folder(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         path = filedialog.askdirectory(title="Select Folder Containing Photos")
         if path:
             self.photo_folder_path = path
             self.photo_path_label.configure(text=self.photo_folder_path)
             self.log_info(f"Selected photo folder: {self.photo_folder_path}")
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure?"):
             self.panchayat_var.set("")
             self.village_var.set("")
@@ -219,12 +195,6 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.app.log_message(self.log_display, f"Error finding photo for {jobcard_no}: {e}", "error"); return None
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.log_info("🚀 Starting Jobcard Verification...")
@@ -240,7 +210,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             villages_to_process = []
             self.log_info(f"Selecting Panchayat: {inputs['panchayat']}")
             html_element = driver.find_element(By.TAG_NAME, "html")
-            self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch")))), inputs['panchayat'])
+            self.select_dropdown(html_element, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch", inputs['panchayat'])
             wait.until(EC.staleness_of(html_element))
 
             if inputs['process_all']:
@@ -254,7 +224,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.app.update_history("location_panchayat", inputs['panchayat'])
 
             for location_village in villages_to_process:
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.app.log_message(self.log_display, "🛑 Stop signal received.", "warning"); break
                 
                 self.log_info(f"\n--- Processing Village: {location_village} ---")
@@ -262,7 +232,7 @@ class JobcardVerifyTab(BaseAutomationTab):
                 self.app.update_history("location_village", location_village)
                 
                 html_element = driver.find_element(By.TAG_NAME, "html")
-                self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlVillage")))), location_village)
+                self.select_dropdown(html_element, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlVillage", location_village)
                 wait.until(EC.staleness_of(html_element))
                 
                 try:
@@ -276,7 +246,7 @@ class JobcardVerifyTab(BaseAutomationTab):
 
                 # --- PAGINATION LOOP ---
                 page_count = 1
-                while not self.app.stop_events[self.automation_key].is_set():
+                while not self.is_stopped():
                     self.log_info(f"   > Processing Page {page_count}")                    
                     self._process_jobcards_for_current_page(driver, wait, inputs['verify_account_only'])
                     
@@ -288,7 +258,7 @@ class JobcardVerifyTab(BaseAutomationTab):
                     page_count += 1
                     time.sleep(2)
 
-            if not self.app.stop_events[self.automation_key].is_set():
+            if not self.is_stopped():
                 self.log_info(f"{'='*50}")
 
             self.log_info("📊 Jobcard verification complete for all selected villages.")
@@ -303,14 +273,8 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
     
     def _process_jobcards_for_current_page(self, driver, wait, verify_account_only):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         row_index = 2 
-        while not self.app.stop_events[self.automation_key].is_set():
+        while not self.is_stopped():
             row_id_base = f"ctl00_ContentPlaceHolder1_grdData_ctl{row_index:02d}"
             
             # FAST FAIL: Check if row exists without waiting 20s
@@ -393,12 +357,6 @@ class JobcardVerifyTab(BaseAutomationTab):
                 row_index += 1
 
     def _handle_pagination(self, driver, wait, current_page_num):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
         """Attempts to find and click the next page button using Link Text (Numbers) or '...'"""
         try:
             # IMPORTANT: Disable implicit wait for this check so we don't wait 20s if page not found

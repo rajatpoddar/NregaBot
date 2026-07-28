@@ -37,6 +37,8 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 class MbEntryTab(BaseAutomationTab):
@@ -69,15 +71,6 @@ class MbEntryTab(BaseAutomationTab):
         self._create_widgets(); self._load_inputs()
         self._toggle_mb_no_entry() 
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         """Creates and places all UI elements for this tab."""
         
         # --- Top Frame for Configuration ---
@@ -297,15 +290,6 @@ class MbEntryTab(BaseAutomationTab):
         else:
             self.mb_no_entry.configure(state="disabled")
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self._load_inputs()
             self.config_vars['location_panchayat'].set("") 
@@ -398,7 +382,7 @@ class MbEntryTab(BaseAutomationTab):
     def run_automation_logic(self, cfg, work_codes_raw):
         self.app.after(0, self.set_ui_state, True) 
         self.app.clear_log(self.log_display) 
-        self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
+        self.safe_tree_clear()
         self.log_info("Starting eMB Entry automation...")
         self.app.after(0, self.app.set_status, "Running eMB Entry...") 
         
@@ -411,7 +395,7 @@ class MbEntryTab(BaseAutomationTab):
                 messagebox.showerror("Input Error", "Please provide at least one Mate Name.")
                 return
 
-            if not self.app.stop_events[self.automation_key].is_set():
+            if not self.is_stopped():
                 self.app.update_history("location_panchayat", cfg['location_panchayat'])
                 mate_key = self._get_current_mate_key()
                 for mate in mate_names_list: self.app.update_history(mate_key, mate)
@@ -419,9 +403,9 @@ class MbEntryTab(BaseAutomationTab):
             # If no work codes entered by user, process all works from dropdown
             if not work_codes_raw:
                 self._process_all_works_from_dropdown(driver, cfg, mate_names_list)
-                final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
+                final_msg = "Automation finished." if not self.is_stopped() else "Stopped."
                 self.app.after(0, self.update_status, final_msg, 1.0)
-                if not self.app.stop_events[self.automation_key].is_set():
+                if not self.is_stopped():
                     self.log_info("📊 e-MB Entry process has finished.")
                     return
 
@@ -430,7 +414,7 @@ class MbEntryTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, f"Starting eMB Entry for {total} workcodes...")
 
             for i, work_code in enumerate(work_codes_raw):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.app.log_message(self.log_display, "Automation stopped.", "warning"); break
                 
                 self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {work_code}", (i+1) / total)
@@ -442,15 +426,27 @@ class MbEntryTab(BaseAutomationTab):
                 self._process_single_work_code(driver, work_code, cfg, mate_names_list)
                 processed_codes.add(work_code)
 
-            final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
+            final_msg = "Automation finished." if not self.is_stopped() else "Stopped."
             self.app.after(0, self.update_status, final_msg, 1.0)
-            if not self.app.stop_events[self.automation_key].is_set(): 
+            if not self.is_stopped(): 
                 messagebox.showinfo("Complete", "e-MB Entry process has finished.")
         
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
             messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
         finally:
+            # Count success/fail from results_tree
+            success_count = 0
+            fail_count = 0
+            for item in self.results_tree.get_children():
+                vals = self.results_tree.item(item)['values']
+                if len(vals) >= 6:
+                    status = str(vals[5]).lower()
+                    if 'success' in status:
+                        success_count += 1
+                    else:
+                        fail_count += 1
+            self.log_info(f"📊 eMB Entry Complete: ✅ {success_count} measurements entered, ❌ {fail_count} failed (of {success_count + fail_count} total)")
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
 
@@ -459,18 +455,9 @@ class MbEntryTab(BaseAutomationTab):
         panchayat = cfg.get('location_panchayat', '-')
         tags = ('failed',) if 'success' not in status.lower() else ()
         values = (panchayat, truncate_workcode(work_code), work_name, mr_no, mr_period, status, details, timestamp)
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
+        self.safe_tree_insert(values, tags)
 
     def _process_single_work_code(self, driver, work_code, cfg, mate_names_list):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         wait = WebDriverWait(driver, 25) 
         extracted_work_name = "-"; extracted_mr_no = "-"; extracted_mr_period = "-"
         
@@ -589,15 +576,6 @@ class MbEntryTab(BaseAutomationTab):
             self._log_result(cfg, work_code, "Failed", "Script Error", extracted_work_name, extracted_mr_no, extracted_mr_period)
 
     def _process_all_works_from_dropdown(self, driver, cfg, mate_names_list):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         """
         Processes ALL available works from the 'Select Work' dropdown.
         Used when user does NOT provide specific work codes.
@@ -674,7 +652,7 @@ class MbEntryTab(BaseAutomationTab):
 
         # Step 5: Process each work from the dropdown
         for i, (work_code, work_name, wc_from_text) in enumerate(work_options):
-            if self.app.stop_events[self.automation_key].is_set():
+            if self.is_stopped():
                 self.log_warning("Automation stopped.")
                 break
 
@@ -810,15 +788,6 @@ class MbEntryTab(BaseAutomationTab):
 
         self.log_info("✅ All dropdown works processed.")
     def _find_activity_prefix(self, driver):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         self.log_info("Searching for 'Earth work' activity...")
         for i in range(1, 61): 
             try:
@@ -833,15 +802,6 @@ class MbEntryTab(BaseAutomationTab):
         return "ctl00$ContentPlaceHolder1$activity$ctl01"
     
     def export_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         """Routes the export request to the correct handler."""
         export_format = self.export_format_menu.get()
         
@@ -853,15 +813,6 @@ class MbEntryTab(BaseAutomationTab):
             self.export_professional_pdf()
 
     def export_professional_report(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         """Generates a professional Excel report similar to eKYC Report."""
         all_items = self.results_tree.get_children()
         if not all_items:
@@ -1027,15 +978,6 @@ class MbEntryTab(BaseAutomationTab):
             messagebox.showerror("Export Error", f"Failed to save Excel: {e}")
 
     def export_professional_pdf(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.common.exceptions import UnexpectedAlertPresentException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         """Generates a professional PDF report with Hindi font support."""
         # --- Check if Library Exists ---
         if not HAS_REPORTLAB:
@@ -1219,7 +1161,6 @@ class MbEntryTab(BaseAutomationTab):
             display_text = "\n".join(workcodes)
         else:
             display_text = str(workcodes)
-        # --------------------------------------------
 
         self.work_codes_text.configure(state="normal")
         self.work_codes_text.delete("1.0", tkinter.END)

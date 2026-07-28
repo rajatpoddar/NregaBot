@@ -10,23 +10,16 @@ from src import config
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 # Excel export imports
 try:
-    import openpyxl
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     HAS_OPENPYXL = True
 except ImportError:
     HAS_OPENPYXL = False
 
 class DeleteApplicantTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        import openpyxl as xl
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException
         super().__init__(parent, app_instance, automation_key="delete_applicant")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -37,18 +30,6 @@ class DeleteApplicantTab(BaseAutomationTab):
         self._create_widgets()
 
     def _init_data_dir(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         try:
             base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -61,18 +42,6 @@ class DeleteApplicantTab(BaseAutomationTab):
     #  UI
     # ──────────────────────────────────────────────────
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         main = ctk.CTkFrame(self, fg_color="transparent")
         main.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         main.grid_columnconfigure(0, weight=1)
@@ -219,18 +188,6 @@ class DeleteApplicantTab(BaseAutomationTab):
     # ──────────────────────────────────────────────────
 
     def _on_tree_click(self, event):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         item = self.data_tree.identify_row(event.y)
         if item:
             if item in self.selected_items:
@@ -244,18 +201,6 @@ class DeleteApplicantTab(BaseAutomationTab):
             self._update_sel_count()
 
     def _update_sel_count(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         total = len(self.data_tree.get_children())
         sel = len(self.selected_items)
         self.sel_count_lbl.configure(
@@ -269,18 +214,6 @@ class DeleteApplicantTab(BaseAutomationTab):
             self.data_tree.item(item, tags=('selected',))
         self._update_sel_count()
 
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         for item in self.data_tree.get_children():
             self.selected_items.add(item)
             self.data_tree.set(item, "select", "☑")
@@ -293,18 +226,6 @@ class DeleteApplicantTab(BaseAutomationTab):
             self.data_tree.item(item, tags=())
         self._update_sel_count()
 
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         for item in self.data_tree.get_children():
             self.selected_items.discard(item)
             self.data_tree.set(item, "select", "☐")
@@ -315,18 +236,6 @@ class DeleteApplicantTab(BaseAutomationTab):
     # ──────────────────────────────────────────────────
 
     def load_excel(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         file_path = filedialog.askopenfilename(
             initialdir=self.data_dir,
             filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
@@ -426,18 +335,6 @@ class DeleteApplicantTab(BaseAutomationTab):
     #  Automation
     # ──────────────────────────────────────────────────
     def start_automation(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         if not self.selected_items:
             messagebox.showwarning("No Selection",
                 "Select at least one applicant (✔) to delete.")
@@ -475,22 +372,9 @@ class DeleteApplicantTab(BaseAutomationTab):
                                          self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_common_ui_state, True)
         self.app.clear_log(self.log_display)
-        for item in self.results_tree.get_children():
-            self.results_tree.delete(item)
+        self.safe_tree_clear()
         self._logged_keys.clear()
 
         driver = self.app.get_driver()
@@ -536,7 +420,7 @@ class DeleteApplicantTab(BaseAutomationTab):
             #  PHASE 1 — Delete Applicants
             # ═══════════════════════════════════════════
             for jc_idx, (jobcard, applicants) in enumerate(grouped.items()):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     break
 
                 self.update_status(f"Jobcard {jc_idx+1}/{total_jc}: {jobcard}",
@@ -781,13 +665,13 @@ class DeleteApplicantTab(BaseAutomationTab):
             #  PHASE 2 — Delete Full Registration
             #  (for jobcards where last member couldn't be deleted)
             # ═══════════════════════════════════════════
-            if pending_reg_del and not self.app.stop_events[self.automation_key].is_set():
+            if pending_reg_del and not self.is_stopped():
                 self.app.log_message(self.log_display,
                     f"\n{'='*50}\n🗑️  PHASE 2: Deleting {len(pending_reg_del)} full registration(s)\n{'='*50}")
                 self.update_status(f"Deleting {len(pending_reg_del)} registrations...", 0.0)
 
                 for reg_idx, jobcard in enumerate(sorted(pending_reg_del)):
-                    if self.app.stop_events[self.automation_key].is_set():
+                    if self.is_stopped():
                         break
                     self._process_reg_deletion(driver, wait, jobcard, panchayat,
                                                reg_reason, del_date, log_one,
@@ -837,18 +721,6 @@ class DeleteApplicantTab(BaseAutomationTab):
     def _process_reg_deletion(self, driver, wait, jobcard, panchayat,
                                reg_reason, del_date, log_one,
                                reg_idx, total_reg):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         """
         Delete a full registration on DelReg.aspx page.
         Called when applicant deletion fails because only 1 member remains.
@@ -956,7 +828,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                 driver.execute_script("arguments[0].click();", submit_btn)
             except Exception:
                 try:
-                    driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_BtnSubmit").click()
+                    self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_BtnSubmit").click()
                 except Exception as e:
                     log_one(jobcard, "[Registration]", "Failed",
                             f"Submit button error: {str(e).splitlines()[0]}")
@@ -1040,8 +912,6 @@ class DeleteApplicantTab(BaseAutomationTab):
             return
 
         try:
-            import openpyxl as xl
-            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
             wb = xl.Workbook()
             ws = wb.active
@@ -1127,18 +997,6 @@ class DeleteApplicantTab(BaseAutomationTab):
     #  Reset
     # ──────────────────────────────────────────────────
     def reset_ui(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         super().reset_ui()
         self.selected_items.clear()
         self._logged_keys.clear()

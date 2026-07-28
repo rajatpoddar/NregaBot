@@ -10,17 +10,10 @@ from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 class IfEditTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="if_edit")
         self.csv_path = None
         self.csv_headers = []
@@ -37,18 +30,6 @@ class IfEditTab(BaseAutomationTab):
         self._create_widgets()
         self._load_profiles_from_file()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         notebook = ctk.CTkTabview(self)
         notebook.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
@@ -168,18 +149,6 @@ class IfEditTab(BaseAutomationTab):
         self.ui_fields[key] = widget
 
     def _create_page1_widgets(self, parent):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         parent.grid_columnconfigure(1, weight=1)
         self._create_field(parent, "estimated_pd", "Estimated PD:", 0)
         self._create_field(parent, "beneficiaries_count", "Beneficiaries Count:", 1)
@@ -191,18 +160,6 @@ class IfEditTab(BaseAutomationTab):
         self._create_field(parent, "centre_scheme_name", "Centre Scheme Name:", 6, widget_type='combo', values=centre_schemes)
 
     def _create_page2_widgets(self, parent):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         parent.grid_columnconfigure((1, 3), weight=1)
         self._create_field(parent, "sanction_no", "Tech Sanction No:", 0, 0)
         self._create_field(parent, "sanction_date", "Tech Sanction Date:", 0, 2)
@@ -223,18 +180,6 @@ class IfEditTab(BaseAutomationTab):
         self._create_field(parent, "fin_scheme_input", "Fin. Scheme Input:", 9, 2)
 
     def _create_page3_widgets(self, parent):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         parent.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(parent, text="Note: These values will be applied to all work codes in the CSV.", text_color="gray50").grid(row=0, column=0, padx=15, pady=(10,5))
         
@@ -253,18 +198,6 @@ class IfEditTab(BaseAutomationTab):
         self.ui_fields['materials_list'] = materials_textbox
 
     def _populate_defaults(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         cfg = {**config.IF_EDIT_CONFIG["page1"], **config.IF_EDIT_CONFIG["page2"]}
         if "defaults" in config.ADD_ACTIVITY_CONFIG:
             cfg.update(config.ADD_ACTIVITY_CONFIG["defaults"])
@@ -359,18 +292,6 @@ class IfEditTab(BaseAutomationTab):
         self._toggle_page_settings()
         self.log_info(f"Profile '{profile_name}' loaded.")
     def _delete_profile(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         profile_name = self.profile_combobox.get()
         if not profile_name or profile_name not in self.profiles or profile_name == "Last Used Config":
             messagebox.showwarning("Selection Error", "Please select a valid, user-saved profile to delete."); return
@@ -388,18 +309,6 @@ class IfEditTab(BaseAutomationTab):
         except Exception as e: messagebox.showerror("Error", f"Failed to delete profile: {e}")
 
     def _toggle_page_settings(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         is_enabled = self.convergence_switch.get() == 1
         state = "normal" if is_enabled else "disabled"
         page_keys = ["sanction_no", "sanction_date", "est_time_completion", "avg_labour_per_day", "expected_mandays", "tech_sanction_amount", "unskilled_labour_cost", "mgnrega_material_cost", "skilled_labour_cost", "semi_skilled_labour_cost", "scheme1_cost", "fin_sanction_no", "fin_sanction_date", "fin_sanction_amount", "fin_scheme_input", "convergence_scheme_type", "state_scheme_name", "centre_scheme_name", "activities_list", "materials_list"]
@@ -419,18 +328,6 @@ class IfEditTab(BaseAutomationTab):
     def set_ui_state(self, running: bool):
         if not self._is_alive():
             return
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
         # Disable select button if data is loaded from WC Gen, even if not running
@@ -458,18 +355,6 @@ class IfEditTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def select_csv_file(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         path = filedialog.askopenfilename(title="Select CSV", filetypes=[("CSV files", "*.csv")])
         if path:
             self.csv_path = path
@@ -496,18 +381,6 @@ class IfEditTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(form_config,))
 
     def run_automation_logic(self, form_config):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
@@ -537,7 +410,7 @@ class IfEditTab(BaseAutomationTab):
             success_count = 0
             fail_count = 0
             for i, row in enumerate(rows_to_process):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.app.log_message(self.log_display, "⏹️ Automation stopped.", "warning"); break
                 work_code = row[self.column_map['work_code']]
                 pct = (i + 1) / total * 100
@@ -566,7 +439,7 @@ class IfEditTab(BaseAutomationTab):
 
     def _log_result(self, work_code, job_card, status, details):
         ts = datetime.now().strftime("%H:%M:%S")
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(ts, truncate_workcode(work_code), job_card, status, details)))
+        self.safe_tree_insert((ts, truncate_workcode(work_code), job_card, status, details))
         level = "success" if status.lower() == "success" else "error" if status.lower() == "failed" else "info"
         self.log_info(f"  {'✅' if level == 'success' else '❌' if level == 'error' else '⏭️'} {truncate_workcode(work_code)} - {status}: {details}", level)        
     def _scroll_to(self, driver, element):
@@ -575,18 +448,6 @@ class IfEditTab(BaseAutomationTab):
         time.sleep(0.3) # Wait for scroll
 
     def _process_single_work_code(self, driver, row, cfg):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         work_code, beneficiary_type, job_card = row[self.column_map['work_code']], row[self.column_map['beneficiary_type']], row[self.column_map['job_card']]
         try:
             current_year, wait = datetime.now().year, WebDriverWait(driver, 20)
@@ -669,18 +530,6 @@ class IfEditTab(BaseAutomationTab):
             if mode in ["Full Process (All Pages)", "Page 2 & 3 Only"]:
                 self.log_info("Page 2: Entering sanction details...")
                 def fill(id, val):
-                    # ---- Lazy imports ----
-                    from selenium.webdriver.common.by import By
-                    from selenium.webdriver.support.ui import Select, WebDriverWait
-                    from selenium.webdriver.support import expected_conditions as EC
-                    from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-                    from selenium.webdriver.common.keys import Keys
-                    from selenium import webdriver
-                    import openpyxl
-                    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-                    from openpyxl.utils import get_column_letter
-                    from openpyxl.worksheet.page import PageMargins
-                    from openpyxl.drawing.image import Image as XLImage
                     elem = wait.until(EC.presence_of_element_located((By.ID, id)))
                     self._scroll_to(driver, elem)
                     elem.clear()
@@ -724,7 +573,7 @@ class IfEditTab(BaseAutomationTab):
             activities_raw = cfg.get("activities_list", "").strip()
             if activities_raw:
                 for act_data in [line.strip().split(',') for line in activities_raw.splitlines() if line.strip()]:
-                    if self.app.stop_events[self.automation_key].is_set(): break
+                    if self.is_stopped(): break
                     if len(act_data) != 3: self.app.log_message(self.log_display, f"  > Skipping invalid activity line: {act_data}", "warning"); continue
                     
                     code_keyword, price, qty = act_data[0].strip(), act_data[1].strip(), act_data[2].strip()
@@ -801,7 +650,7 @@ class IfEditTab(BaseAutomationTab):
                 # 3. Loop through the filtered list using the original proven flow
                 is_first_addition = not existing_material_names
                 for mat_info in materials_to_process:
-                    if self.app.stop_events[self.automation_key].is_set(): break
+                    if self.is_stopped(): break
                     
                     self.log_info(f"  > Processing material: {mat_info['name']} | Price: {mat_info['price']} | Qty: {mat_info['qty']}")                    
                     try:

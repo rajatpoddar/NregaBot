@@ -15,18 +15,12 @@ from src import config
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 class MisReportsTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from openpyxl.styles import Font, Alignment
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
         super().__init__(parent, app_instance, automation_key="mis_reports")
         self.config_file = self.app.get_data_path("mis_reports_inputs.json")
         self.report_checkboxes = {}
@@ -37,18 +31,6 @@ class MisReportsTab(BaseAutomationTab):
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        import pandas as pd
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         # Main tab view to organize Settings, Results, and Logs
         notebook = ctk.CTkTabview(self)
@@ -176,18 +158,6 @@ class MisReportsTab(BaseAutomationTab):
                     # Failsafe for widgets that don't have a 'state' property (like sub-frames)
                     pass
     def start_automation(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         
         selected_reports = [name for name, var in self.report_checkboxes.items() if var.get() == 1]
@@ -229,18 +199,6 @@ class MisReportsTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs, save_path))
 
     def _solve_captcha(self, driver, wait):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.log_info("Attempting to solve CAPTCHA...")
         captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
         captcha_text = wait.until(EC.presence_of_element_located((By.ID, captcha_label_id))).text
@@ -257,18 +215,6 @@ class MisReportsTab(BaseAutomationTab):
         return True
 
     def run_automation_logic(self, inputs, save_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium import webdriver
-        import pandas as pd
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         self.app.after(0, self.set_ui_state, True); self.app.clear_log(self.log_display); self.app.log_message(self.log_display, "Starting MIS Report generation...")
         try:
             driver = self.app.get_driver();
@@ -278,7 +224,7 @@ class MisReportsTab(BaseAutomationTab):
             total_reports = len(inputs['reports'])
             with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
                 for i, report_name in enumerate(inputs['reports']):
-                    if self.app.stop_events[self.automation_key].is_set(): self.app.log_message(self.log_display, "Stop signal received.", "warning"); break
+                    if self.is_stopped(): self.app.log_message(self.log_display, "Stop signal received.", "warning"); break
                     
                     # --- NEW: Update App Status ---
                     status_msg = f"Processing report {i+1}/{total_reports}..."
@@ -420,7 +366,7 @@ class MisReportsTab(BaseAutomationTab):
             self.app.after(0, self.update_status, "Automation Finished", 1.0); 
             self.app.after(0, self.app.set_status, "Automation Finished")
             
-            if not self.app.stop_events[self.automation_key].is_set():
+            if not self.is_stopped():
                 self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 MIS Report generated. File(s) saved near: {save_path}"))
             
             self.app.after(5000, lambda: self.app.set_status("Ready")) # Reset app status
@@ -451,5 +397,4 @@ class MisReportsTab(BaseAutomationTab):
         self._toggle_all_checkboxes(select=True)
         
         # Clear Treeview
-        for item in self.results_tree.get_children():
-            self.results_tree.delete(item)
+        self.safe_tree_clear()

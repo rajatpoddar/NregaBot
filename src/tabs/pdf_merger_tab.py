@@ -229,7 +229,7 @@ class PDFMergerTab(BaseAutomationTab):
             writer = PdfWriter()
             
             for i, pdf_path in enumerate(file_list):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log_warning("Merge cancelled.")
                     writer.close()
                     return
@@ -254,7 +254,7 @@ class PDFMergerTab(BaseAutomationTab):
 
                     writer.add_page(page)
             
-            if self.app.stop_events[self.automation_key].is_set(): return
+            if self.is_stopped(): return
 
             self.log_info(f"Writing to output file: {output_path}")
             with open(output_path, "wb") as f_out:

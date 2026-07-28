@@ -9,18 +9,13 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from ._imports import *  # noqa: F403,F401
+
 logger = get_logger()
 
 # --- NAME CHANGED HERE (SADUpdateStatusTab -> SadUpdateTab) ---
 class SadUpdateTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
-        # Lazy imports
-        import openpyxl
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.keys import Keys
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException, StaleElementReferenceException
         super().__init__(parent, app_instance, automation_key="sad_update_status")
         self.config_file = self.app.get_data_path("sad_update_inputs.json")
         
@@ -34,19 +29,6 @@ class SadUpdateTab(BaseAutomationTab):
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import ElementClickInterceptedException
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
 
         # --- Top Frame: Title & Action Selection ---
         top_frame = ctk.CTkFrame(self.main_scroll, fg_color="transparent")
@@ -176,8 +158,7 @@ class SadUpdateTab(BaseAutomationTab):
         self.file_entry.delete(0, tkinter.END)
         self.manual_text_area.delete("1.0", tkinter.END)
         self.app.clear_log(self.log_display)
-        for item in self.results_tree.get_children():
-            self.results_tree.delete(item)
+        self.safe_tree_clear()
         self.log("UI Reset.")
 
     def set_ui_state(self, running: bool):
@@ -210,19 +191,6 @@ class SadUpdateTab(BaseAutomationTab):
         return None
 
     def _scan_file_for_ack_numbers(self, file_path):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import ElementClickInterceptedException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         ack_list = []
         file_ext = os.path.splitext(file_path)[1].lower()
         pattern = re.compile(r'\d+/\d+/\d+/\d+')
@@ -293,8 +261,7 @@ class SadUpdateTab(BaseAutomationTab):
              messagebox.showwarning("No Data", "No valid items found to process.")
              return
 
-        for item in self.results_tree.get_children():
-            self.results_tree.delete(item)
+        self.safe_tree_clear()
 
         self.main_tabs.set("Results")
 
@@ -310,19 +277,6 @@ class SadUpdateTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from selenium.webdriver.common.keys import Keys
-        from selenium.common.exceptions import ElementClickInterceptedException
-        from selenium import webdriver
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
         items = inputs['items']
         action_val = inputs['action_val']
         total = len(items)
@@ -339,7 +293,7 @@ class SadUpdateTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
             
             for idx, search_term in enumerate(items):
-                if self.app.stop_events[self.automation_key].is_set():
+                if self.is_stopped():
                     self.log("!!! Stopped !!!"); break
 
                 status_msg = f"Processing {idx+1}/{total}: {search_term}"
@@ -485,7 +439,7 @@ class SadUpdateTab(BaseAutomationTab):
                 except Exception as e:
                     self.log(f"--> Error: {e}"); self.add_result(search_term, "Failed", str(e))
 
-            if not self.app.stop_events[self.automation_key].is_set():
+            if not self.is_stopped():
                 self.log("Batch Ended.")
                 self.log(f"📊 SAD Update Complete: Success: {processed_success}/{total}")
 
