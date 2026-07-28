@@ -11,8 +11,9 @@ import re
 from datetime import datetime
 
 from src import config
+from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
+
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class PhysicalCompleteTab(BaseAutomationTab):
@@ -59,13 +60,10 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
         # Row 0: Panchayat
         ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
-        self.panchayat_entry = AutocompleteEntry(
-            input_frame, 
-            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-            app_instance=self.app,
-            history_key="location_panchayat"
-        )
-        self.panchayat_entry.grid(row=0, column=1, columnspan=3, padx=15, pady=(15, 5), sticky="ew")
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=0, column=1, columnspan=3, padx=15, pady=(15, 5), sticky="ew")
 
         # Row 1: Work Category
         ctk.CTkLabel(input_frame, text="Work Category:").grid(row=1, column=0, padx=15, pady=5, sticky="w")
@@ -173,7 +171,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
     def _get_inputs(self):
         inputs = {
-            "panchayat": self.panchayat_entry.get().strip(),
+            "panchayat": self.panchayat_var.get().strip(),
             "work_category": self.work_category_var.get(),
             "work_codes_raw": self.work_codes_textbox.get("1.0", "end").strip()
         }
@@ -183,21 +181,16 @@ class PhysicalCompleteTab(BaseAutomationTab):
     def _save_inputs(self, inputs):
         save_data = {k: v for k, v in inputs.items() if k not in ["work_codes_raw", "work_codes"]}
         try:
-            with open(self.app.get_data_path("physical_complete_inputs.json"), 'w') as f:
-                json.dump(save_data, f, indent=4)
+            self.app.history_manager.save_tab_inputs_batch("physical_complete", save_data)
         except Exception as e:
             print(f"Error saving inputs: {e}")
 
     def _load_saved_inputs(self):
-        try:
-            with open(self.app.get_data_path("physical_complete_inputs.json"), 'r') as f:
-                data = json.load(f)
-            self.panchayat_entry.insert(0, data.get("panchayat", ""))
+        """Load previously saved inputs from DB."""
+        data = self.app.history_manager.get_tab_inputs("physical_complete")
+        if data:
+            self.panchayat_var.set(data.get("panchayat", ""))
             self.work_category_var.set(data.get("work_category", "Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers"))
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            print(f"Error loading inputs: {e}")
     def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -234,8 +227,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         self.last_successful_codes = []
         
         self.app.after(0, self.app.set_status, "Running Physical Complete Work...")
-        self.app.log_message(self.log_display, "--- Starting Physical Complete Automation ---")
-        
+        self.log_info("--- Starting Physical Complete Automation ---")        
         driver = self.app.get_driver()
         if not driver:
             messagebox.showerror("Browser Not Found", "Please launch a browser first.")
@@ -248,43 +240,40 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
             for i, work_code in enumerate(inputs["work_codes"]):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.app.log_message(self.log_display, "Automation stopped by user.", "warning")
-                    break
+                    self.log_warning("⏹️ Automation stopped by user.")                    break
                 
-                status_msg = f"Processing {i+1}/{total_codes}: {work_code}"
-                self.app.after(0, self.app.set_status, status_msg)
-                self.app.after(0, self.update_status, status_msg, (i + 1) / total_codes)
-                self.app.log_message(self.log_display, f"\n--- Processing Work Code: {work_code} ---")
-                
+                pct = (i + 1) / total_codes * 100
+                status_msg = f"[{i+1}/{total_codes}] {truncate_workcode(work_code)} ({pct:.0f}%)"
+                self.app.after(0, self.app.set_status, f"Physical Complete: {status_msg}")
+                self.app.after(0, self.update_status, f"Processing {i+1}/{total_codes}", (i+1)/total_codes)
+                self.log_info(f"  🔄 [{i+1}/{total_codes}] Completing: {truncate_workcode(work_code)}")                
                 status, details = self._process_single_work_code(driver, inputs, work_code)
                 self._log_result(work_code, status, details)
                 
                 if status == "Success": 
                     success_count += 1
                     self.last_successful_codes.append(work_code)
-                else: 
+                    self.log_success(f"    ✅ {truncate_workcode(work_code)}: Marked complete")                else: 
                     fail_count += 1
-
-            completion_message = f"Automation Finished!\n\nSuccessful: {success_count}\nFailed/Cancelled: {fail_count}"
-            messagebox.showinfo("Task Complete", completion_message)
-
+                    self.log_error(f"    ❌ {truncate_workcode(work_code)}: {details}")
+            self.log_info(f"
+{'='*50}")            self.log_info(f"📊 Physical Complete: ✅ {success_count} done, ❌ {fail_count} failed (of {total_codes} total)")            self.log_info(f"{'='*50}")
             # Auto-forward Logic
             if self.auto_forward_var.get() and self.last_successful_codes:
-                self.app.log_message(self.log_display, "\n--- Auto-Forwarding to Scheme Closing ---", "info")
-                self.app.after(500, lambda: self.forward_to_scheme_closing(self.last_successful_panchayat, self.last_successful_codes, auto_start=True))
+                self.log_info("
+--- Auto-Forwarding to Scheme Closing ---")                self.app.after(500, lambda: self.forward_to_scheme_closing(self.last_successful_panchayat, self.last_successful_codes, auto_start=True))
 
         except Exception as e:
-            self.app.log_message(self.log_display, f"A critical error occurred: {str(e).splitlines()[0]}", "error")
-        finally:
+            self.log_error(f"A critical error occurred: {str(e).splitlines()[0]}")        finally:
             self.app.after(0, self.set_ui_state, False)
             self.update_status("Automation Finished", 1.0)
-            self.app.log_message(self.log_display, "\n--- Automation Finished ---")
-            self.app.after(0, self.app.set_status, "Automation Finished")
+            self.log_info("
+--- Automation Finished ---")            self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _log_result(self, work_code, status, details):
         timestamp = time.strftime("%H:%M:%S")
         tags = ('failed',) if 'success' not in status.lower() else ()
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, work_code, status, details), tags=tags))
+        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, truncate_workcode(work_code), status, details), tags=tags))
 
     def _process_single_work_code(self, driver, inputs, work_code):
         # ---- Lazy imports ----
@@ -300,18 +289,15 @@ class PhysicalCompleteTab(BaseAutomationTab):
         
         try:
             driver.get(url)
-            self.app.log_message(self.log_display, "   - Selecting Panchayat...")
-            panchayat_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlPanchayat")))
+            self.log_info("   - Selecting Panchayat...")            panchayat_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlPanchayat")))
             self._select_by_text_case_insensitive(Select(panchayat_select), inputs["panchayat"])
             wait.until(EC.staleness_of(panchayat_select))
 
-            self.app.log_message(self.log_display, "   - Selecting Work Category...")
-            category_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlWorkCategroy")))
+            self.log_info("   - Selecting Work Category...")            category_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlWorkCategroy")))
             Select(category_select).select_by_visible_text(inputs["work_category"])
             wait.until(EC.staleness_of(category_select))
 
-            self.app.log_message(self.log_display, "   - Searching for Work Code...")
-            wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
+            self.log_info("   - Searching for Work Code...")            wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
             time.sleep(1.5)  # Brief wait for postback to begin
             wc_input.send_keys(work_code)
             wc_input.send_keys(Keys.TAB)
@@ -328,16 +314,14 @@ class PhysicalCompleteTab(BaseAutomationTab):
             if not option_found: return "Failed", f"Work code {work_code} not found."
             wait.until(EC.staleness_of(work_dropdown_element))
             
-            self.app.log_message(self.log_display, "   - Verifying Details and Checking Box...")
-            
+            self.log_info("   - Verifying Details and Checking Box...")            
             # Postback Handle
             checkbox = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_checkdisc")))
             if not checkbox.is_selected():
                 checkbox.click()
                 wait.until(EC.staleness_of(checkbox))
 
-            self.app.log_message(self.log_display, "   - Clicking NEXT and handling alert...")
-            next_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_BtnNext")))
+            self.log_info("   - Clicking NEXT and handling alert...")            next_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_BtnNext")))
             next_btn.click()
 
             try:
@@ -350,8 +334,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             except TimeoutException:
                 pass 
             
-            self.app.log_message(self.log_display, "   - Page 2: Waiting for Asset Details form...")
-            
+            self.log_info("   - Page 2: Waiting for Asset Details form...")            
             asset_name_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Name")))
             asset_desc_input = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Description")
             
@@ -360,8 +343,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             asset_desc_input.clear()
             asset_desc_input.send_keys("Completed")
             
-            self.app.log_message(self.log_display, "   - Saving Physical Completion...")
-            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
+            self.log_info("   - Saving Physical Completion...")            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
             
             try:
                 alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
@@ -375,12 +357,10 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
         except (TimeoutException, NoSuchElementException, NoAlertPresentException) as e:
             error_message = str(e).splitlines()[0] if str(e) else "No error message"
-            self.app.log_message(self.log_display, f"   - Error: {error_message}", "error")
-            return "Failed", f"Error on page: {error_message}"
+            self.log_error(f"   - Error: {error_message}")            return "Failed", f"Error on page: {error_message}"
         except Exception as e:
             error_message = str(e).splitlines()[0] if str(e) else "No error message"
-            self.app.log_message(self.log_display, f"   - Unexpected error: {error_message}", "error")
-            return "Failed", f"Unexpected error: {error_message}"
+            self.log_error(f"   - Unexpected error: {error_message}")            return "Failed", f"Unexpected error: {error_message}"
 
     def manual_forward(self):
         """Button click handler for forwarding to Scheme Closing"""
@@ -413,8 +393,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             print(f"Switching tab failed: {e}")
             
         # Update the Panchayat Field
-        scheme_tab.panchayat_entry.delete(0, "end")
-        scheme_tab.panchayat_entry.insert(0, panchayat)
+        scheme_tab.panchayat_var.set(panchayat)
         
         # Update the Work Codes
         scheme_tab.work_codes_textbox.configure(state="normal")
@@ -436,7 +415,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         from selenium.common.exceptions import NoAlertPresentException
         from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure? This will clear all inputs."):
-            self.panchayat_entry.delete(0, "end")
+            self.panchayat_var.set("")
             self.work_codes_textbox.delete("1.0", "end")
             for item in self.results_tree.get_children():
                 self.results_tree.delete(item)
@@ -449,7 +428,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.panchayat_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.work_category_menu.configure(state=state)
         self.work_codes_textbox.configure(state=state)
         self.auto_forward_checkbox.configure(state=state)

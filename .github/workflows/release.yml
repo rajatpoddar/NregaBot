@@ -32,7 +32,7 @@ jobs:
         id: get_changelog
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
-          CHANGELOG_BODY=$(jq -r --arg VERSION "$VERSION" '.changelog[$VERSION] | .[] | "- \\(.)"' config/version.json)
+          CHANGELOG_BODY=$(jq -r --arg VERSION "$VERSION" '.changelog[$VERSION] | .[] | "- \(.)"' config/version.json)
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

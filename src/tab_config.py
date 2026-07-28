@@ -251,11 +251,6 @@ def get_tabs_definition(app: Any) -> Dict[str, Dict[str, Any]]:
                 "creation_func": _lazy_import("MacroManagerTab", "src.tabs.macro_manager_tab"),
                 "icon": app.icon_images.get("emoji_tools")
             },
-            "Login Automation": {
-                "creation_func": _lazy_import("LoginAutomationTab", "src.tabs.login_automation_tab"),
-                "icon": app.icon_images.get("emoji_login_automation"),
-                "key": "login_automation"
-            },
             "PDF Merger": {
                 "creation_func": _lazy_import("PDFMergerTab", "src.tabs.pdf_merger_tab"),
                 "icon": app.icon_images.get("emoji_pdf_merger"),

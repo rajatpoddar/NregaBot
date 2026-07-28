@@ -6,7 +6,6 @@ import json
 import os, time, csv, re
 import threading
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -66,9 +65,9 @@ class SadUpdateTab(BaseAutomationTab):
         action_container.pack(fill="x", pady=5)
         
         ctk.CTkLabel(action_container, text="Select Action:").pack(side="left", padx=10)
-        self.action_combobox = AutocompleteEntry(action_container, suggestions_list=["Dispose", "Reject", "In Progress", "Pending"], width=200)
-        self.action_combobox.insert(0, "Dispose")
-        self.action_combobox.pack(side="left", padx=5)
+        self.action_var = ctk.StringVar(value="Dispose")
+        self.action_menu = ctk.CTkOptionMenu(action_container, variable=self.action_var, values=["Dispose", "Reject", "In Progress", "Pending"], width=200)
+        self.action_menu.pack(side="left", padx=5)
 
         # --- Main TabView (Inputs + Results + Logs) ---
         self.main_tabs = ctk.CTkTabview(self.main_scroll, height=400)
@@ -158,8 +157,7 @@ class SadUpdateTab(BaseAutomationTab):
             self.file_entry.insert(0, file_path)
 
     def log(self, message):
-        self.app.log_message(self.log_display, message)
-
+        self.log_info(message)
     def add_result(self, ack_no, status, message):
         # Map status to tags for coloring
         tag = status 
@@ -189,22 +187,18 @@ class SadUpdateTab(BaseAutomationTab):
         state = "disabled" if running else "normal"
         self.file_entry.configure(state=state)
         self.manual_text_area.configure(state=state)
-        self.action_combobox.configure(state=state)
+        self.action_menu.configure(state=state)
 
     def save_inputs(self, inputs):
         try:
-            with open(self.config_file, 'w') as f: json.dump(inputs, f, indent=4)
+            self.app.history_manager.save_tab_inputs_batch("sad_update", inputs)
         except Exception as e:
             logger.warning("Failed to save SAD inputs: %s", e)
 
     def load_inputs(self):
-        try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r') as f:
-                    data = json.load(f)
-                    self.file_entry.insert(0, data.get('csv_file', ''))
-        except Exception as e:
-            logger.warning("Failed to load SAD inputs: %s", e)
+        data = self.app.history_manager.get_tab_inputs("sad_update")
+        if data:
+            self.file_entry.insert(0, data.get('csv_file', ''))
 
     # --- Parsing Logic ---
     def _parse_smart_ack_no(self, raw_text):
@@ -305,7 +299,7 @@ class SadUpdateTab(BaseAutomationTab):
         self.main_tabs.set("Results")
 
         action_map = {"Pending": "0", "In Progress": "1", "Dispose": "2", "Reject": "3"}
-        action_text = self.action_combobox.get()
+        action_text = self.action_var.get()
         
         inputs = {
             'items': items_to_process,
@@ -493,7 +487,7 @@ class SadUpdateTab(BaseAutomationTab):
 
             if not self.app.stop_events[self.automation_key].is_set():
                 self.log("Batch Ended.")
-                self.app.after(0, lambda: messagebox.showinfo("Completed", f"Success: {processed_success}/{total}"))
+                self.log(f"📊 SAD Update Complete: Success: {processed_success}/{total}")
 
         except Exception as e:
             self.log(f"Critical Error: {e}")

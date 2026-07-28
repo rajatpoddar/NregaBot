@@ -718,7 +718,7 @@ del "%~f0" & exit
     def play_sound(self, sound_name: str):
         self.sound_manager.play(sound_name)
 
-    def show_toast(self, message, kind="success", duration=3000):
+    def show_toast(self, message, kind="success", duration=4000, title="", details=""):
         try:
             if not self.winfo_exists():
                 return
@@ -729,10 +729,28 @@ del "%~f0" & exit
                         self.app_state.current_toast.destroy()
                 except Exception as e: logger.debug("Failed to dismiss old toast: %s", e)
 
-            self.play_sound("complete" if kind == "success" else "error")
+            auto_kind = kind
+            if not title:
+                if kind == "success": title = "Success"
+                elif kind == "error": title = "Error"
+                elif kind == "info": title = "Info"
+                elif kind == "warning": title = "Warning"
+                elif kind == "automation": title = "Automation"
+
+            # Play appropriate sound
+            sound_map = {
+                "success": "complete",
+                "error": "error",
+                "warning": "error",
+                "automation": "complete",
+            }
+            self.play_sound(sound_map.get(kind, "click"))
 
             try:
-                self.app_state.current_toast = ToastNotification(self, message, kind, duration=duration)
+                self.app_state.current_toast = ToastNotification(
+                    self, message, kind=kind, duration=duration,
+                    title=title, details=details
+                )
             except Exception:
                 pass
 

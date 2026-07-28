@@ -212,9 +212,14 @@ class HomeTab(ctk.CTkFrame):
         )
         self.most_used_grid.grid(row=1, column=0, sticky="ew")
 
+        # Cache for most-used cards: list of (name, card_widget)
+        self._most_used_cards: list = []
+        self._most_used_placeholder: Optional[ctk.CTkLabel] = None
+        self._most_used_names_cache: list = []
+
         self._refresh_most_used()
 
-    def _get_most_used_names(self, limit=6):
+    def _get_most_used_names(self, limit=8):
         """Returns only tabs that have been actually used (usage count > 0).
         Starts empty and fills as the user uses automations."""
         keys = self.app.history_manager.get_most_used_keys(limit)
@@ -226,14 +231,32 @@ class HomeTab(ctk.CTkFrame):
                     break
             if len(names) >= limit:
                 break
-        # No fallback padding — stays empty until user uses automations
         return names
 
     def _refresh_most_used(self):
-        for w in self.most_used_grid.winfo_children():
-            w.destroy()
-
+        """Refresh most-used cards efficiently — only rebuilds when the list changes."""
         names = self._get_most_used_names(8)
+
+        # Skip rebuild if the list hasn't changed
+        if names == self._most_used_names_cache:
+            return
+
+        self._most_used_names_cache = list(names)
+
+        # Destroy ALL existing cards (list changed, cheaper to rebuild)
+        for name, card in self._most_used_cards:
+            try:
+                card.destroy()
+            except Exception:
+                pass
+        self._most_used_cards.clear()
+        if self._most_used_placeholder:
+            try:
+                self._most_used_placeholder.destroy()
+            except Exception:
+                pass
+            self._most_used_placeholder = None
+
         cols = 4
         for idx, name in enumerate(names):
             row = idx // cols
@@ -243,15 +266,17 @@ class HomeTab(ctk.CTkFrame):
             )
             card.grid(row=row, column=col, sticky="nsew", padx=5, pady=5)
             self.most_used_grid.grid_columnconfigure(col, weight=1, uniform="most")
+            self._most_used_cards.append((name, card))
 
-        # If no most-used, show a placeholder
+        # Show placeholder if no most-used
         if not names:
-            ctk.CTkLabel(
+            self._most_used_placeholder = ctk.CTkLabel(
                 self.most_used_grid,
                 text="Start using automations — your most-used will appear here.",
                 font=ctk.CTkFont(family="Segoe UI", size=12),
                 text_color=(config.COLORS["text_light"], config.COLORS["text_medium"]),
-            ).grid(row=0, column=0, pady=20)
+            )
+            self._most_used_placeholder.grid(row=0, column=0, pady=20)
 
     # ──────────────────────────────────────────────
     # 4. ALL CATEGORIES

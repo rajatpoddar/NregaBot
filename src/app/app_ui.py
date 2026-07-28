@@ -316,7 +316,7 @@ class UIMixin:
             btn.bind("<Leave>", on_leave)
             return btn
 
-        create_icon_btn(dock_frame, "history", self.show_history_window, "View Activity Log")
+        create_icon_btn(dock_frame, "history", lambda: self.show_activity_log_tab(), "View Activity Log (Settings → Activity Log)")
         create_icon_btn(dock_frame, "emoji_file_manager", self.open_web_file_manager, "Open Cloud Files")
         create_icon_btn(dock_frame, "whatsapp", lambda: webbrowser.open("https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn"), "Join Community")
         create_icon_btn(dock_frame, "feedback", lambda: self.show_frame("Feedback"), "Contact Support")

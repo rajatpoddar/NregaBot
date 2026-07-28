@@ -88,6 +88,7 @@ class LicenseMixin:
             except Exception as e2:
                 logger.warning("Failed to show fallback frame: %s", e2)
                 self.show_frame("About")
+        self._sync_location_from_server()
         self.check_for_updates_background()
         self.set_status("Ready")
         self.after(500, self.run_onboarding_if_needed)
@@ -100,6 +101,48 @@ class LicenseMixin:
             self._setup_licensed_ui()
         else:
             self.on_closing(force=True)
+
+    def _sync_location_from_server(self) -> None:
+        """
+        Server se aaye user_state/user_district/user_block ko
+        history manager mein save karo taake automation tabs
+        mein dropdown mein dikhe.
+        """
+        try:
+            lic = self.app_state.license_info
+            state = (lic.get('user_state') or '').strip().upper()
+            dist  = (lic.get('user_district') or '').strip().upper()
+            block = (lic.get('user_block') or '').strip().upper()
+
+            synced = []
+            if state:
+                self.history_manager.save_entry("location_state", state)
+                self.history_manager.save_entry("mr_track_state", state)
+                self.history_manager.save_entry("issued_mr_state", state)
+                self.history_manager.save_entry("mis_state", state)
+                self.history_manager.save_entry("dashboard_state", state)
+                synced.append(f"State: {state}")
+            if dist:
+                self.history_manager.save_entry("location_district", dist)
+                self.history_manager.save_entry("mr_track_district", dist)
+                self.history_manager.save_entry("issued_mr_district", dist)
+                self.history_manager.save_entry("mis_district", dist)
+                self.history_manager.save_entry("dashboard_district", dist)
+                synced.append(f"District: {dist}")
+            if block:
+                self.history_manager.save_entry("location_block", block)
+                self.history_manager.save_entry("mr_track_block", block)
+                self.history_manager.save_entry("issued_mr_block", block)
+                self.history_manager.save_entry("mis_block", block)
+                self.history_manager.save_entry("dashboard_block", block)
+                synced.append(f"Block: {block}")
+
+            if synced:
+                logger.info("Location synced from server: %s", ", ".join(synced))
+            else:
+                logger.debug("No location data found on server to sync.")
+        except Exception as e:
+            logger.debug("Failed to sync location from server: %s", e)
 
     # ------------------------------------------------------------------
     # ACTIVATION WINDOW

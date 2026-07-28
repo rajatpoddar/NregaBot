@@ -6,7 +6,6 @@ import time
 from datetime import datetime
 from src import config
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class WagelistSendTab(BaseAutomationTab):
@@ -44,10 +43,10 @@ class WagelistSendTab(BaseAutomationTab):
         current_year = datetime.now().year
         year_options = [f"{year}-{year+1}" for year in range(current_year + 1, current_year - 10, -1)]
         
-        self.fin_year_combobox = AutocompleteEntry(settings_container, suggestions_list=year_options)
         default_year = f"{current_year}-{current_year+1}" if datetime.now().month >= 4 else f"{current_year-1}-{current_year}"
-        self.fin_year_combobox.insert(0, default_year)
-        self.fin_year_combobox.grid(row=0, column=1, padx=(0, 15), pady=10, sticky="ew")
+        self.fin_year_var = ctk.StringVar(value=default_year)
+        self.fin_year_menu = ctk.CTkOptionMenu(settings_container, variable=self.fin_year_var, values=year_options)
+        self.fin_year_menu.grid(row=0, column=1, padx=(0, 15), pady=10, sticky="ew")
 
         # --- NEW: Wagelist Range Selection ---
         ctk.CTkLabel(settings_container, text="Start Wagelist (optional):").grid(row=1, column=0, padx=(15, 5), pady=5, sticky="w")
@@ -96,7 +95,7 @@ class WagelistSendTab(BaseAutomationTab):
             return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.fin_year_combobox.configure(state=state)
+        self.fin_year_menu.configure(state=state)
         self.start_wagelist_entry.configure(state=state)
         self.end_wagelist_entry.configure(state=state)
     def reset_ui(self) -> None:
@@ -113,10 +112,9 @@ class WagelistSendTab(BaseAutomationTab):
                 self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.app.log_message(self.log_display, "Form has been reset.")
-            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
     def start_automation(self) -> None:
-        fin_year = self.fin_year_combobox.get()
+        fin_year = self.fin_year_var.get()
         if not fin_year:
             messagebox.showerror("Input Error", "Please select a Financial Year.")
             return
@@ -135,8 +133,7 @@ class WagelistSendTab(BaseAutomationTab):
         self.end_wagelist_entry.delete(0, 'end')
         self.end_wagelist_entry.insert(0, end_wagelist)
         
-        self.app.log_message(self.log_display, f"Received Wagelist range: {start_wagelist} to {end_wagelist}")
-        self.app.set_status("Ready to send wagelists")
+        self.log_info(f"Received Wagelist range: {start_wagelist} to {end_wagelist}")        self.app.set_status("Ready to send wagelists")
 
     # Inside tabs/wagelist_send_tab.py
     def retry_logic_handler(self) -> None:
@@ -158,11 +155,11 @@ class WagelistSendTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
         self.app.clear_log(self.log_display)
-        self.app.log_message(self.log_display, "Starting automation...")
-        self.app.after(0, self.app.set_status, "Running Wagelist Send...")
+        self.log_info("Starting automation...")        self.app.after(0, self.app.set_status, "Running Wagelist Send...")
         self.app.after(0, self.update_status, "Initializing...", 0.0)
         
-        automation_failed = False 
+        automation_failed = False
+        total = 0
         
         try:
             driver = self.app.get_driver()
@@ -171,24 +168,20 @@ class WagelistSendTab(BaseAutomationTab):
 
             driver.get(config.WAGELIST_SEND_CONFIG["url"])
             
-            self.app.log_message(self.log_display, f"Selecting Financial Year: {fin_year}")
-            Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlfin")))).select_by_value(fin_year)
+            self.log_info(f"Selecting Financial Year: {fin_year}")            Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlfin")))).select_by_value(fin_year)
             
-            self.app.log_message(self.log_display, "Waiting for wagelists to load...")
-            wait.until(EC.element_to_be_clickable((By.XPATH, "//select[@id='ctl00_ContentPlaceHolder1_ddl_sel']/option[position()>1]")))
+            self.log_info("Waiting for wagelists to load...")            wait.until(EC.element_to_be_clickable((By.XPATH, "//select[@id='ctl00_ContentPlaceHolder1_ddl_sel']/option[position()>1]")))
             # Element wait handled by WebDriverWait below
 
             all_wagelists = [o.get_attribute("value") for o in Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddl_sel")).options if o.get_attribute("value") != "select"]
             if not all_wagelists:
-                self.app.log_message(self.log_display, "No wagelists found for the selected year.", "warning")
-                messagebox.showwarning("No Wagelists", f"No wagelists were found for the financial year {fin_year}.")
+                self.log_warning("No wagelists found for the selected year.")                messagebox.showwarning("No Wagelists", f"No wagelists were found for the financial year {fin_year}.")
                 return
             
             # Filter wagelists based on user-provided range
             wagelists_to_process = all_wagelists
             if start_wl or end_wl:
-                self.app.log_message(self.log_display, f"Filtering wagelists from '{start_wl or 'start'}' to '{end_wl or 'end'}'.")
-                try:
+                self.log_info(f"Filtering wagelists from '{start_wl or 'start'}' to '{end_wl or 'end'}'.")                try:
                     start_index = all_wagelists.index(start_wl) if start_wl else 0
                     end_index = all_wagelists.index(end_wl) if end_wl else len(all_wagelists) - 1
 
@@ -201,13 +194,13 @@ class WagelistSendTab(BaseAutomationTab):
                     messagebox.showerror("Input Error", "The specified Start or End Wagelist was not found in the list for this financial year.")
                     return
             
-            self.app.log_message(self.log_display, f"Found {len(wagelists_to_process)} wagelists to process.")
-            total = len(wagelists_to_process)
+            self.log_info(f"Found {len(wagelists_to_process)} wagelists to process.")            total = len(wagelists_to_process)
             for idx, wagelist in enumerate(wagelists_to_process, 1):
                 if self.app.stop_events[self.automation_key].is_set():
-                    break
+                    self.log_warning("⏹️ Automation stopped by user.")                    break
                 
-                status_msg = f"Processing {idx}/{total}: {wagelist}"
+                pct = idx / total * 100
+                self.log_info(f"  🔄 [{idx}/{total}] Sending: {wagelist} ({pct:.0f}%)")                status_msg = f"Processing {idx}/{total}: {wagelist}"
                 self.app.after(0, self.update_status, status_msg, idx / total)
                 self.app.after(0, self.app.set_status, status_msg)
                 
@@ -226,8 +219,7 @@ class WagelistSendTab(BaseAutomationTab):
 
         except Exception as e:
             automation_failed = True 
-            self.app.log_message(self.log_display, f"A critical error occurred: {e}", "error")
-            messagebox.showerror("Automation Error", f"An error occurred: {e}")
+            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("Automation Error", f"An error occurred: {e}")
         finally:
             stopped = self.app.stop_events[self.automation_key].is_set()
 
@@ -247,8 +239,19 @@ class WagelistSendTab(BaseAutomationTab):
             self.app.after(0, self.set_ui_state, False)
             
             if not stopped and not automation_failed:
-                self.app.after(0, lambda: messagebox.showinfo("Automation Complete", "Wagelist sending process finished."))
-            
+                # Count results from tree
+                success_count = 0
+                fail_count = 0
+                for item_id in self.results_tree.get_children():
+                    vals = self.results_tree.item(item_id)['values']
+                    if len(vals) >= 2:
+                        st = str(vals[1]).lower()
+                        if 'success' in st:
+                            success_count += 1
+                        elif 'fail' in st or 'error' in st:
+                            fail_count += 1
+                self.log_info(f"
+{'='*50}")                self.log_info(f"📊 Wagelist Send: ✅ {success_count} sent, ❌ {fail_count} failed (of {total} total)")                self.log_info(f"{'='*50}")            
             self.app.after(5000, lambda: self.app.set_status("Ready"))
             self.app.after(5000, lambda: self.update_status("Ready", 0.0))
 
@@ -269,8 +272,7 @@ class WagelistSendTab(BaseAutomationTab):
                 
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_GridView1")))
                 
-                self.app.log_message(self.log_display, f"Selecting all EFMS options for {wagelist}...")
-                
+                self.log_info(f"Selecting all EFMS options for {wagelist}...")                
                 # JS Script checks checkboxes (Already good in previous code, kept same)
                 js_script = """
                     const radios = document.querySelectorAll("input[id$='_rdbPayment_2']");
@@ -284,8 +286,7 @@ class WagelistSendTab(BaseAutomationTab):
                     return clickedCount;
                 """
                 clicked_count = driver.execute_script(js_script)
-                self.app.log_message(self.log_display, f"   - Instantly selected {clicked_count} EFMS options.")
-                
+                self.log_info(f"   - Instantly selected {clicked_count} EFMS options.")                
                 if self.app.stop_events[self.automation_key].is_set(): return False
                 
                 # --- FIX: JS Click for Submit Button (Background Safe) ---
@@ -294,15 +295,12 @@ class WagelistSendTab(BaseAutomationTab):
                 
                 WebDriverWait(driver, 5).until(EC.alert_is_present()).accept()
                 
-                self.app.log_message(self.log_display, f"✅ {wagelist} submitted successfully.", "success")
-                return True
+                self.log_success(f"✅ {wagelist} submitted successfully.")                return True
             except Exception as e:
-                self.app.log_message(self.log_display, f"[WARN] Attempt {attempt+1} failed for {wagelist}: {type(e).__name__}", "warning")
-                if (attempt == 0):
+                self.log_warning(f"[WARN] Attempt {attempt+1} failed for {wagelist}: {type(e).__name__}")                if (attempt == 0):
                     driver.refresh()
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlfin")))
                     Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddlfin")).select_by_value(fin_year)
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_sel")))
 
-        self.app.log_message(self.log_display, f"❌ {wagelist} failed after multiple attempts.", "error")
-        return False
+        self.log_error(f"❌ {wagelist} failed after multiple attempts.")        return False

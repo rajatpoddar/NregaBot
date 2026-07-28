@@ -6,7 +6,6 @@ import json
 import os, time, csv, re, sys, subprocess
 from datetime import datetime
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -109,9 +108,9 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         # 2. Scheme Type Dropdown
         ctk.CTkLabel(settings_frame, text="Scheme Type:").grid(row=2, column=0, sticky="w", padx=10, pady=2)
         scheme_types = ["Service Focus Area"] 
-        self.scheme_type_combobox = AutocompleteEntry(settings_frame, suggestions_list=scheme_types, width=300)
-        self.scheme_type_combobox.insert(0, "Service Focus Area")
-        self.scheme_type_combobox.grid(row=2, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
+        self.scheme_type_var = ctk.StringVar(value="Service Focus Area")
+        self.scheme_type_menu = ctk.CTkOptionMenu(settings_frame, variable=self.scheme_type_var, values=scheme_types, width=300, dynamic_resizing=False)
+        self.scheme_type_menu.grid(row=2, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
         # 3. Scheme/Service Dropdown
         ctk.CTkLabel(settings_frame, text="Scheme/Service:").grid(row=3, column=0, sticky="w", padx=10, pady=2)
@@ -131,8 +130,9 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             "झारखंड राज्य सेवा देने की गारंटी अधिनियम 2011 से जुड़ी अन्य सेवाएं",
             "अन्य लोक कल्याणकारी योजनाएँ (Other Welfare Schemes)"
         ]
-        self.service_combobox = AutocompleteEntry(settings_frame, suggestions_list=service_options, width=300)
-        self.service_combobox.grid(row=3, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
+        self.service_var = ctk.StringVar()
+        self.service_menu = ctk.CTkOptionMenu(settings_frame, variable=self.service_var, values=service_options, width=300, dynamic_resizing=False)
+        self.service_menu.grid(row=3, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
         # 4. Scheme Remarks
         ctk.CTkLabel(settings_frame, text="Scheme Remarks:").grid(row=4, column=0, sticky="w", padx=10, pady=2)
@@ -249,8 +249,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
              self.app_remarks_entry.configure(state="normal")
              self.scheme_remarks_entry.configure(state="normal")
              
-        self.scheme_type_combobox.configure(state=state)
-        self.service_combobox.configure(state=state)
+        self.scheme_type_menu.configure(state=state)
+        self.service_menu.configure(state=state)
         self.file_path_entry.configure(state=state)
         self.backlog_switch.configure(state=state)
         self.export_button.configure(state=state)
@@ -330,8 +330,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         inputs = {
             'file_path': self.file_path_entry.get().strip(),
             'app_remarks': self.app_remarks_entry.get().strip(),
-            'scheme_type': self.scheme_type_combobox.get().strip(),
-            'service': self.service_combobox.get().strip(),
+            'scheme_type': self.scheme_type_var.get(),
+            'service': self.service_var.get(),
             'scheme_remarks': self.scheme_remarks_entry.get().strip(),
             'is_backlog': self.backlog_mode_var.get()
         }
@@ -418,15 +418,12 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             mode_str = "Backlog" if inputs['is_backlog'] else "Normal"
             
             if inputs['file_path']:
-                self.app.log_message(self.log_display, f"Starting BULK Mode ({mode_str})...")
-                self._run_bulk_mode(driver, wait, inputs)
+                self.log_info(f"Starting BULK Mode ({mode_str})...")                self._run_bulk_mode(driver, wait, inputs)
             else:
-                self.app.log_message(self.log_display, f"Starting MONITOR Mode ({mode_str})...")
-                self._run_monitor_mode(driver, wait, inputs)
+                self.log_info(f"Starting MONITOR Mode ({mode_str})...")                self._run_monitor_mode(driver, wait, inputs)
 
         except Exception as e:
-            self.app.log_message(self.log_display, f"Critical Error: {e}", "error")
-        finally:
+            self.log_error(f"Critical Error: {e}")        finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")
             self.app.after(0, self.progress_bar.set, 0)
@@ -447,15 +444,13 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         try:
             data = self._read_file_data(inputs['file_path'])
         except Exception as e:
-            self.app.log_message(self.log_display, str(e), "error")
-            return
+            self.log_error(str(e))            return
 
         total = len(data)
         url_fragment = "application/createBackLog" if inputs['is_backlog'] else "application/create"
         target_url = f"https://sarkaraapkedwar.jharkhand.gov.in/#/{url_fragment}"
         
-        self.app.log_message(self.log_display, f"Loaded {total} records.")
-
+        self.log_info(f"Loaded {total} records.")
         for i, row in enumerate(data):
             if self.app.stop_events[self.automation_key].is_set(): break
             
@@ -564,8 +559,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                             logger.debug("SAD: Failed to close popup: %s", e)
                         
                     except Exception as e:
-                        self.app.log_message(self.log_display, f"Popup Error: {e}", "warning")
-
+                        self.log_warning(f"Popup Error: {e}")
                     # Reset form for next entry
                     try:
                         driver.find_element(By.XPATH, "//button[contains(., 'Reset')]").click()
@@ -593,8 +587,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        self.app.log_message(self.log_display, "Monitor Mode Active. Waiting for form...")
-        last_log_time = 0
+        self.log_info("Monitor Mode Active. Waiting for form...")        last_log_time = 0
 
         while not self.app.stop_events[self.automation_key].is_set():
             try:
@@ -699,8 +692,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         self.file_path_entry.delete(0, tkinter.END)
         self.app_remarks_entry.delete(0, tkinter.END)
-        self.scheme_type_combobox.set("Service Focus Area")
-        self.service_combobox.set("")
+        self.scheme_type_var.set("Service Focus Area")
+        self.service_var.set("")
         self.scheme_remarks_entry.delete(0, tkinter.END)
         self.backlog_switch.deselect()
         self.app.clear_log(self.log_display)
@@ -711,7 +704,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
 
     def save_inputs(self, inputs):
         try:
-            with open(self.config_file, 'w') as f: json.dump(inputs, f, indent=4)
+            self.app.history_manager.save_tab_inputs_batch("sad_auto", inputs)
         except Exception as e:
             logger.warning("SAD: Failed to save inputs: %s", e)
 
@@ -736,8 +729,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                     self.file_path_entry.insert(0, file_path)
                     
                     self.app_remarks_entry.insert(0, data.get('app_remarks', ''))
-                    self.scheme_type_combobox.set(data.get('scheme_type', 'Service Focus Area'))
-                    self.service_combobox.set(data.get('service', ''))
+                    self.scheme_type_var.set(data.get('scheme_type', 'Service Focus Area'))
+                    self.service_var.set(data.get('service', ''))
                     self.scheme_remarks_entry.insert(0, data.get('scheme_remarks', ''))
                     if data.get('is_backlog', False): self.backlog_switch.select()
                     else: self.backlog_switch.deselect()

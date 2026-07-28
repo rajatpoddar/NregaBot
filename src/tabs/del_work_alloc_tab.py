@@ -17,7 +17,7 @@ from selenium.common.exceptions import (
 
 from src import config
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
+
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -59,13 +59,10 @@ class DelWorkAllocTab(BaseAutomationTab):
 
         # 1. Panchayat Name Input (with Autocomplete)
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=15)
-        self.panchayat_entry = AutocompleteEntry(
-            controls_frame, 
-            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-            app_instance=self.app,
-            history_key="location_panchayat"
-        )
-        self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=15)
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=5, pady=15)
 
         # 2. Date Filter Input (Multiple Dates Support)
         date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
@@ -171,7 +168,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         """Locks/Unlocks UI elements during automation."""
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.panchayat_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.from_date_entry.configure(state=state)
         self.cal_btn.configure(state=state)
         self.jobcards_text.configure(state=state)
@@ -185,7 +182,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         from selenium.common.exceptions import WebDriverException
         from selenium import webdriver
         """Validates inputs and spawns the automation thread."""
-        panchayat = self.panchayat_entry.get().strip()
+        panchayat = self.panchayat_var.get().strip()
         from_dates_raw = self.from_date_entry.get().strip()
 
         if not panchayat:
@@ -220,14 +217,14 @@ class DelWorkAllocTab(BaseAutomationTab):
         from selenium import webdriver
         """Resets the form to default state."""
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
-            self.panchayat_entry.delete(0, tkinter.END)
+            self.panchayat_var.set("")
             self.from_date_entry.delete(0, tkinter.END)
             self.jobcards_text.delete('1.0', tkinter.END)
             for item in self.results_tree.get_children():
                 self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.app.log_message(self.log_display, "Form has been reset.")
+            self.log_info("Form has been reset.")
             self.app.after(0, self.app.set_status, "Ready")
 
     def _safe_load_page(self, driver, url):
@@ -245,7 +242,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         """
         for attempt in range(3):
             try:
-                self.app.log_message(self.log_display, f"Loading page (Attempt {attempt+1})...")
+                self.log_info(f"Loading page (Attempt {attempt+1})...")
                 driver.get(url)
                 # Check for alert immediately after load (session expired?)
                 try:
@@ -257,7 +254,7 @@ class DelWorkAllocTab(BaseAutomationTab):
             except Exception as e:
                 err_msg = str(e).lower()
                 if "execution context" in err_msg or "target window already closed" in err_msg:
-                    self.app.log_message(self.log_display, "   -> Browser glitch detected. Retrying...", "warning")
+                    self.log_warning("Browser glitch detected. Retrying...")
                     try: 
                         # Try to stop loading or refresh to reset state
                         driver.execute_script("window.stop();")
@@ -284,7 +281,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         self.app.clear_log(self.log_display)
         
         mode_msg = f"Filtering Dates: {', '.join(target_dates)}" if target_dates else "Mode: Delete ALL"
-        self.app.log_message(self.log_display, f"Starting Delete Work Alloc. {mode_msg}")
+        self.log_info(f"Starting Delete Work Alloc. {mode_msg}")
         self.app.after(0, self.app.set_status, "Running Delete Work Allocation...")
 
         try:
@@ -318,7 +315,7 @@ class DelWorkAllocTab(BaseAutomationTab):
                         break
                 
                 if found_option_text:
-                    self.app.log_message(self.log_display, f"Selecting Panchayat: '{found_option_text}'...")
+                    self.log_info(f"Selecting Panchayat: '{found_option_text}'...")
                     
                     # Store current body element to check for staleness (Postback detection)
                     body_elem = driver.find_element(By.TAG_NAME, "body")
@@ -327,44 +324,46 @@ class DelWorkAllocTab(BaseAutomationTab):
                     
                     # --- CRITICAL: Wait for Postback ---
                     # Selection triggers __doPostBack. We MUST wait for the page to reload.
-                    self.app.log_message(self.log_display, "Waiting for page reload (Postback)...")
+                    self.log_info("Waiting for page reload (Postback)...")
                     try:
                         wait.until(EC.staleness_of(body_elem))
                     except TimeoutException:
-                        self.app.log_message(self.log_display, "Warning: Page did not seem to reload. Continuing...", "warning")
+                        self.log_warning("Page did not seem to reload. Continuing...")
                     
                     # Wait for Registration dropdown to come back
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
-                    self.app.log_message(self.log_display, "Panchayat selected successfully.", "success")
+                    self.log_success("Panchayat selected successfully.")
                     
                 else:
                     available = [o.text for o in panchayat_dropdown.options[:10]]
                     raise ValueError(f"Panchayat '{panchayat}' not found. Did you mean: {available}?")
 
             except Exception as e:
-                self.app.log_message(self.log_display, f"Error selecting Panchayat: {e}", "error")
+                self.log_error(f"Error selecting Panchayat: {e}")
                 return
 
             # 3. Determine Items to Process
             if auto_mode:
-                self.app.log_message(self.log_display, "Auto Mode: Fetching all Registration IDs.")
+                self.log_info("Auto Mode: Fetching all Registration IDs.")
                 # Locate dropdown again after refresh
                 reg_id_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration"))))
                 items_to_process = [opt.get_attribute("value") for opt in reg_id_dropdown.options if opt.get_attribute("value") and "Select" not in opt.text]
                 
                 if not items_to_process:
-                    self.app.log_message(self.log_display, "No Registration IDs found for this Panchayat.", "warning")
+                    self.log_warning("No Registration IDs found for this Panchayat.")
             else:
-                self.app.log_message(self.log_display, f"Manual Mode: Processing {len(jobcard_list)} provided IDs.")
+                self.log_info(f"Manual Mode: Processing {len(jobcard_list)} provided IDs.")
                 items_to_process = jobcard_list
 
             # 4. Process Loop
             total_items = len(items_to_process)
             for i, item_id in enumerate(items_to_process):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.app.log_message(self.log_display, "Automation stopped by user.", "warning")
+                    self.log_warning("⏹️ Automation stopped by user.")
                     break
                 
+                pct = (i + 1) / total_items * 100
+                self.log_info(f"  🔄 [{i+1}/{total_items}] Processing: {item_id} ({pct:.0f}%)")
                 self.app.after(0, self.update_status, f"Processing {i+1}/{total_items}: {item_id}", (i+1) / total_items)
                 
                 # Execute the scraping/action logic
@@ -373,8 +372,21 @@ class DelWorkAllocTab(BaseAutomationTab):
             # 5. Completion
             final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
             self.app.after(0, self.update_status, final_msg, 1.0)
-            if not self.app.stop_events[self.automation_key].is_set():
-                messagebox.showinfo("Complete", "Delete Work Allocation process has finished.")
+            
+            # Count results from tree
+            success_count = 0
+            fail_count = 0
+            for item_id in self.results_tree.get_children():
+                vals = self.results_tree.item(item_id)['values']
+                if len(vals) >= 4:
+                    st = str(vals[3]).lower()
+                    if 'success' in st:
+                        success_count += 1
+                    elif 'fail' in st or 'error' in st:
+                        fail_count += 1
+            self.log_info(f"\n{'='*50}")
+            self.log_info(f"📊 Delete Work Allocation: ✅ {success_count} deleted, ❌ {fail_count} failed (of {total_items} total)")
+            self.log_info(f"{'='*50}")
 
         except Exception as e:
             # Uses the Centralized Error Handler from BaseAutomationTab
@@ -399,7 +411,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         try:
             # A. Select or Search the ID
             if not is_auto_mode:
-                self.app.log_message(self.log_display, f"Searching for Jobcard/RegID: {item_id}")
+                self.log_info(f"Searching for Jobcard/RegID: {item_id}")
                 search_box = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_txtRegSearch")))
                 search_box.clear()
                 search_box.send_keys(item_id)
@@ -424,9 +436,9 @@ class DelWorkAllocTab(BaseAutomationTab):
             try:
                 grid_wait = WebDriverWait(driver, 4) # Shorter wait to prevent getting stuck
                 grid_view = grid_wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_GridView1")))
-                self.app.log_message(self.log_display, f"Details loaded for {item_id}.")
+                self.log_info(f"Details loaded for {item_id}.")
             except TimeoutException:
-                self.app.log_message(self.log_display, f"No applicant rows/allocations found for {item_id}. Skipping.", "info")
+                self.log_info(f"No applicant rows/allocations found for {item_id}. Skipping.")
                 self._log_result(panchayat, item_id, "Skipped", "No allocations found.")
                 return # Exit gracefully and move to the next ID
             
@@ -462,7 +474,7 @@ class DelWorkAllocTab(BaseAutomationTab):
                     self._log_result(panchayat, item_id, "Skipped", f"No rows matched selected dates.")
                     return
                 else:
-                    self.app.log_message(self.log_display, f"Found {matches_found} matching allocation(s).")
+                    self.log_info(f"Found {matches_found} matching allocation(s).")
 
             else:
                 # --- Select All Mode ---
@@ -497,7 +509,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         except (TimeoutException, NoSuchElementException, StaleElementReferenceException, ValueError) as e:
             # Handle item-specific errors without crashing the whole thread
             error_msg = str(e).split('\n')[0]
-            self.app.log_message(self.log_display, f"Failed to process {item_id}: {error_msg}", "error")
+            self.log_error(f"Failed to process {item_id}: {error_msg}")
             self._log_result(panchayat, item_id, "Failed", error_msg)
             
             # Attempt Recovery (Reload page to reset state)
@@ -518,7 +530,7 @@ class DelWorkAllocTab(BaseAutomationTab):
                 wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
 
             except Exception as recovery_e:
-                self.app.log_message(self.log_display, f"Recovery failed: {recovery_e}", "error")
+                self.log_error(f"Recovery failed: {recovery_e}")
 
     def _log_result(self, panchayat, item_id, status, details):
         """Adds a row to the Results Treeview."""

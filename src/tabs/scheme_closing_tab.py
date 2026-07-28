@@ -11,8 +11,9 @@ import re
 from datetime import datetime
 
 from src import config
+from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
+
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class SchemeClosingTab(BaseAutomationTab):
@@ -52,13 +53,10 @@ class SchemeClosingTab(BaseAutomationTab):
 
         # Row 0: Panchayat
         ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
-        self.panchayat_entry = AutocompleteEntry(
-            input_frame, 
-            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-            app_instance=self.app,
-            history_key="location_panchayat"
-        )
-        self.panchayat_entry.grid(row=0, column=1, columnspan=3, padx=15, pady=(15, 5), sticky="ew")
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=0, column=1, columnspan=3, padx=15, pady=(15, 5), sticky="ew")
 
         # Row 1: Work Category
         ctk.CTkLabel(input_frame, text="Work Category:").grid(row=1, column=0, padx=15, pady=5, sticky="w")
@@ -91,14 +89,10 @@ class SchemeClosingTab(BaseAutomationTab):
 
         # Row 4: Measured By (Name)
         ctk.CTkLabel(input_frame, text="Measured by (Name):").grid(row=4, column=0, padx=15, pady=5, sticky="w")
-        self.measured_name_entry = AutocompleteEntry(
-            input_frame, 
-            placeholder_text="e.g., AKHILESH KUMAR",
-            suggestions_list=self.app.history_manager.get_suggestions("staff_name"),
-            app_instance=self.app,
-            history_key="staff_name"
-        )
-        self.measured_name_entry.grid(row=4, column=1, padx=15, pady=5, sticky="ew")
+        s_vals = self.app.history_manager.get_suggestions("staff_name") or [""]
+        self.measured_name_var = ctk.StringVar()
+        self.measured_name_menu = ctk.CTkOptionMenu(input_frame, variable=self.measured_name_var, values=s_vals)
+        self.measured_name_menu.grid(row=4, column=1, padx=15, pady=5, sticky="ew")
         
         # Row 5: Completion Certificate Start No
         ctk.CTkLabel(input_frame, text="Completion Cert. Start No:").grid(row=5, column=0, padx=15, pady=5, sticky="w")
@@ -216,11 +210,11 @@ class SchemeClosingTab(BaseAutomationTab):
 
     def _get_inputs(self):
         inputs = {
-            "panchayat": self.panchayat_entry.get().strip(),
+            "panchayat": self.panchayat_var.get().strip(),
             "work_category": self.work_category_var.get(),
             "area": self.area_entry.get().strip(),
             "measured_by": self.measured_by_var.get(),
-            "measured_name": self.measured_name_entry.get().strip(),
+            "measured_name": self.measured_name_var.get().strip(),
             "cert_no_start": self.cert_no_entry.get().strip(),
             "completion_date": self.completion_date_entry.get().strip(),
             "work_codes_raw": self.work_codes_textbox.get("1.0", "end").strip()
@@ -231,33 +225,24 @@ class SchemeClosingTab(BaseAutomationTab):
     def _save_inputs(self, inputs):
         save_data = {k: v for k, v in inputs.items() if k not in ["work_codes_raw", "work_codes"]}
         try:
-            with open(self.app.get_data_path("scheme_closing_inputs.json"), 'w') as f:
-                json.dump(save_data, f, indent=4)
+            self.app.history_manager.save_tab_inputs_batch("scheme_closing", save_data)
         except Exception as e:
             print(f"Error saving inputs: {e}")
 
     def _load_saved_inputs(self):
-        try:
-            with open(self.app.get_data_path("scheme_closing_inputs.json"), 'r') as f:
-                data = json.load(f)
-            self.panchayat_entry.insert(0, data.get("panchayat", ""))
+        data = self.app.history_manager.get_tab_inputs("scheme_closing")
+        if data:
+            self.panchayat_var.set(data.get("panchayat", ""))
             self.work_category_var.set(data.get("work_category", "Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers"))
             self.area_entry.insert(0, data.get("area", ""))
             self.measured_by_var.set(data.get("measured_by", "Junior Engineer(BP)"))
-            self.measured_name_entry.insert(0, data.get("measured_name", ""))
+            self.measured_name_var.set(data.get("measured_name", ""))
             self.cert_no_entry.insert(0, data.get("cert_no_start", ""))
             
             # --- FIX: Use delete/insert instead of set_date ---
             date_val = data.get("completion_date", "")
             self.completion_date_entry.delete(0, "end")
             self.completion_date_entry.insert(0, date_val)
-            
-        except FileNotFoundError:
-            # Set today's date if no file found
-            self.completion_date_entry.delete(0, "end")
-            self.completion_date_entry.insert(0, datetime.now().strftime("%d/%m/%Y"))
-        except Exception as e:
-            print(f"Error loading inputs: {e}")
     def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -304,8 +289,7 @@ class SchemeClosingTab(BaseAutomationTab):
         
         self.app.after(0, self.app.set_status, "Running Scheme Closing...")
 
-        self.app.log_message(self.log_display, "--- Starting Scheme Closing ---")
-        
+        self.log_info("--- Starting Scheme Closing ---")        
         driver = self.app.get_driver()
         if not driver:
             messagebox.showerror("Browser Not Found", "Please launch a browser first.")
@@ -318,45 +302,40 @@ class SchemeClosingTab(BaseAutomationTab):
             success_count = 0
             fail_count = 0
 
+            total_codes = len(inputs["work_codes"])
             for i, work_code in enumerate(inputs["work_codes"]):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.app.log_message(self.log_display, "Automation stopped by user.", "warning")
-                    break
+                    self.log_warning("⏹️ Automation stopped by user.")                    break
                 
-                # --- MODIFICATION: Improved Status Reporting ---
-                status_msg = f"Processing {i+1}/{total_codes}: {work_code}"
-                progress = (i + 1) / total_codes
-                self.app.after(0, self.app.set_status, status_msg) # मुख्य (main) स्टेटस बार
-                self.app.after(0, self.update_status, status_msg, progress) # टैब का स्टेटस बार
-                # --- END MODIFICATION ---
+                pct = (i + 1) / total_codes * 100
+                status_msg = f"[{i+1}/{total_codes}] {truncate_workcode(work_code)} ({pct:.0f}%)"
+                self.app.after(0, self.app.set_status, f"Processing: {status_msg}")
+                self.app.after(0, self.update_status, f"Processing {i+1}/{total_codes}", (i+1)/total_codes)
                 
-                self.app.log_message(self.log_display, f"\n--- Processing Work Code: {work_code} ---")
-                
+                self.log_info(f"  🔄 [{i+1}/{total_codes}] Closing: {truncate_workcode(work_code)}")                
                 status, details = self._process_single_work_code(driver, inputs, work_code, current_cert_no)
                 self._log_result(work_code, status, details)
                 
                 if status == "Success":
                     current_cert_no += 1
                     success_count += 1
-                else:
+                    self.log_success(f"    ✅ {truncate_workcode(work_code)}: Closed (Cert #{current_cert_no-1})")                else:
                     fail_count += 1
-
-            completion_message = f"Automation Finished!\n\nSuccessful: {success_count}\nFailed/Cancelled: {fail_count}"
-            messagebox.showinfo("Task Complete", completion_message)
-
+                    self.log_error(f"    ❌ {truncate_workcode(work_code)}: {details}")
+            self.log_info(f"
+{'='*50}")            self.log_info(f"📊 Scheme Closing: ✅ {success_count} closed, ❌ {fail_count} failed (of {total_codes} total)")            self.log_info(f"{'='*50}")
         except Exception as e:
-            self.app.log_message(self.log_display, f"A critical error occurred: {str(e).splitlines()[0]}", "error")
-        
+            self.log_error(f"A critical error occurred: {str(e).splitlines()[0]}")        
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.update_status("Automation Finished", 1.0)
-            self.app.log_message(self.log_display, "\n--- Automation Finished ---")
-            self.app.after(0, self.app.set_status, "Automation Finished")
+            self.log_info("
+--- Automation Finished ---")            self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _log_result(self, work_code, status, details):
         timestamp = time.strftime("%H:%M:%S")
         tags = ('failed',) if 'success' not in status.lower() else ()
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, work_code, status, details), tags=tags))
+        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, truncate_workcode(work_code), status, details), tags=tags))
 
     def _process_single_work_code(self, driver, inputs, work_code, cert_no):
         # ---- Lazy imports ----
@@ -373,18 +352,15 @@ class SchemeClosingTab(BaseAutomationTab):
         
         try:
             driver.get(url)
-            self.app.log_message(self.log_display, "   - Page 1: Selecting Panchayat...")
-            panchayat_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlPanchayat")))
+            self.log_info("   - Page 1: Selecting Panchayat...")            panchayat_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlPanchayat")))
             self._select_by_text_case_insensitive(Select(panchayat_select_element), inputs["panchayat"])
             wait.until(EC.staleness_of(panchayat_select_element))
 
-            self.app.log_message(self.log_display, "   - Page 1: Selecting Work Category...")
-            category_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlWorkCategroy")))
+            self.log_info("   - Page 1: Selecting Work Category...")            category_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlWorkCategroy")))
             Select(category_select_element).select_by_visible_text(inputs["work_category"])
             wait.until(EC.staleness_of(category_select_element))
 
-            self.app.log_message(self.log_display, "   - Page 1: Searching for Work Code...")
-            wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
+            self.log_info("   - Page 1: Searching for Work Code...")            wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
 
             time.sleep(1.5)  # Brief wait for postback to begin
 
@@ -403,15 +379,13 @@ class SchemeClosingTab(BaseAutomationTab):
             if not option_found: return "Failed", f"Work code {work_code} not found."
             wait.until(EC.staleness_of(work_dropdown_element))
             
-            self.app.log_message(self.log_display, "   - Page 1: Filling completion details...")
-            work_name_full = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_Pnl_lblworkcode"))).text
+            self.log_info("   - Page 1: Filling completion details...")            work_name_full = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_Pnl_lblworkcode"))).text
             
             area_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_Txtactualbenarea")))
             if not area_input.get_attribute("value"):
                 area_input.send_keys(inputs["area"])
             else:
-                self.app.log_message(self.log_display, "   - Actual Benefited Area is already filled, skipping.")
-
+                self.log_info("   - Actual Benefited Area is already filled, skipping.")
             Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_Ddldesignation")))).select_by_visible_text(inputs["measured_by"])
             
             long_wait.until(EC.presence_of_element_located((By.XPATH, f"//select[@id='ctl00_ContentPlaceHolder1_Ddlmeasured']/option[text()='{inputs['measured_name']}']")))
@@ -427,20 +401,15 @@ class SchemeClosingTab(BaseAutomationTab):
                 )
                 if not excavation_input.get_attribute("value"):
                     excavation_input.send_keys("1")
-                    self.app.log_message(self.log_display, "   - Excavation(cum) field found and filled with '1'.", "info")
-                else:
-                    self.app.log_message(self.log_display, "   - Excavation(cum) field found but already filled.", "info")
-            except TimeoutException:
-                self.app.log_message(self.log_display, "   - Excavation(cum) field not found on this page, skipping.", "info")
-            
+                    self.log_info("   - Excavation(cum) field found and filled with '1'.")                else:
+                    self.log_info("   - Excavation(cum) field found but already filled.")            except TimeoutException:
+                self.log_info("   - Excavation(cum) field not found on this page, skipping.")            
             driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_BtnNext").click()
             
-            self.app.log_message(self.log_display, "   - Page 2: Waiting for page to load...")
-            asset_name_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Name")))
+            self.log_info("   - Page 2: Waiting for page to load...")            asset_name_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Name")))
             asset_desc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Description")))
             
-            self.app.log_message(self.log_display, "   - Page 2: Filling Asset Name and Description...")
-            asset_name_input.clear()
+            self.log_info("   - Page 2: Filling Asset Name and Description...")            asset_name_input.clear()
             asset_name_input.send_keys("Completed")
             asset_desc_input.clear()
             asset_desc_input.send_keys("Completed")
@@ -464,8 +433,7 @@ class SchemeClosingTab(BaseAutomationTab):
                     return "Failed", f"Unexpected alert: {alert_text}"
 
             except TimeoutException:
-                self.app.log_message(self.log_display, "   - No success alert detected, checking page for status...")
-                page_source = driver.page_source
+                self.log_info("   - No success alert detected, checking page for status...")                page_source = driver.page_source
                 if "Work has been Completed Successfully" in page_source:
                     return "Success", "Work completed successfully (page)."
                 else:
@@ -477,12 +445,10 @@ class SchemeClosingTab(BaseAutomationTab):
 
         except (TimeoutException, NoSuchElementException, NoAlertPresentException) as e:
             error_message = str(e).splitlines()[0] if str(e) else "No error message"
-            self.app.log_message(self.log_display, f"   - Error: {error_message}", "error")
-            return "Failed", f"Error on page: {error_message}"
+            self.log_error(f"   - Error: {error_message}")            return "Failed", f"Error on page: {error_message}"
         except Exception as e:
             error_message = str(e).splitlines()[0] if str(e) else "No error message"
-            self.app.log_message(self.log_display, f"   - An unexpected error occurred: {error_message}", "error")
-            return "Failed", f"An unexpected error occurred: {error_message}"
+            self.log_error(f"   - An unexpected error occurred: {error_message}")            return "Failed", f"An unexpected error occurred: {error_message}"
     def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -493,11 +459,11 @@ class SchemeClosingTab(BaseAutomationTab):
         from selenium.common.exceptions import NoAlertPresentException
         from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure? This will clear all inputs."):
-            self.panchayat_entry.delete(0, "end")
+            self.panchayat_var.set("")
             self.work_category_var.set("Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers")
             self.area_entry.delete(0, "end")
             self.measured_by_var.set("Junior Engineer(BP)")
-            self.measured_name_entry.delete(0, "end")
+            self.measured_name_var.set("")
             self.cert_no_entry.delete(0, "end")
             
             # --- FIX: Use delete instead of clear() ---
@@ -515,11 +481,11 @@ class SchemeClosingTab(BaseAutomationTab):
             return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.panchayat_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.work_category_menu.configure(state=state)
         self.area_entry.configure(state=state)
         self.measured_by_menu.configure(state=state)
-        self.measured_name_entry.configure(state=state)
+        self.measured_name_menu.configure(state=state)
         self.cert_no_entry.configure(state=state)
         self.completion_date_entry.configure(state=state)
         self.work_codes_textbox.configure(state=state)
@@ -563,7 +529,7 @@ class SchemeClosingTab(BaseAutomationTab):
         from selenium.common.exceptions import NoAlertPresentException
         from selenium import webdriver
         if not self.results_tree.get_children(): messagebox.showinfo("No Data", "No results to export."); return None, None
-        location_panchayat = self.panchayat_entry.get().strip()
+        location_panchayat = self.panchayat_var.get().strip()
         if not location_panchayat: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
         
         filter_option = self.export_filter_menu.get()
@@ -592,7 +558,7 @@ class SchemeClosingTab(BaseAutomationTab):
         from selenium.webdriver.common.keys import Keys
         from selenium.common.exceptions import NoAlertPresentException
         from selenium import webdriver
-        title = f"Scheme Closing Report: {self.panchayat_entry.get().strip()}"
+        title = f"Scheme Closing Report: {self.panchayat_var.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
         if success and messagebox.askyesno("Success", f"PDF Report saved to:\n{file_path}\n\nDo you want to open it?"):

@@ -6,7 +6,6 @@ import threading
 import time
 from datetime import datetime
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class MacroManagerTab(BaseAutomationTab):
@@ -116,9 +115,12 @@ class MacroManagerTab(BaseAutomationTab):
             # --- UI For Bulk Demand ---
             ctk.CTkLabel(self.input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
             
-            p_entry = AutocompleteEntry(self.input_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, width=200)
+            p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+            p_var = ctk.StringVar()
+            p_entry = ctk.CTkOptionMenu(self.input_frame, variable=p_var, values=p_vals, width=200)
             p_entry.grid(row=0, column=1, padx=10, pady=5, sticky="w")
             self.bulk_inputs['panchayat'] = p_entry
+            self.bulk_inputs['panchayat_var'] = p_var
 
             ctk.CTkLabel(self.input_frame, text="Select CSV File:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
             
@@ -145,7 +147,9 @@ class MacroManagerTab(BaseAutomationTab):
             ctk.CTkLabel(self.input_frame, text="Target Panchayat(s):").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
             
             # Re-create the standard target entry
-            self.target_entry = AutocompleteEntry(self.input_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, width=200)
+            t_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+            self.target_var = ctk.StringVar()
+            self.target_entry = ctk.CTkOptionMenu(self.input_frame, variable=self.target_var, values=t_vals, width=200)
             self.target_entry.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
             
             btn_frame = ctk.CTkFrame(self.input_frame, fg_color="transparent")
@@ -159,7 +163,7 @@ class MacroManagerTab(BaseAutomationTab):
         
         # --- Logic for Bulk Demand ---
         if task == "Bulk Demand (CSV)":
-            p_name = self.bulk_inputs['panchayat'].get().strip()
+            p_name = self.bulk_inputs['panchayat_var'].get().strip()
             f_path = self.bulk_inputs['filepath'].get().strip()
             
             if not p_name or not f_path:
@@ -185,13 +189,13 @@ class MacroManagerTab(BaseAutomationTab):
             self.queue_tree.insert("", "end", iid=str(item_id), values=(item_id, "Bulk Demand", p_name, "Pending", item['msg']), tags=('Pending',))
             
             # Clear inputs
-            self.bulk_inputs['panchayat'].delete(0, "end")
+            self.bulk_inputs['panchayat_var'].set("")
             self.bulk_inputs['filepath'].delete(0, "end")
             
         # --- Logic for Standard Tasks ---
         else:
             if not self.target_entry: return
-            target = self.target_entry.get().strip()
+            target = self.target_var.get().strip()
             
             if not target:
                 messagebox.showwarning("Input", "Please enter a Panchayat Name.")
@@ -205,16 +209,14 @@ class MacroManagerTab(BaseAutomationTab):
                 self.queue_items.append(item)
                 self.queue_tree.insert("", "end", iid=str(item_id), values=(item_id, task, t, "Pending", "Waiting..."), tags=('Pending',))
             
-            self.target_entry.delete(0, "end")
+            self.target_var.set("")
             
-        self.app.log_message(self.log_display, "Task added to queue.")
-
+        self.log_info("Task added to queue.")
     def clear_queue(self):
         self.queue_items.clear()
         for item in self.queue_tree.get_children():
             self.queue_tree.delete(item)
-        self.app.log_message(self.log_display, "Queue cleared.")
-
+        self.log_info("Queue cleared.")
     def update_item_status(self, item_id, status, msg=""):
         try:
             for item in self.queue_items:
@@ -246,8 +248,7 @@ class MacroManagerTab(BaseAutomationTab):
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
         
-        self.app.log_message(self.log_display, ">>> Starting Macro Queue Execution...")
-        self.notebook.set("Logs & Status") 
+        self.log_info(">>> Starting Macro Queue Execution...")        self.notebook.set("Logs & Status") 
         
         self.app.start_automation_thread(self.automation_key, self.app.workflows.process_global_queue, args=(self,))
 

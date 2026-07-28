@@ -11,7 +11,6 @@ from io import StringIO
 # --- MODIFIED IMPORTS ---
 
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
 from src import config
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -70,26 +69,37 @@ class MisReportsTab(BaseAutomationTab):
         settings_container.grid(row=0, column=0, sticky="nsew", padx=5)
         settings_container.grid_columnconfigure(1, weight=1)
         
+        # --- Create all entries first (no cross-references) ---
         ctk.CTkLabel(settings_container, text="State:").grid(row=0, column=0, sticky='w', padx=15, pady=5)
-        self.state_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("location_state"), app_instance=self.app, history_key="location_state",
-                                             command=self._make_parent_callback("location_state", [
-                                                 (self.district_entry, "location_district"),
-                                                 (self.block_entry, "location_block"),
-                                             ]))
-        self.state_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=5)
+        s_vals = self.app.history_manager.get_suggestions("location_state") or [""]
+        self.state_var = ctk.StringVar()
+        self.state_menu = ctk.CTkOptionMenu(settings_container, variable=self.state_var, values=s_vals)
+        self.state_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(settings_container, text="District:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
-        self.district_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("location_district"), app_instance=self.app, history_key="location_district",
-                                                filter_func=self._make_filter_func("location_district", "location_state", self.state_entry),
-                                                command=self._make_parent_callback("location_district", [
-                                                    (self.block_entry, "location_block"),
-                                                ]))
-        self.district_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
-        
+        d_vals = self.app.history_manager.get_suggestions("location_district") or [""]
+        self.district_var = ctk.StringVar()
+        self.district_menu = ctk.CTkOptionMenu(settings_container, variable=self.district_var, values=d_vals)
+        self.district_menu.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
+
         ctk.CTkLabel(settings_container, text="Block:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
-        self.block_entry = AutocompleteEntry(settings_container, suggestions_list=self.app.history_manager.get_suggestions("location_block"), app_instance=self.app, history_key="location_block",
-                                             filter_func=self._make_filter_func("location_block", "location_district", self.district_entry))
-        self.block_entry.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
+        b_vals = self.app.history_manager.get_suggestions("location_block") or [""]
+        self.block_var = ctk.StringVar()
+        self.block_menu = ctk.CTkOptionMenu(settings_container, variable=self.block_var, values=b_vals)
+        self.block_menu.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
+
+        # --- Wire up location hierarchy callbacks now (all widgets exist) ---
+        def _on_state_change(*_):
+            self.district_var.set(""); self.block_var.set("")
+            vals = self.app.history_manager.get_filtered_suggestions("location_district", "location_state", self.state_var.get()) or [""]
+            self.district_menu.configure(values=vals)
+        self.state_var.trace_add("write", _on_state_change)
+        
+        def _on_district_change(*_):
+            self.block_var.set("")
+            vals = self.app.history_manager.get_filtered_suggestions("location_block", "location_district", self.district_var.get()) or [""]
+            self.block_menu.configure(values=vals)
+        self.district_var.trace_add("write", _on_district_change)
 
         # Checkbox list for reports
         self.reports_frame = ctk.CTkFrame(settings_tab)
@@ -150,9 +160,9 @@ class MisReportsTab(BaseAutomationTab):
         state = "disabled" if running else "normal"
         
         # Disable the individual text entry fields
-        self.state_entry.configure(state=state)
-        self.district_entry.configure(state=state)
-        self.block_entry.configure(state=state)
+        self.state_menu.configure(state=state)
+        self.district_menu.configure(state=state)
+        self.block_menu.configure(state=state)
 
         # Disable all widgets within the reports_frame (checkboxes, buttons)
         # This is the corrected logic that avoids the winfo_descendants error.
@@ -182,7 +192,7 @@ class MisReportsTab(BaseAutomationTab):
         
         selected_reports = [name for name, var in self.report_checkboxes.items() if var.get() == 1]
         
-        inputs = {'state': self.state_entry.get().strip(), 'district': self.district_entry.get().strip(), 'block': self.block_entry.get().strip(), 'reports': selected_reports}
+        inputs = {'state': self.state_var.get().strip(), 'district': self.district_var.get().strip(), 'block': self.block_var.get().strip(), 'reports': selected_reports}
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['reports']]):
             messagebox.showwarning("Input Error", "State, District, Block, and at least one Report are required."); return
@@ -231,8 +241,7 @@ class MisReportsTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        self.app.log_message(self.log_display, "Attempting to solve CAPTCHA...")
-        captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
+        self.log_info("Attempting to solve CAPTCHA...")        captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
         captcha_text = wait.until(EC.presence_of_element_located((By.ID, captcha_label_id))).text
         match = re.search(r'(\d+)\s*([+\-*])\s*(\d+)', captcha_text)
         if not match: raise ValueError("Could not parse CAPTCHA expression.")
@@ -241,8 +250,7 @@ class MisReportsTab(BaseAutomationTab):
         if operator == '+': result = num1 + num2
         elif operator == '-': result = num1 - num2
         elif operator == '*': result = num1 * num2
-        self.app.log_message(self.log_display, f"Solved: {captcha_text.strip()} = {result}")
-        driver.find_element(By.ID, captcha_textbox_id).send_keys(str(result))
+        self.log_info(f"Solved: {captcha_text.strip()} = {result}")        driver.find_element(By.ID, captcha_textbox_id).send_keys(str(result))
         driver.find_element(By.ID, verify_button_id).click()
         return True
 
@@ -276,50 +284,39 @@ class MisReportsTab(BaseAutomationTab):
                     # ---
                     
                     self.app.after(0, self.update_status, f"Processing {report_name}", (i+1)/total_reports)
-                    self.app.log_message(self.log_display, f"--- Processing report {i+1}/{total_reports}: {report_name} ---")
-                    
+                    self.log_info(f"--- Processing report {i+1}/{total_reports}: {report_name} ---")                    
                     report_df = pd.DataFrame() # Initialize empty dataframe
                     png_success = False
                     details = ""
                     
                     try:
-                        self.app.log_message(self.log_display, "Navigating to portal and solving CAPTCHA...")
-                        driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+                        self.log_info("Navigating to portal and solving CAPTCHA...")                        driver.get(config.MIS_REPORTS_CONFIG["base_url"])
                         self._solve_captcha(driver, wait)
-                        self.app.log_message(self.log_display, "CAPTCHA verified. Selecting state...")
-                        state_dropdown = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
+                        self.log_info("CAPTCHA verified. Selecting state...")                        state_dropdown = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
                         self._select_by_text_case_insensitive(Select(state_dropdown), inputs['state'])
                         wait.until(EC.presence_of_element_located((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
-                        self.app.log_message(self.log_display, f"Finding and scrolling to '{report_name}'...")
-                        report_link = wait.until(EC.presence_of_element_located((By.LINK_TEXT, report_name.strip())))
+                        self.log_info(f"Finding and scrolling to '{report_name}'...")                        report_link = wait.until(EC.presence_of_element_located((By.LINK_TEXT, report_name.strip())))
                         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", report_link)
                         time.sleep(1); report_link.click()
                         if "Aadhaar Status" in report_name:
-                            self.app.log_message(self.log_display, "Handling special case, selecting State again...")
-                            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['state'].upper()))).click()
-                        self.app.log_message(self.log_display, f"Drilling down to District: {inputs['district']}")
-                        wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
+                            self.log_info("Handling special case, selecting State again...")                            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['state'].upper()))).click()
+                        self.log_info(f"Drilling down to District: {inputs['district']}")                        wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
                         if "Rejected Wage" in report_name:
-                            self.app.log_message(self.log_display, "Handling special case for Rejected Wage report...")
-                            block_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[normalize-space()='{inputs['block'].upper()}']/ancestor::tr")))
+                            self.log_info("Handling special case for Rejected Wage report...")                            block_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[normalize-space()='{inputs['block'].upper()}']/ancestor::tr")))
                             block_row.find_element(By.XPATH, ".//td[5]/a").click()
                         else:
-                            self.app.log_message(self.log_display, f"Drilling down to Block: {inputs['block']}")
-                            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['block'].upper()))).click()
+                            self.log_info(f"Drilling down to Block: {inputs['block']}")                            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['block'].upper()))).click()
                         
-                        self.app.log_message(self.log_display, "Final page reached. Reading table...")
-                        time.sleep(2)
+                        self.log_info("Final page reached. Reading table...")                        time.sleep(2)
                         
                         try:
                             df_list = pd.read_html(StringIO(driver.page_source), header=[0, 1])
                             report_df = df_list[-1]
                             report_df.columns = [col[1] for col in report_df.columns]
                             if not report_df.empty and str(report_df.iloc[0, 0]).strip() == '1' and str(report_df.iloc[0, 1]).strip().startswith('2'):
-                                self.app.log_message(self.log_display, "Detected and removed junk numeric header row from data.", "warning")
-                                report_df = report_df.iloc[1:].reset_index(drop=True)
+                                self.log_warning("Detected and removed junk numeric header row from data.")                                report_df = report_df.iloc[1:].reset_index(drop=True)
                         except ValueError:
-                            self.app.log_message(self.log_display, "Could not parse multi-level header. Trying single header.", "warning")
-                            df_list = pd.read_html(StringIO(driver.page_source), header=0)
+                            self.log_warning("Could not parse multi-level header. Trying single header.")                            df_list = pd.read_html(StringIO(driver.page_source), header=0)
                             report_df = df_list[-1]
 
                         sheet_name = re.sub(r'[\\/*?:\[\]]', '', report_name)[:30]
@@ -372,12 +369,10 @@ class MisReportsTab(BaseAutomationTab):
                         # --- END: FINAL EXCEL FORMATTING ---
                         
                         details = f"Saved to sheet: {sheet_name}"
-                        self.app.log_message(self.log_display, f"Successfully saved and formatted '{report_name}' to sheet '{sheet_name}'.", "success")
-                        
+                        self.log_success(f"Successfully saved and formatted '{report_name}' to sheet '{sheet_name}'.")                        
                         # --- NEW: Generate PNG ---
                         if not report_df.empty:
-                            self.app.log_message(self.log_display, f"Generating PNG for '{report_name}'...")
-                            headers = list(report_df.columns)
+                            self.log_info(f"Generating PNG for '{report_name}'...")                            headers = list(report_df.columns)
                             data = report_df.values.tolist()
                             date_str = datetime.now().strftime('%d-%m-%Y')
                             output_dir = os.path.dirname(save_path)
@@ -387,66 +382,52 @@ class MisReportsTab(BaseAutomationTab):
                             png_success = self.generate_report_image(data, headers, report_name, date_str, png_output_path)
                             
                             if png_success:
-                                self.app.log_message(self.log_display, f"Successfully saved PNG for '{report_name}'.", "success")
-                                details += " | PNG saved."
+                                self.log_success(f"Successfully saved PNG for '{report_name}'.")                                details += " | PNG saved."
                             else:
-                                self.app.log_message(self.log_display, f"Failed to save PNG for '{report_name}'.", "warning")
-                                details += " | PNG failed."
+                                self.log_warning(f"Failed to save PNG for '{report_name}'.")                                details += " | PNG failed."
                         else:
-                            self.app.log_message(self.log_display, f"Skipping PNG for '{report_name}' (no data).", "warning")
-                            details += " | PNG skipped."
+                            self.log_warning(f"Skipping PNG for '{report_name}' (no data).")                            details += " | PNG skipped."
                         # --- END NEW ---
                         
                         self.app.after(0, lambda r=report_name, d=details: self.results_tree.insert("", "end", values=(r, "Success", d)))
 
                     except Exception as e:
                         error_msg = str(e).split('\n')[0]
-                        self.app.log_message(self.log_display, f"Failed to process '{report_name}': {error_msg}", "error")
-                        self.app.after(0, lambda r=report_name, d=error_msg: self.results_tree.insert("", "end", values=(r, "Failed", d), tags=('failed',)))
+                        self.log_error(f"Failed to process '{report_name}': {error_msg}")                        self.app.after(0, lambda r=report_name, d=error_msg: self.results_tree.insert("", "end", values=(r, "Failed", d), tags=('failed',)))
             
-            self.app.log_message(self.log_display, f"Process complete. Excel file saved at: {save_path}", "success")
-            
+            self.log_success(f"Process complete. Excel file saved at: {save_path}")            
         except Exception as e:
-            error_msg = str(e).split('\n')[0]; self.app.log_message(self.log_display, f"A critical error occurred: {error_msg}", "error"); messagebox.showerror("Critical Error", error_msg)
-        finally:
+            error_msg = str(e).split('\n')[0]; self.log_info(f"A critical error occurred: {error_msg}", "error"); messagebox.showerror("Critical Error", error_msg)        finally:
             self.app.after(0, self.set_ui_state, False); 
             self.app.after(0, self.update_status, "Automation Finished", 1.0); 
             self.app.after(0, self.app.set_status, "Automation Finished")
             
             if not self.app.stop_events[self.automation_key].is_set():
-                self.app.after(100, lambda: messagebox.showinfo("Complete", f"MIS Report generation has finished.\nFile(s) saved near: {save_path}"))
+                self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 MIS Report generated. File(s) saved near: {save_path}"))
             
             self.app.after(5000, lambda: self.app.set_status("Ready")) # Reset app status
             self.app.after(5000, lambda: self.update_status("Ready", 0.0)) # Reset tab status
 
     def save_inputs(self, inputs):
         try:
-            with open(self.config_file, 'w') as f:
-                json.dump(inputs, f, indent=4)
+            self.app.history_manager.save_tab_inputs_batch("mis_reports", inputs)
         except Exception as e:
             print(f"Error saving MIS inputs: {e}")
 
     def load_inputs(self):
-        if not os.path.exists(self.config_file): return
-        try:
-            with open(self.config_file, 'r') as f:
-                data = json.load(f)
-            self.state_entry.delete(0, tkinter.END)
-            self.state_entry.insert(0, data.get('state', ''))
-            self.district_entry.delete(0, tkinter.END)
-            self.district_entry.insert(0, data.get('district', ''))
-            self.block_entry.delete(0, tkinter.END)
-            self.block_entry.insert(0, data.get('block', ''))
-        except Exception as e:
-            print(f"Error loading MIS inputs: {e}")
+        data = self.app.history_manager.get_tab_inputs("mis_reports")
+        if data:
+            self.state_var.set(data.get('state', ''))
+            self.district_var.set(data.get('district', ''))
+            self.block_var.set(data.get('block', ''))
     def reset_ui(self) -> None:
         """Resets inputs and checkboxes."""
         super().reset_ui() # Call base to clear logs/status
         
         # Clear Text Inputs
-        self.state_entry.delete(0, tkinter.END)
-        self.district_entry.delete(0, tkinter.END)
-        self.block_entry.delete(0, tkinter.END)
+        self.state_var.set("")
+        self.district_var.set("")
+        self.block_var.set("")
         
         # Reset Checkboxes to Checked
         self._toggle_all_checkboxes(select=True)

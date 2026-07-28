@@ -4,6 +4,7 @@ import tkinter as tk
 import webbrowser
 import os
 import re
+import time
 import platform
 import subprocess
 import threading
@@ -478,75 +479,291 @@ class MarqueeLabel(ctk.CTkFrame):
         except Exception:
             self.is_running = False
 
-# --- 5. TOAST NOTIFICATION (Popup) ---
+# --- 5. PROFESSIONAL TOAST NOTIFICATION ---
+# A sleek, modern notification system that slides in from the bottom-right
+# of the parent window. Features:
+#   - Slide-in animation from right edge
+#   - Auto-dismiss with visible progress bar
+#   - Title + message + details support
+#   - Close button (click to dismiss instantly)
+#   - Click-to-dismiss anywhere
+#   - Color-coded by type (success/error/info/warning)
+#   - Duration display
+
 class ToastNotification(ctk.CTkToplevel):
-    def __init__(self, parent: Any, message: str, kind: str = "success", duration: int = 3000) -> None:
+    """Professional toast notification with slide-in, progress bar, and close button."""
+
+    _active_toasts: List['ToastNotification'] = []  # Class-level queue
+    _MAX_VISIBLE = 3  # Max toasts shown simultaneously
+
+    def __init__(self, parent: Any, message: str, kind: str = "success",
+                 duration: int = 4000, title: str = "", details: str = "") -> None:
         super().__init__(parent)
         self.parent = parent
-        
-        colors = {"success": config.COLORS["btn_start"], "error": config.COLORS["btn_stop"], "info": config.COLORS["blue_info"], "warning": config.COLORS["orange_warning"]}
-        icons = {"success": "✅", "error": "❌", "info": "ℹ️", "warning": "⚠️"}
-        
-        bg_color = colors.get(kind, config.COLORS["bg_medium"])
-        icon_text = icons.get(kind, "ℹ️")
+        self._duration = duration
+        self._start_time: Optional[float] = None
+        self._progress_after_id: Optional[str] = None
+        self._fade_out_started = False
 
+        # ── Theme-aware colors ──
+        mode = ctk.get_appearance_mode()
+        is_dark = mode == "Dark"
+
+        self._configs = {
+            "success": {
+                "icon": "✅", "bg": ("#065F46", "#065F46"),
+                "border": ("#34D399", "#34D399"),
+                "progress": ("#34D399", "#6EE7B7"),
+                "title_color": ("#FFFFFF", "#FFFFFF"),
+                "msg_color": ("#D1FAE5", "#D1FAE5"),
+            },
+            "error": {
+                "icon": "❌", "bg": ("#7F1D1D", "#7F1D1D"),
+                "border": ("#F87171", "#FCA5A5"),
+                "progress": ("#F87171", "#FCA5A5"),
+                "title_color": ("#FFFFFF", "#FFFFFF"),
+                "msg_color": ("#FEE2E2", "#FEE2E2"),
+            },
+            "info": {
+                "icon": "ℹ️", "bg": ("#1E3A5F", "#1E3A5F"),
+                "border": ("#60A5FA", "#93C5FD"),
+                "progress": ("#60A5FA", "#93C5FD"),
+                "title_color": ("#FFFFFF", "#FFFFFF"),
+                "msg_color": ("#DBEAFE", "#DBEAFE"),
+            },
+            "warning": {
+                "icon": "⚠️", "bg": ("#78350F", "#78350F"),
+                "border": ("#FBBF24", "#FCD34D"),
+                "progress": ("#FBBF24", "#FCD34D"),
+                "title_color": ("#FFFFFF", "#FFFFFF"),
+                "msg_color": ("#FEF3C7", "#FEF3C7"),
+            },
+            "automation": {
+                "icon": "🤖", "bg": ("#312E81", "#312E81"),
+                "border": ("#818CF8", "#A5B4FC"),
+                "progress": ("#818CF8", "#A5B4FC"),
+                "title_color": ("#FFFFFF", "#FFFFFF"),
+                "msg_color": ("#E0E7FF", "#E0E7FF"),
+            },
+        }
+
+        cfg = self._configs.get(kind, self._configs["info"])
+
+        # ── Window setup ──
         self.overrideredirect(True)
         self.attributes("-topmost", True)
-        self.attributes("-alpha", 0.0) 
-        self.configure(fg_color=bg_color)
-        
-        self.frame = ctk.CTkFrame(self, fg_color=bg_color, corner_radius=0, border_width=0)
+        self.configure(fg_color=cfg["bg"])
+
+        # ── Main frame ──
+        self.frame = ctk.CTkFrame(self, fg_color=cfg["bg"], corner_radius=10,
+                                   border_width=1, border_color=cfg["border"])
         self.frame.pack(fill="both", expand=True)
-        
+
+        # ── Content area ──
         self.content = ctk.CTkFrame(self.frame, fg_color="transparent")
-        self.content.pack(padx=20, pady=12)
-        
-        self.icon_label = ctk.CTkLabel(self.content, text=icon_text, font=("Arial", 18), text_color="white")
-        self.icon_label.pack(side="left", padx=(0, 10))
-        
-        self.msg_label = ctk.CTkLabel(self.content, text=message, font=("Segoe UI", 14, "bold"), text_color="white")
-        self.msg_label.pack(side="left")
-        
+        self.content.pack(fill="x", padx=16, pady=(12, 4))
+        self.content.grid_columnconfigure(2, weight=1)
+
+        # Icon
+        icon_lbl = ctk.CTkLabel(self.content, text=cfg["icon"],
+                                font=("Segoe UI", 20), text_color=cfg["title_color"])
+        icon_lbl.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="n")
+
+        # Title (bold)
+        title_text = title or kind.capitalize()
+        self._title_label = ctk.CTkLabel(self.content, text=title_text,
+                                          font=("Segoe UI", 13, "bold"),
+                                          text_color=cfg["title_color"],
+                                          anchor="w")
+        self._title_label.grid(row=0, column=1, columnspan=2, sticky="ew", pady=(0, 2))
+
+        # Message
+        self._msg_label = ctk.CTkLabel(self.content, text=message,
+                                        font=("Segoe UI", 12),
+                                        text_color=cfg["msg_color"],
+                                        wraplength=320, justify="left",
+                                        anchor="w")
+        self._msg_label.grid(row=1, column=1, sticky="ew")
+
+        # Details (optional, smaller text below)
+        if details:
+            self._details_label = ctk.CTkLabel(self.content, text=details,
+                                               font=("Segoe UI", 10),
+                                               text_color=cfg["msg_color"],
+                                               wraplength=320, justify="left",
+                                               anchor="w")
+            self._details_label.grid(row=2, column=1, sticky="ew", pady=(2, 0))
+
+        # Close button (X)
+        self._close_btn = ctk.CTkButton(
+            self.content, text="✕", width=24, height=24, corner_radius=12,
+            font=("Segoe UI", 12, "bold"),
+            fg_color="transparent",
+            hover_color=("#E5E7EB", "#374151"),
+            text_color=cfg["title_color"],
+            command=self._animate_out,
+        )
+        self._close_btn.grid(row=0, column=3, rowspan=2, sticky="ne", padx=(8, 0))
+
+        # ── Progress bar ──
+        progress_color = cfg["progress"]
+        self._progress_bg = ctk.CTkFrame(self.frame, height=3, corner_radius=0,
+                                          fg_color=("#E5E7EB", "#374151"))
+        self._progress_bg.pack(fill="x", side="bottom", padx=0, pady=0)
+
+        self._progress_fill = ctk.CTkFrame(self._progress_bg, height=3, corner_radius=0,
+                                            fg_color=progress_color, width=0)
+        self._progress_fill.pack(side="left", fill="y")
+
+        # ── Position & animate ──
         self.update_idletasks()
+
+        # Register in queue (dismiss oldest if > MAX_VISIBLE)
+        ToastNotification._active_toasts.append(self)
+        while len(ToastNotification._active_toasts) > ToastNotification._MAX_VISIBLE:
+            oldest = ToastNotification._active_toasts.pop(0)
+            try:
+                if oldest.winfo_exists():
+                    oldest.destroy()
+            except Exception:
+                pass
+
         self._position_window()
         self._animate_in()
-        self.after(duration, self._animate_out)
-        
-        self.bind("<Button-1>", lambda e: self._animate_out())
-        self.frame.bind("<Button-1>", lambda e: self._animate_out())
-        self.msg_label.bind("<Button-1>", lambda e: self._animate_out())
-        self.icon_label.bind("<Button-1>", lambda e: self._animate_out())
+
+        # Start progress bar
+        self._start_time = time.time()
+        self._update_progress()
+
+        # Auto-dismiss after duration
+        self.after(duration, self._on_auto_dismiss)
+
+        # ── Bindings ──
+        for widget in [self, self.frame, self.content, icon_lbl, self._title_label, self._msg_label]:
+            try:
+                widget.bind("<Button-1>", lambda e: self._animate_out())
+            except Exception:
+                pass
 
     def _position_window(self) -> None:
+        """Position at bottom-right of parent window, stacking if multiple toasts visible."""
         try:
             parent_x = self.parent.winfo_rootx()
             parent_y = self.parent.winfo_rooty()
             parent_w = self.parent.winfo_width()
             parent_h = self.parent.winfo_height()
-            
-            my_w = self.winfo_reqwidth()
+
+            my_w = max(self.winfo_reqwidth(), 380)
             my_h = self.winfo_reqheight()
-            
-            pos_x = parent_x + (parent_w // 2) - (my_w // 2)
-            pos_y = parent_y + parent_h - my_h - 60 
-            
-            self.geometry(f"+{pos_x}+{pos_y}")
+
+            # Find position among active toasts
+            my_idx = 0
+            for i, t in enumerate(ToastNotification._active_toasts):
+                if t is self:
+                    my_idx = i
+                    break
+
+            # Stack from bottom-right: each toast goes up by (my_h + 10) pixels
+            base_x = parent_x + parent_w - my_w - 20
+            base_y = parent_y + parent_h - my_h - 60 - (my_idx * (my_h + 10))
+
+            # Start off-screen to the right (for slide-in effect)
+            self._target_x = int(base_x)
+            self._target_y = int(base_y)
+            self._start_x = int(parent_x + parent_w + 20)  # Off-screen right
+
+            # Set initial position off-screen
+            self.geometry(f"{my_w}x{my_h}+{self._start_x}+{self._target_y}")
         except Exception as e:
             logger.debug("ToastNotification._position_window failed: %s", e)
 
     def _animate_in(self, step: int = 0) -> None:
-        if step <= 10:
-            alpha = step / 10
+        """Slide in from right with fade."""
+        if step > 12:
+            return
+        try:
+            if not self.winfo_exists():
+                return
+            # Slide: interpolate x from _start_x to _target_x
+            progress = step / 12
+            current_x = int(self._start_x + (self._target_x - self._start_x) * progress)
+            alpha = progress
             self.attributes("-alpha", alpha)
-            self.after(30, lambda: self._animate_in(step+1))
-            
-    def _animate_out(self, step: int = 10) -> None:
-        if step >= 0:
-            alpha = step / 10
-            self.attributes("-alpha", alpha)
-            self.after(30, lambda: self._animate_out(step-1))
-        else:
-            self.destroy()
+            self.geometry(f"+{current_x}+{self._target_y}")
+            self.after(20, lambda: self._animate_in(step + 1))
+        except Exception:
+            pass
+
+    def _update_progress(self) -> None:
+        """Update the progress bar to show remaining time."""
+        if self._fade_out_started or not self.winfo_exists():
+            return
+        try:
+            if self._start_time is None:
+                return
+            elapsed = (time.time() - self._start_time) * 1000
+            remaining = max(0, 1.0 - (elapsed / self._duration))
+            pw = int(remaining * 380)
+            self._progress_fill.configure(width=pw)
+            self._progress_bg.update_idletasks()
+            if remaining > 0:
+                self._progress_after_id = self.after(100, self._update_progress)
+        except Exception:
+            pass
+
+    def _on_auto_dismiss(self) -> None:
+        """Called when duration expires — fade out."""
+        self._animate_out()
+
+    def _animate_out(self, step: int = 12) -> None:
+        """Slide out to the right with fade."""
+        if self._fade_out_started:
+            return
+        self._fade_out_started = True
+
+        def _animate(step: int = 12):
+            if step < 0:
+                # Remove from queue and destroy
+                try:
+                    if self in ToastNotification._active_toasts:
+                        ToastNotification._active_toasts.remove(self)
+                except Exception:
+                    pass
+                try:
+                    self.destroy()
+                except Exception:
+                    pass
+                return
+            try:
+                if not self.winfo_exists():
+                    return
+                progress = step / 12
+                current_x = int(self._target_x + (self._start_x - self._target_x) * (1 - progress))
+                alpha = progress
+                self.attributes("-alpha", alpha)
+                self.geometry(f"+{current_x}+{self._target_y}")
+                self.after(20, lambda: _animate(step - 1))
+            except Exception:
+                try:
+                    self.destroy()
+                except Exception:
+                    pass
+
+        _animate()
+
+    def destroy(self) -> None:
+        """Clean up progress bar timer on destroy."""
+        if self._progress_after_id:
+            try:
+                self.after_cancel(self._progress_after_id)
+            except Exception:
+                pass
+        try:
+            if self in ToastNotification._active_toasts:
+                ToastNotification._active_toasts.remove(self)
+        except Exception:
+            pass
+        super().destroy()
 
 # --- 6. ONBOARDING GUIDE ---
 class OnboardingGuide(ctk.CTkToplevel):

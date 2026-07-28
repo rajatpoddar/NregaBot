@@ -12,7 +12,7 @@ from pypdf import PdfWriter, PdfReader # <-- IMPORT ADD KIYA GAYA
 
 from src import config
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
+from src.utils import truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class DuplicateMrTab(BaseAutomationTab):
@@ -50,6 +50,7 @@ class DuplicateMrTab(BaseAutomationTab):
         
         self._create_widgets()
         self._load_history()
+        self._load_inputs()
         self.current_panchayat = ""
         self.output_dir = "" # <-- ADDED
     def _create_widgets(self) -> None:
@@ -72,11 +73,10 @@ class DuplicateMrTab(BaseAutomationTab):
         input_frame.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=10, sticky="w")
-        self.panchayat_entry = AutocompleteEntry(input_frame,
-            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-            app_instance=self.app, 
-            history_key="location_panchayat")
-        self.panchayat_entry.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
 
         ctk.CTkLabel(input_frame, text="Output Action:").grid(row=1, column=0, padx=15, pady=10, sticky="w")
         self.output_action_var = ctk.StringVar(value="Save as PDF Only")
@@ -158,18 +158,39 @@ class DuplicateMrTab(BaseAutomationTab):
     def _update_scale_label(self, value):
         self.scale_label.configure(text=f"{int(value)}%")
 
+    def _save_inputs(self, data):
+        """Save tab inputs to DB."""
+        try:
+            self.app.history_manager.save_tab_inputs_batch("duplicate_mr", data)
+        except Exception as e:
+            pass
+
+    def _load_inputs(self):
+        """Load saved tab inputs from DB."""
+        data = self.app.history_manager.get_tab_inputs("duplicate_mr")
+        if data:
+            if data.get('panchayat'):
+                self.panchayat_var.set(data['panchayat'])
+            self.output_action_var.set(data.get('output_action', 'Save as PDF Only'))
+            self.orientation_var.set(data.get('orientation', 'Landscape'))
+            try:
+                scale = float(data.get('scale', 75))
+                self.scale_slider.set(scale)
+                self._update_scale_label(scale)
+            except ValueError:
+                pass
+
     def _load_history(self):
         panchayat_history = self.app.history_manager.get_suggestions("location_panchayat")
-        if not hasattr(self.panchayat_entry, 'suggestions'):
-             self.panchayat_entry.suggestions = []
-        self.panchayat_entry.suggestions.extend(panchayat_history)
+        # With CTkOptionMenu, suggestions are set at widget creation
+        pass
 
 
     def _log_result(self, work_code, msr_no, status):
         timestamp = time.strftime("%H:%M:%S")
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, work_code, msr_no, status)))
+        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(timestamp, truncate_workcode(work_code), msr_no, status)))
     def start_automation(self) -> None:
-        panchayat = self.panchayat_entry.get().strip()
+        panchayat = self.panchayat_var.get().strip()
         work_codes_raw = self.work_codes_textbox.get("1.0", "end").strip()
         action = self.output_action_var.get()
         orientation = self.orientation_var.get()
@@ -180,6 +201,12 @@ class DuplicateMrTab(BaseAutomationTab):
             return
             
         work_codes = [line.strip() for line in work_codes_raw.splitlines() if line.strip()]
+        self._save_inputs({
+            'panchayat': panchayat,
+            'output_action': action,
+            'orientation': orientation,
+            'scale': scale,
+        })
         self.app.history_manager.save_entry("location_panchayat", panchayat)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(panchayat, work_codes, action, orientation, scale))
 
@@ -205,19 +232,18 @@ class DuplicateMrTab(BaseAutomationTab):
             os.makedirs(output_dir, exist_ok=True)
             return output_dir
         except Exception as e:
-            self.app.log_message(self.log_display, f"Error creating output directory: {e}", "error")
-            messagebox.showerror("Directory Error", f"Could not create output directory: {e}")
+            self.log_error(f"Error creating output directory: {e}")            messagebox.showerror("Directory Error", f"Could not create output directory: {e}")
             return None
         
     def load_data_from_report(self, workcodes: str, location_panchayat: str):
         """Loads data from a report tab (like Issued MR Details)."""
         # Clear existing data
-        self.panchayat_entry.delete(0, "end")
+        self.panchayat_var.set("")
         self.work_codes_textbox.configure(state="normal")
         self.work_codes_textbox.delete("1.0", "end")
         
         # Insert new data
-        self.panchayat_entry.insert(0, location_panchayat)
+        self.panchayat_var.set(location_panchayat)
         self.work_codes_textbox.insert("1.0", workcodes)
         self.work_codes_textbox.configure(state="disabled")
         
@@ -239,18 +265,15 @@ class DuplicateMrTab(BaseAutomationTab):
         self.app.clear_log(self.log_display)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
 
-        self.app.log_message(self.log_display, "--- Starting Duplicate MR Printing ---")
-        self.app.after(0, self.app.set_status, "Running Duplicate MR Print...")
+        self.log_info("--- Starting Duplicate MR Printing ---")        self.app.after(0, self.app.set_status, "Running Duplicate MR Print...")
         self.current_panchayat = panchayat
         
         # --- SETTING self.output_dir ---
         self.output_dir = self._get_output_dir(panchayat)
         if not self.output_dir:
-            self.app.log_message(self.log_display, "Failed to create output directory. Aborting.", "error")
-            self.app.after(0, self.set_ui_state, False)
+            self.log_error("Failed to create output directory. Aborting.")            self.app.after(0, self.set_ui_state, False)
             return
-        self.app.log_message(self.log_display, f"Output will be in: {self.output_dir}", "info")
-        # --- END ---
+        self.log_info(f"Output will be in: {self.output_dir}")        # --- END ---
 
         driver = self.app.get_driver()
         if not driver:
@@ -265,14 +288,13 @@ class DuplicateMrTab(BaseAutomationTab):
             for work_code in work_codes:
                 if self.app.stop_events[self.automation_key].is_set():
                     break
-                self.app.log_message(self.log_display, f"\n--- Processing Work Code: {work_code} ---")
-                self._process_single_work_code(driver, work_code, action, panchayat, orientation, scale)
+                self.log_info(f"
+--- Processing Work Code: {work_code} ---")                self._process_single_work_code(driver, work_code, action, panchayat, orientation, scale)
         except Exception as e:
-            self.app.log_message(self.log_display, f"A critical error occurred: {str(e).splitlines()[0]}", "error")
-        finally:
+            self.log_error(f"A critical error occurred: {str(e).splitlines()[0]}")        finally:
             self.app.after(0, self.set_ui_state, False)
-            self.app.log_message(self.log_display, "\n--- Automation Finished ---")
-            self.app.after(100, self._show_completion_dialog)
+            self.log_info("
+--- Automation Finished ---")            self.app.after(100, self._show_completion_dialog)
             self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _show_completion_dialog(self):
@@ -282,8 +304,7 @@ class DuplicateMrTab(BaseAutomationTab):
             if messagebox.askyesno("Complete", f"{final_message}\n\nDo you want to open the output folder?"):
                 self.app.open_folder(self.output_dir)
         else:
-            messagebox.showinfo("Complete", final_message)
-        # --- END ---
+            self.log_info(f"📊 {final_message}")        # --- END ---
 
     def _process_single_work_code(self, driver, work_code, action, panchayat, orientation, scale):
         # ---- Lazy imports ----
@@ -303,8 +324,7 @@ class DuplicateMrTab(BaseAutomationTab):
             for i, msr_no in enumerate(msr_options):
                 if self.app.stop_events[self.automation_key].is_set(): break
                 
-                self.app.log_message(self.log_display, f"--- Processing MSR {i+1}/{len(msr_options)}: {msr_no} ---")
-                
+                self.log_info(f"--- Processing MSR {i+1}/{len(msr_options)}: {msr_no} ---")                
                 driver.get(url)
                 
                 # --- Background Safe: Select Panchayat ---
@@ -332,20 +352,15 @@ class DuplicateMrTab(BaseAutomationTab):
                 proceed_btn = driver.find_element(By.ID, "btnproceed")
                 driver.execute_script("arguments[0].click();", proceed_btn)
                 
-                self.app.log_message(self.log_display, "   - Loading print page content...")
-                
+                self.log_info("   - Loading print page content...")                
                 try:
                     iframe_wait = WebDriverWait(driver, 5)
                     iframe_wait.until(EC.frame_to_be_available_and_switch_to_it((By.TAG_NAME, 'iframe')))
-                    self.app.log_message(self.log_display, "   - Switched to content iframe.")
-                except TimeoutException:
-                    self.app.log_message(self.log_display, "   - No iframe detected, proceeding in main document.")
-
-                self.app.log_message(self.log_display, "   - Waiting for 'Print' link to become available...")
-                # Presence check for print link
+                    self.log_info("   - Switched to content iframe.")                except TimeoutException:
+                    self.log_info("   - No iframe detected, proceeding in main document.")
+                self.log_info("   - Waiting for 'Print' link to become available...")                # Presence check for print link
                 wait.until(EC.presence_of_element_located((By.PARTIAL_LINK_TEXT, "Print")))
-                self.app.log_message(self.log_display, "   - Print page is ready.")
-                
+                self.log_info("   - Print page is ready.")                
                 pdf_path = self._save_mr_as_pdf(driver, work_code, msr_no, orientation, scale, self.output_dir)
                 
                 if pdf_path: self._log_result(work_code, msr_no, "Saved as PDF")
@@ -358,14 +373,11 @@ class DuplicateMrTab(BaseAutomationTab):
                 driver.switch_to.default_content()
         
         except TimeoutException:
-            self.app.log_message(self.log_display, f"Timeout: Page element not found for work code {work_code}", "error")
-            self._log_result(work_code, "N/A", "Timeout")
+            self.log_error(f"Timeout: Page element not found for work code {work_code}")            self._log_result(work_code, "N/A", "Timeout")
         except NoSuchElementException:
-            self.app.log_message(self.log_display, f"Element not found for work code {work_code}", "error")
-            self._log_result(work_code, "N/A", "Element not found")
+            self.log_error(f"Element not found for work code {work_code}")            self._log_result(work_code, "N/A", "Element not found")
         except Exception as e:
-            self.app.log_message(self.log_display, f"Error processing {work_code}: {str(e).splitlines()[0]}", "error")
-            self._log_result(work_code, "N/A", "Unexpected Error")
+            self.log_error(f"Error processing {work_code}: {str(e).splitlines()[0]}")            self._log_result(work_code, "N/A", "Unexpected Error")
 
     def _get_msr_list(self, driver, wait, work_code, panchayat, url):
         # ---- Lazy imports ----
@@ -377,8 +389,7 @@ class DuplicateMrTab(BaseAutomationTab):
         from selenium.webdriver.common.action_chains import ActionChains
         from selenium import webdriver
         """Helper to get list of MSRs (Background Safe)."""
-        self.app.log_message(self.log_display, f"Getting MSR list for Work Code: {work_code}")
-        try:
+        self.log_info(f"Getting MSR list for Work Code: {work_code}")        try:
             driver.get(url)
             
             panchayat_dd_element = wait.until(EC.presence_of_element_located((By.ID, "ddlPanchayat")))
@@ -399,18 +410,14 @@ class DuplicateMrTab(BaseAutomationTab):
             msr_options = [opt.get_attribute('value') for opt in Select(msr_dd_element).options if '--' not in opt.text]
             
             if not msr_options:
-                self.app.log_message(self.log_display, "No MSR numbers found.", "warning")
-                self._log_result(work_code, "N/A", "No MSRs found")
+                self.log_warning("No MSR numbers found.")                self._log_result(work_code, "N/A", "No MSRs found")
                 return []
             
-            self.app.log_message(self.log_display, f"Found {len(msr_options)} MSRs: {', '.join(msr_options)}")
-            return msr_options
+            self.log_info(f"Found {len(msr_options)} MSRs: {', '.join(msr_options)}")            return msr_options
         except TimeoutException:
-            self.app.log_message(self.log_display, f"Timeout getting MSR list for {work_code}: page elements not loading", "error")
-            return []
+            self.log_error(f"Timeout getting MSR list for {work_code}: page elements not loading")            return []
         except Exception as e:
-            self.app.log_message(self.log_display, f"Error getting MSR list for {work_code}: {str(e).splitlines()[0]}", "error")
-            return []
+            self.log_error(f"Error getting MSR list for {work_code}: {str(e).splitlines()[0]}")            return []
 
     # --- FUNCTION SIGNATURE UPDATED ---
     def _save_mr_as_pdf(self, driver, work_code, msr_no, orientation, scale, output_dir):
@@ -493,8 +500,7 @@ class DuplicateMrTab(BaseAutomationTab):
                 """
                 driver.execute_script(footer_js)
                 
-                self.app.log_message(self.log_display, "   - Note: PDF Scale setting is not supported for Firefox and will be ignored.", "warning")
-                pdf_data_base64 = driver.print_page()
+                self.log_warning("   - Note: PDF Scale setting is not supported for Firefox and will be ignored.")                pdf_data_base64 = driver.print_page()
             
             elif self.app.active_browser == 'chrome':
                 # Inject footer as a fixed-position element (avoids CDP footer causing extra blank page)
@@ -535,8 +541,7 @@ class DuplicateMrTab(BaseAutomationTab):
             else:
                 return None
         except Exception as e:
-            self.app.log_message(self.log_display, f"Error saving PDF: {e}", "error")
-            return None
+            self.log_error(f"Error saving PDF: {e}")            return None
 
     def set_ui_state(self, running: bool):
         if not self._is_alive():
@@ -551,7 +556,7 @@ class DuplicateMrTab(BaseAutomationTab):
         from selenium import webdriver
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.panchayat_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.work_codes_textbox.configure(state=state)
         self.output_action_menu.configure(state=state)
         self.orientation_segmented_button.configure(state=state)
@@ -568,7 +573,7 @@ class DuplicateMrTab(BaseAutomationTab):
         from selenium.webdriver.common.action_chains import ActionChains
         from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure?"):
-            self.panchayat_entry.delete(0, "end")
+            self.panchayat_var.set("")
             self.work_codes_textbox.delete("1.0", "end")
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0)
@@ -589,10 +594,9 @@ class DuplicateMrTab(BaseAutomationTab):
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.common.action_chains import ActionChains
         from selenium import webdriver
-        self.app.log_message(self.log_display, "Starting PDF merge...")
-        
+        self.log_info("Starting PDF merge...")        
         # 1. Get current output directory
-        panchayat = self.panchayat_entry.get().strip()
+        panchayat = self.panchayat_var.get().strip()
         if not panchayat:
             messagebox.showwarning("Input Required", "Please enter a Panchayat name to find the correct folder.", parent=self)
             return
@@ -600,28 +604,24 @@ class DuplicateMrTab(BaseAutomationTab):
         # Get the directory for *today's* saved files for this panchayat
         output_dir = self._get_output_dir(panchayat)
         if not os.path.exists(output_dir):
-            self.app.log_message(self.log_display, f"No output folder found for today: {output_dir}", "warning")
-            messagebox.showinfo("No Files", f"No saved PDFs found for '{panchayat}' from today.", parent=self)
+            self.log_warning(f"No output folder found for today: {output_dir}")            messagebox.showinfo("No Files", f"No saved PDFs found for '{panchayat}' from today.", parent=self)
             return
 
         # 2. Find all PDF files in that directory
         pdf_files = [os.path.join(output_dir, f) for f in os.listdir(output_dir) if f.lower().endswith('.pdf')]
         
         if not pdf_files:
-            self.app.log_message(self.log_display, "No PDF files found in the directory.", "warning")
-            messagebox.showinfo("No Files", f"No PDFs found in:\n{output_dir}", parent=self)
+            self.log_warning("No PDF files found in the directory.")            messagebox.showinfo("No Files", f"No PDFs found in:\n{output_dir}", parent=self)
             return
             
         pdf_files.sort() # Sort files alphabetically
-        self.app.log_message(self.log_display, f"Found {len(pdf_files)} PDF files to merge.")
-
+        self.log_info(f"Found {len(pdf_files)} PDF files to merge.")
         # 3. Get output file name from user
         dialog = ctk.CTkInputDialog(text="Enter a base name for the merged file:", title="Merge PDFs")
         base_name = dialog.get_input()
         
         if not base_name:
-            self.app.log_message(self.log_display, "Merge cancelled by user.", "info")
-            return
+            self.log_info("Merge cancelled by user.")            return
 
         # 4. Get unique output path in the Merged_Pdf_Output folder
         try:
@@ -659,8 +659,7 @@ class DuplicateMrTab(BaseAutomationTab):
         from selenium import webdriver
         """The actual PDF merging logic that runs in a thread."""
         self.app.after(0, self.set_ui_state, True)
-        self.app.log_message(self.log_display, f"Merging {len(file_list)} files...")
-        self.app.after(0, self.app.set_status, "Merging PDFs...")
+        self.log_info(f"Merging {len(file_list)} files...")        self.app.after(0, self.app.set_status, "Merging PDFs...")
         
         # Note: duplicate_mr_tab uses "pdf_merger_dup_mr" event key, 
         # while musterroll_gen_tab uses "pdf_merger_mr". 
@@ -671,12 +670,10 @@ class DuplicateMrTab(BaseAutomationTab):
             merger = PdfWriter()
             for i, pdf_path in enumerate(file_list):
                 if self.app.stop_events.get(stop_event_key, threading.Event()).is_set():
-                    self.app.log_message(self.log_display, "Merge cancelled.", "warning")
-                    merger.close()
+                    self.log_warning("Merge cancelled.")                    merger.close()
                     return
                 
-                self.app.log_message(self.log_display, f"Processing file {i+1}/{len(file_list)}: {os.path.basename(pdf_path)}")
-                
+                self.log_info(f"Processing file {i+1}/{len(file_list)}: {os.path.basename(pdf_path)}")                
                 # Smart blank page filtering logic
                 reader = PdfReader(pdf_path)
                 num_pages = len(reader.pages)
@@ -687,8 +684,7 @@ class DuplicateMrTab(BaseAutomationTab):
                     if page_num == num_pages - 1:
                         text = page.extract_text()
                         if text is None or len(text.strip()) < 250:
-                            self.app.log_message(self.log_display, f"  -> Skipped footer-only last page in {os.path.basename(pdf_path)}")
-                            continue 
+                            self.log_info(f"  -> Skipped footer-only last page in {os.path.basename(pdf_path)}")                            continue 
 
                     merger.add_page(page)
             
@@ -696,14 +692,12 @@ class DuplicateMrTab(BaseAutomationTab):
                 merger.write(f_out)
             merger.close()
             
-            self.app.log_message(self.log_display, "Merge complete!", "success")
-            messagebox.showinfo("Success", f"Successfully merged {len(file_list)} files into:\n{output_path}", parent=self)
+            self.log_success("Merge complete!")            messagebox.showinfo("Success", f"Successfully merged {len(file_list)} files into:\n{output_path}", parent=self)
             if messagebox.askyesno("Open Location?", "Open the Merged PDFs folder?", parent=self):
                 self.app.open_folder(os.path.dirname(output_path))
                 
         except Exception as e:
-            self.app.log_message(self.log_display, f"Error during merge: {e}", "error")
-            messagebox.showerror("Merge Error", f"An error occurred: {e}", parent=self)
+            self.log_error(f"Error during merge: {e}")            messagebox.showerror("Merge Error", f"An error occurred: {e}", parent=self)
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")

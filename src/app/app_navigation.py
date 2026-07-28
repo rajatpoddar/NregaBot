@@ -15,7 +15,7 @@ from src import config
 from src.tab_config import get_tabs_definition
 from src.ui_components import CollapsibleFrame, SkeletonLoader
 from src.utils import resource_path, get_config, save_config, get_logger
-from src.tabs.autocomplete_widget import AutocompleteEntry
+
 
 logger = get_logger()
 
@@ -76,7 +76,6 @@ class NavMixin:
             "NMMS Attendance": "emoji_nmms_attendance",
             # Smart Tools
             "Macro Manager": "emoji_tools",
-            "Login Automation": "emoji_login_automation",
             "PDF Merger": "emoji_pdf_merger",
             "Workcode Extractor": "emoji_wc_extractor",
             "File Manager": "emoji_file_manager",
@@ -126,14 +125,15 @@ class NavMixin:
         if self.app_state.last_selected_category not in categories:
             self.app_state.last_selected_category = "All Automations"
         
-        self.category_filter_menu = AutocompleteEntry(
+        self.category_filter_var = ctk.StringVar()
+        self.category_filter_menu = ctk.CTkOptionMenu(
             header_parent,
-            suggestions_list=categories,
+            variable=self.category_filter_var,
+            values=categories,
             command=self._on_category_filter_change,
             width=180, height=28,
-            show_settings_option=False,
         )
-        self.category_filter_menu.insert(0, self.app_state.last_selected_category)
+        self.category_filter_var.set(self.app_state.last_selected_category)
         self.category_filter_menu.pack(fill="x", pady=(5, 5), padx=5)
 
         # Category colors matching the Home page card colors
@@ -630,8 +630,32 @@ class NavMixin:
 
 
 
+    def show_activity_log_tab(self):
+        """
+        Navigate to Settings → Activity Log tab.
+        Replaces the old popup history window.
+        """
+        self.show_frame("Settings")
+        # After frame loads, switch to the Activity Log sub-tab
+        def _switch_tab():
+            try:
+                settings_instance = self.app_state.tab_instances.get("Settings")
+                if settings_instance and hasattr(settings_instance, 'tab_view'):
+                    settings_instance.tab_view.set("  📋 Activity Log  ")
+                    if hasattr(settings_instance, '_refresh_activity_log'):
+                        settings_instance._refresh_activity_log()
+            except Exception as e:
+                logger.debug("Failed to switch to Activity Log tab: %s", e)
+        self.after(200, _switch_tab)
+
     def show_history_window(self):
-        """Modern Activity Log window with stats, search, and filtered treeview."""
+        """Modern Activity Log window with stats, search, and filtered treeview.
+        
+        DEPRECATED: Use show_activity_log_tab() instead to redirect to Settings.
+        Kept for backward compatibility.
+        """
+        self.show_activity_log_tab()
+        return
         # --- FIX: Single instance guard ---
         if self.app_state._history_window and self.app_state._history_window.winfo_exists():
             self.app_state._history_window.lift()

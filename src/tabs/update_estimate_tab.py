@@ -5,6 +5,7 @@ import customtkinter as ctk
 import time, csv, sys, os, subprocess, re  # <-- ADD 're'
 from datetime import datetime
 from src import config
+from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -147,8 +148,7 @@ class UpdateEstimateTab(BaseAutomationTab):
                 self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0)
-            self.app.log_message(self.log_display, "Form has been reset.")
-
+            self.log_info("Form has been reset.")
     def run_automation_logic(self):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -165,8 +165,7 @@ class UpdateEstimateTab(BaseAutomationTab):
         """The core logic for the Update Estimate automation."""
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Running: Update Estimate")
-        self.app.log_message(self.log_display, "Starting Update Estimate automation...")
-
+        self.log_info("Starting Update Estimate automation...")
         outcome_value = self.estimated_outcome_entry.get().strip()
         work_codes = [line.strip() for line in self.work_key_text.get("1.0", tkinter.END).strip().splitlines() if line.strip()]
 
@@ -187,17 +186,28 @@ class UpdateEstimateTab(BaseAutomationTab):
             total_tasks = len(work_codes)
             for i, work_code in enumerate(work_codes, 1):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.app.log_message(self.log_display, "Automation stopped by user.", "warning"); break
+                    self.app.log_message(self.log_display, "⏹️ Automation stopped by user.", "warning"); break
                 
-                self.app.after(0, self.update_status, f"Processing {i}/{total_tasks}: {work_code}", (i / total_tasks))
+                pct = i / total_tasks * 100
+                self.log_info(f"  🔄 [{i}/{total_tasks}] Processing: {truncate_workcode(work_code)} ({pct:.0f}%)")                self.app.after(0, self.update_status, f"Processing {i}/{total_tasks}: {work_code}", (i / total_tasks))
                 self._process_single_task(driver, wait, work_code, outcome_value)
 
             if not self.app.stop_events[self.automation_key].is_set():
-                messagebox.showinfo("Completed", "Automation finished! Check the 'Results' tab for details.")
-
+                # Count results from tree
+                success_count = 0
+                fail_count = 0
+                for item_id in self.results_tree.get_children():
+                    vals = self.results_tree.item(item_id)['values']
+                    if len(vals) >= 3:
+                        st = str(vals[2]).lower()
+                        if 'success' in st:
+                            success_count += 1
+                        elif 'fail' in st or 'error' in st:
+                            fail_count += 1
+                self.log_info(f"
+{'='*50}")                self.log_info(f"📊 Update Estimate: ✅ {success_count} updated, ❌ {fail_count} failed (of {total_tasks} total)")                self.log_info(f"{'='*50}")
         except Exception as e:
-            self.app.log_message(self.log_display, f"A critical error occurred: {e}", "error")
-            messagebox.showerror("Automation Error", f"An unexpected error occurred: {e}")
+            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("Automation Error", f"An unexpected error occurred: {e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Finished", 1.0)
@@ -298,8 +308,8 @@ class UpdateEstimateTab(BaseAutomationTab):
         """Logs the result to the UI."""
         timestamp = datetime.now().strftime("%H:%M:%S")
         log_level = "error" if is_error else "success"
-        self.app.log_message(self.log_display, f"'{work_code}' - {status.upper()}: {details}", level=log_level)
-        tags = ('failed',) if is_error else ()
+        work_code = truncate_workcode(work_code)
+        self.log_info(f"'{work_code}' - {status.upper()}: {details}", level=log_level)        tags = ('failed',) if is_error else ()
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_code, outcome, status.upper(), details, timestamp), tags=tags))
     
     def export_report(self):

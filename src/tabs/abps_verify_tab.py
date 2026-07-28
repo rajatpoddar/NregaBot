@@ -9,7 +9,7 @@ from datetime import datetime
 
 from src import config
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
+
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -43,12 +43,27 @@ class AbpsVerifyTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure((1, 3), weight=1)
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=0, sticky="w", padx=15, pady=(15, 5))
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, history_key="location_panchayat")
-        self.panchayat_entry.grid(row=0, column=1, sticky="ew", padx=(0, 15), pady=(15, 5))
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=0, column=1, sticky="ew", padx=(0, 15), pady=(15, 5))
 
         ctk.CTkLabel(controls_frame, text="Village:").grid(row=0, column=2, sticky="w", padx=15, pady=(15, 5))
-        self.village_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_village"))
-        self.village_entry.grid(row=0, column=3, sticky="ew", padx=(0, 15), pady=(15, 5))
+        v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
+        self.village_var = ctk.StringVar()
+        self.village_menu = ctk.CTkOptionMenu(controls_frame, variable=self.village_var, values=v_vals)
+        self.village_menu.grid(row=0, column=3, sticky="ew", padx=(0, 15), pady=(15, 5))
+
+        # Filter villages when panchayat changes
+        def _on_panchayat_change(*_):
+            pan = self.panchayat_var.get()
+            if pan:
+                vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or [""]
+            else:
+                vals = self.app.history_manager.get_suggestions("location_village") or [""]
+            self.village_var.set("")
+            self.village_menu.configure(values=vals)
+        self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # --- Note for auto-mode ---
         ctk.CTkLabel(controls_frame, text="ℹ️ Leave Village empty to process all villages automatically.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky="w", padx=15, pady=(0, 15))
@@ -111,13 +126,13 @@ class AbpsVerifyTab(BaseAutomationTab):
         from selenium import webdriver
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.panchayat_entry.configure(state=state)
-        self.village_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
+        self.village_menu.configure(state=state)
         self.export_csv_button.configure(state=state)
         self.export_pdf_button.configure(state=state)
     def start_automation(self) -> None:
-        panchayat = self.panchayat_entry.get().strip()
-        village = self.village_entry.get().strip() # Can be empty for auto-mode
+        panchayat = self.panchayat_var.get().strip()
+        village = self.village_var.get().strip()
         if not panchayat:
             messagebox.showwarning("Input Required", "Please enter a Panchayat name.")
             return
@@ -130,14 +145,13 @@ class AbpsVerifyTab(BaseAutomationTab):
         from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
         from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
-            self.panchayat_entry.delete(0, tkinter.END)
-            self.village_entry.delete(0, tkinter.END)
+            self.panchayat_var.set("")
+            self.village_var.set("")
             for item in self.results_tree.get_children():
                 self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.app.log_message(self.log_display, "Form has been reset.")
-            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
 
     def run_automation_logic(self, panchayat, village):
         # ---- Lazy imports ----
@@ -149,8 +163,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
-        self.app.log_message(self.log_display, "Starting ABPS Verification...")
-        self.app.after(0, self.app.set_status, "Running ABPS Verification...")
+        self.log_info("Starting ABPS Verification...")        self.app.after(0, self.app.set_status, "Running ABPS Verification...")
 
         session_processed_jobcards = set()
 
@@ -165,12 +178,10 @@ class AbpsVerifyTab(BaseAutomationTab):
             
             current_url = driver.current_url
             if "login" in current_url.lower():
-                self.app.log_message(self.log_display, "Error: Redirected to Login page.", "error")
-                return
+                self.log_error("Error: Redirected to Login page.")                return
 
             # --- 1. Select Panchayat (Background Safe) ---
-            self.app.log_message(self.log_display, f"Selecting Panchayat: {panchayat}")
-            try:
+            self.log_info(f"Selecting Panchayat: {panchayat}")            try:
                 # Use Presence Check
                 panchayat_select = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']")))
                 self._select_by_text_case_insensitive(Select(panchayat_select), panchayat)
@@ -204,8 +215,8 @@ class AbpsVerifyTab(BaseAutomationTab):
             # --- VILLAGE LOOP ---
             for i, current_village in enumerate(villages_to_process):
                 if self.app.stop_events[self.automation_key].is_set(): break
-                self.app.log_message(self.log_display, f"\n--- Processing Village {i+1}/{len(villages_to_process)}: {current_village} ---")
-                
+                self.log_info(f"
+--- Processing Village {i+1}/{len(villages_to_process)}: {current_village} ---")                
                 try:
                     self._select_by_text_case_insensitive(Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, village_css)))), current_village)
                     self.app.update_history("location_village", current_village)
@@ -214,14 +225,12 @@ class AbpsVerifyTab(BaseAutomationTab):
                     try:
                         short_wait.until(EC.presence_of_element_located((By.XPATH, table_xpath)))
                     except TimeoutException:
-                        self.app.log_message(self.log_display, f"No records found for {current_village}. Skipping.", "warning")
-                        continue
+                        self.log_warning(f"No records found for {current_village}. Skipping.")                        continue
 
                     page_number = 1
                     while True:
                         if self.app.stop_events[self.automation_key].is_set(): break
-                        self.app.log_message(self.log_display, f"Scanning page {page_number}...")
-                        
+                        self.log_info(f"Scanning page {page_number}...")                        
                         page_processed_count = 0
                         while True:
                             if self.app.stop_events[self.automation_key].is_set(): break
@@ -250,8 +259,7 @@ class AbpsVerifyTab(BaseAutomationTab):
                                 except StaleElementReferenceException: continue
                             
                             if row_to_process is None:
-                                self.app.log_message(self.log_display, "No new unprocessed records found on this page view.")
-                                break
+                                self.log_info("No new unprocessed records found on this page view.")                                break
 
                             try:
                                 self.app.after(0, self.update_status, f"Processing: {app_name}", 0.5)
@@ -286,16 +294,14 @@ class AbpsVerifyTab(BaseAutomationTab):
                         if self.app.stop_events[self.automation_key].is_set(): break
                         
                         if page_processed_count > 0:
-                            self.app.log_message(self.log_display, "Saving all verified records for this page...")
-                            
+                            self.log_info("Saving all verified records for this page...")                            
                             # --- FIX: JS Click for Save ---
                             table_element = driver.find_element(By.XPATH, table_xpath)
                             save_btn = driver.find_element(By.CSS_SELECTOR, "input[id*='btnProceed2']")
                             driver.execute_script("arguments[0].click();", save_btn)
                             
                             wait.until(EC.staleness_of(table_element))
-                            self.app.log_message(self.log_display, "Page saved.")
-
+                            self.log_info("Page saved.")
                         try:
                             # --- FIX: JS Click for Next Page ---
                             next_page_link = driver.find_element(By.LINK_TEXT, str(page_number + 1))
@@ -304,20 +310,15 @@ class AbpsVerifyTab(BaseAutomationTab):
                             wait.until(EC.staleness_of(table_element))
                             page_number += 1
                         except NoSuchElementException:
-                            self.app.log_message(self.log_display, f"No more pages for {current_village}.")
-                            break
+                            self.log_info(f"No more pages for {current_village}.")                            break
 
                 except Exception as village_error:
-                    self.app.log_message(self.log_display, f"Error in {current_village}: {village_error}. Skipping.", "error")
-                    continue
+                    self.log_error(f"Error in {current_village}: {village_error}. Skipping.")                    continue
             
-            final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
-            self.app.after(0, self.update_status, final_msg, 1.0)
-            messagebox.showinfo("Complete", "ABPS verification process has finished.")
+            self.app.after(200, lambda: self._show_abps_summary())
 
         except Exception as e:
-            self.app.log_message(self.log_display, f"A critical error occurred: {e}", "error")
-            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
+            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
@@ -335,9 +336,26 @@ class AbpsVerifyTab(BaseAutomationTab):
         # ABPS me aksar status blank ya 'Checked' aata hai success par
         elif "success" in status_lower or "checked" in status_lower or "verified" in status_lower:
             tags = ('success',)
-            
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(job_card, app_name, status, timestamp), tags=tags))
+        
+        log_level = 'success' if tags == ('success',) else 'error' if tags == ('failed',) else 'info'
+        self.log_info(f"📋 {job_card} ({app_name}): {status}", level=log_level)        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(job_card, app_name, status, timestamp), tags=tags))
 
+    def _show_abps_summary(self):
+        """Show professional summary after ABPS verification finishes."""
+        if not self._is_alive():
+            return
+        total = len(self.results_tree.get_children())
+        success = sum(1 for item in self.results_tree.get_children() if 'success' in str(self.results_tree.item(item)['values'][2]).lower() or 'checked' in str(self.results_tree.item(item)['values'][2]).lower() or 'verified' in str(self.results_tree.item(item)['values'][2]).lower())
+        failed = total - success
+        summary = f"✅ Verified: {success}\n❌ Failed/Error: {failed}\n📊 Total: {total}"
+        self.update_status(f"✅ {success}/{total} verified", 1.0)
+        self.log_info(f"
+{'='*40}
+📊 ABPS Verification Summary
+{summary}
+{'='*40}")        if total > 0:
+            self.log_info(f"
+📊 ABPS Verification Complete: {summary}")
     def export_to_pdf(self):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -359,7 +377,7 @@ class AbpsVerifyTab(BaseAutomationTab):
             data.append(self.results_tree.item(item)['values'])
 
         # 3. Setup Filename and Directory
-        panchayat = self.panchayat_entry.get().strip() or "Report"
+        panchayat = self.panchayat_var.get().strip() or "Report"
         safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat)
         current_year = datetime.now().strftime("%Y")
         date_str = datetime.now().strftime("%d-%m-%Y")

@@ -14,7 +14,6 @@ from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont 
 from src.utils import resource_path, get_logger
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
 from src import config
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -72,44 +71,49 @@ class DashboardReportTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # --- Input Fields ---
+        # --- Create all entries first (no cross-references) ---
         ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
-        self.state_entry = AutocompleteEntry(controls_frame, 
-                                             suggestions_list=self.app.history_manager.get_suggestions("location_state"),
-                                             app_instance=self.app, history_key="location_state",
-                                             command=self._make_parent_callback("location_state", [
-                                                 (self.district_entry, "location_district"),
-                                                 (self.block_entry, "location_block"),
-                                                 (self.panchayat_entry, "location_panchayat"),
-                                             ]))
-        self.state_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
+        s_vals = self.app.history_manager.get_suggestions("location_state") or [""]
+        self.state_var = ctk.StringVar()
+        self.state_menu = ctk.CTkOptionMenu(controls_frame, variable=self.state_var, values=s_vals)
+        self.state_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
 
         ctk.CTkLabel(controls_frame, text="District:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
-        self.district_entry = AutocompleteEntry(controls_frame, 
-                                                suggestions_list=self.app.history_manager.get_suggestions("location_district"),
-                                                app_instance=self.app, history_key="location_district",
-                                                filter_func=self._make_filter_func("location_district", "location_state", self.state_entry),
-                                                command=self._make_parent_callback("location_district", [
-                                                    (self.block_entry, "location_block"),
-                                                    (self.panchayat_entry, "location_panchayat"),
-                                                ]))
-        self.district_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
+        d_vals = self.app.history_manager.get_suggestions("location_district") or [""]
+        self.district_var = ctk.StringVar()
+        self.district_menu = ctk.CTkOptionMenu(controls_frame, variable=self.district_var, values=d_vals)
+        self.district_menu.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Block:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
-        self.block_entry = AutocompleteEntry(controls_frame, 
-                                             suggestions_list=self.app.history_manager.get_suggestions("location_block"),
-                                             app_instance=self.app, history_key="location_block",
-                                             filter_func=self._make_filter_func("location_block", "location_district", self.district_entry),
-                                             command=self._make_parent_callback("location_block", [
-                                                 (self.panchayat_entry, "location_panchayat"),
-                                             ]))
-        self.block_entry.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
+        b_vals = self.app.history_manager.get_suggestions("location_block") or [""]
+        self.block_var = ctk.StringVar()
+        self.block_menu = ctk.CTkOptionMenu(controls_frame, variable=self.block_var, values=b_vals)
+        self.block_menu.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
-        self.panchayat_entry = AutocompleteEntry(controls_frame, 
-                                                 suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-                                                 app_instance=self.app, history_key="location_panchayat",
-                                                 filter_func=self._make_filter_func("location_panchayat", "location_block", self.block_entry))
-        self.panchayat_entry.grid(row=3, column=1, sticky='ew', padx=15, pady=5)
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=3, column=1, sticky='ew', padx=15, pady=5)
+
+        # --- Wire up location hierarchy callbacks now (all widgets exist) ---
+        def _on_state_change(*_):
+            self.district_var.set(""); self.block_var.set(""); self.panchayat_var.set("")
+            vals = self.app.history_manager.get_filtered_suggestions("location_district", "location_state", self.state_var.get()) or [""]
+            self.district_menu.configure(values=vals)
+        self.state_var.trace_add("write", _on_state_change)
+        
+        def _on_district_change(*_):
+            self.block_var.set(""); self.panchayat_var.set("")
+            vals = self.app.history_manager.get_filtered_suggestions("location_block", "location_district", self.district_var.get()) or [""]
+            self.block_menu.configure(values=vals)
+        self.district_var.trace_add("write", _on_district_change)
+        
+        def _on_block_change(*_):
+            self.panchayat_var.set("")
+            vals = self.app.history_manager.get_filtered_suggestions("location_panchayat", "location_block", self.block_var.get()) or [""]
+            self.panchayat_menu.configure(values=vals)
+        self.block_var.trace_add("write", _on_block_change)
 
         ctk.CTkLabel(controls_frame, text="Delay Column:").grid(row=4, column=0, sticky='w', padx=15, pady=5)
         self.delay_column_options = [
@@ -119,10 +123,9 @@ class DashboardReportTab(BaseAutomationTab):
             "Pending for I sig FTO in T+7 days",
             "Pending for II sig FTO in T+8 days"
         ]
-        self.delay_column_entry = AutocompleteEntry(controls_frame, suggestions_list=self.delay_column_options)
-        self.delay_column_entry.grid(row=4, column=1, sticky='ew', padx=15, pady=5)
-        if self.delay_column_options:
-            self.delay_column_entry.insert(0, self.delay_column_options[0])
+        self.delay_column_var = ctk.StringVar(value=self.delay_column_options[0])
+        self.delay_column_menu = ctk.CTkOptionMenu(controls_frame, variable=self.delay_column_var, values=self.delay_column_options)
+        self.delay_column_menu.grid(row=4, column=1, sticky='ew', padx=15, pady=5)
 
         action_frame = self._create_action_buttons(parent_frame=controls_frame)
         action_frame.grid(row=5, column=0, columnspan=2, pady=10)
@@ -182,11 +185,11 @@ class DashboardReportTab(BaseAutomationTab):
             return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.state_entry.configure(state=state)
-        self.district_entry.configure(state=state)
-        self.block_entry.configure(state=state)
-        self.panchayat_entry.configure(state=state)
-        self.delay_column_entry.configure(state=state)
+        self.state_menu.configure(state=state)
+        self.district_menu.configure(state=state)
+        self.block_menu.configure(state=state)
+        self.panchayat_menu.configure(state=state)
+        self.delay_column_menu.configure(state=state)
         self.run_mr_fill_button.configure(state=state)
     def reset_ui(self) -> None:
         pass
@@ -207,11 +210,11 @@ class DashboardReportTab(BaseAutomationTab):
         self._update_workcode_textbox("") 
         
         inputs = {
-            'state': self.state_entry.get().strip(), 
-            'district': self.district_entry.get().strip(), 
-            'block': self.block_entry.get().strip(),
-            'panchayat': self.panchayat_entry.get().strip(),
-            'delay_column': self.delay_column_entry.get().strip()
+            'state': self.state_var.get().strip(), 
+            'district': self.district_var.get().strip(), 
+            'block': self.block_var.get().strip(),
+            'panchayat': self.panchayat_var.get().strip(),
+            'delay_column': self.delay_column_var.get()
         }
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['panchayat'], inputs['delay_column']]):
@@ -237,8 +240,7 @@ class DashboardReportTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        self.app.log_message(self.log_display, "Attempting to solve CAPTCHA...")
-        try:
+        self.log_info("Attempting to solve CAPTCHA...")        try:
             captcha_element = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lblStopSpam")))
             captcha_text = captcha_element.text
             match = re.search(r'(\d+)\s*([+\-*])\s*(\d+)', captcha_text)
@@ -251,11 +253,9 @@ class DashboardReportTab(BaseAutomationTab):
             if "Invalid Captcha Code" in driver.page_source: raise ValueError("CAPTCHA failed.")
             return True
         except TimeoutException:
-            self.app.log_message(self.log_display, "CAPTCHA not found, skipping.", "info")
-            return True
+            self.log_info("CAPTCHA not found, skipping.")            return True
         except ValueError as e:
-            self.app.log_message(self.log_display, f"CAPTCHA Error: {e}", "error")
-            raise
+            self.log_error(f"CAPTCHA Error: {e}")            raise
 
     def run_automation_logic(self, inputs, retries=1):
         # ---- Lazy imports ----
@@ -280,8 +280,7 @@ class DashboardReportTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
 
             # --- STANDARD FLOW ONLY (Direct Link Removed) ---
-            self.app.log_message(self.log_display, "Navigating to Home Page...")
-            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+            self.log_info("Navigating to Home Page...")            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
             self._solve_captcha(driver, wait)
 
             self.update_status("Selecting State...", 0.15)
@@ -332,8 +331,7 @@ class DashboardReportTab(BaseAutomationTab):
             rows = table.find_elements(By.XPATH, ".//tr[position()>1]") 
 
             if not rows:
-                self.app.log_message(self.log_display, "Table is empty.", "warning")
-                return
+                self.log_warning("Table is empty.")                return
 
             workcode_list = []
             pending_mr_count = 0
@@ -368,14 +366,13 @@ class DashboardReportTab(BaseAutomationTab):
             if "Session Expired" in str(e) and retries > 0:
                 self.run_automation_logic(inputs, retries - 1)
                 return
-            self.app.log_message(self.log_display, f"Error: {e}", "error")
-            self.success_message = None
+            self.log_error(f"Error: {e}")            self.success_message = None
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")
             self.app.after(0, self.update_status, "Ready", 0.0)
             if hasattr(self, 'success_message') and self.success_message:
-                self.app.after(100, lambda: messagebox.showinfo("Complete", self.success_message))
+                self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 Dashboard Report Complete: {self.success_message}"))
                 if inputs['delay_column'] == "Attendance not filled in T+2 days":
                     self.app.after(0, lambda: self.run_mr_fill_button.pack(side="left", padx=(10, 0)))
 
@@ -394,7 +391,7 @@ class DashboardReportTab(BaseAutomationTab):
 
     def _run_mr_fill(self):
         wc = self.workcode_textbox.get("1.0", tkinter.END).strip()
-        gp = self.panchayat_entry.get().strip()
+        gp = self.panchayat_var.get().strip()
         if wc and gp: self.app.switch_to_mr_fill_with_data(wc, gp)
         else: messagebox.showwarning("Error", "Missing Data.")
 
@@ -419,10 +416,10 @@ class DashboardReportTab(BaseAutomationTab):
             return
 
         # Basic Info
-        state = self.state_entry.get().strip()
-        district = self.district_entry.get().strip()
-        block = self.block_entry.get().strip()
-        panchayat = self.panchayat_entry.get().strip()
+        state = self.state_var.get().strip()
+        district = self.district_var.get().strip()
+        block = self.block_var.get().strip()
+        panchayat = self.panchayat_var.get().strip()
         safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat or "Report") 
         
         export_format = self.export_format_menu.get()
@@ -433,7 +430,7 @@ class DashboardReportTab(BaseAutomationTab):
         data = [self.results_tree.item(item, 'values') for item in self.results_tree.get_children()]
 
         # Titles & Headers
-        delay_type = self.delay_column_entry.get()
+        delay_type = self.delay_column_var.get()
         if "Attendance" in delay_type: report_type = "Attendance Pending Report"
         elif "Measurement" in delay_type: report_type = "Measurement Book Pending Report"
         elif "Wagelist" in delay_type: report_type = "Wagelist Pending Report"
@@ -778,14 +775,13 @@ class DashboardReportTab(BaseAutomationTab):
     def save_inputs(self, inputs):
         d = {k: inputs.get(k) for k in ('state', 'district', 'block', 'panchayat')}
         try:
-            with open(self.app.get_data_path("dashboard_report_inputs.json"), 'w') as f: json.dump(d, f)
+            self.app.history_manager.save_tab_inputs_batch("dashboard_report", d)
         except Exception as e: logger.debug("Dashboard: Could not save inputs: %s", e)
 
     def load_inputs(self):
-        try:
-            with open(self.app.get_data_path("dashboard_report_inputs.json"), 'r') as f: data = json.load(f)
-            self.state_entry.delete(0, 'end'); self.state_entry.insert(0, data.get('state', ''))
-            self.district_entry.delete(0, 'end'); self.district_entry.insert(0, data.get('district', ''))
-            self.block_entry.delete(0, 'end'); self.block_entry.insert(0, data.get('block', ''))
-            self.panchayat_entry.delete(0, 'end'); self.panchayat_entry.insert(0, data.get('panchayat', ''))
-        except Exception as e: logger.debug("Dashboard: Could not load inputs: %s", e)
+        data = self.app.history_manager.get_tab_inputs("dashboard_report")
+        if data:
+            self.state_var.set(data.get('state', ''))
+            self.district_var.set(data.get('district', ''))
+            self.block_var.set(data.get('block', ''))
+            self.panchayat_var.set(data.get('panchayat', ''))

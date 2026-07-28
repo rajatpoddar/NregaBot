@@ -8,7 +8,6 @@ from datetime import datetime
 from src import config
 import sys, subprocess
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -276,18 +275,15 @@ class DemandTab(BaseAutomationTab):
 
         # --- Row 0: State and Panchayat ---
         ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, padx=(10, 5), pady=5, sticky="w")
-        self.state_combobox = AutocompleteEntry(
-            controls_frame,
-            suggestions_list=list(config.STATE_DEMAND_CONFIG.keys()),
-            app_instance=self.app,
-        )
+        self.state_var = ctk.StringVar()
+        self.state_combobox = ctk.CTkOptionMenu(controls_frame, variable=self.state_var, values=list(config.STATE_DEMAND_CONFIG.keys()))
         self.state_combobox.grid(row=0, column=1, padx=(0, 10), pady=5, sticky="ew")
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=2, padx=(0, 5), pady=5, sticky="w")
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"))
-        self.panchayat_entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
-        # Ensure clicks inside the scrollable parent propagate correctly to this entry
-        self.panchayat_entry.bind("<Button-1>", lambda e: self.panchayat_entry.focus_set(), add="+")
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
 
         # --- Row 1: Demand Date (From) ---
         ctk.CTkLabel(controls_frame, text="Work Demand From:").grid(row=1, column=0, padx=(10, 5), pady=5, sticky="w")
@@ -329,12 +325,9 @@ class DemandTab(BaseAutomationTab):
         work_key_frame.grid(row=3, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
         work_key_frame.grid_columnconfigure(0, weight=1) 
         
-        self.allocation_work_key_entry = AutocompleteEntry(
-            work_key_frame, 
-            suggestions_list=self.work_key_list,
-            placeholder_text="Optional: Enter Work Key or Load from Cloud"
-        )
-        self.allocation_work_key_entry.grid(row=0, column=0, sticky="ew")
+        self.allocation_work_key_var = ctk.StringVar()
+        self.allocation_work_key_menu = ctk.CTkOptionMenu(work_key_frame, variable=self.allocation_work_key_var, values=self.work_key_list if self.work_key_list else [""])
+        self.allocation_work_key_menu.grid(row=0, column=0, sticky="ew")
 
         self.load_work_key_button = ctk.CTkButton(
             work_key_frame, 
@@ -494,8 +487,7 @@ class DemandTab(BaseAutomationTab):
                 selected_count += 1
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
-        self.app.log_message(self.log_display, f"Selected all {selected_count} valid applicants.")
-
+        self.log_info(f"Selected all {selected_count} valid applicants.")
     def _select_custom_number(self):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -547,8 +539,7 @@ class DemandTab(BaseAutomationTab):
             
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
-        self.app.log_message(self.log_display, f"Selected first {selected_count} valid applicants.")
-        self._update_jc_header_counters()
+        self.log_info(f"Selected first {selected_count} valid applicants.")        self._update_jc_header_counters()
 
     def _clear_processed_selection(self):
         # ---- Lazy imports ----
@@ -568,8 +559,7 @@ class DemandTab(BaseAutomationTab):
         Deselects ONLY successfully processed applicants.
         Keeps 'Failed' or 'Skipped' applicants selected for easy retry.
         """
-        self.app.log_message(self.log_display, "Updating selection based on results...", "info")
-        
+        self.log_info("Updating selection based on results...")        
         # 1. Collect Successful JobCard+Name pairs from results
         successful_pairs = set()
         for item in self.results_tree.get_children():
@@ -600,8 +590,7 @@ class DemandTab(BaseAutomationTab):
         self._refresh_selected_jc_panel()
         self._refresh_search_results()
         self._update_selection_summary()
-        self.app.log_message(self.log_display, f"Deselected {deselected_count} successful applicants. Failed items remain checked.")
-        self._update_jc_header_counters()
+        self.log_info(f"Deselected {deselected_count} successful applicants. Failed items remain checked.")        self._update_jc_header_counters()
 
     def _select_csv_from_computer(self):
         # ---- Lazy imports ----
@@ -688,8 +677,7 @@ class DemandTab(BaseAutomationTab):
                         })
 
             loaded_count = len(self.all_applicants_data)
-            self.app.log_message(self.log_display, f"Loaded {loaded_count} applicants from '{os.path.basename(path)}'.")
-            
+            self.log_info(f"Loaded {loaded_count} applicants from '{os.path.basename(path)}'.")            
             self._update_applicant_display()
 
         except Exception as e:
@@ -719,8 +707,7 @@ class DemandTab(BaseAutomationTab):
             file_id = selected_file['id']
             filename = selected_file['filename']
             
-            self.app.log_message(self.log_display, f"Downloading '{filename}' from cloud...")
-            temp_path = self._download_file_from_cloud(file_id, filename)
+            self.log_info(f"Downloading '{filename}' from cloud...")            temp_path = self._download_file_from_cloud(file_id, filename)
             
             if temp_path:
                 self._process_csv_data(temp_path)
@@ -732,8 +719,7 @@ class DemandTab(BaseAutomationTab):
         """
         token = self.app.license_info.get('key')
         if not token:
-            self.app.log_message(self.log_display, "Cloud Download Failed: Not licensed.", "error")
-            return None
+            self.log_error("Cloud Download Failed: Not licensed.")            return None
 
         headers = {'Authorization': f'Bearer {token}'}
         url = f"{config.LICENSE_SERVER_URL}/files/api/download/{file_id}"
@@ -748,11 +734,9 @@ class DemandTab(BaseAutomationTab):
                     for chunk in r.iter_content(chunk_size=8192): 
                         f.write(chunk)
             
-            self.app.log_message(self.log_display, f"Successfully downloaded '{filename}'.", "info")
-            return temp_path
+            self.log_info(f"Successfully downloaded '{filename}'.")            return temp_path
         except Exception as e:
-            self.app.log_message(self.log_display, f"Cloud download failed: {e}", "error")
-            messagebox.showerror("Download Failed", f"Could not download file: {e}")
+            self.log_error(f"Cloud download failed: {e}")            messagebox.showerror("Download Failed", f"Could not download file: {e}")
             return None
 
     def _load_work_key_list_from_cloud(self):
@@ -773,8 +757,7 @@ class DemandTab(BaseAutomationTab):
             # Run download and processing in a thread
             file_id = selected_file['id']
             filename = selected_file['filename']
-            self.app.log_message(self.log_display, f"Downloading work list '{filename}' from cloud...")
-            
+            self.log_info(f"Downloading work list '{filename}' from cloud...")            
             # Disable button to prevent double-click
             self.load_work_key_button.configure(state="disabled") 
             
@@ -864,9 +847,8 @@ class DemandTab(BaseAutomationTab):
             def update_ui_with_keys():
                 self.work_key_list.clear()
                 self.work_key_list.extend(temp_key_list)
-                self.allocation_work_key_entry.suggestions = self.work_key_list
-                self.app.log_message(self.log_display, f"Loaded {len(self.work_key_list)} work keys for autocomplete.")
-                
+                self.allocation_work_key_menu.configure(values=self.work_key_list if self.work_key_list else [""])
+                self.log_info(f"Loaded {len(self.work_key_list)} work keys for autocomplete.")                
             self.app.after(0, update_ui_with_keys)
 
         except Exception as e:
@@ -874,7 +856,7 @@ class DemandTab(BaseAutomationTab):
             
             def clear_ui_keys():
                 self.work_key_list.clear()
-                self.allocation_work_key_entry.suggestions = self.work_key_list
+                self.allocation_work_key_menu.configure(values=self.work_key_list if self.work_key_list else [""])
             self.app.after(0, clear_ui_keys)
 
     # -----------------------------------------------------------------------
@@ -920,8 +902,7 @@ class DemandTab(BaseAutomationTab):
                     matched_jcs.add(jc)
 
         if not matched_jcs:
-            self.app.log_message(self.log_display, f"No JCs matched: {raw}", "warning")
-            return
+            self.log_warning(f"No JCs matched: {raw}")            return
 
         added = 0
         for app_data in self.all_applicants_data:
@@ -1149,7 +1130,7 @@ class DemandTab(BaseAutomationTab):
         state = "disabled" if running else "normal"
         
         self.state_combobox.configure(state=state)
-        self.panchayat_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.days_entry.configure(state=state)
         self.select_csv_button.configure(state=state)
         self.cloud_csv_button.configure(state=state)
@@ -1158,7 +1139,7 @@ class DemandTab(BaseAutomationTab):
         self.demand_date_entry.configure(state=state)
         self.select_all_button.configure(state=state)
         self.clear_selection_button.configure(state=state)
-        self.allocation_work_key_entry.configure(state=state)
+        self.allocation_work_key_menu.configure(state=state)
         self.load_work_key_button.configure(state=state)
         self.retry_failed_button.configure(state=state)
         
@@ -1244,8 +1225,7 @@ class DemandTab(BaseAutomationTab):
         print(f"Auto-Setup: Panchayat={panchayat_name}, File={file_path}")
         
         # 1. Panchayat Name Set
-        self.panchayat_entry.delete(0, tkinter.END)
-        self.panchayat_entry.insert(0, panchayat_name)
+        self.panchayat_var.set(panchayat_name)
         
         # 2. File Load & Immediate Selection
         if file_path and os.path.exists(file_path):
@@ -1259,8 +1239,7 @@ class DemandTab(BaseAutomationTab):
             print(f"Auto-Setup: Loaded & Selected {len(self.all_applicants_data)} applicants.")
         else:
             print(f"Error: File path not found: {file_path}")
-            self.app.log_message(self.log_display, f"Macro Error: File not found {file_path}", "error")
-    def start_automation(self) -> None:
+            self.log_error(f"Macro Error: File not found {file_path}")    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -1279,14 +1258,14 @@ class DemandTab(BaseAutomationTab):
         using the app's built-in thread manager (which plays sound).
         """
         # --- 1. Get and Validate Inputs ---
-        state = self.state_combobox.get()
+        state = self.state_var.get()
         if not state: messagebox.showerror("Input Error", "Select state."); return
         try: cfg = config.STATE_DEMAND_CONFIG[state]; logic_key = cfg["village_code_logic"]; url = cfg["base_url"]
         except KeyError: messagebox.showerror("Config Error", f"Demand config missing for: {state}"); return
 
         selected = [r for r in self.all_applicants_data if r.get('_selected', False)]
-        panchayat = self.panchayat_entry.get().strip(); days_str = self.days_entry.get().strip()
-        work_key_for_allocation = self.allocation_work_key_entry.get().strip()
+        panchayat = self.panchayat_var.get().strip(); days_str = self.days_entry.get().strip()
+        work_key_for_allocation = self.allocation_work_key_var.get().strip()
         
         demand_to_date_str = ""  # Override date feature removed
 
@@ -1310,10 +1289,8 @@ class DemandTab(BaseAutomationTab):
         # self.stop_event.clear(); <-- Handled by app.start_automation_thread
         self.app.clear_log(self.log_display)
         for i in self.results_tree.get_children(): self.results_tree.delete(i)
-        self.app.log_message(self.log_display, f"Starting demand: {len(selected)} applicant(s), State: {state}...")
-        if work_key_for_allocation:
-            self.app.log_message(self.log_display, f"   -> Auto-allocation is ENABLED for Work Key: {work_key_for_allocation}")
-
+        self.log_info(f"Starting demand: {len(selected)} applicant(s), State: {state}...")        if work_key_for_allocation:
+            self.log_info(f"   -> Auto-allocation is ENABLED for Work Key: {work_key_for_allocation}")
         
         # self.app.set_status("Running..."); <-- Handled by app.start_automation_thread
         self.set_ui_state(running=True) # Disable UI elements
@@ -1338,8 +1315,7 @@ class DemandTab(BaseAutomationTab):
             if vc not in grouped: grouped[vc] = {}
             if jc not in grouped[vc]: grouped[vc][jc] = []
             grouped[vc][jc].append(app)
-        if skipped_malformed: self.app.log_message(self.log_display, f"Warn: Skipped {skipped_malformed} malformed Job Cards.", "warning")
-
+        if skipped_malformed: self.log_warning(f"Warn: Skipped {skipped_malformed} malformed Job Cards.")
         # --- 4. Start Worker Thread using the App's Method ---
         # This will play the sound and manage the thread
         args_tuple = (
@@ -1367,12 +1343,12 @@ class DemandTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         """Resets all inputs, selections, and logs on the tab."""
         if not messagebox.askokcancel("Reset?", "Clear inputs, selections, logs?"): return
-        self.state_combobox.delete(0, 'end')
-        self.panchayat_entry.delete(0, 'end')
+        self.state_var.set("")
+        self.panchayat_var.set("")
         self.days_entry.delete(0, 'end')
         self.search_entry.delete(0, 'end')
         self.quick_select_entry.delete(0, 'end')
-        self.allocation_work_key_entry.delete(0, 'end')
+        self.allocation_work_key_var.set("")
         self.demand_date_entry.delete(0, 'end')
 
         self.csv_path = None
@@ -1381,7 +1357,7 @@ class DemandTab(BaseAutomationTab):
 
         # Clear work key list
         self.work_key_list.clear()
-        self.allocation_work_key_entry.suggestions = self.work_key_list
+        self.allocation_work_key_menu.configure(values=self.work_key_list if self.work_key_list else [""])
 
         self._refresh_selected_jc_panel()
         self._refresh_search_results()
@@ -1389,8 +1365,7 @@ class DemandTab(BaseAutomationTab):
         for i in self.results_tree.get_children(): self.results_tree.delete(i)
         self.app.clear_log(self.log_display)
         self.app.after(0, self.app.set_status, "Ready")
-        self.app.log_message(self.log_display, "Form reset.")
-
+        self.log_info("Form reset.")
     def _setup_results_treeview(self):
         """
         Configures the columns and headings for the results table.
@@ -1567,7 +1542,7 @@ class DemandTab(BaseAutomationTab):
                         self.app.after(0, self.app.log_message, self.log_display, f"✅ Triggering Bulk Allocation (Global Key).")
                         self.app.after(500, self.app.run_work_allocation_from_demand, panchayat, work_key_for_allocation)
                     else:
-                        self.app.after(100, lambda: messagebox.showinfo("Complete", "Demand automation finished."))
+                        self.app.after(100, lambda: self.app.log_message(self.log_display, "📊 Demand automation finished."))
                 # ---------------------------------
 
                 self.app.after(0, self._clear_processed_selection)
@@ -2012,12 +1987,10 @@ class DemandTab(BaseAutomationTab):
         Re-selects all applicants who are marked as 'failed' in the
         results table, so the user can run the automation again for them.
         """
-        self.app.log_message(self.log_display, "Re-selecting failed applicants...", "info")
-        failed_items = self.results_tree.tag_has('failed')
+        self.log_info("Re-selecting failed applicants...")        failed_items = self.results_tree.tag_has('failed')
         
         if not failed_items:
-            self.app.log_message(self.log_display, "No failed applicants found in results.", "info")
-            messagebox.showinfo("Retry Failed", "No failed applicants found in the results table.")
+            self.log_info("No failed applicants found in results.")            messagebox.showinfo("Retry Failed", "No failed applicants found in the results table.")
             return
 
         re_selected_count = 0
@@ -2045,16 +2018,13 @@ class DemandTab(BaseAutomationTab):
                         break
                 
                 if not found:
-                    self.app.log_message(self.log_display, f"Could not find {name} ({jc_no}) in original CSV.", "warning")
-                        
+                    self.log_warning(f"Could not find {name} ({jc_no}) in original CSV.")                        
             except Exception as e:
-                self.app.log_message(self.log_display, f"Error processing item {item_id}: {e}", "error")
-
+                self.log_error(f"Error processing item {item_id}: {e}")
         # Refresh panels
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
-        self.app.log_message(self.log_display, f"Re-selected {re_selected_count} failed applicants.")
-        self._update_jc_header_counters()
+        self.log_info(f"Re-selected {re_selected_count} failed applicants.")        self._update_jc_header_counters()
         messagebox.showinfo("Retry Failed", f"Re-selected {re_selected_count} failed applicants.\n\n"
                                              "Please fix any issues (like un-issued job cards) and then click 'Start Automation' to retry.")
 
@@ -2063,15 +2033,12 @@ class DemandTab(BaseAutomationTab):
         Exports the contents of the results treeview to a CSV file.
         """
         if not self.results_tree.get_children(): messagebox.showinfo("Export", "No results."); return
-        p = self.panchayat_entry.get().strip().replace(" ", "_") or "UnknownPanchayat"; s = self.state_combobox.get() or "UnknownState"
+        p = self.panchayat_var.get().strip().replace(" ", "_") or "UnknownPanchayat"; s = self.state_var.get() or "UnknownState"
         fname = f"Demand_Report_{s}_{p}_{datetime.now():%Y%m%d_%H%M}.csv"; self.export_treeview_to_csv(self.results_tree, fname)
 
     def save_inputs(self, inputs):
-        """
-        Saves the current UI inputs (state, panchayat, etc.) to a JSON file.
-        """
         try:
-            with open(self.config_file, 'w') as f: json.dump(inputs, f, indent=4)
+            self.app.history_manager.save_tab_inputs_batch("demand", inputs)
         except Exception as e: print(f"Err saving demand inputs: {e}")
 
     def load_inputs(self):
@@ -2082,17 +2049,17 @@ class DemandTab(BaseAutomationTab):
         days_to_set = self.app.history_manager.get_suggestions("demand_days")[0] if self.app.history_manager.get_suggestions("demand_days") else "14"
         work_key_to_set = ""
         
-        if os.path.exists(self.config_file):
+        data = self.app.history_manager.get_tab_inputs("demand")
+        if data:
+            self.state_var.set(data.get('state', '')); self.panchayat_var.set(data.get('panchayat', ''))
+            days_to_set = data.get('days', days_to_set)
+            work_key_to_set = data.get('work_key_for_allocation', '')
+            loaded = data.get('demand_date', '');
             try:
-                with open(self.config_file, 'r') as f: data = json.load(f)
-                self.state_combobox.delete(0, 'end'); self.state_combobox.insert(0, data.get('state', '')); self.panchayat_entry.insert(0, data.get('panchayat', ''))
-                days_to_set = data.get('days', days_to_set)
-                work_key_to_set = data.get('work_key_for_allocation', '')
-                
-                loaded = data.get('demand_date', '');
-                try: datetime.strptime(loaded, '%d/%m/%Y'); date_to_set = loaded
-                except ValueError: pass
-            except Exception as e: print(f"Err loading demand inputs: {e}")
+                datetime.strptime(loaded, '%d/%m/%Y')
+                date_to_set = loaded
+            except ValueError:
+                pass
             
         # --- FIX: Use delete/insert ---
         self.demand_date_entry.delete(0, "end")
@@ -2102,8 +2069,7 @@ class DemandTab(BaseAutomationTab):
         self.days_entry.delete(0, 'end')
         self.days_entry.insert(0, days_to_set)
         
-        self.allocation_work_key_entry.delete(0, 'end')
-        self.allocation_work_key_entry.insert(0, work_key_to_set)
+        self.allocation_work_key_var.set(work_key_to_set)
 
     def _clear_selection(self):
         # ---- Lazy imports ----
@@ -2121,15 +2087,13 @@ class DemandTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         """Clears the current selection of all applicants."""
         if not any(a.get('_selected', False) for a in self.all_applicants_data):
-            self.app.log_message(self.log_display, "No selection.", "info")
-            return
+            self.log_info("No selection.")            return
         for a in self.all_applicants_data:
             a['_selected'] = False
         self._refresh_selected_jc_panel()
         self._refresh_search_results()
         self._update_selection_summary()
-        self.app.log_message(self.log_display, "Selection cleared.")
-
+        self.log_info("Selection cleared.")
 
     def _on_format_change(self, selected_format):
         """Disables the filter menu for CSV format as it exports all data."""
@@ -2156,8 +2120,8 @@ class DemandTab(BaseAutomationTab):
         Central function to handle exporting results to PDF or CSV.
         """
         export_format = self.export_format_menu.get()
-        panchayat_name = self.panchayat_entry.get().strip()
-        state_name = self.state_combobox.get().strip()
+        panchayat_name = self.panchayat_var.get().strip()
+        state_name = self.state_var.get().strip()
 
         # Ensure Panchayat name is provided for the filename
         if not panchayat_name:
@@ -2203,8 +2167,8 @@ class DemandTab(BaseAutomationTab):
             messagebox.showinfo("No Data", "There are no results to export.")
             return None, None
             
-        panchayat_name = self.panchayat_entry.get().strip()
-        state_name = self.state_combobox.get().strip()
+        panchayat_name = self.panchayat_var.get().strip()
+        state_name = self.state_var.get().strip()
 
         filter_option = self.export_filter_menu.get()
         data_to_export = []
@@ -2272,7 +2236,7 @@ class DemandTab(BaseAutomationTab):
             # Row ID(15), JC(65), Name(60), Status(140)
             col_widths = [15, 65, 60, 140] 
             
-            title = f"Demand Automation Report: {self.panchayat_entry.get().strip()} ({self.state_combobox.get()})"
+            title = f"Demand Automation Report: {self.panchayat_var.get().strip()} ({self.state_var.get()})"
             report_date = datetime.now().strftime('%d %b %Y')
             
             # Using base_tab.py's generate_report_pdf

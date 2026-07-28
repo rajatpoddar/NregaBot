@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 from typing import Any, Optional
@@ -125,6 +126,43 @@ def get_data_path(filename: str = "") -> str:
 def get_user_downloads_path() -> str:
     """Returns the default downloads path for the user."""
     return str(Path.home() / "Downloads")
+
+
+# ── Workcode pattern & truncation ─────────────────────────────────
+WORKCODE_PATTERN = re.compile(r'\b(34\d{8}(?:/\w+)+/\d+)\b')
+
+def truncate_workcode(workcode: str) -> str:
+    """
+    Workcode ke sirf last 6 digits return karta hai.
+    
+    NREGA workcodes format: 34XXXXXXXXXXXXXX/YYYY-YY/ZZZZZZ
+    Sirf last 6 digits (ZZZZZZ) log/store kiya jaata hai privacy ke liye.
+    
+    Agar input pattern match nahi karta (jaise jobcard number, search key),
+    to wapas vahi value return kar deta hai bina truncation ke.
+    
+    Examples:
+        342012345678901/2024-25/123456  → 123456
+        342012345678901/2024-25/789012  → 789012
+        ABC123  → ABC123  (not a workcode, return as-is)
+    """
+    if not workcode or not isinstance(workcode, str):
+        return workcode or ""
+    
+    wc = workcode.strip()
+    if WORKCODE_PATTERN.match(wc):
+        parts = wc.split('/')
+        last_part = parts[-1]
+        if len(last_part) > 6:
+            return last_part[-6:]
+        return last_part
+    
+    # Fallback: check if it looks like a numeric code with digits > 8
+    digits = ''.join(c for c in wc if c.isdigit())
+    if len(digits) > 8 and not any(c.isalpha() for c in wc if c.isalnum()):
+        return digits[-6:]
+    
+    return wc
 
 
 def get_nregabot_path(subdir: str = "") -> str:

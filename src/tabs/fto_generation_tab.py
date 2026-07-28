@@ -181,8 +181,7 @@ class FtoGenerationTab(BaseAutomationTab):
             messagebox.showerror("Error", "Valid Firefox path is required!")
             return
         
-        self.app.log_message(self.log_display, "Launching Old Firefox...")
-        self.launch_btn.configure(state="disabled", text="Launching...")
+        self.log_info("Launching Old Firefox...")        self.launch_btn.configure(state="disabled", text="Launching...")
         
         url = "https://nregade4.nic.in/netnrega/Login.aspx?&level=HomePO&state_code=34"
 
@@ -288,24 +287,29 @@ class FtoGenerationTab(BaseAutomationTab):
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
         self.update_status("Starting Generation...", 0)
         
+        success_count = 0
+        total_steps = 2
         try:
             driver = self.app.get_driver()
             if not driver: return
             cfg = config.FTO_GEN_CONFIG
             wait = WebDriverWait(driver, 15)
             
-            self.update_status("Processing Aadhaar FTO...", 0.25)
-            self._process_verification_page(driver, wait, cfg["aadhaar_fto_url"], "Aadhaar Gen")
+            self.log_info("🔐 Step 1/2: Processing Aadhaar FTO...")            self.update_status("Processing Aadhaar FTO...", 0.25)
+            result_1 = self._process_verification_page(driver, wait, cfg["aadhaar_fto_url"], "Aadhaar Gen")
+            if result_1: success_count += 1
 
-            self.update_status("Processing Top-Up FTO...", 0.75)
-            self._process_verification_page(driver, wait, cfg["top_up_fto_url"], "Top-Up Gen")
+            self.log_info("🔐 Step 2/2: Processing Top-Up FTO...")            self.update_status("Processing Top-Up FTO...", 0.75)
+            result_2 = self._process_verification_page(driver, wait, cfg["top_up_fto_url"], "Top-Up Gen")
+            if result_2: success_count += 1
             
-            self.app.log_message(self.log_display, "Generation complete.")
-            messagebox.showinfo("Success", "FTO Generation Process Completed.")
-
+            self.log_info(f"
+{'='*50}")            if success_count == total_steps:
+                self.log_success(f"✅ FTO Generation Complete! Both steps processed successfully.")            elif success_count > 0:
+                self.log_warning(f"⚠️ FTO Generation: {success_count}/{total_steps} steps completed.")            else:
+                self.log_error(f"❌ FTO Generation: No steps completed successfully.")            self.log_info(f"{'='*50}")
         except Exception as e:
-            self.app.log_message(self.log_display, f"Error: {e}", "error")
-        finally:
+            self.log_error(f"❌ Error: {e}")        finally:
             self.automation_has_run = True
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Finished", 1.0)
@@ -325,8 +329,7 @@ class FtoGenerationTab(BaseAutomationTab):
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
         try:
-            self.app.log_message(self.log_display, f"Navigating to {name}...")
-            driver.get(url)
+            self.log_info(f"🌐 Navigating to {name}...")            driver.get(url)
             
             # --- SCRAPE LOCATION DATA IMMEDIATELY ---
             if not self.stored_location_data: 
@@ -336,29 +339,30 @@ class FtoGenerationTab(BaseAutomationTab):
             wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_wage_list_verify")))
             
             if not driver.find_elements(By.XPATH, "//input[contains(@id, '_auth')]"):
-                self.app.log_message(self.log_display, "No records found.", "warning")
-                self._log_result(name, "Skipped", "No records")
-                return
+                self.log_warning(f"  ⏭️ {name}: No records found to process.")                self._log_result(name, "Skipped", "No records found")
+                return False
 
-            driver.execute_script("document.querySelectorAll('input[id*=\"_auth\"]').forEach(radio => radio.click());")
+            self.log_info(f"  🔘 Selecting all authorization checkboxes...")            driver.execute_script("document.querySelectorAll('input[id*=\"_auth\"]').forEach(radio => radio.click());")
             
-            submit_btn = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ch_verified")))
+            self.log_info(f"  👆 Clicking 'Verified' button...")            submit_btn = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ch_verified")))
             driver.execute_script("arguments[0].click();", submit_btn)
             
-            auth_btn = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_btn")))
+            self.log_info(f"  🖊️ Clicking Digital Signature button...")            auth_btn = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_btn")))
             driver.execute_script("arguments[0].click();", auth_btn)
             
             alert = wait.until(EC.alert_is_present())
             fto_match = re.search(r'FTO No : \((.*?)\)', alert.text)
             fto = fto_match.group(1) if fto_match else "Generated"
             
-            self.app.log_message(self.log_display, f"Success: {fto}", "success")
-            self._log_result(name, "Success", fto)
+            self.log_success(f"  ✅ {name}: FTO Generated — {fto}")            self._log_result(name, "Success", f"FTO: {fto}")
             alert.accept()
+            return True
         except TimeoutException:
-            self._log_result(name, "Failed", "Page load/Login error")
+            self._log_result(name, "Failed", "Page load / Login error")
+            self.log_error(f"  ❌ {name}: Timeout — page load ya login error")            return False
         except Exception as e:
-            self._log_result(name, "Error", str(e))
+            self._log_result(name, "Error", str(e)[:100])
+            self.log_error(f"  ❌ {name}: {str(e).splitlines()[0]}")            return False
 
     def _scrape_location_from_page(self, driver):
         # ---- Lazy imports ----
@@ -375,8 +379,7 @@ class FtoGenerationTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         """Helper to scrape District, Block, Panchayat from TABLE CELLS (Not IDs)."""
         try:
-            self.app.log_message(self.log_display, "Capturing location info...")
-            
+            self.log_info("Capturing location info...")            
             def get_text_by_xpath(label):
                 # ---- Lazy imports ----
                 from selenium.webdriver.common.by import By
@@ -414,10 +417,8 @@ class FtoGenerationTab(BaseAutomationTab):
                 self.stored_location_data['panchayat'] = panch
 
             if self.stored_location_data:
-                self.app.log_message(self.log_display, f"Location captured: {self.stored_location_data}")
-            else:
-                self.app.log_message(self.log_display, "Could not capture location data using XPath.", "warning")
-
+                self.log_info(f"Location captured: {self.stored_location_data}")            else:
+                self.log_warning("Could not capture location data using XPath.")
         except Exception as e:
             print(f"Scrape Error: {e}")
 
@@ -454,12 +455,10 @@ class FtoGenerationTab(BaseAutomationTab):
             self.update_status("Deleting from Link 2...", 0.6)
             self._process_deletion_page(driver, wait, cfg["delete_url_2"], "Delete (Type 2)")
             
-            self.app.log_message(self.log_display, "Deletion process finished.")
-            messagebox.showinfo("Finished", "FTO Deletion check complete.")
+            self.log_info("Deletion process finished.")            messagebox.showinfo("Finished", "FTO Deletion check complete.")
 
         except Exception as e:
-            self.app.log_message(self.log_display, f"Critical Error: {e}", "error")
-        finally:
+            self.log_error(f"Critical Error: {e}")        finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Ready", 1.0)
 
@@ -477,36 +476,30 @@ class FtoGenerationTab(BaseAutomationTab):
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
         try:
-            self.app.log_message(self.log_display, f"Navigating to {log_name}...")
-            driver.get(url)
+            self.log_info(f"Navigating to {log_name}...")            driver.get(url)
             
             try:
                 dd_elem = wait.until(EC.presence_of_element_located((By.TAG_NAME, "select")))
                 select = Select(dd_elem)
             except:
-                self.app.log_message(self.log_display, "Dropdown not found.", "warning")
-                self._log_result(log_name, "Skipped", "Dropdown not found")
+                self.log_warning("Dropdown not found.")                self._log_result(log_name, "Skipped", "Dropdown not found")
                 return
 
             if len(select.options) <= 1:
-                self.app.log_message(self.log_display, "No FTOs available.", "info")
-                self._log_result(log_name, "Skipped", "No FTOs")
+                self.log_info("No FTOs available.")                self._log_result(log_name, "Skipped", "No FTOs")
                 return
 
             fto_text = select.options[1].text
-            self.app.log_message(self.log_display, f"Selecting: {fto_text}")
-            select.select_by_index(1)
+            self.log_info(f"Selecting: {fto_text}")            select.select_by_index(1)
 
-            self.app.log_message(self.log_display, "Waiting for reload...")
-            try:
+            self.log_info("Waiting for reload...")            try:
                 WebDriverWait(driver, 10).until(
                     lambda d: d.execute_script('return document.readyState') == 'complete'
                 )
             except TimeoutException:
                 pass
             
-            self.app.log_message(self.log_display, "Scrolling to bottom...")
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            self.log_info("Scrolling to bottom...")            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(1.5)  # Brief wait for postback to begin
 
             max_retries = 3
@@ -517,8 +510,7 @@ class FtoGenerationTab(BaseAutomationTab):
                     driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", no_radio)
                     time.sleep(1.5)  # Brief wait for postback to begin
                     driver.execute_script("arguments[0].click();", no_radio)
-                    self.app.log_message(self.log_display, "Selected 'No'.")
-                    radio_found = True
+                    self.log_info("Selected 'No'.")                    radio_found = True
                     break
                 except StaleElementReferenceException:
                     time.sleep(1.5)  # Brief wait for postback to begin
@@ -526,8 +518,7 @@ class FtoGenerationTab(BaseAutomationTab):
                     time.sleep(1.5)  # Brief wait for postback to begin
 
             if not radio_found:
-                self.app.log_message(self.log_display, "Could not find 'No' radio button (Check filters or scroll).", "error")
-                return
+                self.log_error("Could not find 'No' radio button (Check filters or scroll).")                return
 
             time.sleep(1.5)  # Brief wait for postback to begin
             try:
@@ -535,8 +526,7 @@ class FtoGenerationTab(BaseAutomationTab):
                 driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", sign_btn)
                 time.sleep(0.5)
                 driver.execute_script("arguments[0].click();", sign_btn)
-                self.app.log_message(self.log_display, "Clicked Signature.")
-                
+                self.log_info("Clicked Signature.")                
                 try:
                     alert = wait.until(EC.alert_is_present())
                     alert.accept()
@@ -544,8 +534,7 @@ class FtoGenerationTab(BaseAutomationTab):
                 except TimeoutException:
                     self._log_result(log_name, "Check", f"Attempted {fto_text}")
             except Exception as e:
-                self.app.log_message(self.log_display, f"Sign Error: {e}", "error")
-
+                self.log_error(f"Sign Error: {e}")
         except Exception as e:
             self._log_result(log_name, "Error", str(e))
 

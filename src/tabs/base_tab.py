@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont 
 
 from src import config
-from src.utils import resource_path, get_logger
+from src.utils import resource_path, get_logger, truncate_workcode
 
 logger = get_logger()
 
@@ -30,9 +30,253 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.retry_btn = None # Placeholder for retry button
         self._tab_destroyed = False  # Flag: set True in destroy() to prevent UI updates on dead widgets
         
+        # --- Activity Tracking for Logging & WhatsApp Notifications ---
+        self.activity_start_time: Optional[float] = None
+        self.activity_panchayat: str = ""
+        self.activity_village: str = ""
+        self.activity_details: str = ""  # JSON-like summary of results
+        
         # --- AfterTracker for safe callback cleanup on tab destroy ---
         from src.ui_components import AfterTracker
         self._safe_after = AfterTracker(self)
+        
+    def _extract_activity_panchayat(self) -> str:
+        """Auto-extract panchayat name from common widget patterns.
+        Checks panchayat_var (StringVar), panchayat_menu/entry widgets,
+        config_vars dict pattern (used by many tabs), and returns uppercase value or empty string."""
+        try:
+            # Priority 0: Check config_vars dict pattern (used by mb_entry, demand, etc.)
+            cfg = getattr(self, 'config_vars', None)
+            if cfg and isinstance(cfg, dict):
+                for key in ['location_panchayat', 'panchayat_name', 'panchayat']:
+                    var = cfg.get(key)
+                    if var is not None and hasattr(var, 'get'):
+                        val = var.get().strip().upper()
+                        if val:
+                            return val
+            # Priority 1: StringVar named panchayat_var
+            for attr in ['panchayat_var', 'panchayat']:
+                v = getattr(self, attr, None)
+                if v is not None and hasattr(v, 'get'):
+                    val = v.get().strip().upper()
+                    if val:
+                        return val
+            # Priority 2: CTkOptionMenu
+            for attr in ['panchayat_menu', 'panchayat_dropdown', 'panchayat_entry']:
+                w = getattr(self, attr, None)
+                if w is not None:
+                    if hasattr(w, 'cget'):
+                        try:
+                            var = w.cget('variable')
+                            if var and hasattr(var, 'get'):
+                                val = var.get().strip().upper()
+                                if val:
+                                    return val
+                        except Exception:
+                            pass
+                    if hasattr(w, 'get'):
+                        val = w.get().strip().upper()
+                        if val:
+                            return val
+        except Exception:
+            pass
+        return ""
+    
+    def _extract_activity_village(self) -> str:
+        """Auto-extract village name from common widget patterns."""
+        try:
+            # Check config_vars dict pattern first
+            cfg = getattr(self, 'config_vars', None)
+            if cfg and isinstance(cfg, dict):
+                for key in ['location_village', 'village_name', 'village']:
+                    var = cfg.get(key)
+                    if var is not None and hasattr(var, 'get'):
+                        val = var.get().strip().upper()
+                        if val:
+                            return val
+            for attr in ['village_var', 'village']:
+                v = getattr(self, attr, None)
+                if v is not None and hasattr(v, 'get'):
+                    val = v.get().strip().upper()
+                    if val:
+                        return val
+            for attr in ['village_menu', 'village_entry']:
+                w = getattr(self, attr, None)
+                if w is not None and hasattr(w, 'get'):
+                    val = w.get().strip().upper()
+                    if val:
+                        return val
+        except Exception:
+            pass
+        return ""
+    
+    def _extract_activity_details(self) -> str:
+        """Extract result summary from results_tree if available.
+        
+        Smart detection of the 'Status' column: checks column headings first,
+        then falls back to common position patterns based on column count.
+        Also includes work codes / keys for richer context.
+        """
+        try:
+            tree = getattr(self, 'results_tree', None)
+            if tree is None:
+                return self.activity_details
+            all_items = tree.get_children()
+            if not all_items:
+                return self.activity_details
+
+            total = len(all_items)
+            success = 0
+            failed = 0
+            skipped = 0
+
+            # ── Find Status column index ──
+            columns = tree["columns"]
+            status_idx = 1  # default fallback
+            work_code_idx = None  # optional: find a Work Code column
+            if columns:
+                col_list = list(columns)
+                # Try to find "Status" by name
+                for i, c in enumerate(col_list):
+                    c_lower = c.lower().strip()
+                    if c_lower == 'status':
+                        status_idx = i
+                        break
+                else:
+                    # No column named 'Status' — use heuristic based on count
+                    if len(col_list) == 3:
+                        # (Code, Status, Detail) → status at 1
+                        status_idx = 1
+                    elif len(col_list) == 4:
+                        # (Time, Code, Status, Detail) or (Code, Status, Detail, Time) → status at 2
+                        status_idx = 2
+                    elif len(col_list) == 5:
+                        # (Time, Panch, Code, Status, Detail) → status at 3
+                        status_idx = 3
+                    elif len(col_list) >= 8:
+                        # Very wide tables (mb_entry=8, demand=10): status further left
+                        status_idx = len(col_list) - 3
+                    elif len(col_list) >= 6:
+                        # Larger tables: status is usually second-to-last
+                        status_idx = len(col_list) - 2
+                
+                # Try to find a "Work Code" or similar column for richer details
+                for i, c in enumerate(col_list):
+                    c_lower = c.lower().strip()
+                    if any(kw in c_lower for kw in ['work code', 'work', 'jobcard', 'key', 'item']):
+                        work_code_idx = i
+                        break
+
+            unique_codes = set()
+            for item_id in all_items:
+                values = tree.item(item_id)['values']
+                if not values or len(values) <= status_idx:
+                    continue
+
+                status = str(values[status_idx]).lower()
+                
+                if 'success' in status or '✅' in status or 'verified' in status or 'saved' in status:
+                    success += 1
+                elif 'fail' in status or '❌' in status or 'error' in status or 'timeout' in status:
+                    failed += 1
+                elif 'skip' in status:
+                    skipped += 1
+                else:
+                    skipped += 1
+
+                # Collect unique work codes for richer context (last 6 digits only)
+                if work_code_idx is not None and len(values) > work_code_idx:
+                    code = str(values[work_code_idx]).strip()
+                    if code and code != 'N/A' and code != '-':
+                        unique_codes.add(truncate_workcode(code))
+
+            # ── Build summary ──
+            emoji_success = "✅" if success > 0 else ""
+            emoji_failed = "❌" if failed > 0 else ""
+            
+            parts = [f"📊 Total: {total}"]
+            if success > 0:
+                parts.append(f"{emoji_success} OK: {success}")
+            if failed > 0:
+                parts.append(f"{emoji_failed} FAIL: {failed}")
+            if skipped > 0:
+                parts.append(f"⏭️ Skip: {skipped}")
+
+            # Add work code count for context
+            if len(unique_codes) > 0 and len(unique_codes) <= 5:
+                codes_str = ", ".join(sorted(unique_codes)[:5])
+                parts.append(f"📋 {codes_str}")
+            elif len(unique_codes) > 5:
+                parts.append(f"📋 {len(unique_codes)} codes")
+
+            return " | ".join(parts)
+        except Exception:
+            return self.activity_details
+    
+    def _refresh_activity_data(self) -> None:
+        """Call before/after automation to sync activity data from widgets."""
+        self.activity_panchayat = self._extract_activity_panchayat()
+        self.activity_village = self._extract_activity_village()
+        self.activity_details = self._extract_activity_details()
+        
+    def show_automation_notification(self, status: str = "success", duration: int = 6000) -> None:
+        """
+        Show a professional toast notification when automation completes.
+        
+        Uses the upgraded ToastNotification with title + details support.
+        Called automatically from AutomationMixin.on_automation_finished().
+        
+        Args:
+            status: "success", "stopped", or "failed"
+            duration: How long to show the notification (ms)
+        """
+        if not self._is_alive():
+            return
+        try:
+            self._refresh_activity_data()
+            summary = self.activity_details
+            panchayat = self.activity_panchayat
+            village = self.activity_village
+            
+            # Choose title based on status
+            if status == "success":
+                title = "✅ Automation Complete"
+                kind = "automation"
+            elif status == "stopped":
+                title = "⏹ Automation Stopped"
+                kind = "warning"
+            else:
+                title = "⚠️ Automation Failed"
+                kind = "error"
+            
+            # Build location string
+            location_parts = []
+            if panchayat:
+                location_parts.append(f"📍 {panchayat}")
+            if village:
+                location_parts.append(f"🏘️ {village}")
+            location_str = " | ".join(location_parts) if location_parts else ""
+            
+            key_display = self.automation_key.replace("_", " ").title()
+            
+            # Format details nicely
+            detail_lines = []
+            if summary:
+                detail_lines.append(summary)
+            if location_str and location_str not in (summary or ""):
+                detail_lines.append(location_str)
+            
+            details_str = "\n".join(detail_lines) if detail_lines else "Check the 'Results' tab for full details"
+            
+            self.app.show_toast(
+                message=f"📋 {key_display}",
+                kind=kind,
+                duration=duration,
+                title=title,
+                details=details_str
+            )
+        except Exception as e:
+            logger.debug(f"Failed to show automation notification: {e}")
         
     def destroy(self) -> None:
         """
@@ -665,13 +909,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             found_work_codes = work_code_pattern.findall(input_content)
             found_wagelists = wagelist_pattern.findall(input_content)
 
-            processed_work_codes = []
-            for code in found_work_codes:
-                last_part = code.split('/')[-1]
-                if len(last_part) > 7:
-                    processed_work_codes.append(last_part[-6:])
-                else:
-                    processed_work_codes.append(last_part)
+            processed_work_codes = [truncate_workcode(code) for code in found_work_codes]
             
             results = processed_work_codes + [wl.upper() for wl in found_wagelists]
             final_results = results 
@@ -756,6 +994,26 @@ class BaseAutomationTab(ctk.CTkFrame):
                 except Exception:
                     pass
         return _on_parent_selected
+
+    # ────────────────────────────────────────────────────────────────
+    # STANDARDIZED LOG HELPERS
+    # ────────────────────────────────────────────────────────────────
+
+    def log_success(self, msg: str) -> None:
+        """Log a success message with ✅ prefix."""
+        self.app.log_message(self.log_display, f"✅ {msg}", "success")
+
+    def log_error(self, msg: str) -> None:
+        """Log an error message with ❌ prefix."""
+        self.app.log_message(self.log_display, f"❌ {msg}", "error")
+
+    def log_warning(self, msg: str) -> None:
+        """Log a warning message with ⚠️ prefix."""
+        self.app.log_message(self.log_display, f"⚠️ {msg}", "warning")
+
+    def log_info(self, msg: str) -> None:
+        """Log an info message with ℹ️ prefix."""
+        self.app.log_message(self.log_display, f"ℹ️ {msg}", "info")
 
     def _apply_appearance_mode(self, theme_color_tuple: Any) -> str:
         if isinstance(theme_color_tuple, (tuple, list)):

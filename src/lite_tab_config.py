@@ -5,7 +5,7 @@
 #   Muster Roll Generate, Mate / Mistri MR, MR Fill, MSR Process,
 #   Gen Wagelist, Send Wagelist, Duplicate MR, EMB Entry, EMB Verify,
 #   Physical Complete, Scheme Closing, Delete Work Allocation,
-#   Delete Demand, Workcode Extractor, EKYC Report, Login Automation
+#   Delete Demand, Workcode Extractor, EKYC Report
 #
 # Uses Unicode emoji characters instead of PNG image files for icons,
 # resulting in faster startup and lower memory usage.
@@ -110,11 +110,6 @@ def get_tabs_definition_lite(app: Any) -> Dict[str, Dict[str, Any]]:
 
         # 4. Smart Tools
         "Smart Tools": {
-            "Login Automation": {
-                "creation_func": _lazy_import("LoginAutomationTab", "src.tabs.login_automation_tab"),
-                "icon": "🤖",
-                "key": "login_automation"
-            },
             "MR Tracking": {
                 "creation_func": _lazy_import("MrTrackingTab", "src.tabs.mr_tracking_tab"),
                 "icon": "📍",

@@ -12,7 +12,6 @@ import customtkinter as ctk
 # Excel Imports
 from src import config
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry 
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -61,34 +60,35 @@ class EKycReportTab(BaseAutomationTab):
 
         # Panchayat Input (Autocomplete Linked to Global History)
         ctk.CTkLabel(input_frame, text="Panchayat:").grid(row=0, column=0, padx=(10, 5), pady=10, sticky="w")
-        self.panchayat_entry = AutocompleteEntry(
-            input_frame, 
-            width=140, 
-            placeholder_text="Leave empty for ALL",
-            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-            app_instance=self.app,
-            history_key="location_panchayat"
-        )
-        self.panchayat_entry.grid(row=0, column=1, padx=5, pady=10)
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals, width=140)
+        self.panchayat_menu.grid(row=0, column=1, padx=5, pady=10)
 
         # Village Input (Autocomplete Linked to Global History)
         ctk.CTkLabel(input_frame, text="Village:").grid(row=0, column=2, padx=(10, 5), pady=10, sticky="w")
-        self.village_entry = AutocompleteEntry(
-            input_frame, 
-            width=140, 
-            placeholder_text="Leave empty for ALL",
-            suggestions_list=self.app.history_manager.get_suggestions("location_village"),
-            app_instance=self.app,
-            history_key="location_village"
-        )
-        self.village_entry.grid(row=0, column=3, padx=5, pady=10)
+        v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
+        self.village_var = ctk.StringVar()
+        self.village_menu = ctk.CTkOptionMenu(input_frame, variable=self.village_var, values=v_vals, width=140)
+        self.village_menu.grid(row=0, column=3, padx=5, pady=10)
+
+        # Filter villages when panchayat changes
+        def _on_panchayat_change(*_):
+            pan = self.panchayat_var.get()
+            if pan:
+                vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or [""]
+            else:
+                vals = self.app.history_manager.get_suggestions("location_village") or [""]
+            self.village_var.set("")
+            self.village_menu.configure(values=vals)
+        self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # Filter Dropdown
         ctk.CTkLabel(input_frame, text="Filter:").grid(row=0, column=4, padx=(10, 5), pady=10, sticky="w")
         self.filter_var = ctk.StringVar(value="All")
-        self.filter_cb = AutocompleteEntry(input_frame, suggestions_list=["All", "Verified (Yes)", "Not Verified (No)"], width=130,
-                                            command=self.apply_filter_visuals)
-        self.filter_cb.grid(row=0, column=5, padx=5, pady=10)
+        self.filter_var.trace_add("write", lambda *_: self.apply_filter_visuals())
+        self.filter_menu = ctk.CTkOptionMenu(input_frame, variable=self.filter_var, values=["All", "Verified (Yes)", "Not Verified (No)"], width=130)
+        self.filter_menu.grid(row=0, column=5, padx=5, pady=10)
 
         note_label = ctk.CTkLabel(self, text="ℹ️ Note: Leave Panchayat empty for ALL panchayats to scan all.", 
                                   text_color=("gray40", "gray70"), font=("Arial", 11, "italic"))
@@ -242,8 +242,8 @@ class EKycReportTab(BaseAutomationTab):
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
         try:
-            panchayat_target = self.panchayat_entry.get().strip()
-            village_target = self.village_entry.get().strip()
+            panchayat_target = self.panchayat_var.get().strip()
+            village_target = self.village_var.get().strip()
 
             self.app.after(0, self.tab_view.set, "Logs & Status")
             driver = self.app.browser_manager.get_driver()
@@ -252,20 +252,17 @@ class EKycReportTab(BaseAutomationTab):
             self.update_status("Opening Website...")
             driver.get(config.EKYC_REPORT_CONFIG["url"])
 
-            # 1. Uncheck Pending (IMPROVED WAIT LOGIC)
+            # 1. Uncheck Pending — simple checkbox toggle, no postback on this page
             try:
                 chk_locator = (By.ID, "ctl00_ContentPlaceHolder1_chbx_freshCase")
                 chk = wait.until(EC.presence_of_element_located(chk_locator))
                 is_checked = driver.execute_script("return arguments[0].checked;", chk)
                 
                 if is_checked:
-                    self.update_status("Unchecking Pending Box...")
-                    driver.execute_script("arguments[0].click();", chk)
-                    try: wait.until(EC.staleness_of(chk))
-                    except: time.sleep(2)
+                    self.log_info("Unchecking 'Pending case' checkbox...")                    driver.execute_script("arguments[0].click();", chk)
+                    # No postback on checkbox toggle — just proceed
             except Exception as e:
-                self.app.log_message(self.log_display, f"Warning in Uncheck Pending: {e}", "warning")
-
+                self.log_warning(f"Warning in Uncheck Pending: {e}")
             # 2. Determine Panchayats to Process
             panchayats_to_process = []
             
@@ -284,8 +281,7 @@ class EKycReportTab(BaseAutomationTab):
                         if val not in ["00", "99"] and txt != "---Select---" and "All" not in txt:
                             panchayats_to_process.append(txt)
                     
-                    self.app.log_message(self.log_display, f"Found {len(panchayats_to_process)} panchayats to scan.", "info")
-                except Exception as e:
+                    self.log_info(f"Found {len(panchayats_to_process)} panchayats to scan.")                except Exception as e:
                     raise Exception(f"Could not fetch panchayat list: {e}")
 
             # 3. Iterate over Panchayats
@@ -295,21 +291,28 @@ class EKycReportTab(BaseAutomationTab):
                 if self.app.stop_events[self.automation_key].is_set(): break
                 
                 self.update_status(f"Processing Panchayat {p_idx}/{total_panchayats}: {p_name}")
-                self.app.log_message(self.log_display, f"\n{'='*50}\nSelecting Panchayat: {p_name}\n{'='*50}", "info")
-                
-                # Select Panchayat
+                self.log_info(f"
+{'='*50}
+Selecting Panchayat: {p_name}
+{'='*50}")                
+                # Select Panchayat (case-insensitive)
                 try:
-                    old_html = driver.find_element(By.TAG_NAME, "html")
                     panchayat_elem = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
                     panchayat_dd = Select(panchayat_elem)
-                    panchayat_dd.select_by_visible_text(p_name)
                     
-                    try: wait.until(EC.staleness_of(old_html))
-                    except: time.sleep(3)
+                    if not self._select_by_text_case_insensitive(panchayat_dd, p_name):
+                        # Log available options for debugging
+                        options_text = [opt.text.strip() for opt in panchayat_dd.options if opt.text.strip() not in ("---Select---", "")]
+                        self.log_error(f"Failed to select panchayat '{p_name}'. Available: {options_text}")                        continue
+                    
+                    # Wait for village dropdown to populate after panchayat postback
+                    try:
+                        wait.until(lambda d: len(Select(d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")).options) > 1)
+                        self.log_success(f"✅ Selected panchayat: '{p_name}' (village list loaded)")                    except:
+                        time.sleep(1.5)  # fallback wait
                     
                 except Exception as e:
-                    self.app.log_message(self.log_display, f"Failed to select {p_name}: {e}", "error")
-                    continue
+                    self.log_error(f"Failed to select {p_name}: {e}")                    continue
 
                 # 4. Determine Villages to Process for this Panchayat
                 villages_to_process = []
@@ -339,10 +342,8 @@ class EKycReportTab(BaseAutomationTab):
                             if val not in ["00", "99"] and txt != "---Select---" and txt != "--All Villages--":
                                 villages_to_process.append(txt)
                         
-                        self.app.log_message(self.log_display, f"Found {len(villages_to_process)} villages in {p_name}.", "info")
-                    except Exception as e:
-                        self.app.log_message(self.log_display, f"Could not fetch village list for {p_name}: {e}", "error")
-                        continue
+                        self.log_info(f"Found {len(villages_to_process)} villages in {p_name}.")                    except Exception as e:
+                        self.log_error(f"Could not fetch village list for {p_name}: {e}")                        continue
 
                 # 5. Process Villages in this Panchayat
                 total_villages = len(villages_to_process)
@@ -351,29 +352,29 @@ class EKycReportTab(BaseAutomationTab):
                     if self.app.stop_events[self.automation_key].is_set(): break
                     
                     self.update_status(f"[{p_name}] Village {v_idx}/{total_villages}: {v_name}")
-                    self.app.log_message(self.log_display, f"  Selecting Village: {v_name}", "info")
-                    
-                    # Selection Retry Logic
+                    self.log_info(f"  Selecting Village: {v_name}")                    
+                    # Select Village (case-insensitive, with retry)
                     selection_success = False
                     for attempt in range(1, 4):
                         try:
-                            old_html = driver.find_element(By.TAG_NAME, "html")
                             v_dd_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
                             v_dd = Select(v_dd_elem)
-                            v_dd.select_by_visible_text(v_name)
                             
-                            try: wait.until(EC.staleness_of(old_html))
-                            except: time.sleep(2)
-                            
-                            selection_success = True
-                            break 
-                        except Exception as e:
-                            self.app.log_message(self.log_display, f"    Retry {attempt} for {v_name}...", "warning")
-                            time.sleep(2)
+                            if self._select_by_text_case_insensitive(v_dd, v_name):
+                                # Wait for postback after village selection
+                                time.sleep(0.5)
+                                selection_success = True
+                                break
+                            else:
+                                # Log available options on first attempt only
+                                if attempt == 1:
+                                    v_options = [opt.text.strip() for opt in v_dd.options if opt.text.strip() not in ("---Select---", "")]
+                                    self.log_warning(f"    Village '{v_name}' not found. Available: {v_options}")                        except Exception as e:
+                            pass
+                        self.log_warning(f"    Retry {attempt} for {v_name}...")                        time.sleep(1.5)
                     
                     if not selection_success:
-                        self.app.log_message(self.log_display, f"    Skipping {v_name} (Selection Failed)", "error")
-                        continue
+                        self.log_error(f"    Skipping {v_name} (Selection Failed after 3 attempts)")                        continue
 
                     self.scrape_current_table(driver, p_name, v_name)
 
@@ -406,8 +407,7 @@ class EKycReportTab(BaseAutomationTab):
         try:
             page_one_link = driver.find_elements(By.XPATH, "//a[text()='1']")
             if page_one_link:
-                self.app.log_message(self.log_display, f"Resetting to Page 1 for {location_village}...", "info")
-                old_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_gvData")
+                self.log_info(f"Resetting to Page 1 for {location_village}...")                old_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_gvData")
                 driver.execute_script("arguments[0].click();", page_one_link[0])
                 try: WebDriverWait(driver, 10).until(EC.staleness_of(old_table))
                 except Exception: time.sleep(2)
@@ -418,15 +418,13 @@ class EKycReportTab(BaseAutomationTab):
             if self.app.stop_events[self.automation_key].is_set(): return
 
             if "No Record Found" in driver.page_source:
-                self.app.log_message(self.log_display, f"No records in {location_village}.", "warning")
-                break
+                self.log_warning(f"No records in {location_village}.")                break
 
             try:
                 table = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_gvData")))
                 rows = table.find_elements(By.TAG_NAME, "tr")
             except:
-                self.app.log_message(self.log_display, "Table not found.", "error")
-                break
+                self.log_error("Table not found.")                break
 
             count_on_page = 0
             if len(rows) > 1:
@@ -468,8 +466,7 @@ class EKycReportTab(BaseAutomationTab):
                         count_on_page += 1
                     except: continue
 
-            self.app.log_message(self.log_display, f"  > Page {current_page_num}: {count_on_page} new records.", "info")
-
+            self.log_info(f"  > Page {current_page_num}: {count_on_page} new records.")
             next_page_num = current_page_num + 1
             try:
                 next_link = driver.find_element(By.XPATH, f"//a[contains(@href, 'Page${next_page_num}')]")
@@ -484,8 +481,7 @@ class EKycReportTab(BaseAutomationTab):
             except NoSuchElementException:
                 break
             except Exception as e:
-                self.app.log_message(self.log_display, f"Pagination error: {e}", "warning")
-                break
+                self.log_warning(f"Pagination error: {e}")                break
 
     def _should_show_record(self, record):
         """Filter logic based on eKYC status only"""
@@ -506,7 +502,8 @@ class EKycReportTab(BaseAutomationTab):
             self.tree.insert("", "end", values=(sno, record['panchayat'], record['village'], record['jobcard'], record['name'], record['abps'], record['ekyc']))
             if sno % 10 == 0: self.tree.yview_moveto(1)
 
-    def apply_filter_visuals(self, _=None):
+    def apply_filter_visuals(self):
+        """Re-apply filter to tree based on current filter_var."""
         for item in self.tree.get_children(): self.tree.delete(item)
         for r in self.all_scraped_data: self.check_and_insert_to_tree(r)
 
@@ -546,8 +543,8 @@ class EKycReportTab(BaseAutomationTab):
         data_export = [r for r in all_data if self._should_show_record(r)]
 
         # File Setup
-        panchayat = self.panchayat_entry.get()
-        village_input = self.village_entry.get()
+        panchayat = self.panchayat_var.get()
+        village_input = self.village_var.get()
         
         if panchayat and village_input:
             file_part = f"{panchayat}_{village_input}"
@@ -760,23 +757,19 @@ class EKycReportTab(BaseAutomationTab):
 
     def save_inputs(self):
         data = {
-            "panchayat": self.panchayat_entry.get().strip(),
-            "village": self.village_entry.get().strip(),
+            "panchayat": self.panchayat_var.get().strip(),
+            "village": self.village_var.get().strip(),
             "filter": self.filter_var.get(),
         }
         try:
-            config_file = self.app.get_data_path("ekyc_inputs.json")
-            with open(config_file, "w") as f: json.dump(data, f, indent=4)
+            self.app.history_manager.save_tab_inputs_batch("ekyc_report", data)
         except Exception as e:
             logger.warning("Failed to save eKYC inputs: %s", e)
 
     def load_inputs(self):
-        config_file = self.app.get_data_path("ekyc_inputs.json")
-        if os.path.exists(config_file):
-            try:
-                with open(config_file, "r") as f: data = json.load(f)
-                self.panchayat_entry.delete(0, "end"); self.panchayat_entry.insert(0, data.get("panchayat", ""))
-                self.village_entry.delete(0, "end"); self.village_entry.insert(0, data.get("village", ""))
-                if data.get("filter"): self.filter_var.set(data.get("filter"))
-            except Exception as e:
-                logger.warning("Failed to load eKYC inputs: %s", e)
+        data = self.app.history_manager.get_tab_inputs("ekyc_report")
+        if data:
+            self.panchayat_var.set(data.get("panchayat", ""))
+            self.village_var.set(data.get("village", ""))
+            saved_filter = data.get("filter", "All")
+            self.filter_var.set(saved_filter)

@@ -8,8 +8,8 @@ import time
 from datetime import datetime
 from src import config
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
-from src.utils import get_logger
+
+from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
@@ -48,8 +48,10 @@ class EmbVerifyTab(BaseAutomationTab):
 
         # Panchayat input field
         ctk.CTkLabel(config_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=15)
-        self.panchayat_entry = AutocompleteEntry(config_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, history_key="location_panchayat")
-        self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=15)
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(config_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=15)
         
         # Verify Amount input field
         ctk.CTkLabel(config_frame, text="Verify Amount (₹):").grid(row=1, column=0, sticky='w', padx=15, pady=(0, 15))
@@ -128,7 +130,7 @@ class EmbVerifyTab(BaseAutomationTab):
         """Enable or disable UI elements based on automation state."""
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.panchayat_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.verify_amount_entry.configure(state=state)
         self.work_codes_text.configure(state=state)
         self.export_button.configure(state=state)
@@ -145,7 +147,7 @@ class EmbVerifyTab(BaseAutomationTab):
         from selenium import webdriver
         """Resets the UI to its initial state."""
         if messagebox.askokcancel("Reset Form?", "This will clear all inputs and results. Continue?"):
-            self.panchayat_entry.delete(0, tkinter.END)
+            self.panchayat_var.set("")
             self.verify_amount_entry.delete(0, tkinter.END)
             self.verify_amount_entry.insert(0, "300")
             self.work_codes_text.delete("1.0", tkinter.END)
@@ -153,7 +155,7 @@ class EmbVerifyTab(BaseAutomationTab):
                 self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.app.log_message(self.log_display, "Form has been reset.")
+            self.log_info("Form has been reset.")
             self.app.after(0, self.app.set_status, "Ready")
     def start_automation(self) -> None:
         # ---- Lazy imports ----
@@ -164,7 +166,7 @@ class EmbVerifyTab(BaseAutomationTab):
         from selenium.common.exceptions import UnexpectedAlertPresentException
         from selenium import webdriver
         """Validates inputs and starts the automation thread."""
-        panchayat = self.panchayat_entry.get().strip()
+        panchayat = self.panchayat_var.get().strip()
         verify_amount = self.verify_amount_entry.get().strip()
         
         if not panchayat or not verify_amount:
@@ -180,10 +182,26 @@ class EmbVerifyTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(panchayat, verify_amount, work_codes))
 
     def _log_result(self, work_code, status, details):
-        """Logs a result to the treeview."""
+        """Logs a result to the treeview with professional status tracking."""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        tags = ('failed',) if 'success' not in status.lower() and 'verified' not in status.lower() else ()
+        work_code = truncate_workcode(work_code)
+        status_lower = status.lower()
+        tags = ('success',) if 'success' in status_lower or 'verified' in status_lower else ()
+        if 'fail' in status_lower or 'rejected' in status_lower or 'error' in status_lower:
+            tags = ('failed',)
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_code, status, details, timestamp), tags=tags))
+
+    def _show_emb_summary(self, total_work):
+        """Show professional summary after eMB verification finishes."""
+        if not self._is_alive():
+            return
+        success = sum(1 for item in self.results_tree.get_children() if 'success' in str(self.results_tree.item(item)['values'][1]).lower() or 'verified' in str(self.results_tree.item(item)['values'][1]).lower())
+        failed = total_work - success
+        summary = f"✅ Verified: {success}\n❌ Failed/Rejected: {failed}\n📊 Total: {total_work}"
+        self.update_status(f"✅ {success}/{total_work} verified", 1.0)
+        self.app.log_message(self.log_display, f"\n{'='*40}\n📊 eMB Verification Summary\n{summary}\n{'='*40}")
+        if total_work > 0:
+            self.app.log_message(self.log_display, f"\n📊 eMB Verification Complete: {summary}")
 
     def run_automation_logic(self, panchayat, verify_amount, work_codes_from_ui):
         # ---- Lazy imports ----
@@ -197,8 +215,9 @@ class EmbVerifyTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
-        self.app.log_message(self.log_display, f"Starting eMB Verification for Panchayat: {panchayat}")
+        self.log_info(f"Starting eMB Verification for Panchayat: {panchayat}")
         self.app.after(0, self.app.set_status, "Running eMB Verification...")
+        total = 0
 
         try:
             driver = self.app.get_driver()
@@ -207,53 +226,62 @@ class EmbVerifyTab(BaseAutomationTab):
             driver.get(config.EMB_VERIFY_CONFIG["url"])
             wait = WebDriverWait(driver, 20) 
 
-            self.app.log_message(self.log_display, f"Selecting Panchayat: {panchayat}")
+            self.log_info(f"Selecting Panchayat: {panchayat}")
             panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
             self._select_by_text_case_insensitive(panchayat_select, panchayat)
             
-            self.app.log_message(self.log_display, "Waiting for page to reload...")
+            self.log_info("Waiting for page to reload...")
             wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
             time.sleep(1.5)  # Brief wait for postback to begin
-            self.app.log_message(self.log_display, "Page reloaded successfully.")
+            self.log_info("Page reloaded successfully.")
             
             work_codes_to_process = []
             use_search = bool(work_codes_from_ui)
 
             if use_search:
                 work_codes_to_process = work_codes_from_ui
-                self.app.log_message(self.log_display, f"Processing {len(work_codes_to_process)} work codes from input.")
+                self.log_info(f"Processing {len(work_codes_to_process)} work codes from input.")
             else:
-                self.app.log_message(self.log_display, "No work codes provided. Fetching all from dropdown...")
+                self.log_info("No work codes provided. Fetching all from dropdown...")
                 work_code_select_element = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work"))))
                 work_codes_to_process = [opt.text for opt in work_code_select_element.options if opt.get_attribute('value')]
                 if not work_codes_to_process:
-                    self.app.log_message(self.log_display, "No work codes found for this Panchayat.", "warning")
+                    self.log_warning("No work codes found for this Panchayat.")
                     self._log_result("N/A", "Skipped", "No work codes found.")
             
             total = len(work_codes_to_process)
             for i, current_wc in enumerate(work_codes_to_process):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.app.log_message(self.log_display, "Automation stopped by user.", "warning")
+                    self.log_warning("⏹️ Automation stopped by user.")
                     break
                 
+                pct = (i + 1) / total * 100
+                self.app.log_message(self.log_display, f"  🔄 [{i+1}/{total}] Verifying: {truncate_workcode(current_wc)} ({pct:.0f}%)")
                 self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {current_wc}", (i+1)/total)
                 self._process_single_work_code(driver, wait, current_wc, use_search, verify_amount)
 
                 if use_search and i < total - 1:
-                    self.app.log_message(self.log_display, "Navigating back for next work code...")
+                    self.log_info("Navigating back for next work code...")
                     driver.get(config.EMB_VERIFY_CONFIG["url"])
                     panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
                     self._select_by_text_case_insensitive(panchayat_select, panchayat)
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
                     time.sleep(1.5)  # Brief wait for postback to begin
 
-            final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
-            self.app.after(0, self.update_status, final_msg, 1.0)
-            if not self.app.stop_events[self.automation_key].is_set():
-                messagebox.showinfo("Complete", "e-MB Verification process has finished.")
+            # Queue summary on main thread after inserts are processed
+            self.app.after(200, lambda: self._show_emb_summary(total))
 
         except Exception as e:
-            self.app.log_message(self.log_display, f"A critical error occurred: {e}", "error")
+            self.log_error(f"A critical error occurred: {e}")
+            messagebox.showerror("Automation Error", f"An unexpected error occurred:\n\n{e}")
+            # Still show summary if some results exist
+            try:
+                self.app.after(200, lambda: self._show_emb_summary(total))
+            except Exception:
+                pass
+
+        except Exception as e:
+            self.log_error(f"A critical error occurred: {e}")
             messagebox.showerror("Automation Error", f"An unexpected error occurred:\n\n{e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
@@ -269,7 +297,7 @@ class EmbVerifyTab(BaseAutomationTab):
         from selenium import webdriver
         """Handles the logic for a single work code verification."""
         try:
-            self.app.log_message(self.log_display, f"Selecting work code: {work_code}")
+            self.log_info(f"Selecting work code: {work_code}")
             work_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work"))))
             
             found = False
@@ -282,14 +310,14 @@ class EmbVerifyTab(BaseAutomationTab):
             if not found:
                 raise NoSuchElementException(f"Work code containing '{work_code}' not found in dropdown.")
             
-            self.app.log_message(self.log_display, "Work selected. Pausing for page to update...")
+            self.log_info("Work selected. Pausing for page to update...")
             time.sleep(1.5)  # Brief wait for postback to begin
 
-            self.app.log_message(self.log_display, "Selecting 'Musterroll Period Wise'.")
+            self.log_info("Selecting 'Musterroll Period Wise'.")
             period_radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rbl_mustrolltype_0")))
             driver.execute_script("arguments[0].click();", period_radio_btn)
             
-            self.app.log_message(self.log_display, "Waiting for measurement periods to load...")
+            self.log_info("Waiting for measurement periods to load...")
             period_dropdown_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddl_mperiod")))
             time.sleep(1.5)  # Brief wait for postback to begin
 
@@ -299,7 +327,7 @@ class EmbVerifyTab(BaseAutomationTab):
                 return
             period_select.select_by_index(1)
             
-            self.app.log_message(self.log_display, "Waiting for activity table to load...")
+            self.log_info("Waiting for activity table to load...")
             wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_grd_activitycomponent_ctl02_lbl_act_unitcost")))
             
             unit_cost = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_grd_activitycomponent_ctl02_lbl_act_unitcost").text.strip()
@@ -322,10 +350,10 @@ class EmbVerifyTab(BaseAutomationTab):
 
             try:
                 final_alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
-                self.app.log_message(self.log_display, f"Confirmation: {final_alert.text}")
+                self.log_info(f"Confirmation: {final_alert.text}")
                 final_alert.accept()
             except TimeoutException:
-                self.app.log_message(self.log_display, "No final confirmation alert appeared.", "info")
+                self.log_info("No final confirmation alert appeared.")
 
         except UnexpectedAlertPresentException as e:
             try:
@@ -335,7 +363,7 @@ class EmbVerifyTab(BaseAutomationTab):
             except Exception as e: logger.warning("EmbVerify: Failed to dismiss alert: %s", e)
         except (TimeoutException, NoSuchElementException) as e:
             self._log_result(work_code, "Failed", f"Could not find a required element or work code not found.")
-            self.app.log_message(self.log_display, f"Error details: {e}", "error")
+            self.log_error(f"Error details: {e}")
         except Exception as e:
             self._log_result(work_code, "Error", f"An unexpected error occurred: {e}")
 
@@ -370,7 +398,7 @@ class EmbVerifyTab(BaseAutomationTab):
         from selenium.common.exceptions import UnexpectedAlertPresentException
         from selenium import webdriver
         if not self.results_tree.get_children(): messagebox.showinfo("No Data", "No results to export."); return None, None
-        location_panchayat = self.panchayat_entry.get().strip()
+        location_panchayat = self.panchayat_var.get().strip()
         if not location_panchayat: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
         
         filter_option = self.export_filter_menu.get()
@@ -398,7 +426,7 @@ class EmbVerifyTab(BaseAutomationTab):
         from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
         from selenium.common.exceptions import UnexpectedAlertPresentException
         from selenium import webdriver
-        title = f"eMB Verification Report: {self.panchayat_entry.get().strip()}"
+        title = f"eMB Verification Report: {self.panchayat_var.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
         if success and messagebox.askyesno("Success", f"PDF Report saved to:\n{file_path}\n\nDo you want to open it?"):

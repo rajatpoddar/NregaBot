@@ -15,7 +15,6 @@ from src.utils import resource_path, get_logger
 from .base_tab import BaseAutomationTab
 
 logger = get_logger()
-from .autocomplete_widget import AutocompleteEntry
 from src import config
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -79,44 +78,49 @@ class IssuedMrReportTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # --- Input Fields ---
+        # --- Create all entries first (no cross-references) ---
         ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
-        self.state_entry = AutocompleteEntry(controls_frame, 
-                                             suggestions_list=self.app.history_manager.get_suggestions("location_state"),
-                                             app_instance=self.app, history_key="location_state",
-                                             command=self._make_parent_callback("location_state", [
-                                                 (self.district_entry, "location_district"),
-                                                 (self.block_entry, "location_block"),
-                                                 (self.panchayat_entry, "location_panchayat"),
-                                             ]))
-        self.state_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
+        s_vals = self.app.history_manager.get_suggestions("location_state") or [""]
+        self.state_var = ctk.StringVar()
+        self.state_menu = ctk.CTkOptionMenu(controls_frame, variable=self.state_var, values=s_vals)
+        self.state_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
 
         ctk.CTkLabel(controls_frame, text="District:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
-        self.district_entry = AutocompleteEntry(controls_frame, 
-                                                suggestions_list=self.app.history_manager.get_suggestions("location_district"),
-                                                app_instance=self.app, history_key="location_district",
-                                                filter_func=self._make_filter_func("location_district", "location_state", self.state_entry),
-                                                command=self._make_parent_callback("location_district", [
-                                                    (self.block_entry, "location_block"),
-                                                    (self.panchayat_entry, "location_panchayat"),
-                                                ]))
-        self.district_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
+        d_vals = self.app.history_manager.get_suggestions("location_district") or [""]
+        self.district_var = ctk.StringVar()
+        self.district_menu = ctk.CTkOptionMenu(controls_frame, variable=self.district_var, values=d_vals)
+        self.district_menu.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Block:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
-        self.block_entry = AutocompleteEntry(controls_frame, 
-                                             suggestions_list=self.app.history_manager.get_suggestions("location_block"),
-                                             app_instance=self.app, history_key="location_block",
-                                             filter_func=self._make_filter_func("location_block", "location_district", self.district_entry),
-                                             command=self._make_parent_callback("location_block", [
-                                                 (self.panchayat_entry, "location_panchayat"),
-                                             ]))
-        self.block_entry.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
+        b_vals = self.app.history_manager.get_suggestions("location_block") or [""]
+        self.block_var = ctk.StringVar()
+        self.block_menu = ctk.CTkOptionMenu(controls_frame, variable=self.block_var, values=b_vals)
+        self.block_menu.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
-        self.panchayat_entry = AutocompleteEntry(controls_frame, 
-                                                 suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-                                                 app_instance=self.app, history_key="location_panchayat",
-                                                 filter_func=self._make_filter_func("location_panchayat", "location_block", self.block_entry))
-        self.panchayat_entry.grid(row=3, column=1, sticky='ew', padx=15, pady=5)
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=3, column=1, sticky='ew', padx=15, pady=5)
+
+        # --- Wire up location hierarchy callbacks now (all widgets exist) ---
+        def _on_state_change(*_):
+            self.district_var.set(""); self.block_var.set(""); self.panchayat_var.set("")
+            vals = self.app.history_manager.get_filtered_suggestions("location_district", "location_state", self.state_var.get()) or [""]
+            self.district_menu.configure(values=vals)
+        self.state_var.trace_add("write", _on_state_change)
+        
+        def _on_district_change(*_):
+            self.block_var.set(""); self.panchayat_var.set("")
+            vals = self.app.history_manager.get_filtered_suggestions("location_block", "location_district", self.district_var.get()) or [""]
+            self.block_menu.configure(values=vals)
+        self.district_var.trace_add("write", _on_district_change)
+        
+        def _on_block_change(*_):
+            self.panchayat_var.set("")
+            vals = self.app.history_manager.get_filtered_suggestions("location_panchayat", "location_block", self.block_var.get()) or [""]
+            self.panchayat_menu.configure(values=vals)
+        self.block_var.trace_add("write", _on_block_change)
 
         action_frame = self._create_action_buttons(parent_frame=controls_frame)
         action_frame.grid(row=4, column=0, columnspan=2, pady=10)
@@ -221,10 +225,10 @@ class IssuedMrReportTab(BaseAutomationTab):
             return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.state_entry.configure(state=state)
-        self.district_entry.configure(state=state)
-        self.block_entry.configure(state=state)
-        self.panchayat_entry.configure(state=state)
+        self.state_menu.configure(state=state)
+        self.district_menu.configure(state=state)
+        self.block_menu.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.run_dup_mr_button.configure(state=state)
         self.btn_abps_check.configure(state=state)
         self.abps_export_button.configure(state=state)
@@ -244,17 +248,16 @@ class IssuedMrReportTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        self.state_entry.delete(0, tkinter.END)
-        self.district_entry.delete(0, tkinter.END)
-        self.block_entry.delete(0, tkinter.END)
-        self.panchayat_entry.delete(0, tkinter.END)
+        self.state_var.set("")
+        self.district_var.set("")
+        self.block_var.set("")
+        self.panchayat_var.set("")
         
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         for item in self.abps_tree.get_children(): self.abps_tree.delete(item)
         self._update_workcode_textbox("")
         
-        self.app.log_message(self.log_display, "Form has been reset.")
-        self.update_status("Ready", 0.0)
+        self.log_info("Form has been reset.")        self.update_status("Ready", 0.0)
         
 
     def start_automation(self) -> None:
@@ -279,10 +282,10 @@ class IssuedMrReportTab(BaseAutomationTab):
         self._update_workcode_textbox("") 
         
         inputs = {
-            'state': self.state_entry.get().strip(), 
-            'district': self.district_entry.get().strip(), 
-            'block': self.block_entry.get().strip(),
-            'panchayat': self.panchayat_entry.get().strip(),
+            'state': self.state_var.get().strip(), 
+            'district': self.district_var.get().strip(), 
+            'block': self.block_var.get().strip(),
+            'panchayat': self.panchayat_var.get().strip(),
         }
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['panchayat']]):
@@ -336,8 +339,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        self.app.log_message(self.log_display, "Attempting to solve CAPTCHA...")
-        captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
+        self.log_info("Attempting to solve CAPTCHA...")        captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
         try:
             captcha_element = wait.until(EC.presence_of_element_located((By.ID, captcha_label_id)))
             captcha_text = captcha_element.text
@@ -348,19 +350,16 @@ class IssuedMrReportTab(BaseAutomationTab):
             if operator == '+': result = num1 + num2
             elif operator == '-': result = num1 - num2
             elif operator == '*': result = num1 * num2
-            self.app.log_message(self.log_display, f"Solved: {captcha_text.strip()} = {result}")
-            driver.find_element(By.ID, captcha_textbox_id).send_keys(str(result))
+            self.log_info(f"Solved: {captcha_text.strip()} = {result}")            driver.find_element(By.ID, captcha_textbox_id).send_keys(str(result))
             driver.find_element(By.ID, verify_button_id).click()
             time.sleep(1.0)  # Short wait after click
             if "Invalid Captcha Code" in driver.page_source:
                 raise ValueError("CAPTCHA verification failed.")
             return True
         except TimeoutException:
-            self.app.log_message(self.log_display, "CAPTCHA not found or already bypassed.", "info")
-            return True 
+            self.log_info("CAPTCHA not found or already bypassed.")            return True 
         except ValueError as e:
-            self.app.log_message(self.log_display, f"CAPTCHA Error: {e}", "error")
-            raise 
+            self.log_error(f"CAPTCHA Error: {e}")            raise 
 
     def run_automation_logic(self, inputs, retries=1):
         # Standard Issued MR Report Logic (Panchayat Specific)
@@ -382,8 +381,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.app.after(0, self.app.set_status, "Starting Issued MR Report...") 
         self.app.after(0, self.update_status, "Initializing...", 0.0)
         self.app.clear_log(self.log_display)
-        self.app.log_message(self.log_display, "Starting Issued MR Report automation...")
-
+        self.log_info("Starting Issued MR Report automation...")
         try:
             driver = self.app.get_driver()
             if not driver: return 
@@ -395,24 +393,20 @@ class IssuedMrReportTab(BaseAutomationTab):
 
             self._solve_captcha(driver, wait)
 
-            self.app.log_message(self.log_display, f"Selecting State: {inputs['state']}...")
-            state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
+            self.log_info(f"Selecting State: {inputs['state']}...")            state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
             self._select_by_text_case_insensitive(Select(state_select), inputs['state'])
             wait.until(EC.presence_of_element_located((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
 
-            self.app.log_message(self.log_display, "Opening Report...")
-            report_link_text = "MGNREGS daily status as per e-muster issued"
+            self.log_info("Opening Report...")            report_link_text = "MGNREGS daily status as per e-muster issued"
             report_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, report_link_text)))
             driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", report_link)
             time.sleep(1); report_link.click()
 
-            self.app.log_message(self.log_display, f"Drilling down to Block: {inputs['block']}")
-            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
+            self.log_info(f"Drilling down to Block: {inputs['block']}")            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
             wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['block'].upper()))).click()
 
             # --- Specific Panchayat Logic ---
-            self.app.log_message(self.log_display, f"Finding Panchayat: {inputs['panchayat']}")
-            
+            self.log_info(f"Finding Panchayat: {inputs['panchayat']}")            
             main_table_xpath = "//table[.//b[text()='SNo.'] and .//b[text()='Panchayats']]"
             wait.until(EC.presence_of_element_located((By.XPATH, f"{main_table_xpath}//tr[1]/td/b[text()='Panchayats']")))
 
@@ -425,8 +419,7 @@ class IssuedMrReportTab(BaseAutomationTab):
                 target_link = target_cell.find_element(By.TAG_NAME, "a")
                 link_text = target_link.text.strip()
                 if link_text == '0':
-                    self.app.log_message(self.log_display, "Value is 0. No data.", "warning")
-                    self.success_message = "No data found (Value 0)"
+                    self.log_warning("Value is 0. No data.")                    self.success_message = "No data found (Value 0)"
                     return
 
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target_link)
@@ -434,11 +427,9 @@ class IssuedMrReportTab(BaseAutomationTab):
                 target_link.click()
 
             except NoSuchElementException:
-                 self.app.log_message(self.log_display, "No link found in cell.", "warning")
-                 return
+                 self.log_warning("No link found in cell.")                 return
 
-            self.app.log_message(self.log_display, "Scraping final table...")
-            FINAL_TABLE_XPATH = "//table[@align='center' and .//b[text()='Work Code']]"
+            self.log_info("Scraping final table...")            FINAL_TABLE_XPATH = "//table[@align='center' and .//b[text()='Work Code']]"
             table = wait.until(EC.presence_of_element_located((By.XPATH, FINAL_TABLE_XPATH)))
             rows = table.find_elements(By.XPATH, ".//tr[position()>1]")
 
@@ -462,16 +453,16 @@ class IssuedMrReportTab(BaseAutomationTab):
             unique_workcodes = list(dict.fromkeys(workcode_list))
             self.app.after(0, self._update_workcode_textbox, "\n".join(unique_workcodes))
 
-            self.app.log_message(self.log_display, f"Completed. Found {scraped_mr_count} MRs.", "success")
-            self.success_message = f"Found {scraped_mr_count} Issued MRs in {inputs['panchayat']}."
+            self.log_success(f"Completed. Found {scraped_mr_count} MRs.")            self.success_message = f"Found {scraped_mr_count} Issued MRs in {inputs['panchayat']}."
 
         except Exception as e:
-            self.app.log_message(self.log_display, f"Error: {e}", "error")
-            self.success_message = None
+            self.log_error(f"Error: {e}")            self.success_message = None
         finally:
             # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")
+            if hasattr(self, 'success_message') and self.success_message:
+                self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 Issued MR Report Complete: {self.success_message}"))
 
     def run_abps_automation_logic(self, inputs):
         # ---- Lazy imports ----
@@ -493,16 +484,14 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.app.after(0, self.app.set_status, "Scanning Block for ABPS Pending...") 
         self.app.after(0, self.update_status, "Initializing...", 0.0)
         self.app.clear_log(self.log_display)
-        self.app.log_message(self.log_display, "Starting ABPS Pending Scan (All Panchayats)...")
-
+        self.log_info("Starting ABPS Pending Scan (All Panchayats)...")
         try:
             driver = self.app.get_driver()
             if not driver: return 
             wait = WebDriverWait(driver, 20)
 
             # 1. Navigate to Block Dashboard (Reuse logic)
-            self.app.log_message(self.log_display, "Navigating to Dashboard...")
-            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+            self.log_info("Navigating to Dashboard...")            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
             self._solve_captcha(driver, wait)
 
             state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
@@ -516,8 +505,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['block'].upper()))).click()
 
             # 2. Scrape All Panchayat Links from Column 5
-            self.app.log_message(self.log_display, "Scanning Dashboard for Panchayat Links (Column 5)...")
-            
+            self.log_info("Scanning Dashboard for Panchayat Links (Column 5)...")            
             # Use specific XPath for table
             table_xpath = "//table[.//b[text()='Panchayats']]"
             wait.until(EC.presence_of_element_located((By.XPATH, table_xpath)))
@@ -557,11 +545,9 @@ class IssuedMrReportTab(BaseAutomationTab):
                     pass
             
             total_gps = len(panchayat_links)
-            self.app.log_message(self.log_display, f"Found {total_gps} Panchayats with data to scan.")
-            
+            self.log_info(f"Found {total_gps} Panchayats with data to scan.")            
             if total_gps == 0:
-                self.app.log_message(self.log_display, "No data found in Column 5 for any Panchayat.", "warning")
-                return
+                self.log_warning("No data found in Column 5 for any Panchayat.")                return
 
             # 3. Iterate through each Panchayat Link
             count = 0
@@ -570,8 +556,7 @@ class IssuedMrReportTab(BaseAutomationTab):
                 
                 progress = (index / total_gps)
                 self.app.after(0, self.update_status, f"Scanning {p_name}...", progress)
-                self.app.log_message(self.log_display, f"Checking Panchayat: {p_name} ({index+1}/{total_gps})")
-                
+                self.log_info(f"Checking Panchayat: {p_name} ({index+1}/{total_gps})")                
                 try:
                     driver.get(href) # Direct navigation
                     
@@ -582,8 +567,7 @@ class IssuedMrReportTab(BaseAutomationTab):
                     try:
                         WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, detail_table_id)))
                     except TimeoutException:
-                        self.app.log_message(self.log_display, f"   > No table found for {p_name}. Skipping.")
-                        continue
+                        self.log_info(f"   > No table found for {p_name}. Skipping.")                        continue
 
                     # Scan Rows
                     # Get rows where Last Column (ABPS) contains "No"
@@ -610,20 +594,17 @@ class IssuedMrReportTab(BaseAutomationTab):
                             self.app.after(0, lambda data=row_data: self.abps_tree.insert("", "end", values=data))
                             
                 except Exception as e:
-                    self.app.log_message(self.log_display, f"   > Error scanning {p_name}: {str(e)[:50]}", "error")
-                    continue
+                    self.log_error(f"   > Error scanning {p_name}: {str(e)[:50]}")                    continue
 
             self.success_message = f"ABPS Scan Complete. Found {count} pending workers."
-            self.app.log_message(self.log_display, self.success_message, "success")
-
+            self.log_success(self.success_message)
         except Exception as e:
-            self.app.log_message(self.log_display, f"Critical Error in ABPS Scan: {e}", "error")
-            self.success_message = None
+            self.log_error(f"Critical Error in ABPS Scan: {e}")            self.success_message = None
         finally:
             # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
             self.app.after(0, self.set_ui_state, False)
             if hasattr(self, 'success_message') and self.success_message:
-                self.app.after(100, lambda: messagebox.showinfo("Complete", self.success_message))
+                self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 Issued MR Complete: {self.success_message}"))
 
     def _update_workcode_textbox(self, text):
         self.workcode_textbox.configure(state="normal")
@@ -642,7 +623,7 @@ class IssuedMrReportTab(BaseAutomationTab):
 
     def _run_duplicate_mr(self):
         workcodes = self.workcode_textbox.get("1.0", tkinter.END).strip()
-        panchayat_name = self.panchayat_entry.get().strip()
+        panchayat_name = self.panchayat_var.get().strip()
 
         if not workcodes:
             messagebox.showwarning("No Data", "There are no workcodes to send.", parent=self)
@@ -660,7 +641,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             messagebox.showinfo("No Data", "There are no results to export.")
             return
 
-        panchayat = self.panchayat_entry.get().strip() or "Report"
+        panchayat = self.panchayat_var.get().strip() or "Report"
         safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat) 
         export_format = self.export_format_menu.get()
         
@@ -696,7 +677,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             messagebox.showinfo("No Data", "There are no ABPS results to export.")
             return
             
-        block = self.block_entry.get().strip() or "Block"
+        block = self.block_var.get().strip() or "Block"
         safe_name = re.sub(r'[\\/*?:"<>|]', '_', block)
         
         current_year = datetime.now().strftime("%Y")
@@ -977,20 +958,18 @@ class IssuedMrReportTab(BaseAutomationTab):
     def save_inputs(self, inputs):
         save_data = {k: inputs.get(k) for k in ('state', 'district', 'block', 'panchayat')}
         try:
-            config_file = self.app.get_data_path("issued_mr_report_inputs.json")
-            with open(config_file, 'w') as f:
-                json.dump(save_data, f, indent=4)
+            self.app.history_manager.save_tab_inputs_batch("issued_mr_report", save_data)
         except Exception as e:
             logger.warning("Failed to save Issued MR inputs: %s", e)
 
     def load_inputs(self):
+        """Load previously saved inputs from DB."""
         try:
-            config_file = self.app.get_data_path("issued_mr_report_inputs.json")
-            if not os.path.exists(config_file): return
-            with open(config_file, 'r') as f: data = json.load(f)
-            self.state_entry.delete(0, 'end'); self.state_entry.insert(0, data.get('state', ''))
-            self.district_entry.delete(0, 'end'); self.district_entry.insert(0, data.get('district', ''))
-            self.block_entry.delete(0, 'end'); self.block_entry.insert(0, data.get('block', ''))
-            self.panchayat_entry.delete(0, 'end'); self.panchayat_entry.insert(0, data.get('panchayat', ''))
+            data = self.app.history_manager.get_tab_inputs("issued_mr_report")
+            if data:
+                self.state_var.set(data.get('state', ''))
+                self.district_var.set(data.get('district', ''))
+                self.block_var.set(data.get('block', ''))
+                self.panchayat_var.set(data.get('panchayat', ''))
         except Exception as e:
             logger.warning("Failed to load Issued MR inputs: %s", e)

@@ -6,8 +6,8 @@ import os, csv, time, pyperclip, json
 from datetime import datetime
 from collections import defaultdict
 from src import config
+from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class IfEditTab(BaseAutomationTab):
@@ -71,16 +71,18 @@ class IfEditTab(BaseAutomationTab):
         mode_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(mode_frame, text="Automation Mode:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
         # --- MODIFIED: Added new automation mode ---
-        self.automation_mode_combo = AutocompleteEntry(mode_frame, suggestions_list=["Full Process (All Pages)", "Page 2 & 3 Only", "Page 3 Only (Activities/Materials)"])
-        self.automation_mode_combo.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
-        self.ui_fields['automation_mode'] = self.automation_mode_combo
+        self.automation_mode_var = ctk.StringVar()
+        self.automation_mode_menu = ctk.CTkOptionMenu(mode_frame, variable=self.automation_mode_var, values=["Full Process (All Pages)", "Page 2 & 3 Only", "Page 3 Only (Activities/Materials)"])
+        self.automation_mode_menu.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
+        self.ui_fields['automation_mode'] = self.automation_mode_var
 
         # Profile Management Frame
         profile_frame = ctk.CTkFrame(settings_container)
         profile_frame.grid(row=1, column=0, sticky='ew', padx=5, pady=5)
         profile_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(profile_frame, text="Configuration Profile:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
-        self.profile_combobox = AutocompleteEntry(profile_frame, suggestions_list=[], command=self._load_profile)
+        self.profile_var = ctk.StringVar()
+        self.profile_combobox = ctk.CTkOptionMenu(profile_frame, variable=self.profile_var, values=[], command=self._load_profile)
         self.profile_combobox.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
         self.profile_name_entry = ctk.CTkEntry(profile_frame, placeholder_text="Enter new profile name to save")
         self.profile_name_entry.grid(row=1, column=1, padx=15, pady=5, sticky="ew")
@@ -132,10 +134,12 @@ class IfEditTab(BaseAutomationTab):
         self.export_csv_button = ctk.CTkButton(results_action_frame, text="Export to CSV", command=lambda: self.export_treeview_to_csv(self.results_tree, "if_edit_results.csv"))
         self.export_csv_button.pack(side="left")
 
-        cols = ("Work Code", "Job Card", "Status", "Details")
+        cols = ("Timestamp", "Work Code", "Job Card", "Status", "Details")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
-        self.results_tree.column("Work Code", width=200); self.results_tree.column("Job Card", width=200); self.results_tree.column("Status", width=100, anchor="center"); self.results_tree.column("Details", width=300)
+        self.results_tree.column("Timestamp", width=80, anchor="center")
+        self.results_tree.column("Work Code", width=180); self.results_tree.column("Job Card", width=180)
+        self.results_tree.column("Status", width=100, anchor="center"); self.results_tree.column("Details", width=300)
         self.results_tree.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)
         scrollbar = ctk.CTkScrollbar(results_tab, command=self.results_tree.yview)
         self.results_tree.configure(yscroll=scrollbar.set); scrollbar.grid(row=1, column=1, sticky='ns')
@@ -149,14 +153,17 @@ class IfEditTab(BaseAutomationTab):
         self.csv_path = None  # Ensure we don't use a file
         self.select_button.configure(state="disabled")
         self.file_label.configure(text=f"{len(data)} work codes loaded from WC Gen tab.")
-        self.app.log_message(self.log_display, f"Received {len(data)} work codes to process.")
-        
+        self.log_info(f"Received {len(data)} work codes to process.")        
     def _create_field(self, parent, key, text, row, col=0, widget_type='entry', values=None, **kwargs):
+        if not hasattr(self, 'dynamic_combo_vars'):
+            self.dynamic_combo_vars = {}
         ctk.CTkLabel(parent, text=text).grid(row=row, column=col, sticky="w", padx=15, pady=5)
         if widget_type == 'entry':
             widget = ctk.CTkEntry(parent, **kwargs)
         elif widget_type == 'combo':
-            widget = AutocompleteEntry(parent, suggestions_list=values or [], **kwargs)
+            widget_var = ctk.StringVar()
+            widget = ctk.CTkOptionMenu(parent, variable=widget_var, values=values or [], **kwargs)
+            self.dynamic_combo_vars[key] = widget_var
         widget.grid(row=row, column=col+1, sticky="ew", padx=15, pady=5)
         self.ui_fields[key] = widget
 
@@ -267,11 +274,13 @@ class IfEditTab(BaseAutomationTab):
                 widget = self.ui_fields[key]
                 if isinstance(widget, ctk.CTkEntry):
                     widget.delete(0, tkinter.END); widget.insert(0, value)
-                elif isinstance(widget, (ctk.CTkComboBox, AutocompleteEntry)):
+                elif isinstance(widget, ctk.CTkOptionMenu):
+                     widget.set(value)
+                elif isinstance(widget, (tkinter.StringVar, tkinter.BooleanVar)):
                      widget.set(value)
         
         # Set defaults for new fields
-        self.automation_mode_combo.set("Full Process (All Pages)")
+        self.automation_mode_var.set("Full Process (All Pages)")
         if 'activities_list' in self.ui_fields:
             self.ui_fields['activities_list'].delete("1.0", tkinter.END)
             default_activity = f"{cfg.get('activity_code', '')},{cfg.get('unit_price', '')},{cfg.get('quantity', '')}"
@@ -299,8 +308,7 @@ class IfEditTab(BaseAutomationTab):
                 self.profile_combobox.set(profile_names[0]); self._load_profile(profile_names[0])
             else: self._populate_defaults()
         except Exception as e:
-            self.app.log_message(self.log_display, f"Could not load profiles: {e}", "warning")
-            self.profiles = {}; self._populate_defaults()
+            self.log_warning(f"Could not load profiles: {e}")            self.profiles = {}; self._populate_defaults()
 
     def _save_profile(self, profile_name=None, is_autosave=False):
         if not is_autosave:
@@ -337,7 +345,9 @@ class IfEditTab(BaseAutomationTab):
                 field = self.ui_fields[key]
                 if isinstance(field, ctk.CTkEntry):
                     field.delete(0, tkinter.END); field.insert(0, value)
-                elif isinstance(field, (ctk.CTkComboBox, AutocompleteEntry)):
+                elif isinstance(field, (ctk.CTkComboBox, ctk.CTkOptionMenu)):
+                    field.set(value)
+                elif isinstance(field, (tkinter.StringVar, tkinter.BooleanVar)):
                     field.set(value)
                 elif isinstance(field, ctk.CTkSwitch):
                     if value == 1: field.select()
@@ -346,8 +356,7 @@ class IfEditTab(BaseAutomationTab):
                     field.delete("1.0", tkinter.END)
                     if value: field.insert("1.0", value)
         self._toggle_page_settings()
-        self.app.log_message(self.log_display, f"Profile '{profile_name}' loaded.")
-
+        self.log_info(f"Profile '{profile_name}' loaded.")
     def _delete_profile(self):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -469,8 +478,7 @@ class IfEditTab(BaseAutomationTab):
                 with open(path, 'r', encoding='utf-8-sig') as f: self.csv_headers = next(csv.reader(f))
                 required_cols = ['work_code', 'beneficiary_type', 'job_card']
                 self.column_map = {col: self.csv_headers.index(col) for col in required_cols}
-                self.app.log_message(self.log_display, "CSV loaded. Required columns found.", "success")
-            except Exception as e:
+                self.log_success("CSV loaded. Required columns found.")            except Exception as e:
                 messagebox.showerror("CSV Error", f"Required columns not in CSV header: {', '.join(required_cols)}\n\nError: {e}")
                 self.csv_path = None; self.column_map = {}; self.file_label.configure(text="No data source selected")
     def start_automation(self) -> None:
@@ -502,45 +510,55 @@ class IfEditTab(BaseAutomationTab):
         self.app.clear_log(self.log_display)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         self.app.after(0, self.app.set_status, "Running IF Editor...")
+        total = 0
+        success_count = 0
+        fail_count = 0
         try:
             driver = self.app.get_driver()
             if not driver: return
             
             rows_to_process = []
             if self.data_from_wc_gen:
-                self.app.log_message(self.log_display, "Processing data received from WC Gen tab...")
-                self.column_map = {'work_code': 0, 'beneficiary_type': 1, 'job_card': 2}
+                self.log_info("Processing data received from WC Gen tab...")                self.column_map = {'work_code': 0, 'beneficiary_type': 1, 'job_card': 2}
                 rows_to_process = [
                     [d['work_code'], d['beneficiary_type'], d['job_card']]
                     for d in self.data_from_wc_gen
                 ]
             else:
-                self.app.log_message(self.log_display, f"Processing data from CSV file: {self.csv_path}")
-                with open(self.csv_path, mode='r', encoding='utf-8-sig') as csvfile:
+                self.log_info(f"Processing data from CSV file: {self.csv_path}")                with open(self.csv_path, mode='r', encoding='utf-8-sig') as csvfile:
                     rows_to_process = list(csv.reader(csvfile))[1:]
             
-            self.app.log_message(self.log_display, f"--- Starting IF Editor: {len(rows_to_process)} work codes to process ---")
-            total = len(rows_to_process)
+            self.log_info(f"--- Starting IF Editor: {len(rows_to_process)} work codes to process ---")            total = len(rows_to_process)
+            success_count = 0
+            fail_count = 0
             for i, row in enumerate(rows_to_process):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.app.log_message(self.log_display, "Automation stopped.", "warning"); break
+                    self.app.log_message(self.log_display, "⏹️ Automation stopped.", "warning"); break
                 work_code = row[self.column_map['work_code']]
-                self.app.log_message(self.log_display, f"--- Processing {i+1}/{total}: WC={work_code} ---")
-                self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {work_code}", (i+1)/total)
+                pct = (i + 1) / total * 100
+                self.log_info(f"  🔄 [{i+1}/{total}] Processing: {truncate_workcode(work_code)} ({pct:.0f}%)")                self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {truncate_workcode(work_code)}", (i+1)/total)
                 self._process_single_work_code(driver, row, form_config)
         except Exception as e:
-            self.app.log_message(self.log_display, f"A critical error occurred: {e}", "error")
-        finally:
-            self.app.after(0, self.app.log_message, self.log_display, "--- Automation Finished ---")
-            self.app.after(0, self.set_ui_state, False)
-            self.app.after(100, lambda: messagebox.showinfo("Complete", "IF Editor process has finished."))
+            self.log_error(f"❌ A critical error occurred: {e}")        finally:
+            # Count results from tree
+            all_items = self.results_tree.get_children()
+            for item_id in all_items:
+                vals = self.results_tree.item(item_id)['values']
+                if len(vals) >= 4:
+                    status = str(vals[3]).lower()
+                    if 'success' in status:
+                        success_count += 1
+                    elif 'fail' in status or 'error' in status:
+                        fail_count += 1
+            self.log_info(f"
+{'='*50}")            self.log_info(f"📊 IF Editor Complete: ✅ {success_count} OK, ❌ {fail_count} failed (of {total} total)")            self.log_info(f"{'='*50}")            self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _log_result(self, work_code, job_card, status, details):
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_code, job_card, status, details)))
+        ts = datetime.now().strftime("%H:%M:%S")
+        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(ts, truncate_workcode(work_code), job_card, status, details)))
         level = "success" if status.lower() == "success" else "error" if status.lower() == "failed" else "info"
-        self.app.log_message(self.log_display, f"'{work_code}' - {status}: {details}", level)
-        
+        self.log_info(f"  {'✅' if level == 'success' else '❌' if level == 'error' else '⏭️'} {truncate_workcode(work_code)} - {status}: {details}", level)        
     def _scroll_to(self, driver, element):
         """Helper to scroll an element into view."""
         driver.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", element)
@@ -582,8 +600,7 @@ class IfEditTab(BaseAutomationTab):
 
             # --- Page 1 ---
             if mode == "Full Process (All Pages)":
-                self.app.log_message(self.log_display, "Page 1: Entering work details...")
-                
+                self.log_info("Page 1: Entering work details...")                
                 est_pd_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_TxtEstpd")))
                 self._scroll_to(driver, est_pd_input)
                 est_pd_input.clear()
@@ -640,8 +657,7 @@ class IfEditTab(BaseAutomationTab):
             # --- Page 2 ---
             wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_txtsanctionno")))
             if mode in ["Full Process (All Pages)", "Page 2 & 3 Only"]:
-                self.app.log_message(self.log_display, "Page 2: Entering sanction details...")
-
+                self.log_info("Page 2: Entering sanction details...")
                 def fill(id, val):
                     # ---- Lazy imports ----
                     from selenium.webdriver.common.by import By
@@ -694,8 +710,7 @@ class IfEditTab(BaseAutomationTab):
             wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlAct")))
             
             existing_activity_codes = {el.text for el in driver.find_elements(By.XPATH, "//span[starts-with(@id, 'ctl00_ContentPlaceHolder1_grdDisplayAct_') and contains(@id, '_lblActCode')]")}
-            self.app.log_message(self.log_display, f"Page 3: Found existing activities: {existing_activity_codes or 'None'}")
-            
+            self.log_info(f"Page 3: Found existing activities: {existing_activity_codes or 'None'}")            
             activities_raw = cfg.get("activities_list", "").strip()
             if activities_raw:
                 for act_data in [line.strip().split(',') for line in activities_raw.splitlines() if line.strip()]:
@@ -709,16 +724,14 @@ class IfEditTab(BaseAutomationTab):
                     found_option = next((opt for opt in act_select.options if code_keyword in opt.get_attribute('value')), None)
                     
                     if not found_option:
-                        self.app.log_message(self.log_display, f"  > Activity with keyword '{code_keyword}' not found in dropdown.", "warning")
-                        continue
+                        self.log_warning(f"  > Activity with keyword '{code_keyword}' not found in dropdown.")                        continue
                     
                     actual_code = found_option.get_attribute('value')
 
                     if actual_code in existing_activity_codes: 
                         self.app.log_message(self.log_display, f"  > Skipping existing activity: {actual_code}"); continue
                     
-                    self.app.log_message(self.log_display, f"  > Adding activity: {actual_code}")
-                    try:
+                    self.log_info(f"  > Adding activity: {actual_code}")                    try:
                         act_dropdown = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlAct")))
                         self._scroll_to(driver, act_dropdown)
                         Select(act_dropdown).select_by_value(actual_code); wait.until(EC.staleness_of(act_dropdown))
@@ -735,20 +748,16 @@ class IfEditTab(BaseAutomationTab):
                         self._scroll_to(driver, save_btn)
                         save_btn.click(); wait.until(EC.staleness_of(save_btn))
                         
-                        self.app.log_message(self.log_display, f"   - Successfully added activity '{actual_code}'.", "success"); existing_activity_codes.add(actual_code)
-                    except Exception as act_e: self.app.log_message(self.log_display, f"   - ERROR adding activity '{actual_code}': {str(act_e).splitlines()[0]}", "error")
-
+                        self.log_info(f"   - Successfully added activity '{actual_code}'.", "success"); existing_activity_codes.add(actual_code)                    except Exception as act_e: self.log_error(f"   - ERROR adding activity '{actual_code}': {str(act_e).splitlines()[0]}")
             materials_raw = cfg.get("materials_list", "").strip()
             if materials_raw:
-                self.app.log_message(self.log_display, "Page 3: Adding materials...")
-
+                self.log_info("Page 3: Adding materials...")
                 # --- FINAL LOGIC: Using precise startswith matching and original user flow ---
                 
                 # 1. Get initial state
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_grdDisplayMat")))
                 existing_material_names = {el.text.strip() for el in driver.find_elements(By.XPATH, "//span[contains(translate(@id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '_lblmatname')]")}
-                self.app.log_message(self.log_display, f"Page 3: Found existing materials: {existing_material_names or 'None'}")
-                
+                self.log_info(f"Page 3: Found existing materials: {existing_material_names or 'None'}")                
                 mat_dropdown_element = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddlMatname")
                 all_options = Select(mat_dropdown_element).options
                 
@@ -774,15 +783,13 @@ class IfEditTab(BaseAutomationTab):
                     if actual_name not in existing_material_names:
                         materials_to_process.append({'option_text': found_option.text, 'name': actual_name, 'price': price, 'qty': qty})
                     else:
-                        self.app.log_message(self.log_display, f"  > Skipping existing material: {actual_name}")
-
+                        self.log_info(f"  > Skipping existing material: {actual_name}")
                 # 3. Loop through the filtered list using the original proven flow
                 is_first_addition = not existing_material_names
                 for mat_info in materials_to_process:
                     if self.app.stop_events[self.automation_key].is_set(): break
                     
-                    self.app.log_message(self.log_display, f"  > Processing material: {mat_info['name']} | Price: {mat_info['price']} | Qty: {mat_info['qty']}")
-                    
+                    self.log_info(f"  > Processing material: {mat_info['name']} | Price: {mat_info['price']} | Qty: {mat_info['qty']}")                    
                     try:
                         if is_first_addition:
                             # --- INSERT FLOW ---
@@ -801,8 +808,7 @@ class IfEditTab(BaseAutomationTab):
                             save_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_btsave")))
                             self._scroll_to(driver, save_btn); save_btn.click(); wait.until(EC.staleness_of(save_btn))
                             
-                            self.app.log_message(self.log_display, f"   - Inserted first material '{mat_info['name']}'.", "success")
-                            is_first_addition = False 
+                            self.log_success(f"   - Inserted first material '{mat_info['name']}'.")                            is_first_addition = False 
                         else:
                             # --- EDIT FLOW (User's original logic) ---
                             edit_link = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(@href, \"ctl00$ContentPlaceHolder1$grdDisplayMat','Edit$0\")]")))
@@ -828,12 +834,10 @@ class IfEditTab(BaseAutomationTab):
                             save_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_btsave")))
                             self._scroll_to(driver, save_btn); save_btn.click(); wait.until(EC.staleness_of(save_btn))
 
-                            self.app.log_message(self.log_display, f"   - Edited & saved material '{mat_info['name']}'.", "success")
-
+                            self.log_success(f"   - Edited & saved material '{mat_info['name']}'.")
                     except Exception as mat_e:
                         error_msg = str(mat_e).splitlines()[0].strip()
-                        self.app.log_message(self.log_display, f"   - ERROR processing material '{mat_info['name']}': {error_msg}", "error")
-                        break 
+                        self.log_error(f"   - ERROR processing material '{mat_info['name']}': {error_msg}")                        break 
 
             self._log_result(work_code, job_card, "Success", "All pages processed.")
         except Exception as e:

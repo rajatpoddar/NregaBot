@@ -6,8 +6,9 @@ import os, random, time, sys, subprocess
 from datetime import datetime
 from fpdf import FPDF
 from src import config
+from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
+
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class MsrTab(BaseAutomationTab):
@@ -44,13 +45,10 @@ class MsrTab(BaseAutomationTab):
         panchayat_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         panchayat_frame.grid(row=0, column=0, sticky='ew', padx=15, pady=(10,0))
         ctk.CTkLabel(panchayat_frame, text="Panchayat Name", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
-        self.panchayat_entry = AutocompleteEntry(
-            panchayat_frame, 
-            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-            app_instance=self.app, # <-- ADD THIS LINE
-            history_key="location_panchayat" # <-- ADD THIS LINE
-        )
-        self.panchayat_entry.pack(fill='x', pady=(5,0))
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(panchayat_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.pack(fill='x', pady=(5,0))
 
         
         amount_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
@@ -114,8 +112,7 @@ class MsrTab(BaseAutomationTab):
     def load_data_from_mr_tracking(self, workcodes, location_panchayat: str):
         """Public method to receive data from other tabs."""
         # Set Panchayat Name
-        self.panchayat_entry.delete(0, tkinter.END)
-        self.panchayat_entry.insert(0, location_panchayat)
+        self.panchayat_var.set(location_panchayat)
         
         # Determine how to display workcodes (Handle List or String)
         display_text = ""
@@ -132,8 +129,7 @@ class MsrTab(BaseAutomationTab):
         
         # Log info
         count = len(display_text.splitlines()) if display_text else 0
-        self.app.log_message(self.log_display, f"Loaded {count} workcodes and panchayat '{location_panchayat}' from MR Tracking.", "info")
-
+        self.log_info(f"Loaded {count} workcodes and panchayat '{location_panchayat}' from MR Tracking.")
     def _on_format_change(self, selected_format):
         """Disables the filter menu for CSV format as it exports all data."""
         if "CSV" in selected_format:
@@ -146,7 +142,7 @@ class MsrTab(BaseAutomationTab):
             return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.panchayat_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.verify_amount_entry.configure(state=state)
         self.work_key_text.configure(state=state)
         # --- Update State Management for New Controls ---
@@ -172,14 +168,13 @@ class MsrTab(BaseAutomationTab):
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
         if messagebox.askokcancel("Reset Form?", "Clear all inputs, results, and logs?"):
-            self.panchayat_entry.delete(0, tkinter.END)
+            self.panchayat_var.set("")
             self.verify_amount_entry.delete(0, tkinter.END); self.verify_amount_entry.insert(0, "300")
             self.work_key_text.configure(state="normal"); self.work_key_text.delete("1.0", tkinter.END); self.work_key_text.configure(state="disabled")
             for item in self.results_tree.get_children(): self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0)
-            self.app.log_message(self.log_display, "Form has been reset.")
-            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
             
     def run_automation_logic(self):
         # ---- Lazy imports ----
@@ -197,10 +192,9 @@ class MsrTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
         self.app.clear_log(self.log_display)
-        self.app.log_message(self.log_display, "Starting MSR processing...")
-        self.app.after(0, self.app.set_status, "Running MSR Payment...")
+        self.log_info("Starting MSR processing...")        self.app.after(0, self.app.set_status, "Running MSR Payment...")
         
-        location_panchayat = self.panchayat_entry.get().strip()
+        location_panchayat = self.panchayat_var.get().strip()
         verify_amount_str = self.verify_amount_entry.get().strip()
         
         self.work_key_text.configure(state="normal") # Enable to read
@@ -226,9 +220,7 @@ class MsrTab(BaseAutomationTab):
                 if not match: raise ValueError(f"Panchayat '{location_panchayat}' not found.")
                 panchayat_select.select_by_visible_text(match)
                 self.app.update_history("location_panchayat", location_panchayat)
-                self.app.log_message(self.log_display, f"Successfully selected Panchayat: {match}", "success"); time.sleep(2)
-            except TimeoutException: self.app.log_message(self.log_display, "Panchayat selection not found/required (GP Login). Proceeding...", "info")
-
+                self.log_info(f"Successfully selected Panchayat: {match}", "success"); time.sleep(2)            except TimeoutException: self.log_info("Panchayat selection not found/required (GP Login). Proceeding...")
             total = len(work_keys)
             for i, work_key in enumerate(work_keys, 1):
                 if self.app.stop_events[self.automation_key].is_set(): self.app.log_message(self.log_display, "Automation stopped by user.", "warning"); break
@@ -240,10 +232,8 @@ class MsrTab(BaseAutomationTab):
                 # --- END MODIFICATION ---
                 self._process_single_work_code(driver, wait, work_key, verify_amount)
                 
-            if not self.app.stop_events[self.automation_key].is_set(): messagebox.showinfo("Completed", "Automation finished! Check the 'Results' tab for details.")
-        except Exception as e:
-            self.app.log_message(self.log_display, f"A critical error occurred: {e}", "error")
-            messagebox.showerror("MSR Error", f"An error occurred: {e}")
+            if not self.app.stop_events[self.automation_key].is_set(): self.log_info("📊 Automation finished. Check the 'Results' tab for details.")        except Exception as e:
+            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("MSR Error", f"An error occurred: {e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Automation Finished.", 1.0)
@@ -301,8 +291,7 @@ class MsrTab(BaseAutomationTab):
                 try:
                     wait.until(EC.staleness_of(old_work_code_ddl))
                 except TimeoutException:
-                    self.app.log_message(self.log_display, "Page did not refresh quickly, forcing wait...", "warning")
-            
+                    self.log_warning("Page did not refresh quickly, forcing wait...")            
             # Wait a tiny bit extra for the new DOM to settle
             try:
                 WebDriverWait(driver, 10).until(
@@ -395,6 +384,7 @@ class MsrTab(BaseAutomationTab):
         # Determine level for log file
         level = "success" if status.lower() == "success" else "error"
         timestamp = datetime.now().strftime("%H:%M:%S")
+        work_key = truncate_workcode(work_key)
         
         # Clean up details text
         details = msg.replace("\n", " ").replace("\r", " ")
@@ -403,8 +393,7 @@ class MsrTab(BaseAutomationTab):
         elif "Work code not found" in msg: details = "Work Code not found."
         
         # Log to the text box
-        self.app.log_message(self.log_display, f"'{work_key}' - {status.upper()}: {details}", level=level)
-        
+        self.log_info(f"'{work_key}' - {status.upper()}: {details}", level=level)        
         # --- FIX: Set the tag to 'success' explicitly for Green color ---
         tags = ('success',) if 'success' in status.lower() else ('failed',)
         
@@ -426,7 +415,7 @@ class MsrTab(BaseAutomationTab):
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
         export_format = self.export_format_menu.get()
-        location_panchayat = self.panchayat_entry.get().strip()
+        location_panchayat = self.panchayat_var.get().strip()
 
         # Ensure Panchayat name is provided for the filename
         if not location_panchayat:
@@ -461,7 +450,7 @@ class MsrTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         all_items = self.results_tree.get_children()
         if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
-        location_panchayat = self.panchayat_entry.get().strip()
+        location_panchayat = self.panchayat_var.get().strip()
         if not location_panchayat: messagebox.showwarning("Input Needed", "Please enter a Panchayat Name for the report title."); return None, None
 
         filter_option = self.export_filter_menu.get()
@@ -507,7 +496,7 @@ class MsrTab(BaseAutomationTab):
             # Workcode (50), Status (30), Details (160), Timestamp (40)
             col_widths = [50, 30, 160, 40] 
             
-            title = f"MSR Payment Status Report: {self.panchayat_entry.get().strip()}"
+            title = f"MSR Payment Status Report: {self.panchayat_var.get().strip()}"
             report_date = datetime.now().strftime('%d %b %Y')
             
             # This new method is in base_tab.py and handles all the styling

@@ -9,9 +9,8 @@ from collections import defaultdict
 from src import config
 from .base_tab import BaseAutomationTab
 from .date_entry_widget import DateEntry
-from .autocomplete_widget import AutocompleteEntry
 from .demand_tab import CloudFilePicker 
-from src.utils import get_logger
+from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
@@ -76,7 +75,8 @@ class WcGenTab(BaseAutomationTab):
         profile_frame.grid(row=1, column=0, columnspan=2, sticky='ew', padx=10)
         profile_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(profile_frame, text="Config Profile:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.profile_combobox = AutocompleteEntry(profile_frame, suggestions_list=[], command=self._load_profile)
+        self.profile_var = ctk.StringVar()
+        self.profile_combobox = ctk.CTkOptionMenu(profile_frame, variable=self.profile_var, values=[], command=self._load_profile)
         self.profile_combobox.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         self.profile_name_entry = ctk.CTkEntry(profile_frame, placeholder_text="Enter new profile name to save")
         self.profile_name_entry.grid(row=1, column=1, padx=5, pady=(5,10), sticky="ew")
@@ -91,13 +91,10 @@ class WcGenTab(BaseAutomationTab):
         panchayat_frame.grid(row=2, column=0, columnspan=2, sticky='ew', padx=10, pady=(0,10))
         panchayat_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(panchayat_frame, text="Panchayat:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.panchayat_entry = AutocompleteEntry(
-            panchayat_frame,
-            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-            app_instance=self.app,
-            history_key="location_panchayat"
-        )
-        self.panchayat_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(panchayat_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         self.load_button = ctk.CTkButton(panchayat_frame, text="Load Categories from Website", command=self._start_category_loading_thread)
         self.load_button.grid(row=1, column=0, columnspan=2, padx=5, pady=(5,10), sticky="ew")
 
@@ -206,8 +203,7 @@ class WcGenTab(BaseAutomationTab):
                 filename = os.path.basename(path)
                 display_name = filename if len(filename) < 25 else filename[:22] + "..."
                 self.pdf_label.configure(text=display_name, text_color=("black", "white"))
-                self.app.log_message(self.log_display, f"Undertaking PDF selected: {filename}")
-        except Exception as e:
+                self.log_info(f"Undertaking PDF selected: {filename}")        except Exception as e:
             messagebox.showerror("Error", f"Could not open file picker: {e}")
 
     def _open_wc_tool_link(self):
@@ -234,19 +230,16 @@ class WcGenTab(BaseAutomationTab):
             file_id = selected_file['id']
             filename = selected_file['filename']
             
-            self.app.log_message(self.log_display, f"Downloading '{filename}' from cloud...")
-            temp_path = self._download_file_from_cloud(file_id, filename)
+            self.log_info(f"Downloading '{filename}' from cloud...")            temp_path = self._download_file_from_cloud(file_id, filename)
             
             if temp_path:
                 self.csv_path = temp_path
                 self.file_label.configure(text=os.path.basename(temp_path))
-                self.app.log_message(self.log_display, f"Cloud file '{filename}' selected.")
-
+                self.log_info(f"Cloud file '{filename}' selected.")
     def _download_file_from_cloud(self, file_id, filename):
         token = self.app.license_info.get('key')
         if not token:
-            self.app.log_message(self.log_display, "Cloud Download Failed: Not licensed.", "error")
-            return None
+            self.log_error("Cloud Download Failed: Not licensed.")            return None
 
         headers = {'Authorization': f'Bearer {token}'}
         url = f"{config.LICENSE_SERVER_URL}/files/api/download/{file_id}"
@@ -260,16 +253,14 @@ class WcGenTab(BaseAutomationTab):
                     for chunk in r.iter_content(chunk_size=8192): 
                         f.write(chunk)
             
-            self.app.log_message(self.log_display, f"Successfully downloaded '{filename}'.", "info")
-            return temp_path
+            self.log_info(f"Successfully downloaded '{filename}'.")            return temp_path
         except Exception as e:
-            self.app.log_message(self.log_display, f"Cloud download failed: {e}", "error")
-            messagebox.showerror("Download Failed", f"Could not download file: {e}")
+            self.log_error(f"Cloud download failed: {e}")            messagebox.showerror("Download Failed", f"Could not download file: {e}")
             return None
 
     def _log_result(self, result_data):
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(
-            result_data.get('work_code', 'N/A'),
+            truncate_workcode(result_data.get('work_code', 'N/A')),
             result_data.get('job_card', 'N/A'),
             result_data.get('beneficiary_type', 'N/A')
         )))
@@ -314,7 +305,7 @@ class WcGenTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         ctk.CTkLabel(parent, text=text).grid(row=row, column=0, sticky="w", padx=15, pady=5)
         if is_dropdown:
-            widget = ctk.CTkComboBox(parent, values=[], state="disabled", command=lambda choice, k=key: self._on_dropdown_select(k, choice))
+            widget = ctk.CTkOptionMenu(parent, values=[], state="disabled", command=lambda choice, k=key: self._on_dropdown_select(k, choice))
         else:
             widget = ctk.CTkEntry(parent, state="disabled")
         widget.grid(row=row, column=1, sticky="ew", padx=15, pady=5)
@@ -329,9 +320,15 @@ class WcGenTab(BaseAutomationTab):
                 formatted_value = value.format(year=current_year) if "{year}" in value else value
                 
                 # We need to temporarily enable if disabled
-                prev_state = field.cget("state") if hasattr(field, "cget") else "normal"
+                try:
+                    prev_state = field.cget("state")
+                except Exception:
+                    prev_state = "normal"
                 if prev_state == "disabled":
-                     if hasattr(field, "configure"): field.configure(state="normal")
+                     try:
+                         field.configure(state="normal")
+                     except Exception:
+                         pass
                 
                 if isinstance(field, DateEntry):
                     field.set_date(formatted_value)
@@ -340,7 +337,10 @@ class WcGenTab(BaseAutomationTab):
                     field.insert(0, formatted_value)
                 
                 if prev_state == "disabled":
-                     if hasattr(field, "configure"): field.configure(state="disabled")
+                     try:
+                         field.configure(state="disabled")
+                     except Exception:
+                         pass
 
     def _load_profiles_from_file(self):
         if not os.path.exists(self.profile_file):
@@ -362,8 +362,7 @@ class WcGenTab(BaseAutomationTab):
             else:
                 self._populate_defaults()
         except Exception as e:
-            self.app.log_message(self.log_display, f"Could not load profiles: {e}", "warning")
-            self.profiles = {}
+            self.log_warning(f"Could not load profiles: {e}")            self.profiles = {}
 
     def _save_profile(self, profile_name=None, is_autosave=False):
         if not is_autosave:
@@ -424,8 +423,7 @@ class WcGenTab(BaseAutomationTab):
                 if is_disabled:
                     field.configure(state="disabled")
         
-        self.app.log_message(self.log_display, f"Profile '{profile_name}' loaded. Click 'Load Categories' to continue.")
-
+        self.log_info(f"Profile '{profile_name}' loaded. Click 'Load Categories' to continue.")
     def _delete_profile(self):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -476,7 +474,7 @@ class WcGenTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        panchayat = self.panchayat_entry.get().strip()
+        panchayat = self.panchayat_var.get().strip()
         if not panchayat:
             messagebox.showwarning("Input Required", "Please enter a Panchayat Name first.")
             return
@@ -505,8 +503,7 @@ class WcGenTab(BaseAutomationTab):
                 return
             
             target_url = config.WC_GEN_CONFIG["url"]
-            self.app.log_message(self.log_display, f"Navigating to: {target_url}")
-            driver.get(target_url)
+            self.log_info(f"Navigating to: {target_url}")            driver.get(target_url)
             
             wait = WebDriverWait(driver, 20)
             
@@ -555,15 +552,14 @@ class WcGenTab(BaseAutomationTab):
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
         for child in self.step2_frame.winfo_children():
-             if isinstance(child, (ctk.CTkEntry, ctk.CTkComboBox, DateEntry)):
+             if isinstance(child, (ctk.CTkEntry, ctk.CTkOptionMenu, DateEntry)):
                 child.configure(state="normal")
         
         self.select_pdf_button.configure(state="normal")
         self.ui_fields['master_category'].configure(values=master_cat_options)
         self.ui_fields['executing_agency'].configure(values=agency_options)
 
-        self.app.log_message(self.log_display, "Categories loaded. Restoring selections...")
-        
+        self.log_info("Categories loaded. Restoring selections...")        
         # Restore Dropdowns
         saved_master_cat = self.saved_config.get('master_category')
         if saved_master_cat and saved_master_cat in master_cat_options:
@@ -600,8 +596,7 @@ class WcGenTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         if not selection:
             return
-        self.app.log_message(self.log_display, f"Selected {dropdown_key}: '{selection}'. Fetching next options...")
-        threading.Thread(target=self._update_dependent_dropdown, args=(dropdown_key, selection), daemon=True).start()
+        self.log_info(f"Selected {dropdown_key}: '{selection}'. Fetching next options...")        threading.Thread(target=self._update_dependent_dropdown, args=(dropdown_key, selection), daemon=True).start()
     
     def _update_dependent_dropdown(self, dropdown_key, selection):
         # ---- Lazy imports ----
@@ -735,8 +730,7 @@ class WcGenTab(BaseAutomationTab):
         try:
             (priority, work_name, khata_no, plot_no, village_name, total_plants, covered_area, area_plantation, total_saplings, job_card, beneficiary_type_for_if_edit) = row_data
         except ValueError:
-            self.app.log_message(self.log_display, "ERROR: CSV row has incorrect number of columns. Expected 11.", "error")
-            return None
+            self.log_error("ERROR: CSV row has incorrect number of columns. Expected 11.")            return None
 
         driver.get(config.WC_GEN_CONFIG["url"])
         wait = WebDriverWait(driver, 25)
@@ -755,22 +749,18 @@ class WcGenTab(BaseAutomationTab):
             from openpyxl.utils import get_column_letter
             from openpyxl.worksheet.page import PageMargins
             from openpyxl.drawing.image import Image as XLImage
-            self.app.log_message(self.log_display, f"  > Selecting '{value}'...")
-            html_element = driver.find_element(By.TAG_NAME, 'html')
+            self.log_info(f"  > Selecting '{value}'...")            html_element = driver.find_element(By.TAG_NAME, 'html')
             Select(wait.until(EC.presence_of_element_located((By.ID, element_id)))).select_by_visible_text(value)
             wait.until(EC.staleness_of(html_element))
-            self.app.log_message(self.log_display, f"  > OK.")
-
-        self.app.log_message(self.log_display, "Step 1: Selecting Categories...")
-        select_and_wait("ContentPlaceHolder1_ddlMastercategory", form_config['master_category'])
+            self.log_info(f"  > OK.")
+        self.log_info("Step 1: Selecting Categories...")        select_and_wait("ContentPlaceHolder1_ddlMastercategory", form_config['master_category'])
         select_and_wait("ContentPlaceHolder1_ddlproposed_work_category", form_config['work_category'])
         select_and_wait("ContentPlaceHolder1_ddlbeneficiary_type", form_config['beneficiary_type'])
         select_and_wait("ContentPlaceHolder1_ddlactivity_type", form_config['activity_type'])
         select_and_wait("ContentPlaceHolder1_ddlproposed_work_type", form_config['work_type'])
         select_and_wait("ContentPlaceHolder1_ddlprostatus", form_config['pro_status'])
 
-        self.app.log_message(self.log_display, "Step 2: Filling Dynamic Fields...")
-        dynamic_fields = {
+        self.log_info("Step 2: Filling Dynamic Fields...")        dynamic_fields = {
             "ContentPlaceHolder1_txtdist": total_plants, 
             "ContentPlaceHolder1_txtAdd_dis": covered_area,
             "ContentPlaceHolder1_txtEst_output": area_plantation, 
@@ -783,25 +773,21 @@ class WcGenTab(BaseAutomationTab):
                     driver.execute_script("arguments[0].value = arguments[1];", field, value)
                 except (NoSuchElementException, TimeoutException): pass 
         
-        self.app.log_message(self.log_display, "Step 3: Selecting Location...")
-        select_and_wait("ContentPlaceHolder1_ddlpanch", form_config['panchayat_name'])
+        self.log_info("Step 3: Selecting Location...")        select_and_wait("ContentPlaceHolder1_ddlpanch", form_config['panchayat_name'])
         
         village_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlvillage")))
         self._select_by_text_case_insensitive(Select(village_select), village_name)
         
         pdf_path = form_config.get('undertaking_pdf')
         if pdf_path and os.path.exists(pdf_path):
-            self.app.log_message(self.log_display, "  > Uploading Undertaking PDF...")
-            try:
+            self.log_info("  > Uploading Undertaking PDF...")            try:
                 abs_pdf_path = os.path.abspath(pdf_path)
                 file_input = driver.find_element(By.ID, "ContentPlaceHolder1_File_indiv_work_file_pdf")
                 driver.execute_script("arguments[0].style.display = 'block'; arguments[0].style.visibility = 'visible';", file_input)
                 file_input.send_keys(abs_pdf_path)
             except Exception as e: 
-                self.app.log_message(self.log_display, f"  > Warning: Could not upload PDF. Error: {e}", "warning")
-
-        self.app.log_message(self.log_display, "Step 4: Filling Final Details...")
-        
+                self.log_warning(f"  > Warning: Could not upload PDF. Error: {e}")
+        self.log_info("Step 4: Filling Final Details...")        
         ridge_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlridgetype")))
         Select(ridge_select).select_by_value(config.WC_GEN_CONFIG["defaults"]["ridge_type"])
         
@@ -848,8 +834,7 @@ class WcGenTab(BaseAutomationTab):
         driver.execute_script("arguments[0].value = arguments[1];", work_name_field, work_name)
         time.sleep(0.5)
 
-        self.app.log_message(self.log_display, "Step 5: Selecting Agency and Saving...")
-        
+        self.log_info("Step 5: Selecting Agency and Saving...")        
         agency_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlExeAgency")))
         self._select_by_text_case_insensitive(Select(agency_select), form_config['executing_agency'])
         
@@ -862,8 +847,7 @@ class WcGenTab(BaseAutomationTab):
             parsed_url = urlparse(final_url)
             work_code = parse_qs(parsed_url.query).get('work_code', [None])[0]
             if work_code:
-                self.app.log_message(self.log_display, f"SUCCESS! Generated Work Code: {work_code}", "success")
-                result_data = {
+                self.log_success(f"SUCCESS! Generated Work Code: {work_code}")                result_data = {
                     "work_code": work_code,
                     "beneficiary_type": beneficiary_type_for_if_edit.strip(),
                     "job_card": job_card.strip()
@@ -871,10 +855,8 @@ class WcGenTab(BaseAutomationTab):
                 self._log_result(result_data)
                 return result_data
             else:
-                self.app.log_message(self.log_display, "Row submitted, but could not extract work code from URL.", "warning")
-        except TimeoutException:
-            self.app.log_message(self.log_display, "Row submitted, but URL did not change to the success page.", "warning")
-        
+                self.log_warning("Row submitted, but could not extract work code from URL.")        except TimeoutException:
+            self.log_warning("Row submitted, but URL did not change to the success page.")        
         return None
     def start_automation(self) -> None:
         # ---- Lazy imports ----
@@ -892,7 +874,7 @@ class WcGenTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         if not self.csv_path: messagebox.showwarning("Missing File", "Please select a CSV data file first."); return
         form_config = {key: field.get() for key, field in self.ui_fields.items()}
-        form_config["panchayat_name"] = self.panchayat_entry.get().strip()
+        form_config["panchayat_name"] = self.panchayat_var.get().strip()
         form_config["undertaking_pdf"] = self.undertaking_pdf_path
 
         required_fields = ["panchayat_name", "master_category", "work_category", "beneficiary_type", "activity_type", "work_type", "pro_status", "executing_agency", "proposal_date", "start_date", "est_labour_cost", "est_material_cost"]
@@ -909,8 +891,7 @@ class WcGenTab(BaseAutomationTab):
         
         self.successful_wcs_data.clear()
         
-        self.app.log_message(self.log_display, "--- Starting Workcode Generation ---")
-        self.app.after(0, self.app.set_status, "Running Workcode Generation...")
+        self.log_info("--- Starting Workcode Generation ---")        self.app.after(0, self.app.set_status, "Running Workcode Generation...")
         
         local_successful_wcs = [] 
         try:
@@ -924,26 +905,26 @@ class WcGenTab(BaseAutomationTab):
                         self.app.log_message(self.log_display, "Automation stopped by user."); break
                     if not any(field.strip() for field in row): continue
                     
-                    self.app.log_message(self.log_display, f"--- Processing Row {i+1}/{total} ---")
-                    try:
+                    self.log_info(f"--- Processing Row {i+1}/{total} ---")                    try:
                         result_data = self._process_single_row(driver, form_config, row)
                         if result_data:
                             local_successful_wcs.append(result_data)
                     except Exception as e:
-                        self.app.log_message(self.log_display, f"ERROR processing row {i+1}: {e}", "error")
-
-        except FileNotFoundError: self.app.log_message(self.log_display, "ERROR: CSV file not found.", "error")
-        except Exception as e: self.app.log_message(self.log_display, f"An unexpected error occurred: {e}", "error")
-        finally:
+                        self.log_error(f"ERROR processing row {i+1}: {e}")
+        except FileNotFoundError: self.log_error("ERROR: CSV file not found.")        except Exception as e: self.log_error(f"An unexpected error occurred: {e}")        finally:
+            total_processed = len(local_successful_wcs)
+            total_rows = len(rows) if 'rows' in dir() and isinstance(rows, list) else 0
             self.successful_wcs_data = local_successful_wcs 
             self.app.after(0, self.set_ui_state, False)
-            self.app.log_message(self.log_display, "\n--- Automation Finished ---")
-            messagebox.showinfo("Complete", "Workcode generation process has finished.")
-            self.app.after(0, self.app.set_status, "Automation Finished")
+            self.log_info(f"
+{'='*50}")            self.log_info(f"📊 Workcode Generation Complete!")            self.log_info(f"✅ Generated: {total_processed} work codes")            if total_rows > 0:
+                failed = total_rows - total_processed
+                if failed > 0:
+                    self.log_info(f"❌ Failed/Skipped: {failed}")                elif total_processed > 0:
+                    self.log_info(f"🎉 All {total_rows} rows processed successfully!")            self.log_info(f"{'='*50}")            self.app.after(0, self.app.set_status, "Automation Finished")
 
             if self.send_to_if_edit_switch.get() and self.successful_wcs_data:
-                self.app.log_message(self.log_display, f"Sending {len(self.successful_wcs_data)} successful work codes to IF Editor tab...")
-                self.app.after(0, self.app.switch_to_if_edit_with_data, self.successful_wcs_data)
+                self.log_info(f"📤 Sending {len(self.successful_wcs_data)} work codes to IF Editor tab...")                self.app.after(0, self.app.switch_to_if_edit_with_data, self.successful_wcs_data)
             
     def select_csv_file(self):
         # ---- Lazy imports ----
@@ -986,7 +967,7 @@ class WcGenTab(BaseAutomationTab):
 
         self.select_button.configure(state=state)
         self.cloud_csv_button.configure(state=state)
-        self.panchayat_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.load_button.configure(state=state)
         self.save_profile_button.configure(state=state)
         self.delete_profile_button.configure(state=state)
@@ -996,11 +977,11 @@ class WcGenTab(BaseAutomationTab):
 
         if running or force_disable_form:
             for child in self.step2_frame.winfo_children():
-                if isinstance(child, (ctk.CTkEntry, ctk.CTkComboBox, DateEntry)): child.configure(state="disabled")
+                if isinstance(child, (ctk.CTkEntry, ctk.CTkOptionMenu, DateEntry)): child.configure(state="disabled")
         else:
             if self.ui_fields['master_category'].cget("values"):
                  for child in self.step2_frame.winfo_children():
-                    if isinstance(child, (ctk.CTkEntry, ctk.CTkComboBox, DateEntry)): child.configure(state="normal")
+                    if isinstance(child, (ctk.CTkEntry, ctk.CTkOptionMenu, DateEntry)): child.configure(state="normal")
     def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -1016,7 +997,7 @@ class WcGenTab(BaseAutomationTab):
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
         if messagebox.askokcancel("Reset Form?", "Are you sure?"):
-            self.panchayat_entry.delete(0, tkinter.END)
+            self.panchayat_var.set("")
             self.file_label.configure(text="No file selected")
             self.csv_path = None
             
@@ -1031,5 +1012,4 @@ class WcGenTab(BaseAutomationTab):
             self.set_ui_state(running=False, force_disable_form=True)
 
             self._populate_defaults()
-            self.app.log_message(self.log_display, "Form has been reset.")
-            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")

@@ -6,7 +6,7 @@ import time, os, sys, json
 from datetime import datetime
 from src import config
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
+
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -46,12 +46,27 @@ class JobcardVerifyTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure(1, weight=1)
         
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=10)
-        self.panchayat_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"), app_instance=self.app, history_key="location_panchayat")
-        self.panchayat_entry.grid(row=0, column=1, sticky='ew', padx=15, pady=10)
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=10)
         
         ctk.CTkLabel(controls_frame, text="Village Name:").grid(row=1, column=0, sticky='w', padx=15, pady=10)
-        self.village_entry = AutocompleteEntry(controls_frame, suggestions_list=self.app.history_manager.get_suggestions("location_village"))
-        self.village_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=10)
+        v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
+        self.village_var = ctk.StringVar()
+        self.village_menu = ctk.CTkOptionMenu(controls_frame, variable=self.village_var, values=v_vals)
+        self.village_menu.grid(row=1, column=1, sticky='ew', padx=15, pady=10)
+
+        # Filter villages when panchayat changes
+        def _on_panchayat_change(*_):
+            pan = self.panchayat_var.get()
+            if pan:
+                vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or [""]
+            else:
+                vals = self.app.history_manager.get_suggestions("location_village") or [""]
+            self.village_var.set("")
+            self.village_menu.configure(values=vals)
+        self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # Checkbox Frame
         chk_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
@@ -96,17 +111,17 @@ class JobcardVerifyTab(BaseAutomationTab):
 
     def _toggle_village_entry(self):
         if self.process_all_villages_var.get():
-            self.village_entry.configure(state="disabled")
+            self.village_menu.configure(state="disabled")
         else:
-            self.village_entry.configure(state="normal")
+            self.village_menu.configure(state="normal")
 
     def _load_saved_preferences(self):
         try:
             if os.path.exists(self.pref_file):
                 with open(self.pref_file, 'r') as f:
                     data = json.load(f)
-                    if "panchayat" in data: self.panchayat_entry.insert(0, data["panchayat"])
-                    if "village" in data: self.village_entry.insert(0, data["village"])
+                    if "panchayat" in data: self.panchayat_var.set(data["panchayat"])
+                    if "village" in data: self.village_var.set(data["village"])
                     if "folder" in data and os.path.exists(data["folder"]):
                         self.photo_folder_path = data["folder"]
                         self.photo_path_label.configure(text=self.photo_folder_path)
@@ -125,14 +140,14 @@ class JobcardVerifyTab(BaseAutomationTab):
             return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        self.panchayat_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.select_folder_button.configure(state=state)
         self.process_all_checkbox.configure(state=state)
         self.verify_account_only_chk.configure(state=state)
         if running or self.process_all_villages_var.get():
-            self.village_entry.configure(state="disabled")
+            self.village_menu.configure(state="disabled")
         else:
-            self.village_entry.configure(state="normal")
+            self.village_menu.configure(state="normal")
 
     def select_photo_folder(self):
         # ---- Lazy imports ----
@@ -145,8 +160,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         if path:
             self.photo_folder_path = path
             self.photo_path_label.configure(text=self.photo_folder_path)
-            self.app.log_message(self.log_display, f"Selected photo folder: {self.photo_folder_path}")
-    def reset_ui(self) -> None:
+            self.log_info(f"Selected photo folder: {self.photo_folder_path}")    def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -154,8 +168,8 @@ class JobcardVerifyTab(BaseAutomationTab):
         from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
         from selenium import webdriver
         if messagebox.askokcancel("Reset Form?", "Are you sure?"):
-            self.panchayat_entry.delete(0, tkinter.END)
-            self.village_entry.delete(0, tkinter.END)
+            self.panchayat_var.set("")
+            self.village_var.set("")
             self.process_all_villages_var.set(False)
             self.verify_account_only_var.set(False)
             self._toggle_village_entry()
@@ -165,7 +179,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.update_status("Ready")
             self.app.after(0, self.app.set_status, "Ready")
     def start_automation(self) -> None:
-        panchayat = self.panchayat_entry.get().strip()
+        panchayat = self.panchayat_var.get().strip()
         village = self.village_entry.get().strip()
         process_all = self.process_all_villages_var.get()
         verify_account_only = self.verify_account_only_var.get()
@@ -212,8 +226,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
-        self.app.log_message(self.log_display, "🚀 Starting Jobcard Verification...")
-        self.app.after(0, self.app.set_status, "Running Jobcard Verification...")
+        self.log_info("🚀 Starting Jobcard Verification...")        self.app.after(0, self.app.set_status, "Running Jobcard Verification...")
         
         try:
             driver = self.app.get_driver()
@@ -223,17 +236,14 @@ class JobcardVerifyTab(BaseAutomationTab):
             driver.get(url)
             
             villages_to_process = []
-            self.app.log_message(self.log_display, f"Selecting Panchayat: {inputs['panchayat']}")
-            html_element = driver.find_element(By.TAG_NAME, "html")
+            self.log_info(f"Selecting Panchayat: {inputs['panchayat']}")            html_element = driver.find_element(By.TAG_NAME, "html")
             self._select_by_text_case_insensitive(Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch")))), inputs['panchayat'])
             wait.until(EC.staleness_of(html_element))
 
             if inputs['process_all']:
-                self.app.log_message(self.log_display, "Finding all villages in Panchayat...")
-                village_dropdown = Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlVillage"))))
+                self.log_info("Finding all villages in Panchayat...")                village_dropdown = Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlVillage"))))
                 villages_to_process = [opt.text for opt in village_dropdown.options if "--Select" not in opt.text]
-                self.app.log_message(self.log_display, f"Found {len(villages_to_process)} villages.")
-            else:
+                self.log_info(f"Found {len(villages_to_process)} villages.")            else:
                 villages_to_process.append(inputs['village'])
 
             self.app.update_history("location_panchayat", inputs['panchayat'])
@@ -242,8 +252,8 @@ class JobcardVerifyTab(BaseAutomationTab):
                 if self.app.stop_events[self.automation_key].is_set():
                     self.app.log_message(self.log_display, "🛑 Stop signal received.", "warning"); break
                 
-                self.app.log_message(self.log_display, f"\n--- Processing Village: {location_village} ---")
-                self.app.after(0, self.update_status, f"Processing Village: {location_village}")
+                self.log_info(f"
+--- Processing Village: {location_village} ---")                self.app.after(0, self.update_status, f"Processing Village: {location_village}")
                 self.app.update_history("location_village", location_village)
                 
                 html_element = driver.find_element(By.TAG_NAME, "html")
@@ -254,32 +264,31 @@ class JobcardVerifyTab(BaseAutomationTab):
                     driver.implicitly_wait(1)
                     msg_element = driver.find_elements(By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
                     if msg_element and msg_element[0].is_displayed() and "no record found" in msg_element[0].text.lower():
-                        self.app.log_message(self.log_display, f"   - Village has no records. Skipping.", "info")
-                        continue
+                        self.log_info(f"   - Village has no records. Skipping.")                        continue
                 finally:
                     driver.implicitly_wait(20)
 
                 # --- PAGINATION LOOP ---
                 page_count = 1
                 while not self.app.stop_events[self.automation_key].is_set():
-                    self.app.log_message(self.log_display, f"   > Processing Page {page_count}")
-                    
+                    self.log_info(f"   > Processing Page {page_count}")                    
                     self._process_jobcards_for_current_page(driver, wait, inputs['verify_account_only'])
                     
                     # Pass the current page number so we know what to look for (Next = page_count + 1)
                     if not self._handle_pagination(driver, wait, page_count):
-                        self.app.log_message(self.log_display, "   - End of pages for this village.", "info")
-                        break 
+                        self.log_info("   - End of pages for this village.")                        break 
                     
                     page_count += 1
                     time.sleep(2)
 
             if not self.app.stop_events[self.automation_key].is_set():
-                messagebox.showinfo("Success", "Jobcard verification complete for all selected villages.")
-        except Exception as e:
-            error_msg = f"{type(e).__name__}: {str(e).splitlines()[0]}"; self.app.log_message(self.log_display, f"Error: {error_msg}", "error"); messagebox.showerror("Automation Error", f"An error occurred: {error_msg}")
+                self.log_info(f"
+{'='*50}")                self.log_info("📊 Jobcard verification complete for all selected villages.")                self.log_info(f"{'='*50}")        except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e).splitlines()[0]}"
+            self.log_error(f"❌ Error: {error_msg}")            messagebox.showerror("Automation Error", f"An error occurred: {error_msg}")
         finally:
-            self.app.after(0, self.update_status, "Finished"); self.app.after(0, self.set_ui_state, False)
+            self.app.after(0, self.update_status, "Finished")
+            self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
     
     def _process_jobcards_for_current_page(self, driver, wait, verify_account_only):
@@ -308,16 +317,14 @@ class JobcardVerifyTab(BaseAutomationTab):
                 try:
                     ac_element = driver.find_elements(By.ID, f"{row_id_base}_lblAc")
                     if not ac_element or not ac_element[0].text.strip():
-                        self.app.log_message(self.log_display, f"   - Skipping Jobcard {jobcard_no} (No Account Number)", "info")
-                        should_skip = True
+                        self.log_info(f"   - Skipping Jobcard {jobcard_no} (No Account Number)")                        should_skip = True
                 except Exception: should_skip = True
 
             if should_skip:
                 row_index += 1
                 continue
 
-            self.app.log_message(self.log_display, f"   - Verifying Jobcard: {jobcard_no}")
-            photo_to_upload = self._get_photo_for_jobcard(jobcard_no)
+            self.log_info(f"   - Verifying Jobcard: {jobcard_no}")            photo_to_upload = self._get_photo_for_jobcard(jobcard_no)
             
             upload_link = None
             try:
@@ -339,10 +346,8 @@ class JobcardVerifyTab(BaseAutomationTab):
                     file_input.send_keys(photo_to_upload)
                     driver.find_element(By.CSS_SELECTOR, 'input[type="submit"]').click()
                     wait.until(EC.alert_is_present()).accept()
-                    self.app.log_message(self.log_display, "     - Photo uploaded successfully.", "success")
-                except Exception as ex:
-                     self.app.log_message(self.log_display, f"     - Upload failed: {str(ex)}", "error")
-                finally:
+                    self.log_success("     - Photo uploaded successfully.")                except Exception as ex:
+                     self.log_error(f"     - Upload failed: {str(ex)}")                finally:
                     if len(driver.window_handles) > 1: driver.close()
                     driver.switch_to.window(main_handle)
             
@@ -362,15 +367,13 @@ class JobcardVerifyTab(BaseAutomationTab):
                 driver.execute_script("arguments[0].click();", update_btn)
                 
                 final_alert = wait.until(EC.alert_is_present())
-                self.app.log_message(self.log_display, f"     - Saved: {final_alert.text}", "success")
-                final_alert.accept()
+                self.log_success(f"     - Saved: {final_alert.text}")                final_alert.accept()
                 
                 # Element wait handled by WebDriverWait below
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch")))
                 row_index = 2
             except Exception as e:
-                self.app.log_message(self.log_display, f"     - Error saving row: {e}", "error")
-                row_index += 1
+                self.log_error(f"     - Error saving row: {e}")                row_index += 1
 
     def _handle_pagination(self, driver, wait, current_page_num):
         # ---- Lazy imports ----
@@ -398,8 +401,7 @@ class JobcardVerifyTab(BaseAutomationTab):
                     next_btn = [candidates[-1]]
 
             if next_btn:
-                self.app.log_message(self.log_display, f"   - Switching to Page {next_page_str}...", "info")
-                html_element = driver.find_element(By.TAG_NAME, "html")
+                self.log_info(f"   - Switching to Page {next_page_str}...")                html_element = driver.find_element(By.TAG_NAME, "html")
                 driver.execute_script("arguments[0].click();", next_btn[0])
                 wait.until(EC.staleness_of(html_element))
                 return True
@@ -407,8 +409,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             return False # No more pages found
 
         except Exception as e:
-            self.app.log_message(self.log_display, f"   - Pagination check failed: {e}", "warning")
-            return False
+            self.log_warning(f"   - Pagination check failed: {e}")            return False
         finally:
             # ALWAYS restore standard wait time
             driver.implicitly_wait(20)

@@ -34,8 +34,7 @@ except ImportError:
 
 from src import config
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
-from src.utils import get_logger
+from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
@@ -91,8 +90,8 @@ class MbEntryTab(BaseAutomationTab):
         config_frame.grid_columnconfigure((1, 3), weight=1)
         
         # --- Form Fields ---
-        self.panchayat_entry = self._create_autocomplete_field(config_frame, "location_panchayat", "Panchayat Name", 0, 0)
-        self.panchayat_entry.bind("<KeyRelease>", self._on_panchayat_change_debounced)
+        self.panchayat_entry = self._create_option_field(config_frame, "location_panchayat", "Panchayat Name", 0, 0)
+        self.config_vars["location_panchayat"].trace_add("write", self._on_panchayat_change_debounced)
         
         # --- MB No. with Auto Checkbox ---
         ctk.CTkLabel(config_frame, text="MB No.").grid(row=1, column=0, sticky='w', padx=15, pady=5)
@@ -116,7 +115,7 @@ class MbEntryTab(BaseAutomationTab):
         self.unit_cost_entry = self._create_field(config_frame, "unit_cost", "Unit Cost (₹)", 2, 0)
         self.pit_count_entry = self._create_field(config_frame, "default_pit_count", "Pit Count", 2, 2)
         
-        self.mate_name_entry = self._create_autocomplete_field(config_frame, "mate_name", "Mate Names (comma-separated)", 3, 0)
+        self.mate_name_entry = self._create_option_field(config_frame, "mate_name", "Mate Names (comma-separated)", 3, 0)
         self._on_panchayat_change()
 
         # Note for user
@@ -231,24 +230,23 @@ class MbEntryTab(BaseAutomationTab):
         entry.grid(row=r, column=c+1, sticky='ew', padx=15, pady=5)
         return entry
 
-    def _create_autocomplete_field(self, parent, key, text, r, c):
+    def _create_option_field(self, parent, key, text, r, c):
         ctk.CTkLabel(parent, text=text).grid(row=r, column=c, sticky='w', padx=15, pady=5)
         var = ctk.StringVar(); self.config_vars[key] = var
-        initial_suggestions = self.app.history_manager.get_suggestions(key)
-        entry = AutocompleteEntry(parent, textvariable=var, suggestions_list=initial_suggestions, app_instance=self.app, history_key=key)
+        initial_suggestions = self.app.history_manager.get_suggestions(key) or [""]
+        entry = ctk.CTkOptionMenu(parent, variable=var, values=initial_suggestions)
         entry.grid(row=r, column=c+1, columnspan=3, sticky='ew', padx=15, pady=5)
         return entry
 
     # --- Panchayat-dependent mate name logic ---
     def _get_current_mate_key(self):
-        panchayat_name = self.panchayat_entry.get().strip().lower()
+        panchayat_name = self.config_vars["location_panchayat"].get().strip().lower()
         panchayat_safe_name = "".join(c for c in panchayat_name if c.isalnum() or c == '_').rstrip()
         if not panchayat_safe_name: return "mate_name_default"
         return f"mate_name_{panchayat_safe_name}"
 
-    def _on_panchayat_change_debounced(self, event=None):
+    def _on_panchayat_change_debounced(self, *args):
         if self.panchayat_after_id: self.after_cancel(self.panchayat_after_id)
-        if event and event.keysym in ("Up", "Down", "Return", "Enter", "Tab"): return
         self.panchayat_after_id = self.after(300, self._on_panchayat_change)
 
     def _load_mapping_data(self):
@@ -270,14 +268,13 @@ class MbEntryTab(BaseAutomationTab):
         mate_key = self._get_current_mate_key()
         new_suggestions = self.app.history_manager.get_suggestions(mate_key)
         if self.mate_name_entry:
-            self.mate_name_entry.history_key = mate_key
-            self.mate_name_entry.suggestions = new_suggestions
-            current_panchayat = self.panchayat_entry.get().strip().lower()
+            mate_vals = new_suggestions if new_suggestions else [""]
+            self.mate_name_entry.configure(values=mate_vals)
+            current_panchayat = self.config_vars["location_panchayat"].get().strip().lower()
             if current_panchayat in self.mapping_data:
                 saved_mate = self.mapping_data[current_panchayat]
-                if self.mate_name_entry.get().strip() != saved_mate:
-                    self.mate_name_entry.delete(0, tkinter.END)
-                    self.mate_name_entry.insert(0, saved_mate)
+                if self.config_vars["mate_name"].get().strip() != saved_mate:
+                    self.config_vars["mate_name"].set(saved_mate)
 
     def set_ui_state(self, running: bool):
         if not self._is_alive():
@@ -318,8 +315,7 @@ class MbEntryTab(BaseAutomationTab):
             for item in self.results_tree.get_children(): self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.app.log_message(self.log_display, "Form has been reset.")
-            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
 
     # --- NEW: Override Retry Logic for MB Entry ---
     def retry_logic_handler(self) -> None:
@@ -382,22 +378,16 @@ class MbEntryTab(BaseAutomationTab):
             )
             if not proceed:
                 return
-            self.app.log_message(self.log_display, "ℹ️ No work codes provided. Will process all works from dropdown.")
-        self._save_mapping_pair(cfg['location_panchayat'], cfg['mate_name'])
+            self.log_info("ℹ️ No work codes provided. Will process all works from dropdown.")        self._save_mapping_pair(cfg['location_panchayat'], cfg['mate_name'])
         self._save_inputs(cfg)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(cfg, work_codes_raw))
     
     def _save_inputs(self, cfg):
         try:
-            with open(self.config_file, 'w') as f: json.dump(cfg, f, indent=4)
-        except Exception as e: self.app.log_message(self.log_display, f"Could not save inputs: {e}", "warning")
-
+            self.app.history_manager.save_tab_inputs_batch("mb_entry", cfg)
+        except Exception as e: self.log_warning(f"Could not save inputs: {e}")
     def _load_inputs(self):
-        saved_data = {}
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, 'r') as f: saved_data = json.load(f)
-            except (json.JSONDecodeError, IOError) as e: self.app.log_message(self.log_display, f"Could not load inputs: {e}", "warning")
+        saved_data = self.app.history_manager.get_tab_inputs("mb_entry")
         for key, var in self.config_vars.items():
             default_value = config.MB_ENTRY_CONFIG["defaults"].get(key, "")
             var.set(saved_data.get(key, default_value))
@@ -407,8 +397,7 @@ class MbEntryTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True) 
         self.app.clear_log(self.log_display) 
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
-        self.app.log_message(self.log_display, "Starting eMB Entry automation...")
-        self.app.after(0, self.app.set_status, "Running eMB Entry...") 
+        self.log_info("Starting eMB Entry automation...")        self.app.after(0, self.app.set_status, "Running eMB Entry...") 
         
         try:
             driver = self.app.get_driver()
@@ -430,8 +419,7 @@ class MbEntryTab(BaseAutomationTab):
                 final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
                 self.app.after(0, self.update_status, final_msg, 1.0)
                 if not self.app.stop_events[self.automation_key].is_set():
-                    messagebox.showinfo("Complete", "e-MB Entry process has finished.")
-                return
+                    self.log_info("📊 e-MB Entry process has finished.")                return
 
             processed_codes = set()
             total = len(work_codes_raw)
@@ -456,8 +444,7 @@ class MbEntryTab(BaseAutomationTab):
                 messagebox.showinfo("Complete", "e-MB Entry process has finished.")
         
         except Exception as e:
-            self.app.log_message(self.log_display, f"A critical error occurred: {e}", "error")
-            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
+            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
@@ -466,7 +453,7 @@ class MbEntryTab(BaseAutomationTab):
         timestamp = datetime.now().strftime("%H:%M:%S")
         panchayat = cfg.get('location_panchayat', '-')
         tags = ('failed',) if 'success' not in status.lower() else ()
-        values = (panchayat, work_code, work_name, mr_no, mr_period, status, details, timestamp)
+        values = (panchayat, truncate_workcode(work_code), work_name, mr_no, mr_period, status, details, timestamp)
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
 
     def _process_single_work_code(self, driver, work_code, cfg, mate_names_list):
@@ -534,21 +521,18 @@ class MbEntryTab(BaseAutomationTab):
             # Re-set page no after dropdown selection (page refresh may clear it)
             driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpageno').value = '{cfg['page_no']}';")
 
-            self.app.log_message(self.log_display, "🔘 Clicking Radio Button...")
-            radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rddist_0")))
+            self.log_info("🔘 Clicking Radio Button...")            radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rddist_0")))
             driver.execute_script("arguments[0].click();", radio_btn)
             time.sleep(1.0)  # Short wait after click
 
-            self.app.log_message(self.log_display, "⏳ Waiting for Period Dropdown...")
-            period_dropdown_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod")))
+            self.log_info("⏳ Waiting for Period Dropdown...")            period_dropdown_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod")))
             period_dropdown = Select(period_dropdown_elem)
             if len(period_dropdown.options) <= 1: raise ValueError("No measurement period found.")
             extracted_mr_period = period_dropdown.options[1].text
             period_element_to_stale = period_dropdown_elem
             period_dropdown.select_by_index(1)
             
-            self.app.log_message(self.log_display, "⏳ Waiting for Refresh...")
-            try: wait.until(EC.staleness_of(period_element_to_stale))
+            self.log_info("⏳ Waiting for Refresh...")            try: wait.until(EC.staleness_of(period_element_to_stale))
             except TimeoutException: pass
 
             wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days')))
@@ -567,11 +551,9 @@ class MbEntryTab(BaseAutomationTab):
             
             driver.execute_script(f"document.getElementsByName('{prefix}$qty')[0].value = '{total_persondays}';")
             driver.execute_script(f"document.getElementsByName('{prefix}$unitcost')[0].value = '{cfg['unit_cost']}';")
-            self.app.log_message(self.log_display, "⚙️ Triggering Auto-Calculation (check)...")
-            driver.execute_script("if(typeof check === 'function') { check(); }")
+            self.log_info("⚙️ Triggering Auto-Calculation (check)...")            driver.execute_script("if(typeof check === 'function') { check(); }")
             driver.execute_script(f"document.getElementsByName('{prefix}$labcomp')[0].value = '{total_cost}';")
-            self.app.log_message(self.log_display, "⚙️ Triggering Validation (checkLabCom)...")
-            driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
+            self.log_info("⚙️ Triggering Validation (checkLabCom)...")            driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
             
             try: driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpit').value = '{cfg['default_pit_count']}';")
             except Exception as e: logger.debug("MBEntry: Could not set pit count: %s", e)
@@ -593,8 +575,7 @@ class MbEntryTab(BaseAutomationTab):
         
         except Exception as e:
             err_msg = str(e).splitlines()[0]
-            self.app.log_message(self.log_display, f"Error on {work_code}: {err_msg}", "error")
-            self._log_result(cfg, work_code, "Failed", "Script Error", extracted_work_name, extracted_mr_no, extracted_mr_period)
+            self.log_error(f"Error on {work_code}: {err_msg}")            self._log_result(cfg, work_code, "Failed", "Script Error", extracted_work_name, extracted_mr_no, extracted_mr_period)
 
     def _process_all_works_from_dropdown(self, driver, cfg, mate_names_list):
         # ---- Lazy imports ----
@@ -623,8 +604,8 @@ class MbEntryTab(BaseAutomationTab):
                 EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch'))
             )
             selected_option = Select(panchayat_dropdown).first_selected_option
-            if selected_option.text.strip() != cfg['location_panchayat']:
-                Select(panchayat_dropdown).select_by_visible_text(cfg['location_panchayat'])
+            if selected_option.text.strip().lower() != cfg['location_panchayat'].strip().lower():
+                self._select_by_text_case_insensitive(Select(panchayat_dropdown), cfg['location_panchayat'])
                 wait.until(EC.staleness_of(panchayat_dropdown))
                 wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
         except Exception:
@@ -640,8 +621,7 @@ class MbEntryTab(BaseAutomationTab):
         driver.execute_script("document.getElementById('ctl00_ContentPlaceHolder1_txtWrkCode').value = '';")
 
         # Step 3: Click search
-        self.app.log_message(self.log_display, "🔍 Searching for all available works...")
-        work_dropdown_old = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_ddlSelWrk')
+        self.log_info("🔍 Searching for all available works...")        work_dropdown_old = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_ddlSelWrk')
         search_btn = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_imgButtonSearch')
         driver.execute_script("arguments[0].click();", search_btn)
 
@@ -672,19 +652,16 @@ class MbEntryTab(BaseAutomationTab):
                 work_options.append((val, extracted_name, wc_from_text))
 
         if not work_options:
-            self.app.log_message(self.log_display, "❌ No works found in dropdown!", "error")
-            self._log_result(cfg, "N/A", "Failed", "No works found in dropdown after search")
+            self.log_error("❌ No works found in dropdown!")            self._log_result(cfg, "N/A", "Failed", "No works found in dropdown after search")
             return
 
-        self.app.log_message(self.log_display, f"✅ Found {len(work_options)} works to process from dropdown.")
-        total = len(work_options)
+        self.log_info(f"✅ Found {len(work_options)} works to process from dropdown.")        total = len(work_options)
         processed_codes = set()
 
         # Step 5: Process each work from the dropdown
         for i, (work_code, work_name, wc_from_text) in enumerate(work_options):
             if self.app.stop_events[self.automation_key].is_set():
-                self.app.log_message(self.log_display, "Automation stopped.", "warning")
-                break
+                self.log_warning("Automation stopped.")                break
 
             if work_code in processed_codes:
                 self._log_result(cfg, work_code, "Skipped", "Duplicate entry (already processed)", work_name)
@@ -778,11 +755,9 @@ class MbEntryTab(BaseAutomationTab):
 
                 driver.execute_script(f"document.getElementsByName('{prefix}$qty')[0].value = '{total_persondays}';")
                 driver.execute_script(f"document.getElementsByName('{prefix}$unitcost')[0].value = '{cfg['unit_cost']}';")
-                self.app.log_message(self.log_display, "⚙️ Triggering Auto-Calculation (check)...")
-                driver.execute_script("if(typeof check === 'function') { check(); }")
+                self.log_info("⚙️ Triggering Auto-Calculation (check)...")                driver.execute_script("if(typeof check === 'function') { check(); }")
                 driver.execute_script(f"document.getElementsByName('{prefix}$labcomp')[0].value = '{total_cost}';")
-                self.app.log_message(self.log_display, "⚙️ Triggering Validation (checkLabCom)...")
-                driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
+                self.log_info("⚙️ Triggering Validation (checkLabCom)...")                driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
 
                 try:
                     driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpit').value = '{cfg['default_pit_count']}';")
@@ -804,8 +779,7 @@ class MbEntryTab(BaseAutomationTab):
                     alert.accept()
                     status = "Success" if "success" in alert_text.lower() or "saved" in alert_text.lower() else "Failed"
                     self._log_result(cfg, work_code, status, alert_text, work_name, extracted_mr_no, extracted_mr_period)
-                    self.app.log_message(self.log_display, f"{work_code}: {status} — {alert_text}")
-                except TimeoutException:
+                    self.log_info(f"{work_code}: {status} — {alert_text}")                except TimeoutException:
                     self._log_result(cfg, work_code, "Failed", "No Alert Received", work_name, extracted_mr_no, extracted_mr_period)
 
                 # Small delay between entries
@@ -813,11 +787,9 @@ class MbEntryTab(BaseAutomationTab):
 
             except Exception as e:
                 err_msg = str(e).splitlines()[0]
-                self.app.log_message(self.log_display, f"Error on {work_code}: {err_msg}", "error")
-                self._log_result(cfg, work_code, "Failed", "Script Error", work_name)
+                self.log_error(f"Error on {work_code}: {err_msg}")                self._log_result(cfg, work_code, "Failed", "Script Error", work_name)
 
-        self.app.log_message(self.log_display, "✅ All dropdown works processed.")
-
+        self.log_info("✅ All dropdown works processed.")
     def _find_activity_prefix(self, driver):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -828,18 +800,15 @@ class MbEntryTab(BaseAutomationTab):
         from selenium import webdriver
         import openpyxl
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        self.app.log_message(self.log_display, "Searching for 'Earth work' activity...")
-        for i in range(1, 61): 
+        self.log_info("Searching for 'Earth work' activity...")        for i in range(1, 61): 
             try:
                 activity_id = f"ctl00_ContentPlaceHolder1_activity_ctl{str(i).zfill(2)}_act_name"
                 element = driver.find_element(By.ID, activity_id)
                 text = element.get_attribute("innerText").lower()
                 if "earth work" in text:
-                    self.app.log_message(self.log_display, f"✅ Found 'Earth work' in row #{i}.", "success")
-                    return f"ctl00$ContentPlaceHolder1$activity$ctl{str(i).zfill(2)}"
+                    self.log_success(f"✅ Found 'Earth work' in row #{i}.")                    return f"ctl00$ContentPlaceHolder1$activity$ctl{str(i).zfill(2)}"
             except NoSuchElementException: continue 
-        self.app.log_message(self.log_display, "⚠️ 'Earth work' not found, defaulting to first row (ctl01).", "warning")
-        return "ctl00$ContentPlaceHolder1$activity$ctl01"
+        self.log_warning("⚠️ 'Earth work' not found, defaulting to first row (ctl01).")        return "ctl00$ContentPlaceHolder1$activity$ctl01"
     
     def export_report(self):
         # ---- Lazy imports ----
@@ -876,7 +845,7 @@ class MbEntryTab(BaseAutomationTab):
         if not all_items:
             messagebox.showinfo("No Data", "No records to export."); return
 
-        panchayat = self.panchayat_entry.get().strip()
+        panchayat = self.config_vars["location_panchayat"].get().strip()
         if not panchayat:
             messagebox.showwarning("Required", "Panchayat Name missing."); return
 
@@ -1055,7 +1024,7 @@ class MbEntryTab(BaseAutomationTab):
         if not all_items:
             messagebox.showinfo("No Data", "No records to export."); return
 
-        panchayat = self.panchayat_entry.get().strip()
+        panchayat = self.config_vars["location_panchayat"].get().strip()
         if not panchayat:
             messagebox.showwarning("Required", "Panchayat Name missing."); return
 
@@ -1219,8 +1188,7 @@ class MbEntryTab(BaseAutomationTab):
             messagebox.showerror("PDF Error", f"Failed to generate PDF: {e}")
     
     def load_data_from_mr_tracking(self, workcodes, panchayat_name: str):
-        self.panchayat_entry.delete(0, tkinter.END)
-        self.panchayat_entry.insert(0, panchayat_name)
+        self.config_vars["location_panchayat"].set(panchayat_name)
         self._on_panchayat_change()
         
         # --- UPDATE: Handle List input from Macro ---
@@ -1239,4 +1207,4 @@ class MbEntryTab(BaseAutomationTab):
         if self.notebook: self.notebook.set("Work Codes")
         
         count = len(display_text.splitlines()) if display_text else 0
-        self.app.log_message(self.log_display, f"Loaded {count} codes for {panchayat_name}.", "info")
+        self.log_info(f"Loaded {count} codes for {panchayat_name}.")

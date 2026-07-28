@@ -49,6 +49,7 @@ class DropdownSelect(ctk.CTkFrame):
 
     ITEM_H = 34
     SETTINGS_LABEL = "⚙️  Set in Settings"
+    CLEAR_LABEL = "✕  Clear Field"
     ARROW_TEXT = "▼"
 
     def __init__(self, parent, suggestions_list=None, app_instance=None,
@@ -205,12 +206,18 @@ class DropdownSelect(ctk.CTkFrame):
                 items.append(s)
         has_data = bool(items)
 
+        # Always show "✕ Clear Field" as the FIRST option if a value is selected
+        if self._selected:
+            items.insert(0, self.CLEAR_LABEL)
+
         if has_data:
             if self._show_settings_option:
                 items.append(self.SETTINGS_LABEL)
         else:
             if self._show_settings_option:
-                items = [self.SETTINGS_LABEL]
+                # Only show Settings option if nothing selected (clear is redundant with settings)
+                if not self._selected:
+                    items = [self.SETTINGS_LABEL]
 
         # ── Create popup ──
         self._popup = ctk.CTkToplevel(self)
@@ -308,6 +315,16 @@ class DropdownSelect(ctk.CTkFrame):
                 tl.focus_force()
         except Exception:
             pass
+
+        if value == self.CLEAR_LABEL:
+            self._selected = ""
+            self._update_display()
+            if self._command:
+                try:
+                    self._command("")
+                except Exception:
+                    pass
+            return
 
         if value == self.SETTINGS_LABEL:
             if self.app and hasattr(self.app, 'show_frame'):

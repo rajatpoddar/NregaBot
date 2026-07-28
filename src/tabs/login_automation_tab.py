@@ -1,16 +1,13 @@
 import threading
-import json
-import os
 import time
 from datetime import datetime
-import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
 from src import config
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
+
 from src.utils import get_logger
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
@@ -28,60 +25,46 @@ class LoginAutomationTab(BaseAutomationTab):
         self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
         
         # Title
-        title = ctk.CTkLabel(self.main_frame, text="NREGA Navigation Automation", font=ctk.CTkFont(size=20, weight="bold"))
+        title = ctk.CTkLabel(self.main_frame, text="NREGA Login & Navigation Automation",
+                             font=ctk.CTkFont(size=20, weight="bold"))
         title.pack(pady=(0, 20))
         
         # --- Financial Year (Auto-set, read-only display) ---
         self.current_financial_year = self._get_current_financial_year()
         
-        # --- Location Form Section ---
-        form_frame = ctk.CTkFrame(self.main_frame)
-        form_frame.pack(fill='x', padx=10, pady=10)
-        form_frame.columnconfigure(1, weight=1)
+        # --- Auto-Detected Location Info Card ---
+        self._auto_detect_location()
+
+        # --- Info Section ---
+        info_frame = ctk.CTkFrame(self.main_frame, fg_color=("gray95", "gray25"), corner_radius=8)
+        info_frame.pack(fill='x', padx=10, pady=(10, 5))
         
-        # 1. Financial Year (Read-only display)
-        ctk.CTkLabel(form_frame, text="Financial Year:", font=ctk.CTkFont(size=13)).grid(row=0, column=0, sticky='w', padx=15, pady=10)
-        fy_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
-        fy_frame.grid(row=0, column=1, padx=15, pady=10, sticky='w')
-        ctk.CTkLabel(fy_frame, text=self.current_financial_year, font=ctk.CTkFont(size=13, weight="bold"), text_color=(config.COLORS["blue_hover"], config.COLORS["blue_light"])).pack(side="left")
-        ctk.CTkLabel(fy_frame, text="  (auto-set)", font=ctk.CTkFont(size=11), text_color="gray50").pack(side="left")
-        
-        # 2. District
-        ctk.CTkLabel(form_frame, text="District Name:", font=ctk.CTkFont(size=13)).grid(row=1, column=0, sticky='w', padx=15, pady=10)
-        self.district_input = AutocompleteEntry(
-            form_frame,
-            suggestions_list=self.app.history_manager.get_suggestions("location_district"),
-            width=250,
-            app_instance=self.app, history_key="location_district")
-        self.district_input.grid(row=1, column=1, padx=15, pady=10, sticky='w')
-        
-        # 3. Block
-        ctk.CTkLabel(form_frame, text="Block Name:", font=ctk.CTkFont(size=13)).grid(row=2, column=0, sticky='w', padx=15, pady=10)
-        self.block_input = AutocompleteEntry(
-            form_frame,
-            suggestions_list=self.app.history_manager.get_suggestions("location_block"),
-            width=250,
-            app_instance=self.app, history_key="location_block")
-        self.block_input.grid(row=2, column=1, padx=15, pady=10, sticky='w')
-        
-        # --- Buttons ---
+        ctk.CTkLabel(info_frame,
+            text="ℹ️  Bot automatically detects your District & Block from saved settings.\n"
+                 "Pehle Settings > Location Data > 'Scrape Now' se data sync karein.\n"
+                 "Browser launch hone ke baad aapko User ID & Password manual enter karna hoga.",
+            font=ctk.CTkFont(size=12),
+            text_color=("gray40", "gray80"),
+            wraplength=650, justify="left",
+        ).pack(padx=15, pady=10)
+
+        # --- Launch Button ---
         btn_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         btn_frame.pack(pady=20)
-        
-        self.save_btn = ctk.CTkButton(btn_frame, text="💾 Save Location", command=self.save_credentials, fg_color="gray", font=ctk.CTkFont(weight="bold"))
-        self.save_btn.pack(side='left', padx=10)
-        
-        self.login_btn = ctk.CTkButton(btn_frame, text="🚀 Launch & Navigate", command=self.run_login_thread, fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["btn_start_hover"], font=ctk.CTkFont(weight="bold"))
-        self.login_btn.pack(side='left', padx=10)
-        
-        # Info Note
-        note_label = ctk.CTkLabel(self.main_frame, text="Note: This will select District & Block automatically.\nYou must enter User ID & Password manually.", text_color="orange", font=ctk.CTkFont(size=12))
-        note_label.pack(pady=10)
 
-        self.status_label = ctk.CTkLabel(self.main_frame, text="Ready to automate", text_color="gray")
+        self.login_btn = ctk.CTkButton(
+            btn_frame, text="🚀 Launch & Navigate",
+            command=self.run_login_thread,
+            fg_color=config.COLORS["btn_start"],
+            hover_color=config.COLORS["btn_start_hover"],
+            font=ctk.CTkFont(weight="bold", size=14),
+            height=40, width=200,
+        )
+        self.login_btn.pack()
+
+        # Status
+        self.status_label = ctk.CTkLabel(self.main_frame, text="Ready to automate", text_color="gray", font=ctk.CTkFont(size=12))
         self.status_label.pack(pady=5)
-        
-        self.load_credentials()
 
     @staticmethod
     def _get_current_financial_year():
@@ -89,53 +72,98 @@ class LoginAutomationTab(BaseAutomationTab):
         Indian FY runs from April to March."""
         now = datetime.now()
         year = now.year
-        # Before April (Jan-Mar), FY is previous year - current year
         if now.month < 4:
             return f"{year - 1}-{year}"
         else:
             return f"{year}-{year + 1}"
 
-    def get_creds_path(self):
-        # ---- Lazy imports ----
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select, WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.page import PageMargins
-        from openpyxl.drawing.image import Image as XLImage
-        import openpyxl
-        from selenium import webdriver
+    def _auto_detect_location(self):
+        """Auto-detect District and Block from history_manager (server-synced data)."""
+        hm = self.app.history_manager
 
-        if hasattr(self.app, 'get_data_path'): return self.app.get_data_path('user_location_pref.json')
-        return 'user_location_pref.json'
+        # Get from history suggestions
+        dist_suggestions = hm.get_suggestions("location_district")
+        block_suggestions = hm.get_suggestions("location_block")
 
-    def save_credentials(self):
-        district = self.district_input.get().strip()
-        block = self.block_input.get().strip()
-        data = {"district": district, "block": block}
-        try:
-            with open(self.get_creds_path(), 'w') as f:
-                json.dump(data, f)
-            # Also save to shared history so Settings data is updated
-            if district:
-                self.app.update_history("location_district", district)
-            if block:
-                self.app.update_history("location_block", block)
-            messagebox.showinfo("Success", "Location Preferences Saved!")
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not save: {str(e)}")
+        # Also check license_info (server-synced) as fallback
+        lic = self.app.license_info if hasattr(self.app, 'license_info') else {}
+        server_dist = (lic.get('user_district') or '').strip().upper()
+        server_block = (lic.get('user_block') or '').strip().upper()
 
-    def load_credentials(self):
-        path = self.get_creds_path()
-        if os.path.exists(path):
-            try:
-                with open(path, 'r') as f:
-                    data = json.load(f)
-                    self.district_input.delete(0, tk.END); self.district_input.insert(0, data.get("district", ""))
-                    self.block_input.delete(0, tk.END); self.block_input.insert(0, data.get("block", ""))
-            except Exception as e: logger.debug("LoginAutomation: Could not load saved credentials: %s", e)
+        # Use first suggestion as default, fallback to server data
+        self.district = dist_suggestions[0] if dist_suggestions else (server_dist or "")
+        self.block = block_suggestions[0] if block_suggestions else (server_block or "")
+
+        # Ensure they're saved in history as well (sync from server if needed)
+        if server_dist and server_dist not in dist_suggestions:
+            hm.save_entry("location_district", server_dist)
+            if not self.district:
+                self.district = server_dist
+        if server_block and server_block not in block_suggestions:
+            hm.save_entry("location_block", server_block)
+            if not self.block:
+                self.block = server_block
+
+        # Build info card showing detected values
+        loc_frame = ctk.CTkFrame(self.main_frame, fg_color=("#F0FDF4", "#0F2A1D"), corner_radius=8,
+                                 border_width=1, border_color=("#BBF7D0", "#166534"))
+        loc_frame.pack(fill='x', padx=10, pady=(0, 5))
+
+        inner = ctk.CTkFrame(loc_frame, fg_color="transparent")
+        inner.pack(padx=15, pady=10)
+
+        ctk.CTkLabel(inner, text="✅  Auto-Detected Location",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color=("#166534", "#4ADE80")).pack(anchor="w")
+
+        # FY row
+        fy_row = ctk.CTkFrame(inner, fg_color="transparent")
+        fy_row.pack(fill="x", pady=(4, 2))
+        ctk.CTkLabel(fy_row, text=f"🗓️  Financial Year:  ",
+                     font=ctk.CTkFont(size=12),
+                     text_color=("gray50", "gray60")).pack(side="left")
+        ctk.CTkLabel(fy_row, text=self.current_financial_year,
+                     font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color=("#166534", "#86EFAC")).pack(side="left")
+
+        # District row
+        dist_row = ctk.CTkFrame(inner, fg_color="transparent")
+        dist_row.pack(fill="x", pady=2)
+        ctk.CTkLabel(dist_row, text=f"📍  District:  ",
+                     font=ctk.CTkFont(size=12),
+                     text_color=("gray50", "gray60")).pack(side="left")
+        if self.district:
+            ctk.CTkLabel(dist_row, text=self.district,
+                         font=ctk.CTkFont(size=12, weight="bold"),
+                         text_color=("#166534", "#86EFAC")).pack(side="left")
+        else:
+            ctk.CTkLabel(dist_row, text="Not set — scrape data first",
+                         font=ctk.CTkFont(size=12),
+                         text_color=("#DC2626", "#F87171")).pack(side="left")
+
+        # Block row
+        block_row = ctk.CTkFrame(inner, fg_color="transparent")
+        block_row.pack(fill="x", pady=2)
+        ctk.CTkLabel(block_row, text=f"📦  Block:  ",
+                     font=ctk.CTkFont(size=12),
+                     text_color=("gray50", "gray60")).pack(side="left")
+        if self.block:
+            ctk.CTkLabel(block_row, text=self.block,
+                         font=ctk.CTkFont(size=12, weight="bold"),
+                         text_color=("#166534", "#86EFAC")).pack(side="left")
+        else:
+            ctk.CTkLabel(block_row, text="Not set — scrape data first",
+                         font=ctk.CTkFont(size=12),
+                         text_color=("#DC2626", "#F87171")).pack(side="left")
+
+        # Note
+        if not self.district or not self.block:
+            ctk.CTkLabel(loc_frame,
+                text="⚠️  Location data nahi mila. Pehle Settings > Location Data > 'Scrape from Website' se data sync karein.",
+                font=ctk.CTkFont(size=11),
+                text_color=("#DC2626", "#F87171"),
+                wraplength=600, justify="left",
+            ).pack(padx=15, pady=(0, 8), anchor="w")
 
     def run_login_thread(self):
         t = threading.Thread(target=self.run_login_automation)
@@ -153,12 +181,25 @@ class LoginAutomationTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        fin_year = self.current_financial_year  # Auto-calculated, no user input needed
-        district = self.district_input.get().strip()
-        block = self.block_input.get().strip()
-        
+
+        fin_year = self.current_financial_year
+
+        # Re-read from history_manager on each run (in case user scraped data after opening this tab)
+        hm = self.app.history_manager
+        dist_suggestions = hm.get_suggestions("location_district")
+        block_suggestions = hm.get_suggestions("location_block")
+        lic = self.app.license_info if hasattr(self.app, 'license_info') else {}
+        server_dist = (lic.get('user_district') or '').strip().upper()
+        server_block = (lic.get('user_block') or '').strip().upper()
+
+        district = dist_suggestions[0] if dist_suggestions else (server_dist or "")
+        block = block_suggestions[0] if block_suggestions else (server_block or "")
+
         if not (district and block):
-            messagebox.showwarning("Missing Info", "Please enter District and Block name")
+            messagebox.showwarning("Missing Data",
+                "District ya Block data nahi mila.\n\n"
+                "Pehle Settings > Location Data > 'Scrape from Website' se data sync karein,\n"
+                "ya Settings > Location Data mein manually add karein.")
             return
 
         try:
@@ -170,11 +211,11 @@ class LoginAutomationTab(BaseAutomationTab):
             url = "https://vbgramgde2.dord.gov.in/VBGRAMG/Login.aspx?&level=HomePO&state_code=34"
             driver.get(url)
             wait = WebDriverWait(driver, 25)
-            
+
             # --- 1. Select Dropdowns ---
             self.update_status(f"Status: Selecting Financial Year ({fin_year})...")
             self._safe_select(wait, "//select[contains(@id, 'ddl_FinYr')]", fin_year)
-            
+
             self.update_status(f"Status: Finding District '{district}'...")
             self._safe_select(wait, "//select[contains(@id, 'ddl_District')]", district, wait_for_options=True)
 
@@ -183,7 +224,6 @@ class LoginAutomationTab(BaseAutomationTab):
 
             # --- Wait for Page Refresh ---
             self.update_status("Status: Waiting for page refresh...")
-            # Block select karne ke baad page reload hota hai, uska wait karein
             try:
                 WebDriverWait(driver, 10).until(
                     lambda d: d.execute_script('return document.readyState') == 'complete'
@@ -191,11 +231,8 @@ class LoginAutomationTab(BaseAutomationTab):
             except TimeoutException:
                 pass
 
-            # --- Process Complete ---
-            # Yahan se Maine Toast Notifications hata diye hain taaki koi crash na ho.
-            # Sirf text status update hoga.
-            self.update_status("Status: Ready for Login")
-            
+            self.update_status("Status: Ready for Login — enter User ID & Password manually")
+
         except Exception as e:
             self.update_status("Status: Error occurred")
             messagebox.showerror("Automation Error", f"Error: {str(e)}")
@@ -239,7 +276,6 @@ class LoginAutomationTab(BaseAutomationTab):
             self.status_label.configure(text=text)
         except Exception:
             pass
-        # 2. Update Global App Footer
         try:
             clean_text = text.replace("Status: ", "")
             self.app.set_status(clean_text)

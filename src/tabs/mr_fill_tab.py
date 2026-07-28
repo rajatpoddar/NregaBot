@@ -7,8 +7,8 @@ from datetime import datetime
 from fpdf import FPDF
 from src import config
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
-from src.utils import get_logger
+
+from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
@@ -72,14 +72,10 @@ class MrFillTab(BaseAutomationTab):
         panchayat_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         panchayat_frame.grid(row=0, column=0, sticky='ew', padx=15, pady=(10,0))
         ctk.CTkLabel(panchayat_frame, text="Panchayat Name", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
-        self.panchayat_entry = AutocompleteEntry(
-            panchayat_frame, 
-            textvariable=self.panchayat_var, # Link to variable
-            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-            app_instance=self.app,
-            history_key="location_panchayat"
-        )
-        self.panchayat_entry.pack(fill='x', pady=(5,0))
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(panchayat_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.pack(fill='x', pady=(5,0))
         ctk.CTkLabel(panchayat_frame, text="e.g., Palojori (skip if using GP login)", text_color="gray50").pack(anchor='w')
         
         # Holiday Columns Entry
@@ -164,27 +160,18 @@ class MrFillTab(BaseAutomationTab):
         self.work_key_text.insert("1.0", workcodes)
         self.work_key_text.configure(state="disabled")
         
-        self.app.log_message(self.log_display, f"Loaded {len(workcodes.splitlines())} workcodes and panchayat '{panchayat_name}' from Dashboard Report.", "info")
-    # --- END NEW METHOD ---
+        self.log_info(f"Loaded {len(workcodes.splitlines())} workcodes and panchayat '{panchayat_name}' from Dashboard Report.")    # --- END NEW METHOD ---
     
     # --- Save and Load Inputs ---
     def _save_inputs(self, cfg):
-        """Saves the current UI inputs to a JSON file."""
+        """Saves the current UI inputs to DB."""
         try:
-            with open(self.config_file, 'w') as f: 
-                json.dump(cfg, f, indent=4)
+            self.app.history_manager.save_tab_inputs_batch("mr_fill", cfg)
         except Exception as e: 
-            self.app.log_message(self.log_display, f"Could not save inputs: {e}", "warning")
-
+            self.log_warning(f"Could not save inputs: {e}")
     def _load_inputs(self):
-        """Loads inputs from the JSON file on startup."""
-        saved_data = {}
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, 'r') as f: 
-                    saved_data = json.load(f)
-            except (json.JSONDecodeError, IOError) as e: 
-                self.app.log_message(self.log_display, f"Could not load inputs: {e}", "warning")
+        """Loads inputs from DB on startup."""
+        saved_data = self.app.history_manager.get_tab_inputs("mr_fill")
         
         # Set values from saved_data, falling back to defaults
         self.panchayat_var.set(saved_data.get("panchayat_name", ""))
@@ -205,7 +192,7 @@ class MrFillTab(BaseAutomationTab):
         """Enables/disables UI elements based on automation state."""
         self.set_common_ui_state(running) # Handles Start, Stop, Reset
         state = "disabled" if running else "normal"
-        self.panchayat_entry.configure(state=state)
+        self.panchayat_menu.configure(state=state)
         self.holiday_cols_entry.configure(state=state)
         self.manual_mode_checkbox.configure(state=state)
         self.work_key_text.configure(state=state)
@@ -234,8 +221,7 @@ class MrFillTab(BaseAutomationTab):
             for item in self.results_tree.get_children(): self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0)
-            self.app.log_message(self.log_display, "Form has been reset.")
-            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
     def start_automation(self) -> None:
         """Validates inputs and starts the automation thread."""
         
@@ -276,8 +262,7 @@ class MrFillTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
         self.app.clear_log(self.log_display)
-        self.app.log_message(self.log_display, "Starting MR Fill (Attendance) processing...")
-        self.app.after(0, self.app.set_status, "Running MR Fill...")
+        self.log_info("Starting MR Fill (Attendance) processing...")        self.app.after(0, self.app.set_status, "Running MR Fill...")
         
         # --- 1. Get inputs from the passed cfg dictionary ---
         panchayat_name = cfg["panchayat_name"]
@@ -311,11 +296,9 @@ class MrFillTab(BaseAutomationTab):
                 self._process_single_work_code(driver, wait, work_key, holiday_cols, is_manual_mode, panchayat_name)
                 
             if not self.app.stop_events[self.automation_key].is_set(): 
-                messagebox.showinfo("Completed", "Automation finished! Check the 'Results' tab for details.")
-        
+                self.log_info("📊 Automation finished. Check the 'Results' tab for details.")        
         except Exception as e:
-            self.app.log_message(self.log_display, f"A critical error occurred: {e}", "error")
-            messagebox.showerror("MR Fill Error", f"An error occurred: {e}")
+            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("MR Fill Error", f"An error occurred: {e}")
         
         finally:
             self.app.after(0, self.set_ui_state, False)
@@ -350,11 +333,9 @@ class MrFillTab(BaseAutomationTab):
             match = next((opt.text for opt in select.options if panchayat_name.strip().lower() in opt.text.lower()), None)
             if match:
                 select.select_by_visible_text(match)
-                self.app.log_message(self.log_display, f"Selected Panchayat: {match}", "info")
-                time.sleep(2) # Wait for page refresh
+                self.log_info(f"Selected Panchayat: {match}")                time.sleep(2) # Wait for page refresh
             else:
-                self.app.log_message(self.log_display, f"Panchayat '{panchayat_name}' not found in list.", "warning")
-        except Exception:
+                self.log_warning(f"Panchayat '{panchayat_name}' not found in list.")        except Exception:
             pass # Ignore errors for GP login scenarios
 
     def _process_single_work_code(self, driver, wait, work_key, holiday_cols, is_manual_mode, panchayat_name):
@@ -482,8 +463,7 @@ class MrFillTab(BaseAutomationTab):
             # --- 6. Submission ---
             if is_manual_mode:
                 self.app.after(0, self.app.set_status, "Manual Mode: Paused")
-                self.app.log_message(self.log_display, f"Manual Mode: Fill details for MR {current_mr_no} and click Save.", "info")
-                WebDriverWait(driver, 600).until(EC.alert_is_present()).accept()
+                self.log_info(f"Manual Mode: Fill details for MR {current_mr_no} and click Save.")                WebDriverWait(driver, 600).until(EC.alert_is_present()).accept()
             else:
                 self.app.after(0, self.app.set_status, "Saving...")
                 driver.execute_script("document.getElementById('btnsave').click();")
@@ -556,6 +536,7 @@ class MrFillTab(BaseAutomationTab):
         """Logs the result to the log display and the results tree."""
         # Clean up message for display
         details = msg.replace("\n", " ").replace("\r", " ").strip()
+        work_key = truncate_workcode(work_key)
         
         # Determine Tag and Log Level
         level = "error"
@@ -572,8 +553,7 @@ class MrFillTab(BaseAutomationTab):
 
         timestamp = datetime.now().strftime("%H:%M:%S")
         
-        self.app.log_message(self.log_display, f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}", level=level)
-        
+        self.log_info(f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}", level=level)        
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_key, mr_no, status.upper(), details, timestamp), tags=(tag,)))
 
     def export_report(self):

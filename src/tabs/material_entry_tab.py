@@ -18,8 +18,9 @@ from selenium.common.exceptions import (
 )
 
 from src import config
+from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
-from .autocomplete_widget import AutocompleteEntry
+
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 PROFILES_FILE = os.path.join(os.path.dirname(__file__), "..", "assets", "material_profiles.json")
@@ -175,14 +176,10 @@ class MaterialEntryTab(BaseAutomationTab):
         input_frame.grid_columnconfigure(3, weight=1)
 
         ctk.CTkLabel(input_frame, text="Panchayat (For Block Login):").grid(row=0, column=0, padx=15, pady=5, sticky="w")
-        self.panchayat_entry = AutocompleteEntry(
-            input_frame,
-            placeholder_text="Leave blank for GP Login",
-            suggestions_list=self.app.history_manager.get_suggestions("location_panchayat"),
-            app_instance=self.app,
-            history_key="location_panchayat"
-        )
-        self.panchayat_entry.grid(row=0, column=1, columnspan=3, padx=15, pady=5, sticky="ew")
+        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        self.panchayat_var = ctk.StringVar()
+        self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu.grid(row=0, column=1, columnspan=3, padx=15, pady=5, sticky="ew")
 
         ctk.CTkLabel(input_frame, text="Work Category:").grid(row=1, column=0, padx=15, pady=5, sticky="w")
         work_category_options = [
@@ -474,7 +471,7 @@ class MaterialEntryTab(BaseAutomationTab):
                 tasks.append({"work_key": parts[0], "bill_no": parts[1]})
 
         return {
-            "panchayat": self.panchayat_entry.get().strip(),
+            "panchayat": self.panchayat_var.get().strip(),
             "work_category": self.work_category_var.get(),
             "vendor_code": self.vendor_code_entry.get().strip(),
             "bill_date": self.bill_date_entry.get().strip(),
@@ -518,14 +515,16 @@ class MaterialEntryTab(BaseAutomationTab):
         try:
             for i, task in enumerate(inputs["tasks"]):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.app.log_message(self.log_display, "\n⚠ Automation stopped by user.", "warning")
-                    break
+                    self.log_warning("
+⚠ Automation stopped by user.")                    break
 
                 work_key = task['work_key']
                 bill_no = task['bill_no']
                 self.update_status(f"Processing {work_key} (Bill {bill_no})", (i + 1) / total_tasks)
-                self.app.log_message(self.log_display, f"\n{'=' * 60}\n▶ Processing Work Key: {work_key} | Bill: {bill_no}\n{'=' * 60}")
-
+                self.log_info(f"
+{'=' * 60}
+▶ Processing Work Key: {work_key} | Bill: {bill_no}
+{'=' * 60}")
                 try:
                     driver.get(config.MATERIAL_ENTRY_CONFIG["url"])
                     # Wait for page to fully load before interacting
@@ -537,20 +536,16 @@ class MaterialEntryTab(BaseAutomationTab):
                         try:
                             panchayat_dd = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
                             self._select_by_text_case_insensitive(Select(panchayat_dd), inputs['panchayat'])
-                            self.app.log_message(self.log_display, f"✓ Panchayat selected: {inputs['panchayat']}")
-                            time.sleep(1.5)  # Brief wait for postback to begin
+                            self.log_info(f"✓ Panchayat selected: {inputs['panchayat']}")                            time.sleep(1.5)  # Brief wait for postback to begin
                         except TimeoutException:
-                            self.app.log_message(self.log_display, "ℹ Panchayat dropdown not found (GP login assumed)")
-
+                            self.log_info("ℹ Panchayat dropdown not found (GP login assumed)")
                     # 2. Work Category — re-fetch after panchayat postback to avoid stale
-                    self.app.log_message(self.log_display, "▶ Selecting Work Category...")
-                    for attempt in range(3):
+                    self.log_info("▶ Selecting Work Category...")                    for attempt in range(3):
                         try:
                             cat_dd_el = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
                             wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
                             Select(cat_dd_el).select_by_visible_text(inputs['work_category'])
-                            self.app.log_message(self.log_display, f"✓ Category: {inputs['work_category']}")
-                            break
+                            self.log_info(f"✓ Category: {inputs['work_category']}")                            break
                         except StaleElementReferenceException:
                             if attempt == 2:
                                 raise
@@ -558,8 +553,7 @@ class MaterialEntryTab(BaseAutomationTab):
                     time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 3. Work Code Search
-                    self.app.log_message(self.log_display, f"▶ Searching Work Key: {work_key}...")
-                    for attempt in range(3):
+                    self.log_info(f"▶ Searching Work Key: {work_key}...")                    for attempt in range(3):
                         try:
                             search_wk = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txtwrksearchkey")))
                             search_wk.clear()
@@ -581,8 +575,7 @@ class MaterialEntryTab(BaseAutomationTab):
                             for opt in wc_dd.options:
                                 if work_key in opt.text:
                                     wc_dd.select_by_visible_text(opt.text)
-                                    self.app.log_message(self.log_display, f"✓ Work code selected: {opt.text}")
-                                    found_wc = True
+                                    self.log_info(f"✓ Work code selected: {opt.text}")                                    found_wc = True
                                     break
                             break
                         except StaleElementReferenceException:
@@ -597,8 +590,7 @@ class MaterialEntryTab(BaseAutomationTab):
                     time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 4. Vendor Code
-                    self.app.log_message(self.log_display, f"▶ Searching Vendor: {inputs['vendor_code']}...")
-                    for attempt in range(3):
+                    self.log_info(f"▶ Searching Vendor: {inputs['vendor_code']}...")                    for attempt in range(3):
                         try:
                             vendor_txt = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txttinsearch")))
                             vendor_txt.clear()
@@ -617,8 +609,7 @@ class MaterialEntryTab(BaseAutomationTab):
                             vendor_dd = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlVendor"))))
                             if len(vendor_dd.options) > 1:
                                 vendor_dd.select_by_index(1)
-                                self.app.log_message(self.log_display, f"✓ Vendor selected: {vendor_dd.first_selected_option.text}")
-                                vendor_found = True
+                                self.log_info(f"✓ Vendor selected: {vendor_dd.first_selected_option.text}")                                vendor_found = True
                             break
                         except StaleElementReferenceException:
                             if attempt == 2:
@@ -631,8 +622,7 @@ class MaterialEntryTab(BaseAutomationTab):
                     time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 5. Bill Details
-                    self.app.log_message(self.log_display, "▶ Entering Bill Details...")
-                    bill_input = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_txtBill_no")
+                    self.log_info("▶ Entering Bill Details...")                    bill_input = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_txtBill_no")
                     bill_input.clear()
                     bill_input.send_keys(bill_no)
 
@@ -640,12 +630,10 @@ class MaterialEntryTab(BaseAutomationTab):
                     date_input.clear()
                     date_input.send_keys(inputs['bill_date'])
                     date_input.send_keys(Keys.TAB)
-                    self.app.log_message(self.log_display, f"✓ Bill No: {bill_no}, Date: {inputs['bill_date']}")
-                    time.sleep(1.5)  # Brief wait for postback to begin
+                    self.log_info(f"✓ Bill No: {bill_no}, Date: {inputs['bill_date']}")                    time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 6. Fill Materials
-                    self.app.log_message(self.log_display, "▶ Filling Materials...")
-                    filled_count = 0
+                    self.log_info("▶ Filling Materials...")                    filled_count = 0
                     for mat in inputs['materials']:
                         try:
                             xpath = f"//table[@id='ctl00_ContentPlaceHolder1_gvData']//tr[.//span[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{mat['name'].lower()}')]]"
@@ -664,13 +652,10 @@ class MaterialEntryTab(BaseAutomationTab):
                             gst_dd = Select(mat_row.find_element(By.XPATH, ".//select[contains(@id, '_gst_slab')]"))
                             gst_dd.select_by_visible_text(mat['gst'])
 
-                            self.app.log_message(self.log_display, f"  ✓ {mat['name']}: Rate={mat['rate']}, Qty={mat['qty']}, GST={mat['gst']}%")
-                            filled_count += 1
+                            self.log_info(f"  ✓ {mat['name']}: Rate={mat['rate']}, Qty={mat['qty']}, GST={mat['gst']}%")                            filled_count += 1
                         except NoSuchElementException:
-                            self.app.log_message(self.log_display, f"  ⚠ Material '{mat['name']}' not found in table", "warning")
-                        except (StaleElementReferenceException, ElementNotInteractableException) as e:
-                            self.app.log_message(self.log_display, f"  ⚠ Error filling '{mat['name']}': {str(e)}", "warning")
-
+                            self.log_warning(f"  ⚠ Material '{mat['name']}' not found in table")                        except (StaleElementReferenceException, ElementNotInteractableException) as e:
+                            self.log_warning(f"  ⚠ Error filling '{mat['name']}': {str(e)}")
                     if filled_count == 0:
                         self._log_result(work_key, bill_no, "Failed", "No materials could be filled")
                         fail_count += 1
@@ -679,8 +664,7 @@ class MaterialEntryTab(BaseAutomationTab):
                     time.sleep(1.5)  # Brief wait for postback to begin
 
                     # 7. Checkbox & Submit
-                    self.app.log_message(self.log_display, "▶ Confirming and Saving...")
-                    checkbox = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_CheckBox1")
+                    self.log_info("▶ Confirming and Saving...")                    checkbox = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_CheckBox1")
                     if not checkbox.is_selected():
                         driver.execute_script("arguments[0].click();", checkbox)
 
@@ -693,43 +677,35 @@ class MaterialEntryTab(BaseAutomationTab):
                         alert = WebDriverWait(driver, 3).until(EC.alert_is_present())
                         alert_text = alert.text
                         alert.accept()
-                        self.app.log_message(self.log_display, f"ℹ Alert: {alert_text}", "warning")
-                    except TimeoutException:
+                        self.log_warning(f"ℹ Alert: {alert_text}")                    except TimeoutException:
                         pass
 
                     # 9. Check Success
                     try:
                         success_msg = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_lblMsg"))).text
                         if "successfully" in success_msg.lower() or "saved" in success_msg.lower():
-                            self.app.log_message(self.log_display, f"✅ SUCCESS: {success_msg}")
-                            self._log_result(work_key, bill_no, "Success", success_msg)
+                            self.log_info(f"✅ SUCCESS: {success_msg}")                            self._log_result(work_key, bill_no, "Success", success_msg)
                             success_count += 1
                         else:
-                            self.app.log_message(self.log_display, f"⚠ Unexpected message: {success_msg}", "warning")
-                            self._log_result(work_key, bill_no, "Warning", success_msg)
+                            self.log_warning(f"⚠ Unexpected message: {success_msg}")                            self._log_result(work_key, bill_no, "Warning", success_msg)
                     except TimeoutException:
-                        self.app.log_message(self.log_display, "⚠ Could not verify success message", "warning")
-                        self._log_result(work_key, bill_no, "Unknown", "No confirmation message found")
+                        self.log_warning("⚠ Could not verify success message")                        self._log_result(work_key, bill_no, "Unknown", "No confirmation message found")
 
                 except TimeoutException as e:
                     error_msg = f"Timeout: Element not found - {str(e)}"
-                    self.app.log_message(self.log_display, f"❌ {error_msg}", "error")
-                    self._log_result(work_key, bill_no, "Failed", error_msg)
+                    self.log_error(f"❌ {error_msg}")                    self._log_result(work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
                 except NoSuchElementException as e:
                     error_msg = f"Element not found: {str(e)}"
-                    self.app.log_message(self.log_display, f"❌ {error_msg}", "error")
-                    self._log_result(work_key, bill_no, "Failed", error_msg)
+                    self.log_error(f"❌ {error_msg}")                    self._log_result(work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
                 except WebDriverException as e:
                     error_msg = f"WebDriver error: {str(e)}"
-                    self.app.log_message(self.log_display, f"❌ {error_msg}", "error")
-                    self._log_result(work_key, bill_no, "Failed", error_msg)
+                    self.log_error(f"❌ {error_msg}")                    self._log_result(work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
                 except Exception as e:
                     error_msg = f"Unexpected error: {str(e)}"
-                    self.app.log_message(self.log_display, f"❌ {error_msg}", "error")
-                    self._log_result(work_key, bill_no, "Failed", error_msg)
+                    self.log_error(f"❌ {error_msg}")                    self._log_result(work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
 
         except Exception as e:
@@ -739,13 +715,14 @@ class MaterialEntryTab(BaseAutomationTab):
             self.app.after(0, self.set_common_ui_state, False)
             self.update_status("Task Finished", 1.0)
             summary = f"Material Entry Automation Complete!\n\n✅ Success: {success_count}\n❌ Failed: {fail_count}\n📊 Total: {total_tasks}"
-            self.app.log_message(self.log_display, f"\n{'=' * 60}\n{summary}\n{'=' * 60}")
-            messagebox.showinfo("Complete", summary, parent=self)
-
+            self.log_info(f"
+{'=' * 60}
+{summary}
+{'=' * 60}")            self.log_info(f"📊 {summary}")
     def _log_result(self, work_key, bill_no, status, details):
         ts = datetime.now().strftime("%H:%M:%S")
         tags = ('success',) if 'success' in status.lower() else ('failed',) if 'failed' in status.lower() else ()
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(ts, work_key, bill_no, status, details), tags=tags))
+        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(ts, truncate_workcode(work_key), bill_no, status, details), tags=tags))
     def reset_ui(self) -> None:
         super().reset_ui()
         self.vendor_code_entry.delete(0, "end")
