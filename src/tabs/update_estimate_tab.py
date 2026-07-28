@@ -189,7 +189,8 @@ class UpdateEstimateTab(BaseAutomationTab):
                     self.app.log_message(self.log_display, "⏹️ Automation stopped by user.", "warning"); break
                 
                 pct = i / total_tasks * 100
-                self.log_info(f"  🔄 [{i}/{total_tasks}] Processing: {truncate_workcode(work_code)} ({pct:.0f}%)")                self.app.after(0, self.update_status, f"Processing {i}/{total_tasks}: {work_code}", (i / total_tasks))
+                self.log_info(f"  🔄 [{i}/{total_tasks}] Processing: {truncate_workcode(work_code)} ({pct:.0f}%)")
+                self.app.after(0, self.update_status, f"Processing {i}/{total_tasks}: {work_code}", (i / total_tasks))
                 self._process_single_task(driver, wait, work_code, outcome_value)
 
             if not self.app.stop_events[self.automation_key].is_set():
@@ -204,10 +205,12 @@ class UpdateEstimateTab(BaseAutomationTab):
                             success_count += 1
                         elif 'fail' in st or 'error' in st:
                             fail_count += 1
-                self.log_info(f"
-{'='*50}")                self.log_info(f"📊 Update Estimate: ✅ {success_count} updated, ❌ {fail_count} failed (of {total_tasks} total)")                self.log_info(f"{'='*50}")
+                self.log_info(f"{'='*50}")
+                self.log_info(f"📊 Update Estimate: ✅ {success_count} updated, ❌ {fail_count} failed (of {total_tasks} total)")
+                self.log_info(f"{'='*50}")
         except Exception as e:
-            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("Automation Error", f"An unexpected error occurred: {e}")
+            self.log_error(f"A critical error occurred: {e}")
+            messagebox.showerror("Automation Error", f"An unexpected error occurred: {e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Finished", 1.0)
@@ -309,7 +312,8 @@ class UpdateEstimateTab(BaseAutomationTab):
         timestamp = datetime.now().strftime("%H:%M:%S")
         log_level = "error" if is_error else "success"
         work_code = truncate_workcode(work_code)
-        self.log_info(f"'{work_code}' - {status.upper()}: {details}", level=log_level)        tags = ('failed',) if is_error else ()
+        self.log_info(f"'{work_code}' - {status.upper()}: {details}", level=log_level)
+        tags = ('failed',) if is_error else ()
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=(work_code, outcome, status.upper(), details, timestamp), tags=tags))
     
     def export_report(self):

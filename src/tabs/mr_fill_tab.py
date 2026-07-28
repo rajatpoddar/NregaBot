@@ -221,7 +221,8 @@ class MrFillTab(BaseAutomationTab):
             for item in self.results_tree.get_children(): self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0)
-            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")
+            self.app.after(0, self.app.set_status, "Ready")
     def start_automation(self) -> None:
         """Validates inputs and starts the automation thread."""
         
@@ -262,7 +263,8 @@ class MrFillTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
         self.app.clear_log(self.log_display)
-        self.log_info("Starting MR Fill (Attendance) processing...")        self.app.after(0, self.app.set_status, "Running MR Fill...")
+        self.log_info("Starting MR Fill (Attendance) processing...")
+        self.app.after(0, self.app.set_status, "Running MR Fill...")
         
         # --- 1. Get inputs from the passed cfg dictionary ---
         panchayat_name = cfg["panchayat_name"]
@@ -298,7 +300,8 @@ class MrFillTab(BaseAutomationTab):
             if not self.app.stop_events[self.automation_key].is_set(): 
                 self.log_info("📊 Automation finished. Check the 'Results' tab for details.")        
         except Exception as e:
-            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("MR Fill Error", f"An error occurred: {e}")
+            self.log_error(f"A critical error occurred: {e}")
+            messagebox.showerror("MR Fill Error", f"An error occurred: {e}")
         
         finally:
             self.app.after(0, self.set_ui_state, False)
@@ -333,9 +336,11 @@ class MrFillTab(BaseAutomationTab):
             match = next((opt.text for opt in select.options if panchayat_name.strip().lower() in opt.text.lower()), None)
             if match:
                 select.select_by_visible_text(match)
-                self.log_info(f"Selected Panchayat: {match}")                time.sleep(2) # Wait for page refresh
+                self.log_info(f"Selected Panchayat: {match}")
+                time.sleep(2) # Wait for page refresh
             else:
-                self.log_warning(f"Panchayat '{panchayat_name}' not found in list.")        except Exception:
+                self.log_warning(f"Panchayat '{panchayat_name}' not found in list.")
+        except Exception:
             pass # Ignore errors for GP login scenarios
 
     def _process_single_work_code(self, driver, wait, work_key, holiday_cols, is_manual_mode, panchayat_name):
@@ -463,7 +468,8 @@ class MrFillTab(BaseAutomationTab):
             # --- 6. Submission ---
             if is_manual_mode:
                 self.app.after(0, self.app.set_status, "Manual Mode: Paused")
-                self.log_info(f"Manual Mode: Fill details for MR {current_mr_no} and click Save.")                WebDriverWait(driver, 600).until(EC.alert_is_present()).accept()
+                self.log_info(f"Manual Mode: Fill details for MR {current_mr_no} and click Save.")
+                WebDriverWait(driver, 600).until(EC.alert_is_present()).accept()
             else:
                 self.app.after(0, self.app.set_status, "Saving...")
                 driver.execute_script("document.getElementById('btnsave').click();")

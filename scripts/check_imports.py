@@ -80,7 +80,7 @@ if syntax_errors:
         print(f'  [{path}] {err}')
 
 # Save results to file
-with open('import_check_results.txt', 'w') as f:
+with open('docs/import_check_results.txt', 'w') as f:
     f.write(f'Results: {len(success)} OK, {len(errors)} ERRORS, {len(syntax_errors)} SYNTAX ERRORS\n\n')
     if errors:
         f.write('IMPORT/RUNTIME ERRORS:\n')
@@ -93,4 +93,4 @@ with open('import_check_results.txt', 'w') as f:
     if not errors and not syntax_errors:
         f.write('All imports passed!')
 
-print('\nResults saved to import_check_results.txt')
+print('\nResults saved to docs/import_check_results.txt')

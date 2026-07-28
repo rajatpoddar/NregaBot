@@ -151,7 +151,8 @@ class ResendRejectedWgTab(BaseAutomationTab):
         from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Running Resend Rejected WG...")
-        self.log_info("🚀 Starting Rejected Wagelist Automation...")        total_panchayats = 0
+        self.log_info("🚀 Starting Rejected Wagelist Automation...")
+        total_panchayats = 0
         
         try:
             driver = self.app.get_driver()
@@ -160,9 +161,11 @@ class ResendRejectedWgTab(BaseAutomationTab):
 
             driver.get(config.REJECTED_WL_CONFIG["RESEND_REJECTED_WG"])
             
-            self.log_info(f"Selecting Financial Year: {inputs['fin_year']}")            Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlstFinyear")))).select_by_value(inputs['fin_year'])
+            self.log_info(f"Selecting Financial Year: {inputs['fin_year']}")
+            Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlstFinyear")))).select_by_value(inputs['fin_year'])
             
-            self.log_info("Waiting for Panchayat list to populate...")            wait.until(EC.presence_of_element_located((By.XPATH, "//select[@id='ctl00_ContentPlaceHolder1_ddlpanch']/option[position()>1]")))
+            self.log_info("Waiting for Panchayat list to populate...")
+            wait.until(EC.presence_of_element_located((By.XPATH, "//select[@id='ctl00_ContentPlaceHolder1_ddlpanch']/option[position()>1]")))
 
             panchayat_dropdown_element = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddlpanch")
             panchayat_options = [opt.text for opt in Select(panchayat_dropdown_element).options if '--Select' not in opt.text]
@@ -170,7 +173,8 @@ class ResendRejectedWgTab(BaseAutomationTab):
             panchayats_to_process = []
             if inputs['process_all']:
                 panchayats_to_process = panchayat_options
-                self.log_info(f"Found {len(panchayats_to_process)} Panchayats to process.")            else:
+                self.log_info(f"Found {len(panchayats_to_process)} Panchayats to process.")
+            else:
                 if inputs['panchayat'] in panchayat_options:
                     panchayats_to_process = [inputs['panchayat']]
                     self.app.update_history("location_panchayat", inputs['panchayat'])
@@ -181,14 +185,17 @@ class ResendRejectedWgTab(BaseAutomationTab):
             total_panchayats = len(panchayats_to_process)
             for i, location_panchayat in enumerate(panchayats_to_process):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.log_warning("⏹️ Automation stopped by user.")                    break
+                    self.log_warning("⏹️ Automation stopped by user.")
+                    break
                 
                 pct = (i + 1) / total_panchayats * 100
-                self.log_info(f"  🔄 [{i+1}/{total_panchayats}] Panchayat: {location_panchayat} ({pct:.0f}%)")                self.app.after(0, self.update_status, f"Processing {i+1}/{total_panchayats}: {location_panchayat}", (i+1)/total_panchayats)
+                self.log_info(f"  🔄 [{i+1}/{total_panchayats}] Panchayat: {location_panchayat} ({pct:.0f}%)")
+                self.app.after(0, self.update_status, f"Processing {i+1}/{total_panchayats}: {location_panchayat}", (i+1)/total_panchayats)
                 self._process_single_panchayat(driver, wait, location_panchayat)
 
         except Exception as e:
-            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("Automation Error", f"An unexpected error occurred: {e}")
+            self.log_error(f"A critical error occurred: {e}")
+            messagebox.showerror("Automation Error", f"An unexpected error occurred: {e}")
         finally:
             # Count results from tree
             success_count = 0
@@ -210,9 +217,11 @@ class ResendRejectedWgTab(BaseAutomationTab):
             self.app.after(0, self.update_status, final_msg, 1.0)
             self.app.after(0, self.set_ui_state, False)
             if not stopped:
-                self.log_info(f"
-{'='*50}")                self.log_info(f"📊 Resend Rejected WG: ✅ {success_count} sent, ❌ {fail_count} failed, ⏭️ {skip_count} skipped (of {total_panchayats} panchayats)")                self.log_info(f"{'='*50}")            self.app.after(0, self.app.set_status, "Automation Finished")
-    
+                self.log_info(f"{'='*50}")
+            self.log_info(f"📊 Resend Rejected WG: ✅ {success_count} sent, ❌ {fail_count} failed, ⏭️ {skip_count} skipped (of {total_panchayats} panchayats)")
+            self.log_info(f"{'='*50}")
+            self.app.after(0, self.app.set_status, "Automation Finished")
+
     def _process_single_panchayat(self, driver, wait, location_panchayat):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -229,7 +238,8 @@ class ResendRejectedWgTab(BaseAutomationTab):
                 wait.until(EC.staleness_of(html_element))
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanch")))
             except TimeoutException:
-                self.log_error("   - ERROR: Page failed to load after selecting Panchayat. Server may be slow. Skipping.")                self._log_result(location_panchayat, "Failed", "Page load timeout")
+                self.log_error("   - ERROR: Page failed to load after selecting Panchayat. Server may be slow. Skipping.")
+                self._log_result(location_panchayat, "Failed", "Page load timeout")
                 driver.refresh()
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlstFinyear")))
                 return
@@ -239,12 +249,14 @@ class ResendRejectedWgTab(BaseAutomationTab):
             no_records_elements = driver.find_elements(By.XPATH, "//td[contains(text(), 'No Records Found')]")
 
             if no_records_elements:
-                self.log_info("   - Result: No records found to process.")                self._log_result(location_panchayat, "Skipped", "No records found")
+                self.log_info("   - Result: No records found to process.")
+                self._log_result(location_panchayat, "Skipped", "No records found")
                 return
 
             # If records exist, proceed
             generate_button = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_btn_go")))
-            self.log_info("   - Records found. Clicking 'Generate Wagelist'.")            generate_button.click()
+            self.log_info("   - Records found. Clicking 'Generate Wagelist'.")
+            generate_button.click()
 
             alert = wait.until(EC.alert_is_present())
             alert.accept()
@@ -253,13 +265,15 @@ class ResendRejectedWgTab(BaseAutomationTab):
             result_text = result_element.text.strip() if result_element.text else "No specific message returned."
             
             status = "Success" if "successfully" in result_text.lower() else "Info"
-            self.log_info(f"   - Result: {result_text}", "success" if status == "Success" else "info")            self._log_result(location_panchayat, status, result_text)
+            self.log_info(f"   - Result: {result_text}", "success" if status == "Success" else "info")
+            self._log_result(location_panchayat, status, result_text)
             
             time.sleep(1.5)  # Brief wait for postback to begin
 
         except Exception as e:
             error_msg = f"An unexpected error occurred: {str(e).splitlines()[0]}"
-            self.log_error(f"   - ERROR: {error_msg}")            self._log_result(location_panchayat, "Failed", error_msg)
+            self.log_error(f"   - ERROR: {error_msg}")
+            self._log_result(location_panchayat, "Failed", error_msg)
 
     def _log_result(self, panchayat, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")

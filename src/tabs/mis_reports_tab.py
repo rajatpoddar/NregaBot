@@ -241,7 +241,8 @@ class MisReportsTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        self.log_info("Attempting to solve CAPTCHA...")        captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
+        self.log_info("Attempting to solve CAPTCHA...")
+        captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
         captcha_text = wait.until(EC.presence_of_element_located((By.ID, captcha_label_id))).text
         match = re.search(r'(\d+)\s*([+\-*])\s*(\d+)', captcha_text)
         if not match: raise ValueError("Could not parse CAPTCHA expression.")
@@ -250,7 +251,8 @@ class MisReportsTab(BaseAutomationTab):
         if operator == '+': result = num1 + num2
         elif operator == '-': result = num1 - num2
         elif operator == '*': result = num1 * num2
-        self.log_info(f"Solved: {captcha_text.strip()} = {result}")        driver.find_element(By.ID, captcha_textbox_id).send_keys(str(result))
+        self.log_info(f"Solved: {captcha_text.strip()} = {result}")
+        driver.find_element(By.ID, captcha_textbox_id).send_keys(str(result))
         driver.find_element(By.ID, verify_button_id).click()
         return True
 
@@ -290,33 +292,43 @@ class MisReportsTab(BaseAutomationTab):
                     details = ""
                     
                     try:
-                        self.log_info("Navigating to portal and solving CAPTCHA...")                        driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+                        self.log_info("Navigating to portal and solving CAPTCHA...")
+                        driver.get(config.MIS_REPORTS_CONFIG["base_url"])
                         self._solve_captcha(driver, wait)
-                        self.log_info("CAPTCHA verified. Selecting state...")                        state_dropdown = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
+                        self.log_info("CAPTCHA verified. Selecting state...")
+                        state_dropdown = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
                         self._select_by_text_case_insensitive(Select(state_dropdown), inputs['state'])
                         wait.until(EC.presence_of_element_located((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
-                        self.log_info(f"Finding and scrolling to '{report_name}'...")                        report_link = wait.until(EC.presence_of_element_located((By.LINK_TEXT, report_name.strip())))
+                        self.log_info(f"Finding and scrolling to '{report_name}'...")
+                        report_link = wait.until(EC.presence_of_element_located((By.LINK_TEXT, report_name.strip())))
                         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", report_link)
                         time.sleep(1); report_link.click()
                         if "Aadhaar Status" in report_name:
-                            self.log_info("Handling special case, selecting State again...")                            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['state'].upper()))).click()
-                        self.log_info(f"Drilling down to District: {inputs['district']}")                        wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
+                            self.log_info("Handling special case, selecting State again...")
+                            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['state'].upper()))).click()
+                        self.log_info(f"Drilling down to District: {inputs['district']}")
+                        wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
                         if "Rejected Wage" in report_name:
-                            self.log_info("Handling special case for Rejected Wage report...")                            block_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[normalize-space()='{inputs['block'].upper()}']/ancestor::tr")))
+                            self.log_info("Handling special case for Rejected Wage report...")
+                            block_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//td[normalize-space()='{inputs['block'].upper()}']/ancestor::tr")))
                             block_row.find_element(By.XPATH, ".//td[5]/a").click()
                         else:
-                            self.log_info(f"Drilling down to Block: {inputs['block']}")                            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['block'].upper()))).click()
+                            self.log_info(f"Drilling down to Block: {inputs['block']}")
+                            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['block'].upper()))).click()
                         
-                        self.log_info("Final page reached. Reading table...")                        time.sleep(2)
+                        self.log_info("Final page reached. Reading table...")
+                        time.sleep(2)
                         
                         try:
                             df_list = pd.read_html(StringIO(driver.page_source), header=[0, 1])
                             report_df = df_list[-1]
                             report_df.columns = [col[1] for col in report_df.columns]
                             if not report_df.empty and str(report_df.iloc[0, 0]).strip() == '1' and str(report_df.iloc[0, 1]).strip().startswith('2'):
-                                self.log_warning("Detected and removed junk numeric header row from data.")                                report_df = report_df.iloc[1:].reset_index(drop=True)
+                                self.log_warning("Detected and removed junk numeric header row from data.")
+                                report_df = report_df.iloc[1:].reset_index(drop=True)
                         except ValueError:
-                            self.log_warning("Could not parse multi-level header. Trying single header.")                            df_list = pd.read_html(StringIO(driver.page_source), header=0)
+                            self.log_warning("Could not parse multi-level header. Trying single header.")
+                            df_list = pd.read_html(StringIO(driver.page_source), header=0)
                             report_df = df_list[-1]
 
                         sheet_name = re.sub(r'[\\/*?:\[\]]', '', report_name)[:30]
@@ -372,7 +384,8 @@ class MisReportsTab(BaseAutomationTab):
                         self.log_success(f"Successfully saved and formatted '{report_name}' to sheet '{sheet_name}'.")                        
                         # --- NEW: Generate PNG ---
                         if not report_df.empty:
-                            self.log_info(f"Generating PNG for '{report_name}'...")                            headers = list(report_df.columns)
+                            self.log_info(f"Generating PNG for '{report_name}'...")
+                            headers = list(report_df.columns)
                             data = report_df.values.tolist()
                             date_str = datetime.now().strftime('%d-%m-%Y')
                             output_dir = os.path.dirname(save_path)
@@ -382,22 +395,27 @@ class MisReportsTab(BaseAutomationTab):
                             png_success = self.generate_report_image(data, headers, report_name, date_str, png_output_path)
                             
                             if png_success:
-                                self.log_success(f"Successfully saved PNG for '{report_name}'.")                                details += " | PNG saved."
+                                self.log_success(f"Successfully saved PNG for '{report_name}'.")
+                                details += " | PNG saved."
                             else:
-                                self.log_warning(f"Failed to save PNG for '{report_name}'.")                                details += " | PNG failed."
+                                self.log_warning(f"Failed to save PNG for '{report_name}'.")
+                                details += " | PNG failed."
                         else:
-                            self.log_warning(f"Skipping PNG for '{report_name}' (no data).")                            details += " | PNG skipped."
+                            self.log_warning(f"Skipping PNG for '{report_name}' (no data).")
+                            details += " | PNG skipped."
                         # --- END NEW ---
                         
                         self.app.after(0, lambda r=report_name, d=details: self.results_tree.insert("", "end", values=(r, "Success", d)))
 
                     except Exception as e:
                         error_msg = str(e).split('\n')[0]
-                        self.log_error(f"Failed to process '{report_name}': {error_msg}")                        self.app.after(0, lambda r=report_name, d=error_msg: self.results_tree.insert("", "end", values=(r, "Failed", d), tags=('failed',)))
+                        self.log_error(f"Failed to process '{report_name}': {error_msg}")
+                        self.app.after(0, lambda r=report_name, d=error_msg: self.results_tree.insert("", "end", values=(r, "Failed", d), tags=('failed',)))
             
             self.log_success(f"Process complete. Excel file saved at: {save_path}")            
         except Exception as e:
-            error_msg = str(e).split('\n')[0]; self.log_info(f"A critical error occurred: {error_msg}", "error"); messagebox.showerror("Critical Error", error_msg)        finally:
+            error_msg = str(e).split('\n')[0]; self.log_info(f"A critical error occurred: {error_msg}", "error"); messagebox.showerror("Critical Error", error_msg)
+        finally:
             self.app.after(0, self.set_ui_state, False); 
             self.app.after(0, self.update_status, "Automation Finished", 1.0); 
             self.app.after(0, self.app.set_status, "Automation Finished")

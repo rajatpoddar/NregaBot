@@ -203,7 +203,8 @@ class WcGenTab(BaseAutomationTab):
                 filename = os.path.basename(path)
                 display_name = filename if len(filename) < 25 else filename[:22] + "..."
                 self.pdf_label.configure(text=display_name, text_color=("black", "white"))
-                self.log_info(f"Undertaking PDF selected: {filename}")        except Exception as e:
+                self.log_info(f"Undertaking PDF selected: {filename}")
+        except Exception as e:
             messagebox.showerror("Error", f"Could not open file picker: {e}")
 
     def _open_wc_tool_link(self):
@@ -230,7 +231,8 @@ class WcGenTab(BaseAutomationTab):
             file_id = selected_file['id']
             filename = selected_file['filename']
             
-            self.log_info(f"Downloading '{filename}' from cloud...")            temp_path = self._download_file_from_cloud(file_id, filename)
+            self.log_info(f"Downloading '{filename}' from cloud...")
+            temp_path = self._download_file_from_cloud(file_id, filename)
             
             if temp_path:
                 self.csv_path = temp_path
@@ -239,7 +241,8 @@ class WcGenTab(BaseAutomationTab):
     def _download_file_from_cloud(self, file_id, filename):
         token = self.app.license_info.get('key')
         if not token:
-            self.log_error("Cloud Download Failed: Not licensed.")            return None
+            self.log_error("Cloud Download Failed: Not licensed.")
+            return None
 
         headers = {'Authorization': f'Bearer {token}'}
         url = f"{config.LICENSE_SERVER_URL}/files/api/download/{file_id}"
@@ -253,9 +256,11 @@ class WcGenTab(BaseAutomationTab):
                     for chunk in r.iter_content(chunk_size=8192): 
                         f.write(chunk)
             
-            self.log_info(f"Successfully downloaded '{filename}'.")            return temp_path
+            self.log_info(f"Successfully downloaded '{filename}'.")
+            return temp_path
         except Exception as e:
-            self.log_error(f"Cloud download failed: {e}")            messagebox.showerror("Download Failed", f"Could not download file: {e}")
+            self.log_error(f"Cloud download failed: {e}")
+            messagebox.showerror("Download Failed", f"Could not download file: {e}")
             return None
 
     def _log_result(self, result_data):
@@ -362,7 +367,8 @@ class WcGenTab(BaseAutomationTab):
             else:
                 self._populate_defaults()
         except Exception as e:
-            self.log_warning(f"Could not load profiles: {e}")            self.profiles = {}
+            self.log_warning(f"Could not load profiles: {e}")
+            self.profiles = {}
 
     def _save_profile(self, profile_name=None, is_autosave=False):
         if not is_autosave:
@@ -503,7 +509,8 @@ class WcGenTab(BaseAutomationTab):
                 return
             
             target_url = config.WC_GEN_CONFIG["url"]
-            self.log_info(f"Navigating to: {target_url}")            driver.get(target_url)
+            self.log_info(f"Navigating to: {target_url}")
+            driver.get(target_url)
             
             wait = WebDriverWait(driver, 20)
             
@@ -596,7 +603,8 @@ class WcGenTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         if not selection:
             return
-        self.log_info(f"Selected {dropdown_key}: '{selection}'. Fetching next options...")        threading.Thread(target=self._update_dependent_dropdown, args=(dropdown_key, selection), daemon=True).start()
+        self.log_info(f"Selected {dropdown_key}: '{selection}'. Fetching next options...")
+        threading.Thread(target=self._update_dependent_dropdown, args=(dropdown_key, selection), daemon=True).start()
     
     def _update_dependent_dropdown(self, dropdown_key, selection):
         # ---- Lazy imports ----
@@ -730,7 +738,8 @@ class WcGenTab(BaseAutomationTab):
         try:
             (priority, work_name, khata_no, plot_no, village_name, total_plants, covered_area, area_plantation, total_saplings, job_card, beneficiary_type_for_if_edit) = row_data
         except ValueError:
-            self.log_error("ERROR: CSV row has incorrect number of columns. Expected 11.")            return None
+            self.log_error("ERROR: CSV row has incorrect number of columns. Expected 11.")
+            return None
 
         driver.get(config.WC_GEN_CONFIG["url"])
         wait = WebDriverWait(driver, 25)
@@ -749,18 +758,21 @@ class WcGenTab(BaseAutomationTab):
             from openpyxl.utils import get_column_letter
             from openpyxl.worksheet.page import PageMargins
             from openpyxl.drawing.image import Image as XLImage
-            self.log_info(f"  > Selecting '{value}'...")            html_element = driver.find_element(By.TAG_NAME, 'html')
+            self.log_info(f"  > Selecting '{value}'...")
+            html_element = driver.find_element(By.TAG_NAME, 'html')
             Select(wait.until(EC.presence_of_element_located((By.ID, element_id)))).select_by_visible_text(value)
             wait.until(EC.staleness_of(html_element))
             self.log_info(f"  > OK.")
-        self.log_info("Step 1: Selecting Categories...")        select_and_wait("ContentPlaceHolder1_ddlMastercategory", form_config['master_category'])
+        self.log_info("Step 1: Selecting Categories...")
+        select_and_wait("ContentPlaceHolder1_ddlMastercategory", form_config['master_category'])
         select_and_wait("ContentPlaceHolder1_ddlproposed_work_category", form_config['work_category'])
         select_and_wait("ContentPlaceHolder1_ddlbeneficiary_type", form_config['beneficiary_type'])
         select_and_wait("ContentPlaceHolder1_ddlactivity_type", form_config['activity_type'])
         select_and_wait("ContentPlaceHolder1_ddlproposed_work_type", form_config['work_type'])
         select_and_wait("ContentPlaceHolder1_ddlprostatus", form_config['pro_status'])
 
-        self.log_info("Step 2: Filling Dynamic Fields...")        dynamic_fields = {
+        self.log_info("Step 2: Filling Dynamic Fields...")
+        dynamic_fields = {
             "ContentPlaceHolder1_txtdist": total_plants, 
             "ContentPlaceHolder1_txtAdd_dis": covered_area,
             "ContentPlaceHolder1_txtEst_output": area_plantation, 
@@ -773,14 +785,16 @@ class WcGenTab(BaseAutomationTab):
                     driver.execute_script("arguments[0].value = arguments[1];", field, value)
                 except (NoSuchElementException, TimeoutException): pass 
         
-        self.log_info("Step 3: Selecting Location...")        select_and_wait("ContentPlaceHolder1_ddlpanch", form_config['panchayat_name'])
+        self.log_info("Step 3: Selecting Location...")
+        select_and_wait("ContentPlaceHolder1_ddlpanch", form_config['panchayat_name'])
         
         village_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlvillage")))
         self._select_by_text_case_insensitive(Select(village_select), village_name)
         
         pdf_path = form_config.get('undertaking_pdf')
         if pdf_path and os.path.exists(pdf_path):
-            self.log_info("  > Uploading Undertaking PDF...")            try:
+            self.log_info("  > Uploading Undertaking PDF...")
+            try:
                 abs_pdf_path = os.path.abspath(pdf_path)
                 file_input = driver.find_element(By.ID, "ContentPlaceHolder1_File_indiv_work_file_pdf")
                 driver.execute_script("arguments[0].style.display = 'block'; arguments[0].style.visibility = 'visible';", file_input)
@@ -847,7 +861,8 @@ class WcGenTab(BaseAutomationTab):
             parsed_url = urlparse(final_url)
             work_code = parse_qs(parsed_url.query).get('work_code', [None])[0]
             if work_code:
-                self.log_success(f"SUCCESS! Generated Work Code: {work_code}")                result_data = {
+                self.log_success(f"SUCCESS! Generated Work Code: {work_code}")
+                result_data = {
                     "work_code": work_code,
                     "beneficiary_type": beneficiary_type_for_if_edit.strip(),
                     "job_card": job_card.strip()
@@ -855,7 +870,8 @@ class WcGenTab(BaseAutomationTab):
                 self._log_result(result_data)
                 return result_data
             else:
-                self.log_warning("Row submitted, but could not extract work code from URL.")        except TimeoutException:
+                self.log_warning("Row submitted, but could not extract work code from URL.")
+        except TimeoutException:
             self.log_warning("Row submitted, but URL did not change to the success page.")        
         return None
     def start_automation(self) -> None:
@@ -891,7 +907,8 @@ class WcGenTab(BaseAutomationTab):
         
         self.successful_wcs_data.clear()
         
-        self.log_info("--- Starting Workcode Generation ---")        self.app.after(0, self.app.set_status, "Running Workcode Generation...")
+        self.log_info("--- Starting Workcode Generation ---")
+        self.app.after(0, self.app.set_status, "Running Workcode Generation...")
         
         local_successful_wcs = [] 
         try:
@@ -905,26 +922,35 @@ class WcGenTab(BaseAutomationTab):
                         self.app.log_message(self.log_display, "Automation stopped by user."); break
                     if not any(field.strip() for field in row): continue
                     
-                    self.log_info(f"--- Processing Row {i+1}/{total} ---")                    try:
+                    self.log_info(f"--- Processing Row {i+1}/{total} ---")
+                    try:
                         result_data = self._process_single_row(driver, form_config, row)
                         if result_data:
                             local_successful_wcs.append(result_data)
                     except Exception as e:
                         self.log_error(f"ERROR processing row {i+1}: {e}")
-        except FileNotFoundError: self.log_error("ERROR: CSV file not found.")        except Exception as e: self.log_error(f"An unexpected error occurred: {e}")        finally:
+        except FileNotFoundError: self.log_error("ERROR: CSV file not found.")
+        except Exception as e: self.log_error(f"An unexpected error occurred: {e}")
+        finally:
             total_processed = len(local_successful_wcs)
             total_rows = len(rows) if 'rows' in dir() and isinstance(rows, list) else 0
             self.successful_wcs_data = local_successful_wcs 
             self.app.after(0, self.set_ui_state, False)
-            self.log_info(f"
-{'='*50}")            self.log_info(f"📊 Workcode Generation Complete!")            self.log_info(f"✅ Generated: {total_processed} work codes")            if total_rows > 0:
+            self.log_info(f"{'='*50}")
+            self.log_info(f"📊 Workcode Generation Complete!")
+            self.log_info(f"✅ Generated: {total_processed} work codes")
+            if total_rows > 0:
                 failed = total_rows - total_processed
                 if failed > 0:
-                    self.log_info(f"❌ Failed/Skipped: {failed}")                elif total_processed > 0:
-                    self.log_info(f"🎉 All {total_rows} rows processed successfully!")            self.log_info(f"{'='*50}")            self.app.after(0, self.app.set_status, "Automation Finished")
+                    self.log_info(f"❌ Failed/Skipped: {failed}")
+                elif total_processed > 0:
+                    self.log_info(f"🎉 All {total_rows} rows processed successfully!")
+                    self.log_info(f"{'='*50}")
+                    self.app.after(0, self.app.set_status, "Automation Finished")
 
             if self.send_to_if_edit_switch.get() and self.successful_wcs_data:
-                self.log_info(f"📤 Sending {len(self.successful_wcs_data)} work codes to IF Editor tab...")                self.app.after(0, self.app.switch_to_if_edit_with_data, self.successful_wcs_data)
+                self.log_info(f"📤 Sending {len(self.successful_wcs_data)} work codes to IF Editor tab...")
+                self.app.after(0, self.app.switch_to_if_edit_with_data, self.successful_wcs_data)
             
     def select_csv_file(self):
         # ---- Lazy imports ----
@@ -1012,4 +1038,5 @@ class WcGenTab(BaseAutomationTab):
             self.set_ui_state(running=False, force_disable_form=True)
 
             self._populate_defaults()
-            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")
+            self.app.after(0, self.app.set_status, "Ready")

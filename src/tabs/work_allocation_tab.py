@@ -174,7 +174,8 @@ class WorkAllocationTab(BaseAutomationTab):
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         self.app.clear_log(self.log_display)
         self.update_status("Ready", 0.0)
-        self.log_info("Form has been reset.")        self.app.after(0, self.app.set_status, "Ready")
+        self.log_info("Form has been reset.")
+        self.app.after(0, self.app.set_status, "Ready")
 
     def run_automation_from_demand(self, panchayat_name, allocation_data):
         """
@@ -204,7 +205,8 @@ class WorkAllocationTab(BaseAutomationTab):
         # 3. Process the Data Format
         if isinstance(allocation_data, str):
             # OLD/SIMPLE MODE: Bulk allocation to one key
-            self.log_info(f"Mode: Bulk Allocation (Single Key: {allocation_data})")            self.work_list_text.insert("1.0", allocation_data)
+            self.log_info(f"Mode: Bulk Allocation (Single Key: {allocation_data})")
+            self.work_list_text.insert("1.0", allocation_data)
             inputs['work_keys'] = [allocation_data]
             inputs['allocation_map'] = None # No specific mapping, assume 'Allocate All'
             
@@ -222,7 +224,8 @@ class WorkAllocationTab(BaseAutomationTab):
             messagebox.showerror("Error", "Invalid data format received from Demand tab.")
             return
 
-        self.log_info(f"Panchayat: {panchayat_name}")        self.log_info(f"Work Category: {work_category}")
+        self.log_info(f"Panchayat: {panchayat_name}")
+        self.log_info(f"Work Category: {work_category}")
         # 4. Save and Start
         self._save_inputs(inputs)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
@@ -255,7 +258,8 @@ class WorkAllocationTab(BaseAutomationTab):
             work_keys = list(self.csv_allocation_data.keys())
             inputs['work_keys'] = work_keys
             inputs['allocation_map'] = self.csv_allocation_data
-            self.log_info(f"Mode: CSV Allocation ({len(work_keys)} works loaded)")        else:
+            self.log_info(f"Mode: CSV Allocation ({len(work_keys)} works loaded)")
+        else:
             # Mode 2: Use Text Box (Original)
             if not inputs['work_list_raw']:
                 messagebox.showwarning("Input Error", "Please enter Work Keys or Load a CSV.")
@@ -286,14 +290,16 @@ class WorkAllocationTab(BaseAutomationTab):
         Waits for the 'Please Wait...' overlay to disappear.
         Handles cases where the overlay is very fast or doesn't appear at all.
         """
-        self.log_info(f"   - Waiting for page to settle after '{action_name}'...")        try:
+        self.log_info(f"   - Waiting for page to settle after '{action_name}'...")
+        try:
             # 1. Check if overlay is visible (with a very short timeout)
             short_wait = WebDriverWait(driver, 0.5) # 0.5 second check
             overlay_visible = short_wait.until(EC.visibility_of_element_located((By.ID, self.wait_overlay_id)))
             
             # 2. If it was visible, wait for it to disappear (with the long timeout)
             if overlay_visible:
-                self.log_info("   - Overlay detected, waiting for it to disappear...")                long_wait.until(EC.invisibility_of_element_located((By.ID, self.wait_overlay_id)))
+                self.log_info("   - Overlay detected, waiting for it to disappear...")
+                long_wait.until(EC.invisibility_of_element_located((By.ID, self.wait_overlay_id)))
                 self.log_info("   - Page settled.")            
         except TimeoutException:
             # This is the normal, fast path. The overlay was not visible (or gone in < 0.5s).
@@ -312,7 +318,8 @@ class WorkAllocationTab(BaseAutomationTab):
         from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Starting Work Allocation...")
-        self.log_info("Starting Work Allocation automation...")        self.has_failures = False 
+        self.log_info("Starting Work Allocation automation...")
+        self.has_failures = False 
         
         try:
             driver = self.app.get_driver()
@@ -324,20 +331,24 @@ class WorkAllocationTab(BaseAutomationTab):
             # --- NEW: Long wait specifically for Save operation (5 Minutes) ---
             save_wait = WebDriverWait(driver, 300) 
             
-            self.log_info(f"Navigating to Work Allocation page...")            driver.get(config.WORK_ALLOCATION_CONFIG["url"])
+            self.log_info(f"Navigating to Work Allocation page...")
+            driver.get(config.WORK_ALLOCATION_CONFIG["url"])
 
             # --- START: Standard Setup (Panchayat/Category) ---
-            self.log_info("Checking for Panchayat dropdown...")            try:
+            self.log_info("Checking for Panchayat dropdown...")
+            try:
                 short_wait = WebDriverWait(driver, 3)
                 panchayat_select_element = short_wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
                 
-                self.log_info("Panchayat dropdown found. Selecting...")                if not inputs['panchayat_name']: raise ValueError("Panchayat Name is required for PO login.")
+                self.log_info("Panchayat dropdown found. Selecting...")
+                if not inputs['panchayat_name']: raise ValueError("Panchayat Name is required for PO login.")
                 panchayat_select = Select(panchayat_select_element)
                 if panchayat_select.first_selected_option.text.strip() != inputs['panchayat_name'].strip():
                     self._select_by_text_case_insensitive(panchayat_select, inputs['panchayat_name'])
                     self._wait_for_settle(driver, wait, "Panchayat Selection")
             except (TimeoutException, NoSuchElementException):
-                self.log_info("Panchayat dropdown not found. Assuming GP Login.")            except ValueError as e:
+                self.log_info("Panchayat dropdown not found. Assuming GP Login.")
+            except ValueError as e:
                 self.app.log_message(self.log_display, str(e), "error"); messagebox.showerror("Input Error", str(e)); self.app.after(0, self.set_ui_state, False); return
 
             self.app.after(0, self.app.set_status, "Setting Work Category...")
@@ -356,7 +367,8 @@ class WorkAllocationTab(BaseAutomationTab):
             total_items = len(work_keys)
             for i, work_key in enumerate(work_keys):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.log_warning("Stop signal received.")                    break
+                    self.log_warning("Stop signal received.")
+                    break
                 
                 status_msg = f"Processing {i+1}/{total_items}: Key={work_key}"
                 self.app.after(0, self.app.set_status, status_msg)
@@ -372,7 +384,8 @@ class WorkAllocationTab(BaseAutomationTab):
 
         except Exception as e:
             error_msg = f"A critical error occurred: {e}"
-            self.log_error(error_msg)            messagebox.showerror("Critical Error", error_msg)
+            self.log_error(error_msg)
+            messagebox.showerror("Critical Error", error_msg)
             self.app.after(0, self.app.set_status, "Error")
         finally:
             self.app.after(0, self.set_ui_state, False)
@@ -403,7 +416,8 @@ class WorkAllocationTab(BaseAutomationTab):
         found_count = 0 # To track how many specific applicants were found
 
         try:
-            self.log_info(f"   - Processing Key: {work_key}")            if target_applicants:
+            self.log_info(f"   - Processing Key: {work_key}")
+            if target_applicants:
                 self.log_info(f"     (Granular Mode: Allocating {len(target_applicants)} specific laborers)")
             # --- Step 3: Enter Work Key ---
             search_box = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txtwrksearchkey")))
@@ -424,7 +438,8 @@ class WorkAllocationTab(BaseAutomationTab):
             
             if not matching_option:
                 error_msg = "Workcode not found in dropdown."
-                self.log_error(f"   - FAILED: {error_msg}")                self._log_result(work_key, "N/A", "Failed", error_msg)
+                self.log_error(f"   - FAILED: {error_msg}")
+                self._log_result(work_key, "N/A", "Failed", error_msg)
                 return 
             
             selected_work_code_text = matching_option.text
@@ -435,13 +450,15 @@ class WorkAllocationTab(BaseAutomationTab):
             
             if not target_applicants:
                 # --- BULK MODE (Allocate All) ---
-                self.log_info("   - Clicking 'Allocate All'...")                alloc_checkbox = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_GridView1_ctl01_chkHAllocate")))
+                self.log_info("   - Clicking 'Allocate All'...")
+                alloc_checkbox = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_GridView1_ctl01_chkHAllocate")))
                 if not alloc_checkbox.is_selected():
                     alloc_checkbox.click()
                     self._wait_for_settle(driver, wait, "Allocate All")
             else:
                 # --- GRANULAR MODE (Specific Checkboxes) ---
-                self.log_info("   - Selecting specific applicants...")                grid_id = "ctl00_ContentPlaceHolder1_GridView1"
+                self.log_info("   - Selecting specific applicants...")
+                grid_id = "ctl00_ContentPlaceHolder1_GridView1"
                 try:
                     rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
                     for i, row in enumerate(rows):
@@ -459,23 +476,27 @@ class WorkAllocationTab(BaseAutomationTab):
                                 if not checkbox.is_selected(): checkbox.click(); found_count += 1
                         except Exception: continue
                             
-                    self.log_info(f"   - Selected {found_count}/{len(target_applicants)} applicants found on page.")                except Exception as e:
+                    self.log_info(f"   - Selected {found_count}/{len(target_applicants)} applicants found on page.")
+                except Exception as e:
                     self.log_error(f"   - Error traversing table: {e}")
                 # --- NEW LOGIC: Skip if no labourers found ---
                 if found_count == 0:
                     msg = "Skipped: Labours not found in table."
-                    self.log_warning(f"   - {msg}")                    # Use 'warning' tag (yellow) or 'failed' (red) as preferred. 
+                    self.log_warning(f"   - {msg}")
+                    # Use 'warning' tag (yellow) or 'failed' (red) as preferred. 
                     # Assuming 'skipped' tag maps to yellow in base_tab.
                     self._log_result(work_key, selected_work_code_text, "Skipped", msg)
                     return 
                 # ---------------------------------------------
 
             # --- Step 6: Click Save (with 5 MIN WAIT) ---
-            self.log_info("   - Clicking 'Save' (Timeout set to 5 mins)...")            save_button = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_cmdSave")))
+            self.log_info("   - Clicking 'Save' (Timeout set to 5 mins)...")
+            save_button = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_cmdSave")))
             save_button.click()
             
             # Use save_wait (300s) for the alert
-            self.log_info("   - Waiting for confirmation alert...")            alert = save_wait.until(EC.alert_is_present())
+            self.log_info("   - Waiting for confirmation alert...")
+            alert = save_wait.until(EC.alert_is_present())
             alert_text = alert.text.strip()
             alert.accept()
             
@@ -492,13 +513,15 @@ class WorkAllocationTab(BaseAutomationTab):
 
         except (TimeoutException, NoAlertPresentException, StaleElementReferenceException) as e:
             error_msg = f"Page error (Timeout/Alert): {str(e).splitlines()[0]}"
-            self.log_error(f"   - FAILED: {error_msg}")            self._log_result(work_key, selected_work_code_text, "Failed", error_msg)
+            self.log_error(f"   - FAILED: {error_msg}")
+            self._log_result(work_key, selected_work_code_text, "Failed", error_msg)
             try: driver.get(config.WORK_ALLOCATION_CONFIG["url"]); self.app.log_message(self.log_display, "   - Refreshing page..."); return
             except Exception: return
         
         except Exception as e:
             error_msg = f"Critical error: {e}"
-            self.log_error(f"   - FAILED: {error_msg}")            self._log_result(work_key, selected_work_code_text, "Failed", error_msg)
+            self.log_error(f"   - FAILED: {error_msg}")
+            self._log_result(work_key, selected_work_code_text, "Failed", error_msg)
 
     def _load_demand_csv(self):
         # ---- Lazy imports ----
@@ -547,14 +570,16 @@ class WorkAllocationTab(BaseAutomationTab):
             
             filename = os.path.basename(file_path)
             self.file_label.configure(text=f"Loaded: {filename}", text_color="green")
-            self.log_info(f"CSV Loaded: {filename}")            self.log_info(f"Found {len(self.csv_allocation_data)} works with {count} workers.")            
+            self.log_info(f"CSV Loaded: {filename}")
+            self.log_info(f"Found {len(self.csv_allocation_data)} works with {count} workers.")            
             # Disable text box to indicate CSV mode is active
             self.work_list_text.delete("1.0", tkinter.END)
             self.work_list_text.insert("1.0", f"[CSV Loaded] {filename}\nContains {len(self.csv_allocation_data)} Work Codes.\n\nClick 'Start' to proceed.")
             self.work_list_text.configure(state="disabled")
             
         except Exception as e:
-            self.log_error(f"Error loading CSV: {e}")            messagebox.showerror("Error", f"Failed to load CSV: {e}")
+            self.log_error(f"Error loading CSV: {e}")
+            messagebox.showerror("Error", f"Failed to load CSV: {e}")
 
     def _log_result(self, work_key, work_code, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -615,7 +640,8 @@ class WorkAllocationTab(BaseAutomationTab):
             self.results_tree.delete(item)
 
         # 4. Auto Start
-        self.log_info(f"Retrying {len(failed_keys)} failed work keys...")        self.start_automation()
+        self.log_info(f"Retrying {len(failed_keys)} failed work keys...")
+        self.start_automation()
 
     def export_report(self):
         # ---- Lazy imports ----

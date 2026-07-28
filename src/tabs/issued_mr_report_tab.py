@@ -257,7 +257,8 @@ class IssuedMrReportTab(BaseAutomationTab):
         for item in self.abps_tree.get_children(): self.abps_tree.delete(item)
         self._update_workcode_textbox("")
         
-        self.log_info("Form has been reset.")        self.update_status("Ready", 0.0)
+        self.log_info("Form has been reset.")
+        self.update_status("Ready", 0.0)
         
 
     def start_automation(self) -> None:
@@ -339,7 +340,8 @@ class IssuedMrReportTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        self.log_info("Attempting to solve CAPTCHA...")        captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
+        self.log_info("Attempting to solve CAPTCHA...")
+        captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
         try:
             captcha_element = wait.until(EC.presence_of_element_located((By.ID, captcha_label_id)))
             captcha_text = captcha_element.text
@@ -350,16 +352,19 @@ class IssuedMrReportTab(BaseAutomationTab):
             if operator == '+': result = num1 + num2
             elif operator == '-': result = num1 - num2
             elif operator == '*': result = num1 * num2
-            self.log_info(f"Solved: {captcha_text.strip()} = {result}")            driver.find_element(By.ID, captcha_textbox_id).send_keys(str(result))
+            self.log_info(f"Solved: {captcha_text.strip()} = {result}")
+            driver.find_element(By.ID, captcha_textbox_id).send_keys(str(result))
             driver.find_element(By.ID, verify_button_id).click()
             time.sleep(1.0)  # Short wait after click
             if "Invalid Captcha Code" in driver.page_source:
                 raise ValueError("CAPTCHA verification failed.")
             return True
         except TimeoutException:
-            self.log_info("CAPTCHA not found or already bypassed.")            return True 
+            self.log_info("CAPTCHA not found or already bypassed.")
+            return True 
         except ValueError as e:
-            self.log_error(f"CAPTCHA Error: {e}")            raise 
+            self.log_error(f"CAPTCHA Error: {e}")
+            raise 
 
     def run_automation_logic(self, inputs, retries=1):
         # Standard Issued MR Report Logic (Panchayat Specific)
@@ -393,16 +398,19 @@ class IssuedMrReportTab(BaseAutomationTab):
 
             self._solve_captcha(driver, wait)
 
-            self.log_info(f"Selecting State: {inputs['state']}...")            state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
+            self.log_info(f"Selecting State: {inputs['state']}...")
+            state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
             self._select_by_text_case_insensitive(Select(state_select), inputs['state'])
             wait.until(EC.presence_of_element_located((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
 
-            self.log_info("Opening Report...")            report_link_text = "MGNREGS daily status as per e-muster issued"
+            self.log_info("Opening Report...")
+            report_link_text = "MGNREGS daily status as per e-muster issued"
             report_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, report_link_text)))
             driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", report_link)
             time.sleep(1); report_link.click()
 
-            self.log_info(f"Drilling down to Block: {inputs['block']}")            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
+            self.log_info(f"Drilling down to Block: {inputs['block']}")
+            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
             wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['block'].upper()))).click()
 
             # --- Specific Panchayat Logic ---
@@ -419,7 +427,8 @@ class IssuedMrReportTab(BaseAutomationTab):
                 target_link = target_cell.find_element(By.TAG_NAME, "a")
                 link_text = target_link.text.strip()
                 if link_text == '0':
-                    self.log_warning("Value is 0. No data.")                    self.success_message = "No data found (Value 0)"
+                    self.log_warning("Value is 0. No data.")
+                    self.success_message = "No data found (Value 0)"
                     return
 
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target_link)
@@ -427,9 +436,11 @@ class IssuedMrReportTab(BaseAutomationTab):
                 target_link.click()
 
             except NoSuchElementException:
-                 self.log_warning("No link found in cell.")                 return
+                 self.log_warning("No link found in cell.")
+                 return
 
-            self.log_info("Scraping final table...")            FINAL_TABLE_XPATH = "//table[@align='center' and .//b[text()='Work Code']]"
+            self.log_info("Scraping final table...")
+            FINAL_TABLE_XPATH = "//table[@align='center' and .//b[text()='Work Code']]"
             table = wait.until(EC.presence_of_element_located((By.XPATH, FINAL_TABLE_XPATH)))
             rows = table.find_elements(By.XPATH, ".//tr[position()>1]")
 
@@ -453,10 +464,12 @@ class IssuedMrReportTab(BaseAutomationTab):
             unique_workcodes = list(dict.fromkeys(workcode_list))
             self.app.after(0, self._update_workcode_textbox, "\n".join(unique_workcodes))
 
-            self.log_success(f"Completed. Found {scraped_mr_count} MRs.")            self.success_message = f"Found {scraped_mr_count} Issued MRs in {inputs['panchayat']}."
+            self.log_success(f"Completed. Found {scraped_mr_count} MRs.")
+            self.success_message = f"Found {scraped_mr_count} Issued MRs in {inputs['panchayat']}."
 
         except Exception as e:
-            self.log_error(f"Error: {e}")            self.success_message = None
+            self.log_error(f"Error: {e}")
+            self.success_message = None
         finally:
             # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
             self.app.after(0, self.set_ui_state, False)
@@ -491,7 +504,8 @@ class IssuedMrReportTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
 
             # 1. Navigate to Block Dashboard (Reuse logic)
-            self.log_info("Navigating to Dashboard...")            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+            self.log_info("Navigating to Dashboard...")
+            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
             self._solve_captcha(driver, wait)
 
             state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
@@ -547,7 +561,8 @@ class IssuedMrReportTab(BaseAutomationTab):
             total_gps = len(panchayat_links)
             self.log_info(f"Found {total_gps} Panchayats with data to scan.")            
             if total_gps == 0:
-                self.log_warning("No data found in Column 5 for any Panchayat.")                return
+                self.log_warning("No data found in Column 5 for any Panchayat.")
+                return
 
             # 3. Iterate through each Panchayat Link
             count = 0
@@ -567,7 +582,8 @@ class IssuedMrReportTab(BaseAutomationTab):
                     try:
                         WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, detail_table_id)))
                     except TimeoutException:
-                        self.log_info(f"   > No table found for {p_name}. Skipping.")                        continue
+                        self.log_info(f"   > No table found for {p_name}. Skipping.")
+                        continue
 
                     # Scan Rows
                     # Get rows where Last Column (ABPS) contains "No"
@@ -594,12 +610,14 @@ class IssuedMrReportTab(BaseAutomationTab):
                             self.app.after(0, lambda data=row_data: self.abps_tree.insert("", "end", values=data))
                             
                 except Exception as e:
-                    self.log_error(f"   > Error scanning {p_name}: {str(e)[:50]}")                    continue
+                    self.log_error(f"   > Error scanning {p_name}: {str(e)[:50]}")
+                    continue
 
             self.success_message = f"ABPS Scan Complete. Found {count} pending workers."
             self.log_success(self.success_message)
         except Exception as e:
-            self.log_error(f"Critical Error in ABPS Scan: {e}")            self.success_message = None
+            self.log_error(f"Critical Error in ABPS Scan: {e}")
+            self.success_message = None
         finally:
             # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
             self.app.after(0, self.set_ui_state, False)

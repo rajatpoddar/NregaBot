@@ -421,7 +421,8 @@ class MateMrGenTab(BaseAutomationTab):
             self.update_status("Ready", 0.0)
             self.success_label.configure(text="Success: 0")
             self.skipped_label.configure(text="Skipped/Failed: 0")
-            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")
+            self.app.after(0, self.app.set_status, "Ready")
 
     # ------------------------------------------------------------------ #
     #  Output directory                                                   #
@@ -437,7 +438,8 @@ class MateMrGenTab(BaseAutomationTab):
             os.makedirs(output_dir, exist_ok=True)
             return output_dir
         except Exception as e:
-            self.log_error(f"Error creating output directory: {e}")            messagebox.showerror("Directory Error", f"Could not create output directory: {e}")
+            self.log_error(f"Error creating output directory: {e}")
+            messagebox.showerror("Directory Error", f"Could not create output directory: {e}")
             return None
 
     # ------------------------------------------------------------------ #
@@ -460,7 +462,8 @@ class MateMrGenTab(BaseAutomationTab):
 
         self.output_dir = self._get_output_dir(inputs['panchayat'] or "MateMistri")
         if not self.output_dir:
-            self.log_error("Failed to create output directory. Aborting.")            self.app.after(0, self.set_ui_state, False)
+            self.log_error("Failed to create output directory. Aborting.")
+            self.app.after(0, self.set_ui_state, False)
             return
 
         try:
@@ -485,7 +488,8 @@ class MateMrGenTab(BaseAutomationTab):
 
             for index, item in enumerate(items_to_process):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.log_warning("Stop signal received.")                    break
+                    self.log_warning("Stop signal received.")
+                    break
                 self.app.log_message(
                     self.log_display,
                     f"\n--- Processing item ({index + 1}/{total_items}): {item} ---", "info")
@@ -534,9 +538,11 @@ class MateMrGenTab(BaseAutomationTab):
         from selenium import webdriver
         """If location_panchayat is empty, skip validation and return True."""
         if not location_panchayat:
-            self.log_info("Panchayat not provided — skipping validation.")            return True
+            self.log_info("Panchayat not provided — skipping validation.")
+            return True
         try:
-            self.log_info("Validating Panchayat name...")            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
+            self.log_info("Validating Panchayat name...")
+            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
             panchayat_dropdown = Select(
                 wait.until(EC.presence_of_element_located((By.ID, "exe_agency"))))
             target = config.AGENCY_PREFIX + location_panchayat
@@ -544,10 +550,12 @@ class MateMrGenTab(BaseAutomationTab):
                 err = (f"Panchayat '{location_panchayat}' not found on the portal. "
                        "Please check spelling.")
                 if "macro" in self.app.active_automations:
-                    self.log_error(f"Skipping: {err}")                    return False
+                    self.log_error(f"Skipping: {err}")
+                    return False
                 messagebox.showerror("Validation Error", err)
                 return False
-            self.log_success("Panchayat name is valid.")            return True
+            self.log_success("Panchayat name is valid.")
+            return True
         except Exception as e:
             self.app.log_message(
                 self.log_display, f"Validation failed: {e}", "error")
@@ -670,10 +678,12 @@ class MateMrGenTab(BaseAutomationTab):
         from selenium import webdriver
         full_work_code_text = ""
         try:
-            self.log_info("   - Navigating to MR page...")            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
+            self.log_info("   - Navigating to MR page...")
+            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
 
             # 1. Select Panchayat (optional — skip if not provided)
-            self.log_info("   - Selecting Panchayat...")            if inputs['panchayat']:
+            self.log_info("   - Selecting Panchayat...")
+            if inputs['panchayat']:
                 panchayat_dropdown = wait.until(
                     EC.presence_of_element_located((By.ID, "exe_agency")))
                 self._select_by_text_case_insensitive(
@@ -699,7 +709,8 @@ class MateMrGenTab(BaseAutomationTab):
                 return
 
             # 4. Fill dates via JS (bypasses datepicker widget)
-            self.log_info("   - Entering dates...")            driver.execute_script(
+            self.log_info("   - Entering dates...")
+            driver.execute_script(
                 f"document.getElementById('txtDateFrom').value = '{inputs['start_date']}';")
             driver.execute_script(
                 f"document.getElementById('txtDateTo').value = '{inputs['end_date']}';")
@@ -743,7 +754,8 @@ class MateMrGenTab(BaseAutomationTab):
                     "   - Warning: 'Workers per MR' field not found, skipping.", "warning")
 
             # 7. Submit
-            self.log_info("   - Submitting form...")            body_element = driver.find_element(By.TAG_NAME, 'body')
+            self.log_info("   - Submitting form...")
+            body_element = driver.find_element(By.TAG_NAME, 'body')
             btn_proceed = wait.until(
                 EC.presence_of_element_located((By.ID, "btnProceed")))
             driver.execute_script("arguments[0].click();", btn_proceed)
@@ -983,7 +995,8 @@ class MateMrGenTab(BaseAutomationTab):
             return None
 
         except Exception as e:
-            self.log_error(f"Error saving PDF: {e}")            return None
+            self.log_error(f"Error saving PDF: {e}")
+            return None
 
     # ------------------------------------------------------------------ #
     #  Print file                                                         #
@@ -1003,7 +1016,8 @@ class MateMrGenTab(BaseAutomationTab):
             time.sleep(2)
         except Exception as e:
             msg = f"An unexpected error occurred while printing: {e}"
-            self.log_error(msg)            self.app.after(0, lambda: messagebox.showwarning("Print Error", msg))
+            self.log_error(msg)
+            self.app.after(0, lambda: messagebox.showwarning("Print Error", msg))
 
     # ------------------------------------------------------------------ #
     #  Export report                                                      #
@@ -1108,7 +1122,8 @@ class MateMrGenTab(BaseAutomationTab):
         from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
         from selenium.webdriver.common.keys import Keys
         from selenium import webdriver
-        self.log_info("Starting PDF merge...")        pdf_files = self.current_session_files
+        self.log_info("Starting PDF merge...")
+        pdf_files = self.current_session_files
         if not pdf_files:
             self.app.log_message(
                 self.log_display,
@@ -1127,7 +1142,8 @@ class MateMrGenTab(BaseAutomationTab):
             text="Enter a base name for the merged file:", title="Merge PDFs")
         base_name = dialog.get_input()
         if not base_name:
-            self.log_info("Merge cancelled.")            return
+            self.log_info("Merge cancelled.")
+            return
 
         try:
             merge_dir = self.app.get_nregabot_path("Merged_PDF")
@@ -1156,25 +1172,29 @@ class MateMrGenTab(BaseAutomationTab):
         from selenium.webdriver.common.keys import Keys
         from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
-        self.log_info(f"Merging {len(file_list)} files...")        self.app.after(0, self.app.set_status, "Merging PDFs...")
+        self.log_info(f"Merging {len(file_list)} files...")
+        self.app.after(0, self.app.set_status, "Merging PDFs...")
         try:
             merger = PdfWriter()
             for pdf_path in file_list:
                 if self.app.stop_events.get(
                         "pdf_merger_mate_mr", threading.Event()).is_set():
-                    self.log_warning("Merge cancelled.")                    merger.close()
+                    self.log_warning("Merge cancelled.")
+                    merger.close()
                     return
                 merger.append(pdf_path)
             with open(output_path, "wb") as f_out:
                 merger.write(f_out)
             merger.close()
-            self.log_success("Merge complete!")            messagebox.showinfo(
+            self.log_success("Merge complete!")
+            messagebox.showinfo(
                 "Success",
                 f"Merged {len(file_list)} files into:\n{output_path}", parent=self)
             if messagebox.askyesno("Open Location?", "Open the Merged PDFs folder?", parent=self):
                 self.app.open_folder(os.path.dirname(output_path))
         except Exception as e:
-            self.log_error(f"Merge error: {e}")            messagebox.showerror("Merge Error", f"An error occurred: {e}", parent=self)
+            self.log_error(f"Merge error: {e}")
+            messagebox.showerror("Merge Error", f"An error occurred: {e}", parent=self)
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")

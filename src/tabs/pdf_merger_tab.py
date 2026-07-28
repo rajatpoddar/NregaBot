@@ -158,7 +158,8 @@ class PDFMergerTab(BaseAutomationTab):
             idx = self.file_listbox.curselection()[0]
             removed_file = self.selected_files.pop(idx)
             self.update_listbox()
-            self.log_info(f"Removed: {os.path.basename(removed_file)}")        except IndexError:
+            self.log_info(f"Removed: {os.path.basename(removed_file)}")
+        except IndexError:
             messagebox.showwarning("No Selection", "Please select a file from the list to remove.", parent=self)
 
     def reset_ui(self) -> None:
@@ -170,7 +171,8 @@ class PDFMergerTab(BaseAutomationTab):
             self.file_name_entry.delete(0, tkinter.END) 
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.log_info("File list and name cleared.")            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("File list and name cleared.")
+            self.app.after(0, self.app.set_status, "Ready")
             
     def _get_output_path(self, base_name):
         """Generates a unique output path in the user's downloads folder."""
@@ -192,7 +194,8 @@ class PDFMergerTab(BaseAutomationTab):
                 
             return output_path
         except Exception as e:
-            self.log_error(f"Error creating output path: {e}")            messagebox.showerror("Path Error", f"Could not create output directory: {e}", parent=self)
+            self.log_error(f"Error creating output path: {e}")
+            messagebox.showerror("Path Error", f"Could not create output directory: {e}", parent=self)
             return None
 
     def start_automation(self) -> None:
@@ -219,17 +222,20 @@ class PDFMergerTab(BaseAutomationTab):
     def run_automation_logic(self, file_list, output_path):
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
-        self.log_info(f"Starting merge of {len(file_list)} files...")        self.app.after(0, self.app.set_status, "Merging PDFs...")
+        self.log_info(f"Starting merge of {len(file_list)} files...")
+        self.app.after(0, self.app.set_status, "Merging PDFs...")
 
         try:
             writer = PdfWriter()
             
             for i, pdf_path in enumerate(file_list):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.log_warning("Merge cancelled.")                    writer.close()
+                    self.log_warning("Merge cancelled.")
+                    writer.close()
                     return
 
-                self.log_info(f"Processing file {i+1}/{len(file_list)}: {os.path.basename(pdf_path)}")                self.app.after(0, self.update_status, f"Processing file {i+1}/{len(file_list)}")
+                self.log_info(f"Processing file {i+1}/{len(file_list)}: {os.path.basename(pdf_path)}")
+                self.app.after(0, self.update_status, f"Processing file {i+1}/{len(file_list)}")
                 
                 reader = PdfReader(pdf_path)
                 num_pages = len(reader.pages)
@@ -243,24 +249,28 @@ class PDFMergerTab(BaseAutomationTab):
                         
                         # Check if text is None or just contains footer details like 'Attendence Taken by...'
                         if text is None or len(text.strip()) < 250:
-                            self.log_info(f"  -> Skipped footer-only last page in {os.path.basename(pdf_path)}")                            continue 
+                            self.log_info(f"  -> Skipped footer-only last page in {os.path.basename(pdf_path)}")
+                            continue 
 
                     writer.add_page(page)
             
             if self.app.stop_events[self.automation_key].is_set(): return
 
-            self.log_info(f"Writing to output file: {output_path}")            with open(output_path, "wb") as f_out:
+            self.log_info(f"Writing to output file: {output_path}")
+            with open(output_path, "wb") as f_out:
                 writer.write(f_out)
             
             writer.close()
             
-            self.log_success("Merge complete!")            messagebox.showinfo("Success", f"Successfully merged {len(file_list)} files into:\n{output_path}", parent=self)
+            self.log_success("Merge complete!")
+            messagebox.showinfo("Success", f"Successfully merged {len(file_list)} files into:\n{output_path}", parent=self)
             
             if messagebox.askyesno("Open Location?", "Do you want to open the folder containing the merged file?", parent=self):
                 self.app.open_folder(os.path.dirname(output_path))
 
         except Exception as e:
-            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("Merge Error", f"An error occurred during merging:\n\n{e}", parent=self)
+            self.log_error(f"A critical error occurred: {e}")
+            messagebox.showerror("Merge Error", f"An error occurred during merging:\n\n{e}", parent=self)
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")

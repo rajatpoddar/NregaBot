@@ -314,7 +314,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
         try:
-            self.log_info("Reading panchayat table from current browser page...")            self.log_info(f"  Current URL: {driver.current_url}")
+            self.log_info("Reading panchayat table from current browser page...")
+            self.log_info(f"  Current URL: {driver.current_url}")
             try:
                 WebDriverWait(driver, 6).until(EC.presence_of_element_located((By.XPATH, "//table//tr[td]")))
             except TimeoutException:
@@ -358,7 +359,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
             self.app.after(0, lambda d=data: self._populate_panchayat_checkboxes(d))
         except Exception as e:
-            self.log_error(f"Scrape error: {e}")            self.app.after(0, lambda err=str(e): messagebox.showerror("Scrape Error", f"Could not read the page:\n{err}"))
+            self.log_error(f"Scrape error: {e}")
+            self.app.after(0, lambda err=str(e): messagebox.showerror("Scrape Error", f"Could not read the page:\n{err}"))
         finally:
             self.app.after(0, lambda: self._scrape_btn.configure(state="normal", text="🔍 Scrape Current Page"))
 
@@ -382,7 +384,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         if not data:
             self._pan_info_lbl.configure(text="No panchayats found. Make sure panchayat list is visible in browser.")
-            self.log_warning("No panchayats found on page.")            return
+            self.log_warning("No panchayats found on page.")
+            return
 
         self._pan_scroll.grid_columnconfigure(0, weight=1)
         for i, item in enumerate(data):
@@ -415,7 +418,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
             messagebox.showwarning("No Selection", "Please select at least one panchayat.")
             return
         self._save_inputs()
-        self.log_info(f"Starting for {len(selected)} panchayat(s)...")        self.app.start_automation_thread(self.automation_key, self._run_scrape_logic, args=(selected,))
+        self.log_info(f"Starting for {len(selected)} panchayat(s)...")
+        self.app.start_automation_thread(self.automation_key, self._run_scrape_logic, args=(selected,))
 
     def _run_scrape_logic(self, selected_panchayats: list):
         # ---- Lazy imports ----
@@ -455,23 +459,27 @@ class NmmsAttendanceTab(BaseAutomationTab):
         try:
             for p_idx, pan_name in enumerate(selected_panchayats):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.log_warning("Stop signal received.")                    break
+                    self.log_warning("Stop signal received.")
+                    break
 
                 self.app.after(0, self.update_status, f"Panchayat {p_idx+1}/{total}: {pan_name}", p_idx / total)
                 self.log_info(f"▶ {pan_name}")
                 pan_info = next((d for d in self._panchayat_data if d["name"] == pan_name), None)
                 if not pan_info:
-                    self.log_warning(f"  ⚠ No data for '{pan_name}'")                    continue
+                    self.log_warning(f"  ⚠ No data for '{pan_name}'")
+                    continue
 
                 mr_rows = self._click_and_scrape_mr_list(pan_info, driver, pan_name)
                 if not mr_rows:
-                    self.log_warning(f"  No MRs found for {pan_name}.")                    # Go back to panchayat list if we navigated away
+                    self.log_warning(f"  No MRs found for {pan_name}.")
+                    # Go back to panchayat list if we navigated away
                     if driver.current_url != page1_url:
                         driver.back()
                         time.sleep(2)
                     continue
 
-                self.log_info(f"  {len(mr_rows)} MR(s) found.")                # At this point driver is on MR list page for this panchayat
+                self.log_info(f"  {len(mr_rows)} MR(s) found.")
+                # At this point driver is on MR list page for this panchayat
                 mr_list_url = driver.current_url
 
                 for mr_info in mr_rows:
@@ -517,12 +525,14 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     time.sleep(2)
 
             self.app.after(0, self.update_status, "Completed!", 1.0)
-            self.log_success(f"Done! {summary_sno} MR(s) scraped.")            cnt = summary_sno
+            self.log_success(f"Done! {summary_sno} MR(s) scraped.")
+            cnt = summary_sno
             total_workers = len(self.workers_tree.get_children()) if hasattr(self, 'workers_tree') else 0
             self.app.after(200, lambda: self.app.log_message(self.log_display, f"📊 NMMS Attendance Complete: {cnt} MRs scraped, {total_workers} workers found. Photos: {photos_dir}"))
 
         except Exception as e:
-            self.log_error(f"Critical error: {e}")            self.app.after(0, lambda err=str(e): messagebox.showerror("Error", f"Scraping failed:\n{err}"))
+            self.log_error(f"Critical error: {e}")
+            self.app.after(0, lambda err=str(e): messagebox.showerror("Error", f"Scraping failed:\n{err}"))
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")
@@ -548,7 +558,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
         mr_rows = []
         try:
             # Always click the link on the current page — never use driver.get(href)
-            self.log_info(f"  Clicking MR link for '{pan_name}'...")            try:
+            self.log_info(f"  Clicking MR link for '{pan_name}'...")
+            try:
                 link = driver.find_element(
                     By.XPATH,
                     f"//tr[td[normalize-space()='{pan_name}']]//td[4]//a"
@@ -563,7 +574,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     )
                     link.click()
                 except NoSuchElementException:
-                    self.log_warning(f"  ⚠ MR link not found for '{pan_name}'.")                    return []
+                    self.log_warning(f"  ⚠ MR link not found for '{pan_name}'.")
+                    return []
 
             time.sleep(2)
 
@@ -571,7 +583,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
                 WebDriverWait(driver, 15).until(
                     EC.presence_of_element_located((By.XPATH, "//table//tr[td]")))
             except TimeoutException:
-                self.log_warning("  ⚠ Timeout on MR list page.")                return []
+                self.log_warning("  ⚠ Timeout on MR list page.")
+                return []
 
             for row in driver.find_elements(By.XPATH, "//table//tr"):
                 cells = row.find_elements(By.TAG_NAME, "td")
@@ -601,7 +614,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
                 except Exception:
                     continue
         except Exception as e:
-            self.log_error(f"  MR list error: {e}")        return mr_rows
+            self.log_error(f"  MR list error: {e}")
+            return mr_rows
 
     def _scrape_mr_detail(self, mr_info: dict, driver, pan_name: str, photos_dir: str) -> dict:
         # ---- Lazy imports ----
@@ -629,7 +643,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
         }
         msr_no = mr_info.get("msr_no", "")
         if not msr_no:
-            self.log_warning("    ⚠ No MSR no for this row.")            return detail
+            self.log_warning("    ⚠ No MSR no for this row.")
+            return detail
 
         try:
             self.app.log_message(self.log_display,
@@ -688,9 +703,9 @@ class NmmsAttendanceTab(BaseAutomationTab):
                 self.app.log_message(self.log_display, 
                     f"      Photo-1: {detail.get('photo1_taken','')} | By: {detail.get('taken_by','')}")
             else:
-                self.log_warning("      ⚠ Photo-1 info not found")            if p2_ok:
-                self.app.log_message(self.log_display, 
-                    f"      Photo-2: {detail.get('photo2_taken','')}")
+                self.log_warning("      ⚠ Photo-1 info not found")
+                if p2_ok:
+                    self.app.log_message(self.log_display, f"      Photo-2: {detail.get('photo2_taken','')}")
 
             # Photos download
             if self._save_photos_var.get():
@@ -726,14 +741,16 @@ class NmmsAttendanceTab(BaseAutomationTab):
             detail["worker_count"] = str(len(workers))
             
             if workers:
-                self.log_info(f"      Workers: {len(workers)}")            else:
+                self.log_info(f"      Workers: {len(workers)}")
+            else:
                 self.log_warning("      ⚠ No workers found!")
             # Go back to MR list page via browser back button
             driver.back()
             time.sleep(1.5)
 
         except Exception as e:
-            self.log_error(f"    Detail error: {e}")            try:
+            self.log_error(f"    Detail error: {e}")
+            try:
                 driver.back()
                 time.sleep(1.5)
             except Exception:
@@ -1085,14 +1102,16 @@ class NmmsAttendanceTab(BaseAutomationTab):
             if resp.status_code == 200 and len(resp.content) > 500:
                 with open(path, "wb") as f:
                     f.write(resp.content)
-                self.log_info(f"    📷 Photo {photo_no}: {fname}")                return ("Yes", path)
+                self.log_info(f"    📷 Photo {photo_no}: {fname}")
+                return ("Yes", path)
 
             self.app.log_message(self.log_display,
                 f"    Photo {photo_no}: HTTP {resp.status_code} ({len(resp.content)} bytes)", "warning")
             return ("No", "")
 
         except Exception as e:
-            self.log_warning(f"    Photo {photo_no} failed: {e}")            return ("Error", "")
+            self.log_warning(f"    Photo {photo_no} failed: {e}")
+            return ("Error", "")
 
     # -----------------------------------------------------------------------
     # EXCEL EXPORT
@@ -1120,7 +1139,8 @@ class NmmsAttendanceTab(BaseAutomationTab):
             messagebox.showinfo("Exported", f"Report saved!\n\n{file_path}")
             if os.name == "nt":
                 try: os.startfile(file_path)
-                except Exception as e_open: logger.debug("NMMS: Could not open file: %s", e_open)
+                except Exception as e_open:
+                    logger.debug("NMMS: Could not open file: %s", e_open)
         except Exception as e:
             messagebox.showerror("Export Error", f"Could not save report:\n{e}")
 

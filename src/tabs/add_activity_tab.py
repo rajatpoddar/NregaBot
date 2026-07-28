@@ -171,7 +171,8 @@ class AddActivityTab(BaseAutomationTab):
                 self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")
+            self.app.after(0, self.app.set_status, "Ready")
 
     def run_automation_logic(self, work_keys, unit_price, quantity):
         # ---- Lazy imports ----
@@ -190,7 +191,8 @@ class AddActivityTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
-        self.log_info("Starting 'Add Activity' automation...")        self.app.after(0, self.app.set_status, "Running Add Activity...")
+        self.log_info("Starting 'Add Activity' automation...")
+        self.app.after(0, self.app.set_status, "Running Add Activity...")
 
         try:
             driver = self.app.get_driver()
@@ -200,14 +202,16 @@ class AddActivityTab(BaseAutomationTab):
             total = len(work_keys)
             for i, work_key in enumerate(work_keys):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.log_warning("Automation stopped.")                    break
+                    self.log_warning("Automation stopped.")
+                    break
                 self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {work_key}", (i+1) / total)
                 self._process_single_work_key(driver, work_key, unit_price, quantity)
 
             # Queue summary on main thread after inserts are processed
             self.app.after(200, lambda: self._show_add_activity_summary(work_keys))
         except Exception as e:
-            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
+            self.log_error(f"A critical error occurred: {e}")
+            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
@@ -233,13 +237,10 @@ class AddActivityTab(BaseAutomationTab):
         failed = total - success
         summary = f"✅ Success: {success}\n❌ Failed: {failed}\n📊 Total: {total}"
         self.update_status(f"✅ {success}/{total} success", 1.0)
-        self.log_info(f"
-{'='*40}
-📊 Add Activity Summary
-{summary}
-{'='*40}")        if total > 0:
+        self.log_info(f"{'='*40}\n📊 Add Activity Summary\n{summary}\n{'='*40}")
+        if total > 0:
             self.log_info(f"📊 Add Activity complete: {summary}")
-    # Inside tabs/add_activity_tab.py
+
     def retry_logic_handler(self) -> None:
         """Override to map the retry button to the work_keys_text box."""
         self.retry_failed_automation(self.work_keys_text)
@@ -314,7 +315,8 @@ class AddActivityTab(BaseAutomationTab):
 
             if len(work_select.options) > 1:
                 work_select.select_by_index(1)
-                self.log_info("Work selected. Loading details...")            else:
+                self.log_info("Work selected. Loading details...")
+            else:
                 # If still empty, the work key might be invalid
                 self._log_result(work_key, "Failed", "Work Key not found or Dropdown empty.")
                 return
@@ -323,8 +325,10 @@ class AddActivityTab(BaseAutomationTab):
             try:
                 activity_table = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_grdDisplayAct')))
                 if "No Activity Found" in activity_table.get_attribute("innerText"):
-                    self.log_info("No existing activity. Proceeding to add.")                else:
-                    self.log_warning("Activity already exists. Skipping.")                    self._log_result(work_key, "Skipped", "An activity is already present.")
+                    self.log_info("No existing activity. Proceeding to add.")
+                else:
+                    self.log_warning("Activity already exists. Skipping.")
+                    self._log_result(work_key, "Skipped", "An activity is already present.")
                     return
             except (NoSuchElementException, TimeoutException):
                 # Sometimes the table doesn't load instantly, assume safe to proceed
@@ -364,7 +368,8 @@ class AddActivityTab(BaseAutomationTab):
             time.sleep(1.5)  # Brief wait for postback to begin
 
             # --- 6. Click Save (JS Safe) ---
-            self.log_info("Saving activity...")            save_button = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_btsave')))
+            self.log_info("Saving activity...")
+            save_button = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_btsave')))
             driver.execute_script("arguments[0].click();", save_button)
 
             # --- 7. Check Result ---

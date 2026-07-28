@@ -248,7 +248,8 @@ class MacroManagerTab(BaseAutomationTab):
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
         
-        self.log_info(">>> Starting Macro Queue Execution...")        self.notebook.set("Logs & Status") 
+        self.log_info(">>> Starting Macro Queue Execution...")
+        self.notebook.set("Logs & Status")
         
         self.app.start_automation_thread(self.automation_key, self.app.workflows.process_global_queue, args=(self,))
 

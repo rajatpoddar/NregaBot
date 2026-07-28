@@ -356,10 +356,14 @@ class DeleteApplicantTab(BaseAutomationTab):
                         if "job card" in ht or "jobcard" in ht:       hdr_map["jobcard"] = ci
                         elif "applicant" in ht or ("name" in ht and "scheme" not in ht and "report" not in ht): hdr_map["name"] = ci
                         elif "s.no" in ht or "s no" in ht or ht == "#": hdr_map["sno"] = ci
-                        elif "panchayat" in ht:                       hdr_map["panchayat"] = ci
-                        elif "village" in ht:                         hdr_map["village"] = ci
-                        elif "abps" in ht:                            hdr_map["abps"] = ci
-                        elif "ekyc" in ht:                            hdr_map["ekyc"] = ci
+                        elif "panchayat" in ht:
+                            hdr_map["panchayat"] = ci
+                        elif "village" in ht:
+                            hdr_map["village"] = ci
+                        elif "abps" in ht:
+                            hdr_map["abps"] = ci
+                        elif "ekyc" in ht:
+                            hdr_map["ekyc"] = ci
                     break
 
             if "jobcard" not in hdr_map or "name" not in hdr_map:
@@ -540,7 +544,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                 self.app.log_message(self.log_display,
                     f"\n{'─'*50}\n🔄 Jobcard {jc_idx+1}/{total_jc}: {jobcard}\n{'─'*50}")
 
-                self.log_info("🌐 Opening Delete Applicant page...")                driver.get(config.DELETE_APPLICANT_CONFIG["url"])
+                self.log_info("🌐 Opening Delete Applicant page...")
+                driver.get(config.DELETE_APPLICANT_CONFIG["url"])
 
                 # Track whether we found this jobcard on the portal
                 # If yes but applicant processing fails → mark for reg deletion
@@ -549,7 +554,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                 # ── 1. Panchayat ──
                 if panchayat:
                     try:
-                        self.log_info(f"📍 Selecting Panchayat: {panchayat}")                        panch_dd = wait.until(EC.presence_of_element_located(
+                        self.log_info(f"📍 Selecting Panchayat: {panchayat}")
+                        panch_dd = wait.until(EC.presence_of_element_located(
                             (By.ID, "ctl00_ContentPlaceHolder1_ddlpnch")))
                         self._select_by_text_case_insensitive(Select(panch_dd), panchayat)
                         time.sleep(1.5)  # Brief wait for postback to begin
@@ -557,7 +563,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                         self.log_info("📍 Panchayat dropdown not found (GP login).")
                 # ── 2. Village (JS — fast) ──
                 try:
-                    self.log_info("🏘️  Selecting village from jobcard code...")                    v_code = jobcard.split('/')[0].split('-')[-1]
+                    self.log_info("🏘️  Selecting village from jobcard code...")
+                    v_code = jobcard.split('/')[0].split('-')[-1]
                     v_dd = wait.until(EC.presence_of_element_located(
                         (By.ID, "ctl00_ContentPlaceHolder1_ddlvillage")))
                     found = driver.execute_script("""
@@ -572,7 +579,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                         return false;
                     """, v_dd, v_code)
                     if found:
-                        self.log_info(f"     ✅ Village code {v_code} selected.")                    else:
+                        self.log_info(f"     ✅ Village code {v_code} selected.")
+                    else:
                         for nu, ov in applicants:
                             log_one(jobcard, ov[3], "Failed", f"Village code '{v_code}' not found.")
                         continue
@@ -584,7 +592,8 @@ class DeleteApplicantTab(BaseAutomationTab):
 
                 # ── 3. Registration (JS — fast) ──
                 try:
-                    self.log_info("📋 Selecting Registration No (Jobcard)...")                    reg_dd = wait.until(EC.presence_of_element_located(
+                    self.log_info("📋 Selecting Registration No (Jobcard)...")
+                    reg_dd = wait.until(EC.presence_of_element_located(
                         (By.ID, "ctl00_ContentPlaceHolder1_ddlReg")))
                     found_reg = driver.execute_script("""
                         var sel = arguments[0], target = arguments[1].toUpperCase();
@@ -598,8 +607,10 @@ class DeleteApplicantTab(BaseAutomationTab):
                         return false;
                     """, reg_dd, jobcard)
                     if found_reg:
-                        self.log_info(f"     ✅ Jobcard {jobcard} selected.")                    else:
-                        self.log_info(f"     ❌ Jobcard {jobcard} not found in registration dropdown.")                        for nu, ov in applicants:
+                        self.log_info(f"     ✅ Jobcard {jobcard} selected.")
+                    else:
+                        self.log_info(f"     ❌ Jobcard {jobcard} not found in registration dropdown.")
+                        for nu, ov in applicants:
                             log_one(jobcard, ov[3], "Failed", "Jobcard not found in village.")
                         continue
                 except Exception as e:
@@ -612,7 +623,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                 jobcard_found_on_portal = True
 
                 # ── 4. Process table ──
-                self.log_info("📊 Scanning applicant table...")                try:
+                self.log_info("📊 Scanning applicant table...")
+                try:
                     table = wait.until(EC.presence_of_element_located(
                         (By.ID, "ctl00_ContentPlaceHolder1_grdData")))
                     rows = table.find_elements(By.TAG_NAME, "tr")[1:]
@@ -675,7 +687,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                                     arguments[0].dispatchEvent(new Event('blur'));
                                 """, di, del_date)
                                 
-                                self.log_info(f"     ✔ Filled: {actual}")                                filled_ok.append((norm_name, ov))
+                                self.log_info(f"     ✔ Filled: {actual}")
+                                filled_ok.append((norm_name, ov))
                             except Exception as e:
                                 err_msg = str(e).splitlines()[0]
                                 # Translate technical Selenium errors to user-friendly messages
@@ -697,7 +710,8 @@ class DeleteApplicantTab(BaseAutomationTab):
 
                     # ── 5. Submit if any filled ──
                     if filled_ok:
-                        self.log_info("📤 Submitting deletion...")                        # Use JS click to avoid stale element errors (page may refresh via partial postback)
+                        self.log_info("📤 Submitting deletion...")
+                        # Use JS click to avoid stale element errors (page may refresh via partial postback)
                         try:
                             btn = wait.until(EC.presence_of_element_located(
                                 (By.ID, "ctl00_ContentPlaceHolder1_BtnDelete")))
@@ -719,7 +733,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                             alert_text = alert.text
                             alert.accept()
                             alert_fired = True
-                            self.log_info(f"     Alert: {alert_text}")                        except TimeoutException:
+                            self.log_info(f"     Alert: {alert_text}")
+                        except TimeoutException:
                             pass  # No alert → postback happened normally
 
                         # Step B: If "cannot delete all" → schedule registration deletion, DONE with this jobcard
@@ -733,7 +748,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                             continue  # Skip lblmsg check — page didn't postback
 
                         # Step C: Wait for postback to complete, then read lblmsg
-                        self.log_info("     Waiting for postback result...")                        try:
+                        self.log_info("     Waiting for postback result...")
+                        try:
                             lblmsg = WebDriverWait(driver, 10).until(
                                 EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_lblmsg")))
                             msg_text = lblmsg.text.strip()
@@ -751,12 +767,14 @@ class DeleteApplicantTab(BaseAutomationTab):
                                 log_one(jobcard, ov[3], "Failed", msg_text)
                         else:
                             # lblmsg not found or empty — maybe form succeeded without message
-                            self.log_info("     ✅ No error message — assuming success.")                            for nu, ov in filled_ok:
+                            self.log_info("     ✅ No error message — assuming success.")
+                            for nu, ov in filled_ok:
                                 log_one(jobcard, ov[3], "Success", "Submitted successfully.")
                     else:
                         self.log_warning("⚠️  No applicants were filled.")
                 except Exception as e:
-                    self.log_error(f"❌ Table error: {e}")                    for nu, ov in applicants:
+                    self.log_error(f"❌ Table error: {e}")
+                    for nu, ov in applicants:
                         log_one(jobcard, ov[3], "Failed", f"Table error: {str(e).splitlines()[0]}")
 
             # ═══════════════════════════════════════════
@@ -842,12 +860,14 @@ class DeleteApplicantTab(BaseAutomationTab):
 
         try:
             # Navigate
-            self.log_info("🌐 Opening Registration Delete page...")            driver.get(config.DEL_REG_CONFIG["url"])
+            self.log_info("🌐 Opening Registration Delete page...")
+            driver.get(config.DEL_REG_CONFIG["url"])
 
             # ── Select Panchayat ──
             if panchayat:
                 try:
-                    self.log_info(f"📍 Selecting Panchayat: {panchayat}")                    panch_dd = wait.until(EC.presence_of_element_located(
+                    self.log_info(f"📍 Selecting Panchayat: {panchayat}")
+                    panch_dd = wait.until(EC.presence_of_element_located(
                         (By.ID, "ctl00_ContentPlaceHolder1_ddlpnch")))
                     self._select_by_text_case_insensitive(Select(panch_dd), panchayat)
                     time.sleep(1.5)  # Brief wait for postback to begin
@@ -855,7 +875,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                     self.log_info("📍 Panchayat dropdown not found (GP login).")
             # ── Select Village (JS — fast) ──
             try:
-                self.log_info("🏘️  Selecting village...")                v_code = jobcard.split('/')[0].split('-')[-1]
+                self.log_info("🏘️  Selecting village...")
+                v_code = jobcard.split('/')[0].split('-')[-1]
                 v_dd = wait.until(EC.presence_of_element_located(
                     (By.ID, "ctl00_ContentPlaceHolder1_ddlvillage")))
                 found = driver.execute_script("""
@@ -870,7 +891,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                     return false;
                 """, v_dd, v_code)
                 if not found:
-                    self.log_info(f"     ❌ Village code '{v_code}' not found.")                    log_one(jobcard, "[Registration]", "Failed",
+                    self.log_info(f"     ❌ Village code '{v_code}' not found.")
+                    log_one(jobcard, "[Registration]", "Failed",
                             f"Village code '{v_code}' not found on DelReg page.")
                     return
             except Exception:
@@ -881,7 +903,8 @@ class DeleteApplicantTab(BaseAutomationTab):
 
             # ── Select Registration (JS — fast) ──
             try:
-                self.log_info(f"📋 Selecting Registration: {jobcard}")                reg_dd = wait.until(EC.presence_of_element_located(
+                self.log_info(f"📋 Selecting Registration: {jobcard}")
+                reg_dd = wait.until(EC.presence_of_element_located(
                     (By.ID, "ctl00_ContentPlaceHolder1_ddlReg")))
                 found_reg = driver.execute_script("""
                     var sel = arguments[0], target = arguments[1].toUpperCase();
@@ -895,19 +918,23 @@ class DeleteApplicantTab(BaseAutomationTab):
                     return false;
                 """, reg_dd, jobcard)
                 if found_reg:
-                    self.log_info(f"     ✅ Registration {jobcard} selected.")                else:
-                    self.log_info(f"     ❌ Jobcard {jobcard} not found on DelReg page.")                    log_one(jobcard, "[Registration]", "Failed",
+                    self.log_info(f"     ✅ Registration {jobcard} selected.")
+                else:
+                    self.log_info(f"     ❌ Jobcard {jobcard} not found on DelReg page.")
+                    log_one(jobcard, "[Registration]", "Failed",
                             "Jobcard not found on DelReg page.")
                     return
             except Exception as e:
-                self.log_info(f"     ❌ Registration error: {str(e).splitlines()[0]}")                log_one(jobcard, "[Registration]", "Failed",
+                self.log_info(f"     ❌ Registration error: {str(e).splitlines()[0]}")
+                log_one(jobcard, "[Registration]", "Failed",
                         f"Reg selection error: {str(e).splitlines()[0]}")
                 return
             time.sleep(1.5)  # Brief wait for postback to begin
 
             # ── Select Reason ──
             try:
-                self.log_info(f"📝 Selecting reason: {reg_reason}")                reason_dd = Select(wait.until(EC.presence_of_element_located(
+                self.log_info(f"📝 Selecting reason: {reg_reason}")
+                reason_dd = Select(wait.until(EC.presence_of_element_located(
                     (By.ID, "ctl00_ContentPlaceHolder1_ddlDelReason"))))
                 reason_dd.select_by_visible_text(reg_reason)
             except Exception as e:
@@ -922,7 +949,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                     return
 
             # ── Submit ──
-            self.log_info("📤 Submitting registration deletion...")            try:
+            self.log_info("📤 Submitting registration deletion...")
+            try:
                 submit_btn = wait.until(EC.element_to_be_clickable(
                     (By.ID, "ctl00_ContentPlaceHolder1_BtnSubmit")))
                 driver.execute_script("arguments[0].click();", submit_btn)
@@ -942,7 +970,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                 alert_text = alert.text
                 alert.accept()
                 alert_fired = True
-                self.log_info(f"     Alert: {alert_text}")            except TimeoutException:
+                self.log_info(f"     Alert: {alert_text}")
+            except TimeoutException:
                 pass
 
             # ── Check lblmsg for result (same as Phase 1) ──

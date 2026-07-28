@@ -174,7 +174,8 @@ class MsrTab(BaseAutomationTab):
             for item in self.results_tree.get_children(): self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0)
-            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")
+            self.app.after(0, self.app.set_status, "Ready")
             
     def run_automation_logic(self):
         # ---- Lazy imports ----
@@ -192,7 +193,8 @@ class MsrTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
         self.app.clear_log(self.log_display)
-        self.log_info("Starting MSR processing...")        self.app.after(0, self.app.set_status, "Running MSR Payment...")
+        self.log_info("Starting MSR processing...")
+        self.app.after(0, self.app.set_status, "Running MSR Payment...")
         
         location_panchayat = self.panchayat_var.get().strip()
         verify_amount_str = self.verify_amount_entry.get().strip()
@@ -220,7 +222,8 @@ class MsrTab(BaseAutomationTab):
                 if not match: raise ValueError(f"Panchayat '{location_panchayat}' not found.")
                 panchayat_select.select_by_visible_text(match)
                 self.app.update_history("location_panchayat", location_panchayat)
-                self.log_info(f"Successfully selected Panchayat: {match}", "success"); time.sleep(2)            except TimeoutException: self.log_info("Panchayat selection not found/required (GP Login). Proceeding...")
+                self.log_info(f"Successfully selected Panchayat: {match}", "success"); time.sleep(2)
+            except TimeoutException: self.log_info("Panchayat selection not found/required (GP Login). Proceeding...")
             total = len(work_keys)
             for i, work_key in enumerate(work_keys, 1):
                 if self.app.stop_events[self.automation_key].is_set(): self.app.log_message(self.log_display, "Automation stopped by user.", "warning"); break
@@ -232,8 +235,10 @@ class MsrTab(BaseAutomationTab):
                 # --- END MODIFICATION ---
                 self._process_single_work_code(driver, wait, work_key, verify_amount)
                 
-            if not self.app.stop_events[self.automation_key].is_set(): self.log_info("📊 Automation finished. Check the 'Results' tab for details.")        except Exception as e:
-            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("MSR Error", f"An error occurred: {e}")
+            if not self.app.stop_events[self.automation_key].is_set(): self.log_info("📊 Automation finished. Check the 'Results' tab for details.")
+        except Exception as e:
+            self.log_error(f"A critical error occurred: {e}")
+            messagebox.showerror("MSR Error", f"An error occurred: {e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Automation Finished.", 1.0)

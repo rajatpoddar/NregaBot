@@ -240,7 +240,8 @@ class DashboardReportTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        self.log_info("Attempting to solve CAPTCHA...")        try:
+        self.log_info("Attempting to solve CAPTCHA...")
+        try:
             captcha_element = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lblStopSpam")))
             captcha_text = captcha_element.text
             match = re.search(r'(\d+)\s*([+\-*])\s*(\d+)', captcha_text)
@@ -253,9 +254,11 @@ class DashboardReportTab(BaseAutomationTab):
             if "Invalid Captcha Code" in driver.page_source: raise ValueError("CAPTCHA failed.")
             return True
         except TimeoutException:
-            self.log_info("CAPTCHA not found, skipping.")            return True
+            self.log_info("CAPTCHA not found, skipping.")
+            return True
         except ValueError as e:
-            self.log_error(f"CAPTCHA Error: {e}")            raise
+            self.log_error(f"CAPTCHA Error: {e}")
+            raise
 
     def run_automation_logic(self, inputs, retries=1):
         # ---- Lazy imports ----
@@ -280,7 +283,8 @@ class DashboardReportTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
 
             # --- STANDARD FLOW ONLY (Direct Link Removed) ---
-            self.log_info("Navigating to Home Page...")            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+            self.log_info("Navigating to Home Page...")
+            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
             self._solve_captcha(driver, wait)
 
             self.update_status("Selecting State...", 0.15)
@@ -331,7 +335,8 @@ class DashboardReportTab(BaseAutomationTab):
             rows = table.find_elements(By.XPATH, ".//tr[position()>1]") 
 
             if not rows:
-                self.log_warning("Table is empty.")                return
+                self.log_warning("Table is empty.")
+                return
 
             workcode_list = []
             pending_mr_count = 0
@@ -366,7 +371,8 @@ class DashboardReportTab(BaseAutomationTab):
             if "Session Expired" in str(e) and retries > 0:
                 self.run_automation_logic(inputs, retries - 1)
                 return
-            self.log_error(f"Error: {e}")            self.success_message = None
+            self.log_error(f"Error: {e}")
+            self.success_message = None
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")

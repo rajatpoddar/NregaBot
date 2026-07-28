@@ -364,7 +364,8 @@ class MusterrollGenTab(BaseAutomationTab):
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
             self.success_label.configure(text="Success: 0"); self.skipped_label.configure(text="Skipped/Failed: 0")
-            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")
+            self.app.after(0, self.app.set_status, "Ready")
             
     def save_inputs(self, inputs):
         try:
@@ -399,13 +400,16 @@ class MusterrollGenTab(BaseAutomationTab):
     def _print_file(self, file_path):
         try:
             if not os.path.exists(file_path):
-                self.log_error(f"Print Error: File not found at {file_path}")                return
+                self.log_error(f"Print Error: File not found at {file_path}")
+                return
             if sys.platform == "win32": os.startfile(file_path, "print")
             else: subprocess.run(["lpr", file_path], check=True)
-            self.log_info(f"Sent {os.path.basename(file_path)} to printer.")            time.sleep(2)
+            self.log_info(f"Sent {os.path.basename(file_path)} to printer.")
+            time.sleep(2)
         except Exception as e:
             error_msg = f"An unexpected error occurred while printing: {e}"
-            self.log_error(error_msg)            self.app.after(0, lambda: messagebox.showwarning("Print Error", error_msg))
+            self.log_error(error_msg)
+            self.app.after(0, lambda: messagebox.showwarning("Print Error", error_msg))
 
     def _get_output_dir(self, location_panchayat):
         try:
@@ -416,7 +420,8 @@ class MusterrollGenTab(BaseAutomationTab):
             os.makedirs(output_dir, exist_ok=True)
             return output_dir
         except Exception as e:
-            self.log_error(f"Error creating output directory: {e}")            messagebox.showerror("Directory Error", f"Could not create output directory: {e}")
+            self.log_error(f"Error creating output directory: {e}")
+            messagebox.showerror("Directory Error", f"Could not create output directory: {e}")
             return None
 
     def run_automation_logic(self, inputs):
@@ -430,11 +435,13 @@ class MusterrollGenTab(BaseAutomationTab):
         from selenium import webdriver
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
-        self.log_info(f"Starting MR generation for: {inputs['panchayat']}")        self.app.after(0, self.app.set_status, "Running MR Generation...")
+        self.log_info(f"Starting MR generation for: {inputs['panchayat']}")
+        self.app.after(0, self.app.set_status, "Running MR Generation...")
         
         self.output_dir = self._get_output_dir(inputs['panchayat'])
         if not self.output_dir:
-            self.log_error("Failed to create output directory. Aborting.")            self.app.after(0, self.set_ui_state, False)
+            self.log_error("Failed to create output directory. Aborting.")
+            self.app.after(0, self.set_ui_state, False)
             return
             
         try:
@@ -458,14 +465,16 @@ class MusterrollGenTab(BaseAutomationTab):
 
             for index, item in enumerate(items_to_process):
                 if self.app.stop_events[self.automation_key].is_set(): 
-                    self.log_warning("Stop signal received.")                    break
-                self.log_info(f"
---- Processing item ({index+1}/{total_items}): {item} ---")                self.app.after(0, self.update_status, f"Processing {item}", (index+1)/total_items)
+                    self.log_warning("Stop signal received.")
+                    break
+                self.log_info(f"--- Processing item ({index+1}/{total_items}): {item} ---")
+                self.app.after(0, self.update_status, f"Processing {item}", (index+1)/total_items)
                 
                 self._process_single_item(driver, wait, inputs, item, self.output_dir, session_skip_list)
 
         except Exception as e:
-            self.log_error(f"A critical error occurred: {e}")            if "in str" not in str(e): 
+            self.log_error(f"A critical error occurred: {e}")
+            if "in str" not in str(e):
                 messagebox.showerror("Critical Error", f"An unexpected error stopped the automation.\n\nError: {e}")
         
         finally:
@@ -477,7 +486,8 @@ class MusterrollGenTab(BaseAutomationTab):
     def _show_completion_dialog(self, output_dir):
         summary = f"Automation complete.\nSuccess: {self.success_count}\nSkipped/Failed: {self.skipped_count}"
         if "macro" in self.app.active_automations:
-            self.log_info(f"Batch Finished. Output saved to: {output_dir}")            return
+            self.log_info(f"Batch Finished. Output saved to: {output_dir}")
+            return
 
         if self.success_count > 0 and output_dir and os.path.exists(output_dir):
             if messagebox.askyesno("Task Finished", f"{summary}\n\nDo you want to open the output folder?"):
@@ -494,17 +504,21 @@ class MusterrollGenTab(BaseAutomationTab):
         from selenium.common.exceptions import UnexpectedAlertPresentException
         from selenium import webdriver
         try:
-            self.log_info("Validating Panchayat name...")            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
+            self.log_info("Validating Panchayat name...")
+            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
             panchayat_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "exe_agency"))))
             if not self._select_by_text_case_insensitive(panchayat_dropdown, config.AGENCY_PREFIX + location_panchayat):
                 error_msg = f"Panchayat name '{location_panchayat}' not found on the website. Please check spelling."
                 if "macro" in self.app.active_automations:
-                    self.log_error(f"Skipping: {error_msg}")                    return False
+                    self.log_error(f"Skipping: {error_msg}")
+                    return False
                 messagebox.showerror("Validation Error", error_msg)
                 return False
-            self.log_success("Panchayat name is valid.")            return True
+            self.log_success("Panchayat name is valid.")
+            return True
         except Exception as e:
-            self.log_error(f"Validation failed: Error: {e}")            return False
+            self.log_error(f"Validation failed: Error: {e}")
+            return False
 
     def _get_items_to_process(self, driver, wait, inputs):
         # ---- Lazy imports ----
@@ -516,16 +530,20 @@ class MusterrollGenTab(BaseAutomationTab):
         from selenium.common.exceptions import UnexpectedAlertPresentException
         from selenium import webdriver
         if inputs['auto_mode']:
-            self.log_info("Auto Mode: Fetching available work codes...")            try:
+            self.log_info("Auto Mode: Fetching available work codes...")
+            try:
                 agency_select = Select(driver.find_element(By.ID, "exe_agency"))
                 self._select_by_text_case_insensitive(agency_select, config.AGENCY_PREFIX + inputs['panchayat'])
                 wait.until(lambda d: len(Select(d.find_element(By.ID, "ddlWorkCode")).options) > 1)
                 items = [opt.text for opt in Select(driver.find_element(By.ID, "ddlWorkCode")).options if opt.get_attribute("value")]
-                self.log_info(f"Found {len(items)} available work codes.")                return items
+                self.log_info(f"Found {len(items)} available work codes.")
+                return items
             except Exception as e:
-                self.log_error(f"Could not fetch work codes automatically. Error: {e}")                return []
+                self.log_error(f"Could not fetch work codes automatically. Error: {e}")
+                return []
         else:
-            self.log_info(f"Processing {len(inputs['work_codes'])} provided work keys.")            return inputs['work_codes']
+            self.log_info(f"Processing {len(inputs['work_codes'])} provided work keys.")
+            return inputs['work_codes']
 
     def _process_single_item(self, driver, wait, inputs, item, output_dir, session_skip_list):
         # ---- Lazy imports ----
@@ -538,24 +556,29 @@ class MusterrollGenTab(BaseAutomationTab):
         from selenium import webdriver
         full_work_code_text = ""
         try:
-            self.log_info("   - Navigating to MR page...")            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
+            self.log_info("   - Navigating to MR page...")
+            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
             
-            self.log_info("   - Selecting Panchayat...")            panchayat_dropdown = wait.until(EC.presence_of_element_located((By.ID, "exe_agency")))
+            self.log_info("   - Selecting Panchayat...")
+            panchayat_dropdown = wait.until(EC.presence_of_element_located((By.ID, "exe_agency")))
             self._select_by_text_case_insensitive(Select(panchayat_dropdown), config.AGENCY_PREFIX + inputs['panchayat'])
             
-            self.log_info(f"   - Selecting work code for '{item}'...")            full_work_code_text = self._select_work_code(driver, wait, item, inputs['auto_mode'])
+            self.log_info(f"   - Selecting work code for '{item}'...")
+            full_work_code_text = self._select_work_code(driver, wait, item, inputs['auto_mode'])
             
             if full_work_code_text in session_skip_list:
                 self._log_result(item, "Skipped", "Already processed in this session.")
                 return
 
-            self.log_info("   - Entering dates and staff details...")            driver.execute_script(f"document.getElementById('txtDateFrom').value = '{inputs['start_date']}';")
+            self.log_info("   - Entering dates and staff details...")
+            driver.execute_script(f"document.getElementById('txtDateFrom').value = '{inputs['start_date']}';")
             driver.execute_script(f"document.getElementById('txtDateTo').value = '{inputs['end_date']}';")
             
             designation_dropdown = wait.until(EC.presence_of_element_located((By.ID, "ddldesg")))
             Select(designation_dropdown).select_by_visible_text(inputs['designation'])
 
-            self.log_info("   - Waiting for Technical Staff list to populate...")            wait.until(EC.presence_of_element_located((By.XPATH, "//select[@id='ddlstaff']/option[position()>1]")))
+            self.log_info("   - Waiting for Technical Staff list to populate...")
+            wait.until(EC.presence_of_element_located((By.XPATH, "//select[@id='ddlstaff']/option[position()>1]")))
             
             staff_dropdown = Select(driver.find_element(By.ID, "ddlstaff"))
             staff_found = False
@@ -568,7 +591,8 @@ class MusterrollGenTab(BaseAutomationTab):
             if not staff_found:
                 raise ValueError(f"Staff name '{inputs['staff']}' not found. Check spelling.")
             
-            self.log_info("   - Submitting form...")            body_element = driver.find_element(By.TAG_NAME, 'body')
+            self.log_info("   - Submitting form...")
+            body_element = driver.find_element(By.TAG_NAME, 'body')
             btn_proceed = wait.until(EC.presence_of_element_located((By.ID, "btnProceed")))
             driver.execute_script("arguments[0].click();", btn_proceed)
             
@@ -588,14 +612,16 @@ class MusterrollGenTab(BaseAutomationTab):
                 self._log_result(item, "Skipped", error_reason)
                 session_skip_list.add(full_work_code_text)
                 return
-            self.log_info("   - Muster Roll is valid. Generating output...")            pdf_path = self._save_mr_as_pdf(driver, full_work_code_text, output_dir, inputs['orientation'], inputs['scale'])
+            self.log_info("   - Muster Roll is valid. Generating output...")
+            pdf_path = self._save_mr_as_pdf(driver, full_work_code_text, output_dir, inputs['orientation'], inputs['scale'])
             
             log_detail = f"Saved as {os.path.basename(pdf_path)}" if pdf_path else "PDF Save Failed"
             
             if pdf_path:
                 self.current_session_files.append(pdf_path)
                 if inputs.get('save_to_cloud'):
-                    self.log_info("   - Uploading to cloud...")                    if self._upload_to_cloud(pdf_path, inputs['panchayat']):
+                    self.log_info("   - Uploading to cloud...")
+                    if self._upload_to_cloud(pdf_path, inputs['panchayat']):
                         log_detail += " & Cloud Uploaded"
                     else:
                         log_detail += " (Cloud Failed)"
@@ -607,10 +633,12 @@ class MusterrollGenTab(BaseAutomationTab):
             session_skip_list.add(full_work_code_text)
 
         except TimeoutException:
-            self.log_error(f"Error on '{item}': Timeout (Slow Network)")            self._log_result(item, "Failed", "Timeout - Slow Network")
+            self.log_error(f"Error on '{item}': Timeout (Slow Network)")
+            self._log_result(item, "Failed", "Timeout - Slow Network")
         except Exception as e:
             error_msg = str(e).splitlines()[0] if str(e) else "Unknown Error"
-            self.log_error(f"Error on '{item}': {error_msg}")            self._log_result(item, "Failed", error_msg)
+            self.log_error(f"Error on '{item}': {error_msg}")
+            self._log_result(item, "Failed", error_msg)
 
     def _save_mr_as_pdf(self, driver, full_work_code, output_dir, orientation, scale):
         # ---- Lazy imports ----
@@ -640,7 +668,8 @@ class MusterrollGenTab(BaseAutomationTab):
 
             # --- CSS for Orientation ---
             if is_landscape:
-                self.log_info("   - Injecting CSS for landscape orientation...")                driver.execute_script(
+                self.log_info("   - Injecting CSS for landscape orientation...")
+                driver.execute_script(
                     "var css = '@page { size: landscape; }';"
                     "var head = document.head || document.getElementsByTagName('head')[0];"
                     "var style = document.createElement('style');"
@@ -651,7 +680,8 @@ class MusterrollGenTab(BaseAutomationTab):
                 )
 
             # --- Fix: Remove blank page caused by website update ---
-            self.log_info("   - Removing blank page elements...")            driver.execute_script("""
+            self.log_info("   - Removing blank page elements...")
+            driver.execute_script("""
                 // 1. Inject print CSS to suppress all known blank-page causes
                 var styleTag = document.createElement('style');
                 styleTag.innerHTML = `
@@ -700,7 +730,9 @@ class MusterrollGenTab(BaseAutomationTab):
                 """
                 driver.execute_script(footer_js)
 
-                self.log_info("   - Using Firefox's print command...")                self.log_warning("   - Note: PDF Scale setting is ignored for Firefox.")                pdf_data_base64 = driver.print_page()
+                self.log_info("   - Using Firefox's print command...")
+                self.log_warning("   - Note: PDF Scale setting is ignored for Firefox.")
+                pdf_data_base64 = driver.print_page()
 
             elif self.app.active_browser == 'chrome':
                 self.log_info("   - Using Chrome's advanced print command (CDP)...")
@@ -740,10 +772,12 @@ class MusterrollGenTab(BaseAutomationTab):
                     f.write(pdf_data)
                 return save_path
             else:
-                self.log_error("Error: PDF data was not generated by the browser.")                return None
+                self.log_error("Error: PDF data was not generated by the browser.")
+                return None
 
         except Exception as e:
-            self.log_error(f"Error saving PDF: {e}")            return None
+            self.log_error(f"Error saving PDF: {e}")
+            return None
 
     def _select_work_code(self, driver, wait, item, is_auto_mode):
         # ---- Lazy imports ----
@@ -774,7 +808,8 @@ class MusterrollGenTab(BaseAutomationTab):
                     if found_option:
                         full_work_code_text = found_option.text
                         work_code_dropdown.select_by_visible_text(full_work_code_text)
-                        self.log_info(f"   - Found and selected: {full_work_code_text}")                        return full_work_code_text
+                        self.log_info(f"   - Found and selected: {full_work_code_text}")
+                        return full_work_code_text
                     else:
                         raise NoSuchElementException(f"Could not find a matching work for auto item '{item}'.")
                 
@@ -803,13 +838,15 @@ class MusterrollGenTab(BaseAutomationTab):
                     if found_option:
                         full_work_code_text = found_option.text
                         work_code_dropdown.select_by_visible_text(full_work_code_text)
-                        self.log_info(f"   - Found and selected: {full_work_code_text}")                        return full_work_code_text
+                        self.log_info(f"   - Found and selected: {full_work_code_text}")
+                        return full_work_code_text
                     else:
                         raise NoSuchElementException(f"Could not find a matching work for search key '{item}'.")
                         
             except StaleElementReferenceException:
                 if attempt < 2:
-                    self.log_warning("   - Stale element detected, retrying selection...")                    time.sleep(2)
+                    self.log_warning("   - Stale element detected, retrying selection...")
+                    time.sleep(2)
                     continue
                 else:
                     raise
@@ -864,7 +901,8 @@ class MusterrollGenTab(BaseAutomationTab):
         from selenium import webdriver
         """Uploads a given file to the user's cloud storage via the API."""
         if not self.app.license_info.get('key'):
-            self.log_warning("   - Cloud Upload Skipped: No license key found.")            return False
+            self.log_warning("   - Cloud Upload Skipped: No license key found.")
+            return False
             
         headers = {'Authorization': f"Bearer {self.app.license_info['key']}"}
         url = f"{config.LICENSE_SERVER_URL}/files/api/upload"
@@ -889,11 +927,14 @@ class MusterrollGenTab(BaseAutomationTab):
             if response.status_code == 201:
                 return True
             else:
-                self.log_error(f"   - Cloud upload failed with status {response.status_code}: {response.text}")                return False
+                self.log_error(f"   - Cloud upload failed with status {response.status_code}: {response.text}")
+                return False
         except requests.exceptions.RequestException as e:
-            self.log_error(f"   - A connection error occurred during cloud upload: {e}")            return False
+            self.log_error(f"   - A connection error occurred during cloud upload: {e}")
+            return False
         except Exception as e:
-            self.log_error(f"   - An unexpected error occurred during cloud upload: {e}")            return False
+            self.log_error(f"   - An unexpected error occurred during cloud upload: {e}")
+            return False
 
     def export_report(self):
         # ---- Lazy imports ----
@@ -980,7 +1021,8 @@ class MusterrollGenTab(BaseAutomationTab):
         pdf_files = self.current_session_files
         
         if not pdf_files:
-            self.log_warning("No PDFs generated in this session to merge.")            messagebox.showinfo("No Files", "No MRs have been successfully generated in this cycle yet.\nRun the automation first.", parent=self)
+            self.log_warning("No PDFs generated in this session to merge.")
+            messagebox.showinfo("No Files", "No MRs have been successfully generated in this cycle yet.\nRun the automation first.", parent=self)
             return
             
         self.log_info(f"Merging {len(pdf_files)} files generated in this session.")
@@ -989,7 +1031,8 @@ class MusterrollGenTab(BaseAutomationTab):
         base_name = dialog.get_input()
         
         if not base_name:
-            self.log_info("Merge cancelled by user.")            return
+            self.log_info("Merge cancelled by user.")
+            return
 
         # Get unique output path
         try:
@@ -1027,7 +1070,8 @@ class MusterrollGenTab(BaseAutomationTab):
         from selenium import webdriver
         """The actual PDF merging logic that runs in a thread."""
         self.app.after(0, self.set_ui_state, True)
-        self.log_info(f"Merging {len(file_list)} files...")        self.app.after(0, self.app.set_status, "Merging PDFs...")
+        self.log_info(f"Merging {len(file_list)} files...")
+        self.app.after(0, self.app.set_status, "Merging PDFs...")
         
         # Note: duplicate_mr_tab uses "pdf_merger_dup_mr" event key, 
         # while musterroll_gen_tab uses "pdf_merger_mr". 
@@ -1038,7 +1082,8 @@ class MusterrollGenTab(BaseAutomationTab):
             merger = PdfWriter()
             for i, pdf_path in enumerate(file_list):
                 if self.app.stop_events.get(stop_event_key, threading.Event()).is_set():
-                    self.log_warning("Merge cancelled.")                    merger.close()
+                    self.log_warning("Merge cancelled.")
+                    merger.close()
                     return
                 
                 self.log_info(f"Processing file {i+1}/{len(file_list)}: {os.path.basename(pdf_path)}")                
@@ -1052,7 +1097,8 @@ class MusterrollGenTab(BaseAutomationTab):
                     if page_num == num_pages - 1:
                         text = page.extract_text()
                         if text is None or len(text.strip()) < 250:
-                            self.log_info(f"  -> Skipped footer-only last page in {os.path.basename(pdf_path)}")                            continue 
+                            self.log_info(f"  -> Skipped footer-only last page in {os.path.basename(pdf_path)}")
+                            continue 
 
                     merger.add_page(page)
             
@@ -1060,12 +1106,14 @@ class MusterrollGenTab(BaseAutomationTab):
                 merger.write(f_out)
             merger.close()
             
-            self.log_success("Merge complete!")            messagebox.showinfo("Success", f"Successfully merged {len(file_list)} files into:\n{output_path}", parent=self)
+            self.log_success("Merge complete!")
+            messagebox.showinfo("Success", f"Successfully merged {len(file_list)} files into:\n{output_path}", parent=self)
             if messagebox.askyesno("Open Location?", "Open the Merged PDFs folder?", parent=self):
                 self.app.open_folder(os.path.dirname(output_path))
                 
         except Exception as e:
-            self.log_error(f"Error during merge: {e}")            messagebox.showerror("Merge Error", f"An error occurred: {e}", parent=self)
+            self.log_error(f"Error during merge: {e}")
+            messagebox.showerror("Merge Error", f"An error occurred: {e}", parent=self)
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")

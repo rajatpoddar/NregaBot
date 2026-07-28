@@ -240,7 +240,8 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
             for i, work_code in enumerate(inputs["work_codes"]):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.log_warning("⏹️ Automation stopped by user.")                    break
+                    self.log_warning("⏹️ Automation stopped by user.")
+                    break
                 
                 pct = (i + 1) / total_codes * 100
                 status_msg = f"[{i+1}/{total_codes}] {truncate_workcode(work_code)} ({pct:.0f}%)"
@@ -253,22 +254,25 @@ class PhysicalCompleteTab(BaseAutomationTab):
                 if status == "Success": 
                     success_count += 1
                     self.last_successful_codes.append(work_code)
-                    self.log_success(f"    ✅ {truncate_workcode(work_code)}: Marked complete")                else: 
+                    self.log_success(f"    ✅ {truncate_workcode(work_code)}: Marked complete")
+                else: 
                     fail_count += 1
                     self.log_error(f"    ❌ {truncate_workcode(work_code)}: {details}")
-            self.log_info(f"
-{'='*50}")            self.log_info(f"📊 Physical Complete: ✅ {success_count} done, ❌ {fail_count} failed (of {total_codes} total)")            self.log_info(f"{'='*50}")
+            self.log_info(f"{'='*50}")
+            self.log_info(f"📊 Physical Complete: ✅ {success_count} done, ❌ {fail_count} failed (of {total_codes} total)")
+            self.log_info(f"{'='*50}")
             # Auto-forward Logic
             if self.auto_forward_var.get() and self.last_successful_codes:
-                self.log_info("
---- Auto-Forwarding to Scheme Closing ---")                self.app.after(500, lambda: self.forward_to_scheme_closing(self.last_successful_panchayat, self.last_successful_codes, auto_start=True))
+                self.log_info("--- Auto-Forwarding to Scheme Closing ---")
+                self.app.after(500, lambda: self.forward_to_scheme_closing(self.last_successful_panchayat, self.last_successful_codes, auto_start=True))
 
         except Exception as e:
-            self.log_error(f"A critical error occurred: {str(e).splitlines()[0]}")        finally:
+            self.log_error(f"A critical error occurred: {str(e).splitlines()[0]}")
+        finally:
             self.app.after(0, self.set_ui_state, False)
             self.update_status("Automation Finished", 1.0)
-            self.log_info("
---- Automation Finished ---")            self.app.after(0, self.app.set_status, "Automation Finished")
+            self.log_info("--- Automation Finished ---")
+            self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _log_result(self, work_code, status, details):
         timestamp = time.strftime("%H:%M:%S")
@@ -289,15 +293,18 @@ class PhysicalCompleteTab(BaseAutomationTab):
         
         try:
             driver.get(url)
-            self.log_info("   - Selecting Panchayat...")            panchayat_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlPanchayat")))
+            self.log_info("   - Selecting Panchayat...")
+            panchayat_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlPanchayat")))
             self._select_by_text_case_insensitive(Select(panchayat_select), inputs["panchayat"])
             wait.until(EC.staleness_of(panchayat_select))
 
-            self.log_info("   - Selecting Work Category...")            category_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlWorkCategroy")))
+            self.log_info("   - Selecting Work Category...")
+            category_select = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlWorkCategroy")))
             Select(category_select).select_by_visible_text(inputs["work_category"])
             wait.until(EC.staleness_of(category_select))
 
-            self.log_info("   - Searching for Work Code...")            wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
+            self.log_info("   - Searching for Work Code...")
+            wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
             time.sleep(1.5)  # Brief wait for postback to begin
             wc_input.send_keys(work_code)
             wc_input.send_keys(Keys.TAB)
@@ -321,7 +328,8 @@ class PhysicalCompleteTab(BaseAutomationTab):
                 checkbox.click()
                 wait.until(EC.staleness_of(checkbox))
 
-            self.log_info("   - Clicking NEXT and handling alert...")            next_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_BtnNext")))
+            self.log_info("   - Clicking NEXT and handling alert...")
+            next_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_BtnNext")))
             next_btn.click()
 
             try:
@@ -343,7 +351,8 @@ class PhysicalCompleteTab(BaseAutomationTab):
             asset_desc_input.clear()
             asset_desc_input.send_keys("Completed")
             
-            self.log_info("   - Saving Physical Completion...")            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
+            self.log_info("   - Saving Physical Completion...")
+            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
             
             try:
                 alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
@@ -357,10 +366,12 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
         except (TimeoutException, NoSuchElementException, NoAlertPresentException) as e:
             error_message = str(e).splitlines()[0] if str(e) else "No error message"
-            self.log_error(f"   - Error: {error_message}")            return "Failed", f"Error on page: {error_message}"
+            self.log_error(f"   - Error: {error_message}")
+            return "Failed", f"Error on page: {error_message}"
         except Exception as e:
             error_message = str(e).splitlines()[0] if str(e) else "No error message"
-            self.log_error(f"   - Unexpected error: {error_message}")            return "Failed", f"Unexpected error: {error_message}"
+            self.log_error(f"   - Unexpected error: {error_message}")
+            return "Failed", f"Unexpected error: {error_message}"
 
     def manual_forward(self):
         """Button click handler for forwarding to Scheme Closing"""

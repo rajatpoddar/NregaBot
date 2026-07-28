@@ -305,7 +305,8 @@ class SchemeClosingTab(BaseAutomationTab):
             total_codes = len(inputs["work_codes"])
             for i, work_code in enumerate(inputs["work_codes"]):
                 if self.app.stop_events[self.automation_key].is_set():
-                    self.log_warning("⏹️ Automation stopped by user.")                    break
+                    self.log_warning("⏹️ Automation stopped by user.")
+                    break
                 
                 pct = (i + 1) / total_codes * 100
                 status_msg = f"[{i+1}/{total_codes}] {truncate_workcode(work_code)} ({pct:.0f}%)"
@@ -319,18 +320,20 @@ class SchemeClosingTab(BaseAutomationTab):
                 if status == "Success":
                     current_cert_no += 1
                     success_count += 1
-                    self.log_success(f"    ✅ {truncate_workcode(work_code)}: Closed (Cert #{current_cert_no-1})")                else:
+                    self.log_success(f"    ✅ {truncate_workcode(work_code)}: Closed (Cert #{current_cert_no-1})")
+                else:
                     fail_count += 1
                     self.log_error(f"    ❌ {truncate_workcode(work_code)}: {details}")
-            self.log_info(f"
-{'='*50}")            self.log_info(f"📊 Scheme Closing: ✅ {success_count} closed, ❌ {fail_count} failed (of {total_codes} total)")            self.log_info(f"{'='*50}")
+            self.log_info(f"{'='*50}")
+            self.log_info(f"📊 Scheme Closing: ✅ {success_count} closed, ❌ {fail_count} failed (of {total_codes} total)")
+            self.log_info(f"{'='*50}")
         except Exception as e:
             self.log_error(f"A critical error occurred: {str(e).splitlines()[0]}")        
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.update_status("Automation Finished", 1.0)
-            self.log_info("
---- Automation Finished ---")            self.app.after(0, self.app.set_status, "Automation Finished")
+            self.log_info("--- Automation Finished ---")
+            self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _log_result(self, work_code, status, details):
         timestamp = time.strftime("%H:%M:%S")
@@ -352,15 +355,18 @@ class SchemeClosingTab(BaseAutomationTab):
         
         try:
             driver.get(url)
-            self.log_info("   - Page 1: Selecting Panchayat...")            panchayat_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlPanchayat")))
+            self.log_info("   - Page 1: Selecting Panchayat...")
+            panchayat_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlPanchayat")))
             self._select_by_text_case_insensitive(Select(panchayat_select_element), inputs["panchayat"])
             wait.until(EC.staleness_of(panchayat_select_element))
 
-            self.log_info("   - Page 1: Selecting Work Category...")            category_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlWorkCategroy")))
+            self.log_info("   - Page 1: Selecting Work Category...")
+            category_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlWorkCategroy")))
             Select(category_select_element).select_by_visible_text(inputs["work_category"])
             wait.until(EC.staleness_of(category_select_element))
 
-            self.log_info("   - Page 1: Searching for Work Code...")            wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
+            self.log_info("   - Page 1: Searching for Work Code...")
+            wc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txt_search_wrk")))
 
             time.sleep(1.5)  # Brief wait for postback to begin
 
@@ -379,7 +385,8 @@ class SchemeClosingTab(BaseAutomationTab):
             if not option_found: return "Failed", f"Work code {work_code} not found."
             wait.until(EC.staleness_of(work_dropdown_element))
             
-            self.log_info("   - Page 1: Filling completion details...")            work_name_full = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_Pnl_lblworkcode"))).text
+            self.log_info("   - Page 1: Filling completion details...")
+            work_name_full = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_Pnl_lblworkcode"))).text
             
             area_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_Txtactualbenarea")))
             if not area_input.get_attribute("value"):
@@ -401,15 +408,18 @@ class SchemeClosingTab(BaseAutomationTab):
                 )
                 if not excavation_input.get_attribute("value"):
                     excavation_input.send_keys("1")
-                    self.log_info("   - Excavation(cum) field found and filled with '1'.")                else:
-                    self.log_info("   - Excavation(cum) field found but already filled.")            except TimeoutException:
-                self.log_info("   - Excavation(cum) field not found on this page, skipping.")            
-            driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_BtnNext").click()
+                    self.log_info("   - Excavation(cum) field found and filled with '1'.")
+            except TimeoutException:
+                    self.log_info("   - Excavation(cum) field not found on this page, skipping.")
+            else:
+                    self.log_info("   - Excavation(cum) field found but already filled.")
             
-            self.log_info("   - Page 2: Waiting for page to load...")            asset_name_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Name")))
+            self.log_info("   - Page 2: Waiting for page to load...")
+            asset_name_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Name")))
             asset_desc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Description")))
             
-            self.log_info("   - Page 2: Filling Asset Name and Description...")            asset_name_input.clear()
+            self.log_info("   - Page 2: Filling Asset Name and Description...")
+            asset_name_input.clear()
             asset_name_input.send_keys("Completed")
             asset_desc_input.clear()
             asset_desc_input.send_keys("Completed")
@@ -433,7 +443,8 @@ class SchemeClosingTab(BaseAutomationTab):
                     return "Failed", f"Unexpected alert: {alert_text}"
 
             except TimeoutException:
-                self.log_info("   - No success alert detected, checking page for status...")                page_source = driver.page_source
+                self.log_info("   - No success alert detected, checking page for status...")
+                page_source = driver.page_source
                 if "Work has been Completed Successfully" in page_source:
                     return "Success", "Work completed successfully (page)."
                 else:
@@ -445,10 +456,12 @@ class SchemeClosingTab(BaseAutomationTab):
 
         except (TimeoutException, NoSuchElementException, NoAlertPresentException) as e:
             error_message = str(e).splitlines()[0] if str(e) else "No error message"
-            self.log_error(f"   - Error: {error_message}")            return "Failed", f"Error on page: {error_message}"
+            self.log_error(f"   - Error: {error_message}")
+            return "Failed", f"Error on page: {error_message}"
         except Exception as e:
             error_message = str(e).splitlines()[0] if str(e) else "No error message"
-            self.log_error(f"   - An unexpected error occurred: {error_message}")            return "Failed", f"An unexpected error occurred: {error_message}"
+            self.log_error(f"   - An unexpected error occurred: {error_message}")
+            return "Failed", f"An unexpected error occurred: {error_message}"
     def reset_ui(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By

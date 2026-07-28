@@ -315,7 +315,8 @@ class MbEntryTab(BaseAutomationTab):
             for item in self.results_tree.get_children(): self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")
+            self.app.after(0, self.app.set_status, "Ready")
 
     # --- NEW: Override Retry Logic for MB Entry ---
     def retry_logic_handler(self) -> None:
@@ -378,7 +379,8 @@ class MbEntryTab(BaseAutomationTab):
             )
             if not proceed:
                 return
-            self.log_info("ℹ️ No work codes provided. Will process all works from dropdown.")        self._save_mapping_pair(cfg['location_panchayat'], cfg['mate_name'])
+            self.log_info("ℹ️ No work codes provided. Will process all works from dropdown.")
+            self._save_mapping_pair(cfg['location_panchayat'], cfg['mate_name'])
         self._save_inputs(cfg)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(cfg, work_codes_raw))
     
@@ -397,7 +399,8 @@ class MbEntryTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True) 
         self.app.clear_log(self.log_display) 
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
-        self.log_info("Starting eMB Entry automation...")        self.app.after(0, self.app.set_status, "Running eMB Entry...") 
+        self.log_info("Starting eMB Entry automation...")
+        self.app.after(0, self.app.set_status, "Running eMB Entry...") 
         
         try:
             driver = self.app.get_driver()
@@ -419,7 +422,8 @@ class MbEntryTab(BaseAutomationTab):
                 final_msg = "Automation finished." if not self.app.stop_events[self.automation_key].is_set() else "Stopped."
                 self.app.after(0, self.update_status, final_msg, 1.0)
                 if not self.app.stop_events[self.automation_key].is_set():
-                    self.log_info("📊 e-MB Entry process has finished.")                return
+                    self.log_info("📊 e-MB Entry process has finished.")
+                    return
 
             processed_codes = set()
             total = len(work_codes_raw)
@@ -444,7 +448,8 @@ class MbEntryTab(BaseAutomationTab):
                 messagebox.showinfo("Complete", "e-MB Entry process has finished.")
         
         except Exception as e:
-            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
+            self.log_error(f"A critical error occurred: {e}")
+            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
@@ -521,18 +526,21 @@ class MbEntryTab(BaseAutomationTab):
             # Re-set page no after dropdown selection (page refresh may clear it)
             driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpageno').value = '{cfg['page_no']}';")
 
-            self.log_info("🔘 Clicking Radio Button...")            radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rddist_0")))
+            self.log_info("🔘 Clicking Radio Button...")
+            radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rddist_0")))
             driver.execute_script("arguments[0].click();", radio_btn)
             time.sleep(1.0)  # Short wait after click
 
-            self.log_info("⏳ Waiting for Period Dropdown...")            period_dropdown_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod")))
+            self.log_info("⏳ Waiting for Period Dropdown...")
+            period_dropdown_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod")))
             period_dropdown = Select(period_dropdown_elem)
             if len(period_dropdown.options) <= 1: raise ValueError("No measurement period found.")
             extracted_mr_period = period_dropdown.options[1].text
             period_element_to_stale = period_dropdown_elem
             period_dropdown.select_by_index(1)
             
-            self.log_info("⏳ Waiting for Refresh...")            try: wait.until(EC.staleness_of(period_element_to_stale))
+            self.log_info("⏳ Waiting for Refresh...")
+            try: wait.until(EC.staleness_of(period_element_to_stale))
             except TimeoutException: pass
 
             wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days')))
@@ -551,9 +559,11 @@ class MbEntryTab(BaseAutomationTab):
             
             driver.execute_script(f"document.getElementsByName('{prefix}$qty')[0].value = '{total_persondays}';")
             driver.execute_script(f"document.getElementsByName('{prefix}$unitcost')[0].value = '{cfg['unit_cost']}';")
-            self.log_info("⚙️ Triggering Auto-Calculation (check)...")            driver.execute_script("if(typeof check === 'function') { check(); }")
+            self.log_info("⚙️ Triggering Auto-Calculation (check)...")
+            driver.execute_script("if(typeof check === 'function') { check(); }")
             driver.execute_script(f"document.getElementsByName('{prefix}$labcomp')[0].value = '{total_cost}';")
-            self.log_info("⚙️ Triggering Validation (checkLabCom)...")            driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
+            self.log_info("⚙️ Triggering Validation (checkLabCom)...")
+            driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
             
             try: driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpit').value = '{cfg['default_pit_count']}';")
             except Exception as e: logger.debug("MBEntry: Could not set pit count: %s", e)
@@ -575,7 +585,8 @@ class MbEntryTab(BaseAutomationTab):
         
         except Exception as e:
             err_msg = str(e).splitlines()[0]
-            self.log_error(f"Error on {work_code}: {err_msg}")            self._log_result(cfg, work_code, "Failed", "Script Error", extracted_work_name, extracted_mr_no, extracted_mr_period)
+            self.log_error(f"Error on {work_code}: {err_msg}")
+            self._log_result(cfg, work_code, "Failed", "Script Error", extracted_work_name, extracted_mr_no, extracted_mr_period)
 
     def _process_all_works_from_dropdown(self, driver, cfg, mate_names_list):
         # ---- Lazy imports ----
@@ -621,7 +632,8 @@ class MbEntryTab(BaseAutomationTab):
         driver.execute_script("document.getElementById('ctl00_ContentPlaceHolder1_txtWrkCode').value = '';")
 
         # Step 3: Click search
-        self.log_info("🔍 Searching for all available works...")        work_dropdown_old = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_ddlSelWrk')
+        self.log_info("🔍 Searching for all available works...")
+        work_dropdown_old = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_ddlSelWrk')
         search_btn = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_imgButtonSearch')
         driver.execute_script("arguments[0].click();", search_btn)
 
@@ -652,16 +664,19 @@ class MbEntryTab(BaseAutomationTab):
                 work_options.append((val, extracted_name, wc_from_text))
 
         if not work_options:
-            self.log_error("❌ No works found in dropdown!")            self._log_result(cfg, "N/A", "Failed", "No works found in dropdown after search")
+            self.log_error("❌ No works found in dropdown!")
+            self._log_result(cfg, "N/A", "Failed", "No works found in dropdown after search")
             return
 
-        self.log_info(f"✅ Found {len(work_options)} works to process from dropdown.")        total = len(work_options)
+        self.log_info(f"✅ Found {len(work_options)} works to process from dropdown.")
+        total = len(work_options)
         processed_codes = set()
 
         # Step 5: Process each work from the dropdown
         for i, (work_code, work_name, wc_from_text) in enumerate(work_options):
             if self.app.stop_events[self.automation_key].is_set():
-                self.log_warning("Automation stopped.")                break
+                self.log_warning("Automation stopped.")
+                break
 
             if work_code in processed_codes:
                 self._log_result(cfg, work_code, "Skipped", "Duplicate entry (already processed)", work_name)
@@ -755,9 +770,11 @@ class MbEntryTab(BaseAutomationTab):
 
                 driver.execute_script(f"document.getElementsByName('{prefix}$qty')[0].value = '{total_persondays}';")
                 driver.execute_script(f"document.getElementsByName('{prefix}$unitcost')[0].value = '{cfg['unit_cost']}';")
-                self.log_info("⚙️ Triggering Auto-Calculation (check)...")                driver.execute_script("if(typeof check === 'function') { check(); }")
+                self.log_info("⚙️ Triggering Auto-Calculation (check)...")
+                driver.execute_script("if(typeof check === 'function') { check(); }")
                 driver.execute_script(f"document.getElementsByName('{prefix}$labcomp')[0].value = '{total_cost}';")
-                self.log_info("⚙️ Triggering Validation (checkLabCom)...")                driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
+                self.log_info("⚙️ Triggering Validation (checkLabCom)...")
+                driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
 
                 try:
                     driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpit').value = '{cfg['default_pit_count']}';")
@@ -779,7 +796,8 @@ class MbEntryTab(BaseAutomationTab):
                     alert.accept()
                     status = "Success" if "success" in alert_text.lower() or "saved" in alert_text.lower() else "Failed"
                     self._log_result(cfg, work_code, status, alert_text, work_name, extracted_mr_no, extracted_mr_period)
-                    self.log_info(f"{work_code}: {status} — {alert_text}")                except TimeoutException:
+                    self.log_info(f"{work_code}: {status} — {alert_text}")
+                except TimeoutException:
                     self._log_result(cfg, work_code, "Failed", "No Alert Received", work_name, extracted_mr_no, extracted_mr_period)
 
                 # Small delay between entries
@@ -787,7 +805,8 @@ class MbEntryTab(BaseAutomationTab):
 
             except Exception as e:
                 err_msg = str(e).splitlines()[0]
-                self.log_error(f"Error on {work_code}: {err_msg}")                self._log_result(cfg, work_code, "Failed", "Script Error", work_name)
+                self.log_error(f"Error on {work_code}: {err_msg}")
+                self._log_result(cfg, work_code, "Failed", "Script Error", work_name)
 
         self.log_info("✅ All dropdown works processed.")
     def _find_activity_prefix(self, driver):
@@ -800,15 +819,18 @@ class MbEntryTab(BaseAutomationTab):
         from selenium import webdriver
         import openpyxl
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        self.log_info("Searching for 'Earth work' activity...")        for i in range(1, 61): 
+        self.log_info("Searching for 'Earth work' activity...")
+        for i in range(1, 61): 
             try:
                 activity_id = f"ctl00_ContentPlaceHolder1_activity_ctl{str(i).zfill(2)}_act_name"
                 element = driver.find_element(By.ID, activity_id)
                 text = element.get_attribute("innerText").lower()
                 if "earth work" in text:
-                    self.log_success(f"✅ Found 'Earth work' in row #{i}.")                    return f"ctl00$ContentPlaceHolder1$activity$ctl{str(i).zfill(2)}"
+                    self.log_success(f"✅ Found 'Earth work' in row #{i}.")
+                    return f"ctl00$ContentPlaceHolder1$activity$ctl{str(i).zfill(2)}"
             except NoSuchElementException: continue 
-        self.log_warning("⚠️ 'Earth work' not found, defaulting to first row (ctl01).")        return "ctl00$ContentPlaceHolder1$activity$ctl01"
+        self.log_warning("⚠️ 'Earth work' not found, defaulting to first row (ctl01).")
+        return "ctl00$ContentPlaceHolder1$activity$ctl01"
     
     def export_report(self):
         # ---- Lazy imports ----

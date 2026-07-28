@@ -259,7 +259,8 @@ class EKycReportTab(BaseAutomationTab):
                 is_checked = driver.execute_script("return arguments[0].checked;", chk)
                 
                 if is_checked:
-                    self.log_info("Unchecking 'Pending case' checkbox...")                    driver.execute_script("arguments[0].click();", chk)
+                    self.log_info("Unchecking 'Pending case' checkbox...")
+                    driver.execute_script("arguments[0].click();", chk)
                     # No postback on checkbox toggle — just proceed
             except Exception as e:
                 self.log_warning(f"Warning in Uncheck Pending: {e}")
@@ -281,7 +282,8 @@ class EKycReportTab(BaseAutomationTab):
                         if val not in ["00", "99"] and txt != "---Select---" and "All" not in txt:
                             panchayats_to_process.append(txt)
                     
-                    self.log_info(f"Found {len(panchayats_to_process)} panchayats to scan.")                except Exception as e:
+                    self.log_info(f"Found {len(panchayats_to_process)} panchayats to scan.")
+                except Exception as e:
                     raise Exception(f"Could not fetch panchayat list: {e}")
 
             # 3. Iterate over Panchayats
@@ -291,10 +293,7 @@ class EKycReportTab(BaseAutomationTab):
                 if self.app.stop_events[self.automation_key].is_set(): break
                 
                 self.update_status(f"Processing Panchayat {p_idx}/{total_panchayats}: {p_name}")
-                self.log_info(f"
-{'='*50}
-Selecting Panchayat: {p_name}
-{'='*50}")                
+                self.log_info(f"{'='*50}\nSelecting Panchayat: {p_name}\n{'='*50}")
                 # Select Panchayat (case-insensitive)
                 try:
                     panchayat_elem = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
@@ -303,16 +302,19 @@ Selecting Panchayat: {p_name}
                     if not self._select_by_text_case_insensitive(panchayat_dd, p_name):
                         # Log available options for debugging
                         options_text = [opt.text.strip() for opt in panchayat_dd.options if opt.text.strip() not in ("---Select---", "")]
-                        self.log_error(f"Failed to select panchayat '{p_name}'. Available: {options_text}")                        continue
+                        self.log_error(f"Failed to select panchayat '{p_name}'. Available: {options_text}")
+                        continue
                     
                     # Wait for village dropdown to populate after panchayat postback
                     try:
                         wait.until(lambda d: len(Select(d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")).options) > 1)
-                        self.log_success(f"✅ Selected panchayat: '{p_name}' (village list loaded)")                    except:
+                        self.log_success(f"✅ Selected panchayat: '{p_name}' (village list loaded)")
+                    except:
                         time.sleep(1.5)  # fallback wait
                     
                 except Exception as e:
-                    self.log_error(f"Failed to select {p_name}: {e}")                    continue
+                    self.log_error(f"Failed to select {p_name}: {e}")
+                    continue
 
                 # 4. Determine Villages to Process for this Panchayat
                 villages_to_process = []
@@ -342,8 +344,10 @@ Selecting Panchayat: {p_name}
                             if val not in ["00", "99"] and txt != "---Select---" and txt != "--All Villages--":
                                 villages_to_process.append(txt)
                         
-                        self.log_info(f"Found {len(villages_to_process)} villages in {p_name}.")                    except Exception as e:
-                        self.log_error(f"Could not fetch village list for {p_name}: {e}")                        continue
+                        self.log_info(f"Found {len(villages_to_process)} villages in {p_name}.")
+                    except Exception as e:
+                        self.log_error(f"Could not fetch village list for {p_name}: {e}")
+                        continue
 
                 # 5. Process Villages in this Panchayat
                 total_villages = len(villages_to_process)
@@ -369,12 +373,15 @@ Selecting Panchayat: {p_name}
                                 # Log available options on first attempt only
                                 if attempt == 1:
                                     v_options = [opt.text.strip() for opt in v_dd.options if opt.text.strip() not in ("---Select---", "")]
-                                    self.log_warning(f"    Village '{v_name}' not found. Available: {v_options}")                        except Exception as e:
+                                    self.log_warning(f"    Village '{v_name}' not found. Available: {v_options}")
+                        except Exception as e:
                             pass
-                        self.log_warning(f"    Retry {attempt} for {v_name}...")                        time.sleep(1.5)
+                        self.log_warning(f"    Retry {attempt} for {v_name}...")
+                        time.sleep(1.5)
                     
                     if not selection_success:
-                        self.log_error(f"    Skipping {v_name} (Selection Failed after 3 attempts)")                        continue
+                        self.log_error(f"    Skipping {v_name} (Selection Failed after 3 attempts)")
+                        continue
 
                     self.scrape_current_table(driver, p_name, v_name)
 
@@ -407,7 +414,8 @@ Selecting Panchayat: {p_name}
         try:
             page_one_link = driver.find_elements(By.XPATH, "//a[text()='1']")
             if page_one_link:
-                self.log_info(f"Resetting to Page 1 for {location_village}...")                old_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_gvData")
+                self.log_info(f"Resetting to Page 1 for {location_village}...")
+                old_table = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_gvData")
                 driver.execute_script("arguments[0].click();", page_one_link[0])
                 try: WebDriverWait(driver, 10).until(EC.staleness_of(old_table))
                 except Exception: time.sleep(2)
@@ -418,13 +426,15 @@ Selecting Panchayat: {p_name}
             if self.app.stop_events[self.automation_key].is_set(): return
 
             if "No Record Found" in driver.page_source:
-                self.log_warning(f"No records in {location_village}.")                break
+                self.log_warning(f"No records in {location_village}.")
+                break
 
             try:
                 table = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_gvData")))
                 rows = table.find_elements(By.TAG_NAME, "tr")
             except:
-                self.log_error("Table not found.")                break
+                self.log_error("Table not found.")
+                break
 
             count_on_page = 0
             if len(rows) > 1:
@@ -481,7 +491,8 @@ Selecting Panchayat: {p_name}
             except NoSuchElementException:
                 break
             except Exception as e:
-                self.log_warning(f"Pagination error: {e}")                break
+                self.log_warning(f"Pagination error: {e}")
+                break
 
     def _should_show_record(self, record):
         """Filter logic based on eKYC status only"""

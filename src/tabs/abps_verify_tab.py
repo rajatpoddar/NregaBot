@@ -151,7 +151,8 @@ class AbpsVerifyTab(BaseAutomationTab):
                 self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")
+            self.app.after(0, self.app.set_status, "Ready")
 
     def run_automation_logic(self, panchayat, village):
         # ---- Lazy imports ----
@@ -163,7 +164,8 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.app.after(0, lambda: [self.results_tree.delete(item) for item in self.results_tree.get_children()])
-        self.log_info("Starting ABPS Verification...")        self.app.after(0, self.app.set_status, "Running ABPS Verification...")
+        self.log_info("Starting ABPS Verification...")
+        self.app.after(0, self.app.set_status, "Running ABPS Verification...")
 
         session_processed_jobcards = set()
 
@@ -178,10 +180,12 @@ class AbpsVerifyTab(BaseAutomationTab):
             
             current_url = driver.current_url
             if "login" in current_url.lower():
-                self.log_error("Error: Redirected to Login page.")                return
+                self.log_error("Error: Redirected to Login page.")
+                return
 
             # --- 1. Select Panchayat (Background Safe) ---
-            self.log_info(f"Selecting Panchayat: {panchayat}")            try:
+            self.log_info(f"Selecting Panchayat: {panchayat}")
+            try:
                 # Use Presence Check
                 panchayat_select = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']")))
                 self._select_by_text_case_insensitive(Select(panchayat_select), panchayat)
@@ -215,8 +219,7 @@ class AbpsVerifyTab(BaseAutomationTab):
             # --- VILLAGE LOOP ---
             for i, current_village in enumerate(villages_to_process):
                 if self.app.stop_events[self.automation_key].is_set(): break
-                self.log_info(f"
---- Processing Village {i+1}/{len(villages_to_process)}: {current_village} ---")                
+                self.log_info(f"--- Processing Village {i+1}/{len(villages_to_process)}: {current_village} ---")
                 try:
                     self._select_by_text_case_insensitive(Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, village_css)))), current_village)
                     self.app.update_history("location_village", current_village)
@@ -225,7 +228,8 @@ class AbpsVerifyTab(BaseAutomationTab):
                     try:
                         short_wait.until(EC.presence_of_element_located((By.XPATH, table_xpath)))
                     except TimeoutException:
-                        self.log_warning(f"No records found for {current_village}. Skipping.")                        continue
+                        self.log_warning(f"No records found for {current_village}. Skipping.")
+                        continue
 
                     page_number = 1
                     while True:
@@ -259,7 +263,8 @@ class AbpsVerifyTab(BaseAutomationTab):
                                 except StaleElementReferenceException: continue
                             
                             if row_to_process is None:
-                                self.log_info("No new unprocessed records found on this page view.")                                break
+                                self.log_info("No new unprocessed records found on this page view.")
+                                break
 
                             try:
                                 self.app.after(0, self.update_status, f"Processing: {app_name}", 0.5)
@@ -310,15 +315,18 @@ class AbpsVerifyTab(BaseAutomationTab):
                             wait.until(EC.staleness_of(table_element))
                             page_number += 1
                         except NoSuchElementException:
-                            self.log_info(f"No more pages for {current_village}.")                            break
+                            self.log_info(f"No more pages for {current_village}.")
+                            break
 
                 except Exception as village_error:
-                    self.log_error(f"Error in {current_village}: {village_error}. Skipping.")                    continue
+                    self.log_error(f"Error in {current_village}: {village_error}. Skipping.")
+                    continue
             
             self.app.after(200, lambda: self._show_abps_summary())
 
         except Exception as e:
-            self.log_error(f"A critical error occurred: {e}")            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
+            self.log_error(f"A critical error occurred: {e}")
+            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
@@ -338,7 +346,8 @@ class AbpsVerifyTab(BaseAutomationTab):
             tags = ('success',)
         
         log_level = 'success' if tags == ('success',) else 'error' if tags == ('failed',) else 'info'
-        self.log_info(f"📋 {job_card} ({app_name}): {status}", level=log_level)        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(job_card, app_name, status, timestamp), tags=tags))
+        self.log_info(f"📋 {job_card} ({app_name}): {status}", level=log_level)
+        self.app.after(0, lambda: self.results_tree.insert("", "end", values=(job_card, app_name, status, timestamp), tags=tags))
 
     def _show_abps_summary(self):
         """Show professional summary after ABPS verification finishes."""
@@ -349,13 +358,9 @@ class AbpsVerifyTab(BaseAutomationTab):
         failed = total - success
         summary = f"✅ Verified: {success}\n❌ Failed/Error: {failed}\n📊 Total: {total}"
         self.update_status(f"✅ {success}/{total} verified", 1.0)
-        self.log_info(f"
-{'='*40}
-📊 ABPS Verification Summary
-{summary}
-{'='*40}")        if total > 0:
-            self.log_info(f"
-📊 ABPS Verification Complete: {summary}")
+        self.log_info(f"{'='*40}\n📊 ABPS Verification Summary\n{summary}\n{'='*40}")
+        if total > 0:
+            self.log_info(f"📊 ABPS Verification Complete: {summary}")
     def export_to_pdf(self):
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By

@@ -186,7 +186,8 @@ class WagelistGenTab(BaseAutomationTab):
             for item in self.results_tree.get_children(): self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.log_info("Form has been reset.")            self.app.after(0, self.app.set_status, "Ready")
+            self.log_info("Form has been reset.")
+            self.app.after(0, self.app.set_status, "Ready")
     def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
@@ -258,7 +259,8 @@ class WagelistGenTab(BaseAutomationTab):
                 if self.app.stop_events[self.automation_key].is_set(): break
 
                 # UI Update for current item
-                self.log_info(f"=== Processing '{agency_name_part}' ({p_index+1}/{total_panchayats}) ===")                self.app.after(0, self.app.set_status, f"Processing: {agency_name_part}")
+                self.log_info(f"=== Processing '{agency_name_part}' ({p_index+1}/{total_panchayats}) ===")
+                self.app.after(0, self.app.set_status, f"Processing: {agency_name_part}")
                 self.app.after(0, self.update_status, f"{agency_name_part}", (p_index / total_panchayats))
                 
                 # --- SETUP OUTPUT DIR (Per Panchayat) ---
@@ -270,7 +272,8 @@ class WagelistGenTab(BaseAutomationTab):
                         # Create a subfolder for this specific panchayat
                         output_dir = os.path.join(self.app.get_nregabot_path("PDF_Output/Wagelist"), folder_name, datetime.now().strftime('%Y-%m-%d'), safe_agency_name)
                         os.makedirs(output_dir, exist_ok=True)
-                        self.log_info(f"   PDFs will be saved to: {output_dir}")                    except Exception:
+                        self.log_info(f"   PDFs will be saved to: {output_dir}")
+                    except Exception:
                         output_dir = None
 
                 total_errors_to_skip = 0
@@ -290,7 +293,8 @@ class WagelistGenTab(BaseAutomationTab):
                             except Exception: time.sleep(2)
                         
                         if not loaded: 
-                            self.log_error(f"   Failed to load URL for {agency_name_part}. Skipping...")                            break # Move to next panchayat
+                            self.log_error(f"   Failed to load URL for {agency_name_part}. Skipping...")
+                            break # Move to next panchayat
 
                         # B. Select Agency
                         try:
@@ -299,9 +303,11 @@ class WagelistGenTab(BaseAutomationTab):
                             full_agency_name = config.AGENCY_PREFIX + agency_name_part
                             
                             if not self._select_by_text_case_insensitive(select, full_agency_name):
-                                self.log_warning(f"   No pending wagelists or Agency not found: '{full_agency_name}'.")                                break # Move to next panchayat
+                                self.log_warning(f"   No pending wagelists or Agency not found: '{full_agency_name}'.")
+                                break # Move to next panchayat
                         except Exception as e:
-                            self.log_error(f"   Error selecting agency: {e}")                            break 
+                            self.log_error(f"   Error selecting agency: {e}")
+                            break 
                         
                         # C. Click Proceed
                         try:
@@ -315,10 +321,12 @@ class WagelistGenTab(BaseAutomationTab):
                             wagelist_table = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_wagelist_msr")))
                             rows = wagelist_table.find_elements(By.XPATH, ".//tr[td]")
                         except:
-                            self.log_info(f"   No wagelist table found for {agency_name_part}.")                            break
+                            self.log_info(f"   No wagelist table found for {agency_name_part}.")
+                            break
 
                         if not rows or total_errors_to_skip >= len(rows): 
-                            self.log_success(f"   Done with {agency_name_part}.")                            break
+                            self.log_success(f"   Done with {agency_name_part}.")
+                            break
                             
                         row_to_process = rows[total_errors_to_skip]
                         
@@ -361,7 +369,8 @@ class WagelistGenTab(BaseAutomationTab):
                                 return False
                             WebDriverWait(driver, 45).until(check_outcome)
                         except TimeoutException:
-                            self.log_error("   Timeout: Page slow.")                            total_errors_to_skip += 1
+                            self.log_error("   Timeout: Page slow.")
+                            total_errors_to_skip += 1
                             continue
 
                         # H. Handle Result
@@ -379,7 +388,8 @@ class WagelistGenTab(BaseAutomationTab):
                                 pdf_path = self._save_page_as_pdf(driver, wagelist_no, work_code, output_dir)
                                 pdf_info = " (PDF Saved)" if pdf_path else " (PDF Failed)"
 
-                            self.log_success(f"   SUCCESS: {wagelist_no}{pdf_info}")                            self._log_result(work_code, "Success", wagelist_no, "", "")
+                            self.log_success(f"   SUCCESS: {wagelist_no}{pdf_info}")
+                            self._log_result(work_code, "Success", wagelist_no, "", "")
                             # Stay at index 0 because processed item is gone
                             pass 
 
@@ -389,11 +399,13 @@ class WagelistGenTab(BaseAutomationTab):
                                 err_text = err_elem.get_attribute("innerText").strip()
                             except: err_text = "Unknown Error"
                             
-                            self.log_error(f"   Failed: {err_text}")                            self._log_result(work_code, f"Failed ({err_text[:20]})", "N/A", "", "")
+                            self.log_error(f"   Failed: {err_text}")
+                            self._log_result(work_code, f"Failed ({err_text[:20]})", "N/A", "", "")
                             total_errors_to_skip += 1 # Skip this failed item
 
                     except Exception as e:
-                        self.log_error(f"   Row Error: {e}")                        total_errors_to_skip += 1
+                        self.log_error(f"   Row Error: {e}")
+                        total_errors_to_skip += 1
                 
                 # End of While Loop (One Panchayat done)
                 time.sleep(1) # Breathe before next panchayat
@@ -402,10 +414,12 @@ class WagelistGenTab(BaseAutomationTab):
 
             if not self.app.stop_events[self.automation_key].is_set():
                 if all_generated_wagelists:
-                    self.log_info(f"📊 Wagelist Gen Complete: Processed {total_panchayats} Panchayat(s), Generated {len(all_generated_wagelists)} Wagelists.")                else:
+                    self.log_info(f"📊 Wagelist Gen Complete: Processed {total_panchayats} Panchayat(s), Generated {len(all_generated_wagelists)} Wagelists.")
+                else:
                     self.log_info("📊 Wagelist Gen Complete: No wagelists were generated.")
         except Exception as e: 
-            self.log_info(f"Critical Error: {e}", level="error")        finally:
+            self.log_info(f"Critical Error: {e}", level="error")
+        finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Finished", 1.0)
             self.app.after(0, self.app.set_status, "Finished")
@@ -462,13 +476,15 @@ class WagelistGenTab(BaseAutomationTab):
             
             # Use browser-specific commands to print to PDF
             if self.app.active_browser == 'firefox':
-                self.log_info("   - Using Firefox's print command to save PDF...")                print_options = PrintOptions()
+                self.log_info("   - Using Firefox's print command to save PDF...")
+                print_options = PrintOptions()
                 print_options.orientation = "landscape"
                 print_options.scale = 0.7
                 pdf_data_base64 = driver.print_page(print_options)
 
             elif self.app.active_browser == 'chrome':
-                self.log_info("   - Using Chrome's advanced print command (CDP) to save PDF...")                print_options = {
+                self.log_info("   - Using Chrome's advanced print command (CDP) to save PDF...")
+                print_options = {
                     "landscape": True, 
                     "displayHeaderFooter": False, 
                     "printBackground": True, 
@@ -487,10 +503,12 @@ class WagelistGenTab(BaseAutomationTab):
                     f.write(pdf_data)
                 return save_path
             else:
-                self.log_error(f"Error: PDF data was not generated for {wagelist_no}.")                return None
+                self.log_error(f"Error: PDF data was not generated for {wagelist_no}.")
+                return None
 
         except Exception as e:
-            self.log_error(f"Error saving PDF for {wagelist_no}: {e}")            return None
+            self.log_error(f"Error saving PDF for {wagelist_no}: {e}")
+            return None
 
     def export_report(self):
         # ---- Lazy imports ----

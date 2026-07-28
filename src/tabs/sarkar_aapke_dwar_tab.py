@@ -418,12 +418,15 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             mode_str = "Backlog" if inputs['is_backlog'] else "Normal"
             
             if inputs['file_path']:
-                self.log_info(f"Starting BULK Mode ({mode_str})...")                self._run_bulk_mode(driver, wait, inputs)
+                self.log_info(f"Starting BULK Mode ({mode_str})...")
+                self._run_bulk_mode(driver, wait, inputs)
             else:
-                self.log_info(f"Starting MONITOR Mode ({mode_str})...")                self._run_monitor_mode(driver, wait, inputs)
+                self.log_info(f"Starting MONITOR Mode ({mode_str})...")
+                self._run_monitor_mode(driver, wait, inputs)
 
         except Exception as e:
-            self.log_error(f"Critical Error: {e}")        finally:
+            self.log_error(f"Critical Error: {e}")
+        finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")
             self.app.after(0, self.progress_bar.set, 0)
@@ -444,7 +447,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         try:
             data = self._read_file_data(inputs['file_path'])
         except Exception as e:
-            self.log_error(str(e))            return
+            self.log_error(str(e))
+            return
 
         total = len(data)
         url_fragment = "application/createBackLog" if inputs['is_backlog'] else "application/create"
@@ -587,7 +591,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.page import PageMargins
         from openpyxl.drawing.image import Image as XLImage
-        self.log_info("Monitor Mode Active. Waiting for form...")        last_log_time = 0
+        self.log_info("Monitor Mode Active. Waiting for form...")
+        last_log_time = 0
 
         while not self.app.stop_events[self.automation_key].is_set():
             try:

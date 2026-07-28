@@ -539,7 +539,8 @@ class DemandTab(BaseAutomationTab):
             
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
-        self.log_info(f"Selected first {selected_count} valid applicants.")        self._update_jc_header_counters()
+        self.log_info(f"Selected first {selected_count} valid applicants.")
+        self._update_jc_header_counters()
 
     def _clear_processed_selection(self):
         # ---- Lazy imports ----
@@ -590,7 +591,8 @@ class DemandTab(BaseAutomationTab):
         self._refresh_selected_jc_panel()
         self._refresh_search_results()
         self._update_selection_summary()
-        self.log_info(f"Deselected {deselected_count} successful applicants. Failed items remain checked.")        self._update_jc_header_counters()
+        self.log_info(f"Deselected {deselected_count} successful applicants. Failed items remain checked.")
+        self._update_jc_header_counters()
 
     def _select_csv_from_computer(self):
         # ---- Lazy imports ----
@@ -707,7 +709,8 @@ class DemandTab(BaseAutomationTab):
             file_id = selected_file['id']
             filename = selected_file['filename']
             
-            self.log_info(f"Downloading '{filename}' from cloud...")            temp_path = self._download_file_from_cloud(file_id, filename)
+            self.log_info(f"Downloading '{filename}' from cloud...")
+            temp_path = self._download_file_from_cloud(file_id, filename)
             
             if temp_path:
                 self._process_csv_data(temp_path)
@@ -719,7 +722,8 @@ class DemandTab(BaseAutomationTab):
         """
         token = self.app.license_info.get('key')
         if not token:
-            self.log_error("Cloud Download Failed: Not licensed.")            return None
+            self.log_error("Cloud Download Failed: Not licensed.")
+            return None
 
         headers = {'Authorization': f'Bearer {token}'}
         url = f"{config.LICENSE_SERVER_URL}/files/api/download/{file_id}"
@@ -734,9 +738,11 @@ class DemandTab(BaseAutomationTab):
                     for chunk in r.iter_content(chunk_size=8192): 
                         f.write(chunk)
             
-            self.log_info(f"Successfully downloaded '{filename}'.")            return temp_path
+            self.log_info(f"Successfully downloaded '{filename}'.")
+            return temp_path
         except Exception as e:
-            self.log_error(f"Cloud download failed: {e}")            messagebox.showerror("Download Failed", f"Could not download file: {e}")
+            self.log_error(f"Cloud download failed: {e}")
+            messagebox.showerror("Download Failed", f"Could not download file: {e}")
             return None
 
     def _load_work_key_list_from_cloud(self):
@@ -902,7 +908,8 @@ class DemandTab(BaseAutomationTab):
                     matched_jcs.add(jc)
 
         if not matched_jcs:
-            self.log_warning(f"No JCs matched: {raw}")            return
+            self.log_warning(f"No JCs matched: {raw}")
+            return
 
         added = 0
         for app_data in self.all_applicants_data:
@@ -1239,7 +1246,8 @@ class DemandTab(BaseAutomationTab):
             print(f"Auto-Setup: Loaded & Selected {len(self.all_applicants_data)} applicants.")
         else:
             print(f"Error: File path not found: {file_path}")
-            self.log_error(f"Macro Error: File not found {file_path}")    def start_automation(self) -> None:
+            self.log_error(f"Macro Error: File not found {file_path}")
+    def start_automation(self) -> None:
         # ---- Lazy imports ----
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -1289,7 +1297,8 @@ class DemandTab(BaseAutomationTab):
         # self.stop_event.clear(); <-- Handled by app.start_automation_thread
         self.app.clear_log(self.log_display)
         for i in self.results_tree.get_children(): self.results_tree.delete(i)
-        self.log_info(f"Starting demand: {len(selected)} applicant(s), State: {state}...")        if work_key_for_allocation:
+        self.log_info(f"Starting demand: {len(selected)} applicant(s), State: {state}...")
+        if work_key_for_allocation:
             self.log_info(f"   -> Auto-allocation is ENABLED for Work Key: {work_key_for_allocation}")
         
         # self.app.set_status("Running..."); <-- Handled by app.start_automation_thread
@@ -1987,10 +1996,12 @@ class DemandTab(BaseAutomationTab):
         Re-selects all applicants who are marked as 'failed' in the
         results table, so the user can run the automation again for them.
         """
-        self.log_info("Re-selecting failed applicants...")        failed_items = self.results_tree.tag_has('failed')
+        self.log_info("Re-selecting failed applicants...")
+        failed_items = self.results_tree.tag_has('failed')
         
         if not failed_items:
-            self.log_info("No failed applicants found in results.")            messagebox.showinfo("Retry Failed", "No failed applicants found in the results table.")
+            self.log_info("No failed applicants found in results.")
+            messagebox.showinfo("Retry Failed", "No failed applicants found in the results table.")
             return
 
         re_selected_count = 0
@@ -2024,7 +2035,8 @@ class DemandTab(BaseAutomationTab):
         # Refresh panels
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
-        self.log_info(f"Re-selected {re_selected_count} failed applicants.")        self._update_jc_header_counters()
+        self.log_info(f"Re-selected {re_selected_count} failed applicants.")
+        self._update_jc_header_counters()
         messagebox.showinfo("Retry Failed", f"Re-selected {re_selected_count} failed applicants.\n\n"
                                              "Please fix any issues (like un-issued job cards) and then click 'Start Automation' to retry.")
 
@@ -2087,7 +2099,8 @@ class DemandTab(BaseAutomationTab):
         from openpyxl.drawing.image import Image as XLImage
         """Clears the current selection of all applicants."""
         if not any(a.get('_selected', False) for a in self.all_applicants_data):
-            self.log_info("No selection.")            return
+            self.log_info("No selection.")
+            return
         for a in self.all_applicants_data:
             a['_selected'] = False
         self._refresh_selected_jc_panel()
