@@ -58,7 +58,7 @@ ECHO MAIN app PyInstaller build successful.
 ECHO.
 
 REM --- Step 1b: Build LITE App ---
-ECHO [STEP 1b/2] Building LITE app with PyInstaller...
+ECHO [STEP 1b/3] Building LITE app with PyInstaller...
 ECHO.
 
 pyinstaller --noconfirm --windowed --onedir ^
@@ -88,8 +88,28 @@ ECHO.
 ECHO LITE app PyInstaller build successful.
 ECHO.
 
-REM --- Step 2: Create installer with Inno Setup (MAIN app only) ---
-ECHO [STEP 2/2] Creating the MAIN installer with Inno Setup...
+REM --- Step 1c: Create LITE app portable ZIP ---
+ECHO [STEP 1c/3] Creating LITE app portable ZIP...
+ECHO.
+
+REM Strip quotes from version for filename
+SET ZIP_VERSION=%APP_VERSION:"=%
+
+REM Create portable ZIP of the onedir directory
+powershell -Command "Compress-Archive -Path 'dist\NREGA Bot Lite' -DestinationPath 'dist\NREGA_Bot_Lite_v%ZIP_VERSION%_portable.zip' -Force"
+
+if errorlevel 1 (
+    ECHO.
+    ECHO !!!!!!! LITE app ZIP creation FAILED. !!!!!!!
+    goto End
+)
+
+ECHO.
+ECHO LITE app portable ZIP created successfully.
+ECHO.
+
+REM --- Step 2a: Create MAIN app installer with Inno Setup ---
+ECHO [STEP 2a/3] Creating the MAIN installer with Inno Setup...
 ECHO.
 
 REM Check if the Inno Setup compiler exists (Local Machine Check)
@@ -104,16 +124,35 @@ ISCC /dAppVersion=%APP_VERSION% "scripts\installer.iss"
 
 if errorlevel 1 (
     ECHO.
-    ECHO !!!!!!! Inno Setup compilation FAILED. !!!!!!!
+    ECHO !!!!!!! MAIN Inno Setup compilation FAILED. !!!!!!!
     goto End
 )
 
 ECHO.
+ECHO MAIN installer created successfully.
+ECHO.
+
+REM --- Step 2b: Create LITE app installer with Inno Setup ---
+ECHO [STEP 2b/3] Creating the LITE installer with Inno Setup...
+ECHO.
+
+ISCC /dAppVersion=%APP_VERSION% "scripts\installer_lite.iss"
+
+if errorlevel 1 (
+    ECHO.
+    ECHO !!!!!!! LITE Inno Setup compilation FAILED. !!!!!!!
+    goto End
+)
+
+ECHO.
+ECHO LITE installer created successfully.
+ECHO.
 ECHO =======================================================
 ECHO.
 ECHO  Build successful!
-ECHO  - MAIN installer: dist\installer
-ECHO  - LITE standalone: dist\%LITE_APP_NAME%.exe
+ECHO  - MAIN installer: dist\installer\NREGABot-v%APP_VERSION:"=%-Setup.exe
+ECHO  - LITE installer: dist\installer\NREGABot-Lite-v%APP_VERSION:"=%-Setup.exe
+ECHO  - LITE portable:  dist\NREGA_Bot_Lite_v%ZIP_VERSION%_portable.zip
 ECHO.
 ECHO =======================================================
 

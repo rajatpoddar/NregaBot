@@ -37,7 +37,7 @@ jobs:
           echo "$CHANGELOG_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-  # --- 2. Build for Windows (Loader EXE + Lite EXE + Secure Win Core Zip) ---
+  # --- 2. Build for Windows (Loader EXE + Lite Portable ZIP + Secure Win Core Zip) ---
   build-windows:
       name: Build Windows (Main + Lite + Core)
       needs: get-release-info
@@ -109,7 +109,7 @@ jobs:
             path: |
               dist/installer/*.exe
               dist/core_win_*.zip
-              dist/NREGA Bot Lite.exe
+              dist/NREGA_Bot_Lite_v*_portable.zip
             retention-days: 1
 
         - name: Debug - List Windows build outputs
