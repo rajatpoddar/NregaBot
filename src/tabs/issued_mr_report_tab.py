@@ -242,9 +242,9 @@ class IssuedMrReportTab(BaseAutomationTab):
         for item in self.abps_tree.get_children(): self.abps_tree.delete(item)
         
         inputs = {
-            'state': self.state_entry.get().strip(), 
-            'district': self.district_entry.get().strip(), 
-            'block': self.block_entry.get().strip(),
+            'state': self.state_var.get().strip(), 
+            'district': self.district_var.get().strip(), 
+            'block': self.block_var.get().strip(),
             # Panchayat is intentionally ignored here
         }
         
@@ -260,31 +260,116 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_abps_automation_logic, args=(inputs,))
 
     def _solve_captcha(self, driver, wait):
+        """Solve CAPTCHA — tries hidden field answer first, falls back to math parsing."""
         self.log_info("Attempting to solve CAPTCHA...")
-        captcha_label_id = "ContentPlaceHolder1_lblStopSpam"; captcha_textbox_id = "ContentPlaceHolder1_txtCaptcha"; verify_button_id = "ContentPlaceHolder1_btnLogin"
+        textbox_id = "ContentPlaceHolder1_txtCaptcha"
+        btn_id = "ContentPlaceHolder1_btnLogin"
+
+        # Strategy 1: Read the hidden answer field (new portal has hfCaptcha)
         try:
-            captcha_element = wait.until(EC.presence_of_element_located((By.ID, captcha_label_id)))
-            captcha_text = captcha_element.text
+            hf = driver.find_element(By.ID, "ContentPlaceHolder1_hfCaptcha")
+            answer = hf.get_attribute("value")
+            if answer and answer.strip().isdigit():
+                self.log_info(f"CAPTCHA solved via hidden field: {answer.strip()}")
+                driver.find_element(By.ID, textbox_id).send_keys(answer.strip())
+                driver.find_element(By.ID, btn_id).click()
+                time.sleep(2)
+                if "Invalid Captcha Code" not in driver.page_source:
+                    return True
+        except Exception:
+            pass
+
+        # Strategy 2: Parse the math expression from label
+        captcha_label_id = "ContentPlaceHolder1_lblStopSpam"
+        try:
+            captcha_text = wait.until(EC.presence_of_element_located((By.ID, captcha_label_id))).text
             match = re.search(r'(\d+)\s*([+\-*])\s*(\d+)', captcha_text)
-            if not match: raise ValueError("Could not parse CAPTCHA expression.")
+            if not match:
+                raise ValueError(f"Could not parse CAPTCHA from: {captcha_text}")
             num1, operator, num2 = match.groups(); num1, num2 = int(num1), int(num2)
-            result = 0
-            if operator == '+': result = num1 + num2
-            elif operator == '-': result = num1 - num2
-            elif operator == '*': result = num1 * num2
-            self.log_info(f"Solved: {captcha_text.strip()} = {result}")
-            driver.find_element(By.ID, captcha_textbox_id).send_keys(str(result))
-            driver.find_element(By.ID, verify_button_id).click()
-            time.sleep(1.0)  # Short wait after click
-            if "Invalid Captcha Code" in driver.page_source:
-                raise ValueError("CAPTCHA verification failed.")
+            result = { '+': num1 + num2, '-': num1 - num2, '*': num1 * num2 }[operator]
+            self.log_info(f"CAPTCHA solved: {captcha_text.strip()} = {result}")
+            driver.find_element(By.ID, textbox_id).send_keys(str(result))
+            driver.find_element(By.ID, btn_id).click()
+            time.sleep(2)
             return True
         except TimeoutException:
             self.log_info("CAPTCHA not found or already bypassed.")
-            return True 
-        except ValueError as e:
+            return True
+        except Exception as e:
             self.log_error(f"CAPTCHA Error: {e}")
-            raise 
+            raise
+
+    def _handle_report_drilldown(self, driver, wait, inputs):
+        """
+        After opening a report page, drill down to district/block level.
+        Handles two patterns:
+        1. Dropdown-based (district→block select elements) — new portal
+        2. Link-based (click district name → click block name) — old portal
+        """
+        state = inputs.get('state', '')
+        district = inputs.get('district', '')
+        block = inputs.get('block', '')
+
+        # Pattern 1: Check for state/district/block dropdowns on the report page
+        try:
+            state_select = driver.find_element(By.ID, "ContentPlaceHolder1_ddl_States")
+            if state_select.is_displayed():
+                self.log_info("State dropdown found on report page, selecting...")
+                self._select_by_text_case_insensitive(Select(state_select), state)
+                time.sleep(2)
+
+                # Check for district dropdown
+                try:
+                    district_select = WebDriverWait(driver, 5).until(
+                        EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_District"))
+                    )
+                    if district_select.is_displayed() and district:
+                        self.log_info(f"District dropdown found, selecting: {district}")
+                        self._select_by_text_case_insensitive(Select(district_select), district)
+                        time.sleep(2)
+
+                        # Check for block dropdown
+                        try:
+                            block_select = WebDriverWait(driver, 5).until(
+                                EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_Block"))
+                            )
+                            if block_select.is_displayed() and block:
+                                self.log_info(f"Block dropdown found, selecting: {block}")
+                                self._select_by_text_case_insensitive(Select(block_select), block)
+                                time.sleep(2)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Pattern 2: Check for district/block links on page (old portal style)
+        if district:
+            try:
+                district_link = driver.find_element(By.XPATH, f"//a[contains(normalize-space(), '{district.upper()}')]")
+                if district_link.is_displayed():
+                    self.log_info(f"Clicking district link: {district}")
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", district_link)
+                    time.sleep(0.5)
+                    district_link.click()
+                    time.sleep(2)
+
+                    if block:
+                        try:
+                            block_link = WebDriverWait(driver, 5).until(
+                                EC.element_to_be_clickable((By.XPATH, f"//a[contains(normalize-space(), '{block.upper()}')]"))
+                            )
+                            self.log_info(f"Clicking block link: {block}")
+                            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", block_link)
+                            time.sleep(0.5)
+                            block_link.click()
+                            time.sleep(2)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
     def run_automation_logic(self, inputs, retries=1):
         # Standard Issued MR Report Logic (Panchayat Specific)
@@ -306,27 +391,51 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.log_info(f"Selecting State: {inputs['state']}...")
             state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
             self._select_by_text_case_insensitive(Select(state_select), inputs['state'])
-            wait.until(EC.presence_of_element_located((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
+            time.sleep(4)  # Wait for postback to load accordion
+            self.log_info("Waiting for report accordion to load...")
+            wait.until(EC.presence_of_element_located((By.ID, "accordionMain")))
 
+            # Expand all accordion sections so report links are visible
             self.log_info("Opening Report...")
-            report_link_text = "MGNREGS daily status as per e-muster issued"
-            report_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, report_link_text)))
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", report_link)
-            time.sleep(1); report_link.click()
+            driver.execute_script("""
+                document.querySelectorAll('.accordion-collapse').forEach(function(el) {
+                    el.classList.add('show');
+                });
+            """)
+            time.sleep(0.5)
 
-            self.log_info(f"Drilling down to Block: {inputs['block']}")
-            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
-            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['block'].upper()))).click()
+            report_link_text = "VBGRAMG daily status as per e-muster issued"
+            report_link = driver.find_element(By.XPATH, f"//a[contains(normalize-space(.), '{report_link_text}')]")
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", report_link)
+            time.sleep(0.5); report_link.click()
+
+            self.log_info(f"Drilling down to district/block: {inputs['district']} > {inputs['block']}")
+            self._handle_report_drilldown(driver, wait, inputs)
 
             # --- Specific Panchayat Logic ---
-            self.log_info(f"Finding Panchayat: {inputs['panchayat']}")            
-            main_table_xpath = "//table[.//b[text()='SNo.'] and .//b[text()='Panchayats']]"
-            wait.until(EC.presence_of_element_located((By.XPATH, f"{main_table_xpath}//tr[1]/td/b[text()='Panchayats']")))
-
-            panchayat_row_xpath = f"{main_table_xpath}//tr[td[2][normalize-space()='{inputs['panchayat']}']]"
-            panchayat_row = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, panchayat_row_xpath)))
-
-            target_cell = panchayat_row.find_element(By.XPATH, "./td[6]") # Column 6 for MR Issued
+            self.log_info(f"Finding Panchayat: {inputs['panchayat']}")
+            
+            # Find the panchayat summary table
+            main_table_xpath = "//table[@width='80%'][.//b[text()='SNo.'] and .//b[text()='Panchayats']]"
+            wait.until(EC.presence_of_element_located((By.XPATH, main_table_xpath)))
+            
+            # Iterate through rows to find panchayat (case-insensitive)
+            target_panchayat = inputs['panchayat'].strip()
+            rows = driver.find_elements(By.XPATH, f"{main_table_xpath}//tr[td]")
+            panchayat_row = None
+            for row in rows:
+                cells = row.find_elements(By.TAG_NAME, "td")
+                if len(cells) >= 6:
+                    p_name = cells[1].text.strip()
+                    if p_name.lower() == target_panchayat.lower():
+                        panchayat_row = row
+                        break
+            
+            if panchayat_row is None:
+                raise ValueError(f"Panchayat '{target_panchayat}' not found in table.")
+            
+            self.log_info(f"Found row for {target_panchayat}. Looking for MR Issued link in column 6...")
+            target_cell = panchayat_row.find_element(By.XPATH, "./td[6]") # Column 6 = No. of Ongoing Works (MRs Issued)
 
             try:
                 target_link = target_cell.find_element(By.TAG_NAME, "a")
@@ -345,7 +454,8 @@ class IssuedMrReportTab(BaseAutomationTab):
                  return
 
             self.log_info("Scraping final table...")
-            FINAL_TABLE_XPATH = "//table[@align='center' and .//b[text()='Work Code']]"
+            # Detail page table: Bootstrap-styled with <th> headers (not <b> inside <td>)
+            FINAL_TABLE_XPATH = "//table[contains(@class, 'table-striped') and .//th[contains(text(), 'Work Code')]]"
             table = wait.until(EC.presence_of_element_located((By.XPATH, FINAL_TABLE_XPATH)))
             rows = table.find_elements(By.XPATH, ".//tr[position()>1]")
 
@@ -400,13 +510,25 @@ class IssuedMrReportTab(BaseAutomationTab):
 
             state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
             self._select_by_text_case_insensitive(Select(state_select), inputs['state'])
-            wait.until(EC.presence_of_element_located((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
+            time.sleep(4)  # Wait for postback to load accordion
+            self.log_info("Waiting for report accordion to load...")
+            wait.until(EC.presence_of_element_located((By.ID, "accordionMain")))
 
-            report_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "MGNREGS daily status as per e-muster issued")))
+            # Expand all accordion sections so report links are visible
+            self.log_info("Opening Report...")
+            driver.execute_script("""
+                document.querySelectorAll('.accordion-collapse').forEach(function(el) {
+                    el.classList.add('show');
+                });
+            """)
+            time.sleep(0.5)
+
+            report_link = driver.find_element(By.XPATH, f"//a[contains(normalize-space(.), 'VBGRAMG daily status as per e-muster issued')]")
             report_link.click()
+            time.sleep(3)
 
-            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
-            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['block'].upper()))).click()
+            self.log_info(f"Drilling down to district/block: {inputs['district']} > {inputs['block']}")
+            self._handle_report_drilldown(driver, wait, inputs)
 
             # 2. Scrape All Panchayat Links from Column 5
             self.log_info("Scanning Dashboard for Panchayat Links (Column 5)...")            

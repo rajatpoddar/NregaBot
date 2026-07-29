@@ -186,7 +186,26 @@ class DashboardReportTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def _solve_captcha(self, driver, wait):
+        """Solve CAPTCHA — tries hidden field answer first, falls back to math parsing."""
         self.log_info("Attempting to solve CAPTCHA...")
+        textbox_id = "ContentPlaceHolder1_txtCaptcha"
+        btn_id = "ContentPlaceHolder1_btnLogin"
+
+        # Strategy 1: Read hidden answer field
+        try:
+            hf = driver.find_element(By.ID, "ContentPlaceHolder1_hfCaptcha")
+            answer = hf.get_attribute("value")
+            if answer and answer.strip().isdigit():
+                self.log_info(f"CAPTCHA solved via hidden field: {answer.strip()}")
+                driver.find_element(By.ID, textbox_id).send_keys(answer.strip())
+                driver.find_element(By.ID, btn_id).click()
+                time.sleep(2)
+                if "Invalid Captcha Code" not in driver.page_source:
+                    return True
+        except Exception:
+            pass
+
+        # Strategy 2: Parse math expression
         try:
             captcha_element = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lblStopSpam")))
             captcha_text = captcha_element.text
@@ -194,9 +213,9 @@ class DashboardReportTab(BaseAutomationTab):
             if not match: raise ValueError("Could not parse CAPTCHA.")
             num1, operator, num2 = match.groups(); num1, num2 = int(num1), int(num2)
             result = num1 + num2 if operator == '+' else (num1 - num2 if operator == '-' else num1 * num2)
-            self._find(driver, By.ID, "ContentPlaceHolder1_txtCaptcha").send_keys(str(result))
-            self._find(driver, By.ID, "ContentPlaceHolder1_btnLogin").click()
-            time.sleep(1.0)  # Short wait after click
+            driver.find_element(By.ID, textbox_id).send_keys(str(result))
+            driver.find_element(By.ID, btn_id).click()
+            time.sleep(1.0)
             if "Invalid Captcha Code" in driver.page_source: raise ValueError("CAPTCHA failed.")
             return True
         except TimeoutException:
@@ -205,6 +224,70 @@ class DashboardReportTab(BaseAutomationTab):
         except ValueError as e:
             self.log_error(f"CAPTCHA Error: {e}")
             raise
+
+    def _handle_report_drilldown(self, driver, wait, inputs):
+        """
+        After opening a report page, drill down to district/block level.
+        Handles two patterns:
+        1. Dropdown-based (district→block select elements) — new portal
+        2. Link-based (click district name → click block name) — old portal
+        """
+        state = inputs.get('state', '')
+        district = inputs.get('district', '')
+        block = inputs.get('block', '')
+
+        # Pattern 1: Check for state/district/block dropdowns on the report page
+        try:
+            state_select = driver.find_element(By.ID, "ContentPlaceHolder1_ddl_States")
+            if state_select.is_displayed():
+                self.log_info("State dropdown found on report page, selecting...")
+                self._select_by_text_case_insensitive(Select(state_select), state)
+                time.sleep(2)
+                try:
+                    district_select = WebDriverWait(driver, 5).until(
+                        EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_District"))
+                    )
+                    if district_select.is_displayed() and district:
+                        self.log_info(f"District dropdown found, selecting: {district}")
+                        self._select_by_text_case_insensitive(Select(district_select), district)
+                        time.sleep(2)
+                        try:
+                            block_select = WebDriverWait(driver, 5).until(
+                                EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_Block"))
+                            )
+                            if block_select.is_displayed() and block:
+                                self.log_info(f"Block dropdown found, selecting: {block}")
+                                self._select_by_text_case_insensitive(Select(block_select), block)
+                                time.sleep(2)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Pattern 2: Check for district/block links on page
+        if district:
+            try:
+                district_link = driver.find_element(By.XPATH, f"//a[contains(normalize-space(), '{district.upper()}')]")
+                if district_link.is_displayed():
+                    self.log_info(f"Clicking district link: {district}")
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", district_link)
+                    time.sleep(0.5)
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", district_link)
+                    time.sleep(2)
+                    if block:
+                        try:
+                            block_link = WebDriverWait(driver, 5).until(
+                                EC.element_to_be_clickable((By.XPATH, f"//a[contains(normalize-space(), '{block.upper()}')]"))
+                            )
+                            self.log_info(f"Clicking block link: {block}")
+                            driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", block_link)
+                            time.sleep(2)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
     def run_automation_logic(self, inputs, retries=1):
         self.app.after(0, self.set_ui_state, True)
@@ -217,35 +300,116 @@ class DashboardReportTab(BaseAutomationTab):
             if not driver: return 
             wait = WebDriverWait(driver, 20)
 
-            # --- STANDARD FLOW ONLY (Direct Link Removed) ---
-            self.log_info("Navigating to Home Page...")
+            # --- STANDARD FLOW ONLY (Accordion + Drilldown) ---
+            self.log_info("Navigating to MIS portal...")
             driver.get(config.MIS_REPORTS_CONFIG["base_url"])
             self._solve_captcha(driver, wait)
 
             self.update_status("Selecting State...", 0.15)
-            self.select_dropdown(driver, "ContentPlaceHolder1_ddl_States", inputs['state'])
-            
-            self.update_status("Opening Dashboard...", 0.2)
-            report_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Dashboard for Delay Monitoring System")))
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", report_link)
-            time.sleep(1); report_link.click()
+            state_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddl_States")))
+            driver.execute_script("""
+                arguments[0].scrollIntoView({block: 'center'});
+                var select = arguments[0];
+                var target = arguments[1].toLowerCase().trim();
+                for (var i = 0; i < select.options.length; i++) {
+                    if (select.options[i].text.toLowerCase().trim() === target) {
+                        select.selectedIndex = i;
+                        select.dispatchEvent(new Event('change', {bubbles: true}));
+                        break;
+                    }
+                }
+            """, state_select, inputs['state'])
+            time.sleep(4)
+            self.update_status("Waiting for report accordion...", 0.18)
+            wait.until(EC.presence_of_element_located((By.ID, "accordionMain")))
 
-            self.update_status("Selecting District...", 0.25)
-            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['district'].upper()))).click()
+            # Expand accordion and find the Dashboard link
+            self.update_status("Opening Dashboard Report...", 0.2)
+            driver.execute_script("""
+                document.querySelectorAll('.accordion-collapse').forEach(function(el) {
+                    el.classList.add('show');
+                });
+            """)
+            time.sleep(0.5)
 
-            self.update_status("Selecting Block...", 0.3)
-            wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, inputs['block'].upper()))).click()
+            report_link = driver.find_element(By.XPATH, "//a[contains(normalize-space(.), 'Dashboard for Delay Monitoring System')]")
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", report_link)
+            time.sleep(5)  # Wait for full dashboard page to load
+
+            # Dashboard page loads with data via URL params — check if table already present
+            self.update_status("Checking for panchayat table...", 0.25)
+            main_table_xpath_gen = "//table[contains(., 'Panchayat') and contains(., 'S No')]"
+            try:
+                # Short wait (5s) to give the page time to render before giving up
+                WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, main_table_xpath_gen)))
+                self.log_info("Panchayat table already loaded, skipping drilldown.")
+            except TimeoutException:
+                self.log_info("Table not found directly, trying drilldown...")
+                self._handle_report_drilldown(driver, wait, inputs)
+
+            # --- Expand All on dashboard page: click radio buttons to trigger postback ---
+            self.update_status("Expanding all data on dashboard...", 0.3)
+            try:
+                # Click 'All Districts' radio button (index 0) to ensure full data loads
+                all_districts_rb = driver.find_element(By.ID, "ContentPlaceHolder1_rdbuttondistrict_0")
+                if not all_districts_rb.is_selected():
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", all_districts_rb)
+                    self.log_info("Selected 'All Districts' radio button")
+                    time.sleep(3)
+            except Exception:
+                pass
+            try:
+                # Click 'Consolidate for the Financial Year' radio button (index 0) for full data
+                consolidate_rb = driver.find_element(By.ID, "ContentPlaceHolder1_RadioButtonList1_0")
+                if not consolidate_rb.is_selected():
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", consolidate_rb)
+                    self.log_info("Selected 'Consolidate for the Financial Year' radio button")
+                    time.sleep(3)
+            except Exception:
+                pass
 
             self.update_status("Finding Panchayat...", 0.35)
-            main_table_xpath = "//table[.//b[text()='S No.'] and .//b[text()='Panchayat']]"
-            wait.until(EC.presence_of_element_located((By.XPATH, f"{main_table_xpath}//tr[1]/td/b[text()='Panchayat']")))
-            panchayat_row = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, f"{main_table_xpath}//tr[td[2][normalize-space()='{inputs['panchayat']}']]")))
+            # Find the panchayat summary table — 3 strategies:
+            # 1. old portal: <b> inside <td>
+            # 2. new portal Bootstrap: <th> elements
+            # 3. Generic: any table containing 'Panchayat' and 'S No' (text-based)
+            main_table_xpath = "//table[.//b[text()='SNo.'] and (.//b[text()='Panchayat'] or .//b[text()='Panchayats'])]"
+            tables = driver.find_elements(By.XPATH, main_table_xpath)
+            if not tables:
+                main_table_xpath = "//table[.//th[contains(text(), 'SNo.')] and .//th[contains(text(), 'Panchayat')]]"
+                tables = driver.find_elements(By.XPATH, main_table_xpath)
+            if not tables:
+                self.log_info("Trying generic text-based XPath...")
+                main_table_xpath = "//table[contains(., 'Panchayat') and contains(., 'S No')]"
+            wait.until(EC.presence_of_element_located((By.XPATH, main_table_xpath)))
+
+            # Iterate through rows to find panchayat (case-insensitive) with retry
+            target_panchayat = inputs['panchayat'].strip()
+            panchayat_row = None
+            for attempt in range(5):
+                rows = driver.find_elements(By.XPATH, f"{main_table_xpath}//tr[td]")
+                for row in rows:
+                    cells = row.find_elements(By.TAG_NAME, "td")
+                    if len(cells) >= 6:
+                        p_name = cells[1].text.strip()
+                        if p_name.lower() == target_panchayat.lower():
+                            panchayat_row = row
+                            break
+                if panchayat_row is not None:
+                    break
+                time.sleep(1)
+            if panchayat_row is None:
+                raise ValueError(f"Panchayat '{target_panchayat}' not found in table.")
 
             self.update_status("Finding Column...", 0.4)
-            header_cells = driver.find_elements(By.XPATH, f"{main_table_xpath}//tr[.//b[contains(text(), 'T+2')]]/td/b")
             target_col_index = -1
-            for i, th_b in enumerate(header_cells):
-                if ' '.join(inputs['delay_column'].split()).lower().strip() == ' '.join(th_b.text.split()).lower().strip():
+            # Try finding header cells — old portal: <b> inside <td>
+            header_cells = driver.find_elements(By.XPATH, f"{main_table_xpath}//tr[.//b[contains(text(), 'T+2')]]/td/b")
+            if not header_cells:
+                # New portal: <th> elements
+                header_cells = driver.find_elements(By.XPATH, f"{main_table_xpath}//tr[th[contains(text(), 'T+2')]]/th")
+            for i, header_el in enumerate(header_cells):
+                if ' '.join(inputs['delay_column'].split()).lower().strip() == ' '.join(header_el.text.split()).lower().strip():
                     target_col_index = i + 2
                     break
 
@@ -256,16 +420,19 @@ class DashboardReportTab(BaseAutomationTab):
 
             try:
                 target_link = target_cell.find_element(By.TAG_NAME, "a")
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target_link)
-                time.sleep(0.5); target_link.click()
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", target_link)
             except NoSuchElementException:
                  if target_cell.text.strip() == '0':
-                    messagebox.showinfo("No Data", f"No records found for {inputs['delay_column']} in {inputs['panchayat']}.")
+                    self.log_info(f"No records found (value=0) for {inputs['delay_column']} in {inputs['panchayat']}.")
                     self.success_message = None; return
                  else: raise ValueError("Target cell is not a clickable link.")
 
             self.update_status("Loading Final Report...", 0.5)
-            FINAL_TABLE_XPATH = "//table[@bordercolor='green' and .//b[contains(text(), 'E-MR No.')]]"
+            # Dual-strategy: table with <th> containing 'E-MR' (new portal) OR old green-bordered table
+            FINAL_TABLE_XPATH = (
+                "//table[.//th[contains(text(), 'E-MR')]]"
+                " | //table[@bordercolor='green' and .//b[contains(text(), 'E-MR No.')]]"
+            )
             table = wait.until(EC.presence_of_element_located((By.XPATH, FINAL_TABLE_XPATH)))
             rows = table.find_elements(By.XPATH, ".//tr[position()>1]") 
 
