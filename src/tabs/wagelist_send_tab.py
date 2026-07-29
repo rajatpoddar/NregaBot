@@ -274,7 +274,7 @@ class WagelistSendTab(BaseAutomationTab):
                 
                 WebDriverWait(driver, 5).until(EC.alert_is_present()).accept()
                 
-                self.log_success(f"✅ {wagelist} submitted successfully.")
+                self.log_success(f"{wagelist} submitted successfully.")
                 return True
             except Exception as e:
                 self.log_warning(f"[WARN] Attempt {attempt+1} failed for {wagelist}: {type(e).__name__}")
@@ -284,5 +284,5 @@ class WagelistSendTab(BaseAutomationTab):
                     Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddlfin")).select_by_value(fin_year)
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_sel")))
 
-        self.log_error(f"❌ {wagelist} failed after multiple attempts.")
+        self.log_error(f"{wagelist} failed after multiple attempts.")
         return False

@@ -442,7 +442,7 @@ class WcGenTab(BaseAutomationTab):
                  error_msg = error_msg.split("Stacktrace:")[0].strip()
             
             self.app.after(0, lambda msg=error_msg: messagebox.showerror("Error", f"Failed to load categories:\n{msg}"))
-            self.app.after(0, lambda msg=error_msg: self.app.log_message(self.log_display, f"Error: {msg}", "error"))
+            self.log_error(f"Error: {msg}")
 
         finally:
             self.app.after(0, lambda: self.load_button.configure(state="normal", text="Load Categories from Website"))
@@ -498,7 +498,7 @@ class WcGenTab(BaseAutomationTab):
         try:
             driver = self.app.get_driver()
             if not driver:
-                self.app.after(0, lambda: self.app.log_message(self.log_display, "Browser not available for dropdown update.", "warning"))
+                self.log_warning("Browser not available for dropdown update.")
                 return
             wait = WebDriverWait(driver, 20)
             
@@ -527,7 +527,7 @@ class WcGenTab(BaseAutomationTab):
             self.app.after_idle(self._update_next_combobox, current['next'], new_options, list(dependency_map.keys()))
         except Exception as e:
             error_message = str(e).splitlines()[0]
-            self.app.after(0, lambda msg=error_message: self.app.log_message(self.log_display, f"Error updating dropdown: {msg}", "error"))
+            self.log_error(f"Error updating dropdown: {msg}")
 
     def _update_next_combobox(self, next_key, options, all_keys):
         self.ui_fields[next_key].configure(values=options, state="normal")
@@ -706,7 +706,7 @@ class WcGenTab(BaseAutomationTab):
                 total = len(rows)
                 for i, row in enumerate(rows):
                     if self.is_stopped():
-                        self.app.log_message(self.log_display, "Automation stopped by user."); break
+                        self.log_info("Automation stopped by user."); break
                     if not any(field.strip() for field in row): continue
                     
                     self.log_info(f"--- Processing Row {i+1}/{total} ---")

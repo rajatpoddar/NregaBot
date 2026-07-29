@@ -139,7 +139,7 @@ class UpdateEstimateTab(BaseAutomationTab):
             total_tasks = len(work_codes)
             for i, work_code in enumerate(work_codes, 1):
                 if self.is_stopped():
-                    self.app.log_message(self.log_display, "⏹️ Automation stopped by user.", "warning"); break
+                    self.log_warning("⏹️ Automation stopped by user."); break
                 
                 pct = i / total_tasks * 100
                 self.log_info(f"  🔄 [{i}/{total_tasks}] Processing: {truncate_workcode(work_code)} ({pct:.0f}%)")

@@ -411,14 +411,14 @@ class IfEditTab(BaseAutomationTab):
             fail_count = 0
             for i, row in enumerate(rows_to_process):
                 if self.is_stopped():
-                    self.app.log_message(self.log_display, "⏹️ Automation stopped.", "warning"); break
+                    self.log_warning("⏹️ Automation stopped."); break
                 work_code = row[self.column_map['work_code']]
                 pct = (i + 1) / total * 100
                 self.log_info(f"  🔄 [{i+1}/{total}] Processing: {truncate_workcode(work_code)} ({pct:.0f}%)")
                 self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {truncate_workcode(work_code)}", (i+1)/total)
                 self._process_single_work_code(driver, row, form_config)
         except Exception as e:
-            self.log_error(f"❌ A critical error occurred: {e}")
+            self.log_error(f"A critical error occurred: {e}")
         finally:
             # Count results from tree
             all_items = self.results_tree.get_children()
@@ -574,7 +574,7 @@ class IfEditTab(BaseAutomationTab):
             if activities_raw:
                 for act_data in [line.strip().split(',') for line in activities_raw.splitlines() if line.strip()]:
                     if self.is_stopped(): break
-                    if len(act_data) != 3: self.app.log_message(self.log_display, f"  > Skipping invalid activity line: {act_data}", "warning"); continue
+                    if len(act_data) != 3: self.log_warning(f"  > Skipping invalid activity line: {act_data}"); continue
                     
                     code_keyword, price, qty = act_data[0].strip(), act_data[1].strip(), act_data[2].strip()
                     
@@ -589,7 +589,7 @@ class IfEditTab(BaseAutomationTab):
                     actual_code = found_option.get_attribute('value')
 
                     if actual_code in existing_activity_codes: 
-                        self.app.log_message(self.log_display, f"  > Skipping existing activity: {actual_code}"); continue
+                        self.log_info(f"  > Skipping existing activity: {actual_code}"); continue
                     
                     self.log_info(f"  > Adding activity: {actual_code}")
                     try:
@@ -630,7 +630,7 @@ class IfEditTab(BaseAutomationTab):
                     if not line.strip(): continue
                     parts = line.strip().split(',')
                     if len(parts) != 3:
-                        self.app.log_message(self.log_display, f"  > Skipping invalid UI line: {line}", "warning"); continue
+                        self.log_warning(f"  > Skipping invalid UI line: {line}"); continue
                     
                     # Clean the user input keyword
                     keyword = parts[0].strip().split('$$')[0]
@@ -640,7 +640,7 @@ class IfEditTab(BaseAutomationTab):
                     found_option = next((opt for opt in all_options if opt.text.strip().startswith(keyword)), None)
                     
                     if not found_option:
-                        self.app.log_message(self.log_display, f"  > Material starting with '{keyword}' not found in dropdown.", "warning"); continue
+                        self.log_warning(f"  > Material starting with '{keyword}' not found in dropdown."); continue
                         
                     actual_name = found_option.text.split('$$')[0].strip()
                     if actual_name not in existing_material_names:

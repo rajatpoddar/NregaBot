@@ -473,7 +473,7 @@ class MisReportsTab(BaseAutomationTab):
         return pd.DataFrame()
 
     def run_automation_logic(self, inputs, save_path):
-        self.app.after(0, self.set_ui_state, True); self.app.clear_log(self.log_display); self.app.log_message(self.log_display, "Starting MIS Report generation...")
+        self.app.after(0, self.set_ui_state, True); self.app.clear_log(self.log_display); self.log_info("Starting MIS Report generation...")
         try:
             driver = self.app.get_driver()
             if not driver: return
@@ -506,7 +506,7 @@ class MisReportsTab(BaseAutomationTab):
                 # ═══════════════════════════════════════════════
                 for i, report_name in enumerate(inputs['reports']):
                     if self.is_stopped():
-                        self.app.log_message(self.log_display, "Stop signal received.", "warning")
+                        self.log_warning("Stop signal received.")
                         break
                     
                     status_msg = f"Processing report {i+1}/{total_reports}..."
@@ -670,7 +670,7 @@ class MisReportsTab(BaseAutomationTab):
                         time.sleep(1)
                         
                     except NoSuchElementException:
-                        self.log_warning(f"❌ Report '{report_name}' not found in accordion.")
+                        self.log_warning(f"Report '{report_name}' not found in accordion.")
                         self.app.after(0, lambda r=report_name: self.results_tree.insert("", "end", values=(r, "Failed", "Link not found"), tags=('failed',)))
                     except Exception as e:
                         error_msg = str(e).split('\n')[0]
@@ -701,7 +701,7 @@ class MisReportsTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Automation Finished")
             
             if not self.is_stopped():
-                self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 MIS Report generated. File(s) saved near: {save_path}"))
+                self.log_info(f"📊 MIS Report generated. File(s) saved near: {save_path}")
             
             self.app.after(5000, lambda: self.app.set_status("Ready"))
             self.app.after(5000, lambda: self.update_status("Ready", 0.0))

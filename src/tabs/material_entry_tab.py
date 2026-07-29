@@ -553,29 +553,29 @@ class MaterialEntryTab(BaseAutomationTab):
                             self._log_result(work_key, bill_no, "Success", success_msg)
                             success_count += 1
                         else:
-                            self.log_warning(f"⚠ Unexpected message: {success_msg}")
+                            self.log_warning(f"Unexpected message: {success_msg}")
                             self._log_result(work_key, bill_no, "Warning", success_msg)
                     except TimeoutException:
                         self.log_warning("⚠ Could not verify success message")
                         self._log_result(work_key, bill_no, "Unknown", "No confirmation message found")
                 except TimeoutException as e:
                     error_msg = f"Timeout: Element not found - {str(e)}"
-                    self.log_error(f"❌ {error_msg}")
+                    self.log_error(f"{error_msg}")
                     self._log_result(work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
                 except NoSuchElementException as e:
                     error_msg = f"Element not found: {str(e)}"
-                    self.log_error(f"❌ {error_msg}")
+                    self.log_error(f"{error_msg}")
                     self._log_result(work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
                 except WebDriverException as e:
                     error_msg = f"WebDriver error: {str(e)}"
-                    self.log_error(f"❌ {error_msg}")
+                    self.log_error(f"{error_msg}")
                     self._log_result(work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
                 except Exception as e:
                     error_msg = f"Unexpected error: {str(e)}"
-                    self.log_error(f"❌ {error_msg}")
+                    self.log_error(f"{error_msg}")
                     self._log_result(work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
         except Exception as e:

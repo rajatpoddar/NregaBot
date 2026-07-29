@@ -380,7 +380,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")
             if hasattr(self, 'success_message') and self.success_message:
-                self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 Issued MR Report Complete: {self.success_message}"))
+                self.log_info(f"📊 Issued MR Report Complete: {self.success_message}")
 
     def run_abps_automation_logic(self, inputs):
         """New Logic for scanning the whole block for ABPS Pending workers."""
@@ -511,7 +511,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
             self.app.after(0, self.set_ui_state, False)
             if hasattr(self, 'success_message') and self.success_message:
-                self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 Issued MR Complete: {self.success_message}"))
+                self.log_info(f"📊 Issued MR Complete: {self.success_message}")
 
     def _update_workcode_textbox(self, text):
         self.workcode_textbox.configure(state="normal")

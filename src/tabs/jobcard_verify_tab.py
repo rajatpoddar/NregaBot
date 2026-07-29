@@ -184,15 +184,15 @@ class JobcardVerifyTab(BaseAutomationTab):
                 for ext in ['.jpg', '.jpeg', '.png']:
                     photo_path = os.path.join(self.photo_folder_path, jobcard_key + ext)
                     if os.path.exists(photo_path):
-                        self.app.log_message(self.log_display, f"Found photo: {os.path.basename(photo_path)}"); return photo_path
+                        self.log_info(f"Found photo: {os.path.basename(photo_path)}"); return photo_path
             
             default_photo_path = resource_path(config.JOBCARD_VERIFY_CONFIG["default_photo"])
             if os.path.exists(default_photo_path):
-                self.app.log_message(self.log_display, f"Using default photo '{config.JOBCARD_VERIFY_CONFIG['default_photo']}'.", "warning"); return default_photo_path
+                self.log_warning(f"Using default photo '{config.JOBCARD_VERIFY_CONFIG['default_photo']}'."); return default_photo_path
             
-            self.app.log_message(self.log_display, f"No photo found for {jobcard_key}.", "error"); return None
+            self.log_error(f"No photo found for {jobcard_key}."); return None
         except Exception as e:
-            self.app.log_message(self.log_display, f"Error finding photo for {jobcard_no}: {e}", "error"); return None
+            self.log_error(f"Error finding photo for {jobcard_no}: {e}"); return None
 
     def run_automation_logic(self, inputs):
         self.app.after(0, self.set_ui_state, True)
@@ -225,7 +225,7 @@ class JobcardVerifyTab(BaseAutomationTab):
 
             for location_village in villages_to_process:
                 if self.is_stopped():
-                    self.app.log_message(self.log_display, "🛑 Stop signal received.", "warning"); break
+                    self.log_warning("🛑 Stop signal received."); break
                 
                 self.log_info(f"\n--- Processing Village: {location_village} ---")
                 self.app.after(0, self.update_status, f"Processing Village: {location_village}")
@@ -265,7 +265,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.log_info(f"{'='*50}")
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e).splitlines()[0]}"
-            self.log_error(f"❌ Error: {error_msg}")
+            self.log_error(f"Error: {error_msg}")
             messagebox.showerror("Automation Error", f"An error occurred: {error_msg}")
         finally:
             self.app.after(0, self.update_status, "Finished")

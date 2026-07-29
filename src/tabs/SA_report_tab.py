@@ -145,8 +145,8 @@ class SAReportTab(BaseAutomationTab):
                 
                 result_data = (sr_no, district, block, panchayat, issue_no, issue_type, forwarded_to, status, issue_description)
                 self.app.after(0, lambda data=result_data: self.results_tree.insert("", "end", values=data))
-        except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as e: error_msg = f"A browser error occurred: {str(e).splitlines()[0]}"; self.app.log_message(self.log_display, error_msg, "error"); messagebox.showerror("Automation Error", error_msg)
-        except Exception as e: self.app.log_message(self.log_display, f"An unexpected error occurred: {e}", "error"); messagebox.showerror("Critical Error", f"An unexpected error occurred: {e}")
+        except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as e: error_msg = f"A browser error occurred: {str(e).splitlines()[0]}"; self.log_error(error_msg); messagebox.showerror("Automation Error", error_msg)
+        except Exception as e: self.log_error(f"An unexpected error occurred: {e}"); messagebox.showerror("Critical Error", f"An unexpected error occurred: {e}")
         finally:
             # Count results from tree
             issue_count = 0
@@ -163,7 +163,7 @@ class SAReportTab(BaseAutomationTab):
             self.app.after(0, self.set_ui_state, False); self.app.after(0, self.update_status, "Automation Finished", 1.0); self.app.after(0, self.app.set_status, "Automation Finished")
             if not self.is_stopped():
                 total_issues = issue_count + closed_count
-                self.app.after(100, lambda: self.app.log_message(self.log_display, f"\n{'='*50}\n📊 Social Audit Summary: {total_issues} issues found (⏳ {issue_count} pending, ✅ {closed_count} closed)\n{'='*50}"))
+                self.app.after(100, lambda: self.log_info(f"\n{'='*50}\n📊 Social Audit Summary: {total_issues} issues found (⏳ {issue_count} pending, ✅ {closed_count} closed)\n{'='*50}"))
             
             # Reset status after 5 seconds
             self.app.after(5000, lambda: self.app.set_status("Ready"))

@@ -792,8 +792,7 @@ class DemandTab(BaseAutomationTab):
         self.quick_select_entry.delete(0, "end")
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
-        self.app.log_message(self.log_display,
-                             f"Quick-selected {added} applicants from {len(matched_jcs)} JC(s).")
+        self.log_info(f"Quick-selected {added} applicants from {len(matched_jcs)} JC(s).")
 
     def _on_search_change(self, event=None):
         """Triggered on every keystroke in the search box."""
@@ -953,7 +952,7 @@ class DemandTab(BaseAutomationTab):
             jc = job_card.split('/')[0]
             if state_logic_key == "jh": return jc.split('-')[-1]
             elif state_logic_key == "rj": return jc[-3:]
-            else: self.app.log_message(self.log_display, f"Warn: Unknown state logic '{state_logic_key}'."); return jc.split('-')[-1]
+            else: self.log_info(f"Warn: Unknown state logic '{state_logic_key}'."); return jc.split('-')[-1]
         except IndexError: return None
 
     # Add this method inside DemandTab class
@@ -1289,7 +1288,7 @@ class DemandTab(BaseAutomationTab):
                         self.app.after(0, self.app.log_message, self.log_display, f"✅ Triggering Bulk Allocation (Global Key).")
                         self.app.after(500, self.app.run_work_allocation_from_demand, panchayat, work_key_for_allocation)
                     else:
-                        self.app.after(100, lambda: self.app.log_message(self.log_display, "📊 Demand automation finished."))
+                        self.log_info("📊 Demand automation finished.")
 
                 self.app.after(0, self._clear_processed_selection)
             

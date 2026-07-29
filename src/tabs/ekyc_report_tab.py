@@ -275,7 +275,7 @@ class EKycReportTab(BaseAutomationTab):
                     # Wait for village dropdown to populate after panchayat postback
                     try:
                         wait.until(lambda d: len(Select(d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")).options) > 1)
-                        self.log_success(f"✅ Selected panchayat: '{p_name}' (village list loaded)")
+                        self.log_success(f"Selected panchayat: '{p_name}' (village list loaded)")
                     except:
                         time.sleep(1.5)  # fallback wait
                     

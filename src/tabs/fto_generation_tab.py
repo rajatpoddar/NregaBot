@@ -163,10 +163,10 @@ class FtoGenerationTab(BaseAutomationTab):
             # Yeh call aapke browser_manager.py ka naya function hit karegi
             success, msg = self.app.browser_manager.launch_old_firefox(path, url)
             if success:
-                self.app.after(0, lambda: self.app.log_message(self.log_display, "Browser Launched. Please login manually, plug in your DSC token, then click Start.", "success"))
+                self.log_success("Browser Launched. Please login manually, plug in your DSC token, then click Start.")
                 self.app.after(0, lambda: messagebox.showinfo("Browser Ready", "Old Firefox is open.\n\n1. Login to NREGA.\n2. Go to FTO page.\n3. Return here and click 'Start'."))
             else:
-                self.app.after(0, lambda: self.app.log_message(self.log_display, msg, "error"))
+                self.log_error(msg)
                 self.app.after(0, lambda: messagebox.showerror("Browser Error", msg))
             
             self.app.after(0, lambda: self.launch_btn.configure(state="normal", text="Launch Old Firefox"))
@@ -245,14 +245,14 @@ class FtoGenerationTab(BaseAutomationTab):
             
             self.log_info(f"{'='*50}")
             if success_count == total_steps:
-                self.log_success(f"✅ FTO Generation Complete! Both steps processed successfully.")
+                self.log_success(f"FTO Generation Complete! Both steps processed successfully.")
             elif success_count > 0:
-                self.log_warning(f"⚠️ FTO Generation: {success_count}/{total_steps} steps completed.")
+                self.log_warning(f"FTO Generation: {success_count}/{total_steps} steps completed.")
             else:
-                self.log_error(f"❌ FTO Generation: No steps completed successfully.")
+                self.log_error(f"FTO Generation: No steps completed successfully.")
                 self.log_info(f"{'='*50}")
         except Exception as e:
-            self.log_error(f"❌ Error: {e}")
+            self.log_error(f"Error: {e}")
         finally:
             self.automation_has_run = True
             self.app.after(0, self.set_ui_state, False)

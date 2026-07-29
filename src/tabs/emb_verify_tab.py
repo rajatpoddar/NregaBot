@@ -162,9 +162,9 @@ class EmbVerifyTab(BaseAutomationTab):
         failed = total_work - success
         summary = f"✅ Verified: {success}\n❌ Failed/Rejected: {failed}\n📊 Total: {total_work}"
         self.update_status(f"✅ {success}/{total_work} verified", 1.0)
-        self.app.log_message(self.log_display, f"\n{'='*40}\n📊 eMB Verification Summary\n{summary}\n{'='*40}")
+        self.log_info(f"\n{'='*40}\n📊 eMB Verification Summary\n{summary}\n{'='*40}")
         if total_work > 0:
-            self.app.log_message(self.log_display, f"\n📊 eMB Verification Complete: {summary}")
+            self.log_info(f"\n📊 eMB Verification Complete: {summary}")
 
     def run_automation_logic(self, panchayat, verify_amount, work_codes_from_ui):
         """The main logic for the eMB verification automation."""
@@ -212,7 +212,7 @@ class EmbVerifyTab(BaseAutomationTab):
                     break
                 
                 pct = (i + 1) / total * 100
-                self.app.log_message(self.log_display, f"  🔄 [{i+1}/{total}] Verifying: {truncate_workcode(current_wc)} ({pct:.0f}%)")
+                self.log_info(f"  🔄 [{i+1}/{total}] Verifying: {truncate_workcode(current_wc)} ({pct:.0f}%)")
                 self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {current_wc}", (i+1)/total)
                 self._process_single_work_code(driver, wait, current_wc, use_search, verify_amount)
 
@@ -282,7 +282,7 @@ class EmbVerifyTab(BaseAutomationTab):
             unit_cost = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_grd_activitycomponent_ctl02_lbl_act_unitcost").text.strip()
             wage_per_day = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_grd_activitycomponent_ctl02_lbl_wageperday").text.strip()
 
-            self.app.log_message(self.log_display, f"Found Unit Cost: {unit_cost}, Wage Per Day: {wage_per_day} for {work_code}")
+            self.log_info(f"Found Unit Cost: {unit_cost}, Wage Per Day: {wage_per_day} for {work_code}")
 
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(0.5)
@@ -292,7 +292,7 @@ class EmbVerifyTab(BaseAutomationTab):
                 self._log_result(work_code, "Verified", f"Unit Cost & Wage were correct ({verify_amount}).")
             else:
                 rejection_reason = "unit cost is not correct"
-                self.app.log_message(self.log_display, f"Rejecting. Unit Cost: {unit_cost}, Wage: {wage_per_day}", "warning")
+                self.log_warning(f"Rejecting. Unit Cost: {unit_cost}, Wage: {wage_per_day}")
                 self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_txt_rejection_reason").send_keys(rejection_reason)
                 self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_btn_reject").click()
                 self._log_result(work_code, "Rejected", f"Unit Cost: {unit_cost}, Wage: {wage_per_day}. Reason sent.")

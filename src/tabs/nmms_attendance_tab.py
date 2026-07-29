@@ -296,8 +296,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
                         pass
                     data.append({"sno": sno, "name": pan, "no_works": no_works,
                                  "no_mr": no_mr, "persondays": persondays, "mr_href": mr_href})
-                    self.app.log_message(self.log_display,
-                        f"  Found: {pan} | MRs: {no_mr} | href: {(mr_href[:70] + '...') if len(mr_href) > 70 else mr_href}")
+                    self.log_info(f"Found: {pan} | MRs: {no_mr} | href: {(mr_href[:70] + '...') if len(mr_href) > 70 else mr_href}")
                 except Exception:
                     continue
 
@@ -431,7 +430,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
             self.log_success(f"Done! {summary_sno} MR(s) scraped.")
             cnt = summary_sno
             total_workers = len(self.workers_tree.get_children()) if hasattr(self, 'workers_tree') else 0
-            self.app.after(200, lambda: self.app.log_message(self.log_display, f"📊 NMMS Attendance Complete: {cnt} MRs scraped, {total_workers} workers found. Photos: {photos_dir}"))
+            self.log_info(f"📊 NMMS Attendance Complete: {cnt} MRs scraped, {total_workers} workers found. Photos: {photos_dir}")
 
         except Exception as e:
             self.log_error(f"Critical error: {e}")
@@ -584,8 +583,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
             return detail
 
         try:
-            self.app.log_message(self.log_display,
-                f"    MR {msr_no} | {mr_info.get('work_code','')}")
+            self.log_info(f"MR {msr_no} | {mr_info.get('work_code','')}")
             url_before = driver.current_url
 
             # Click the MR number link on the summary page
@@ -609,8 +607,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     except Exception:
                         driver.execute_script("arguments[0].click();", link)
                 except NoSuchElementException:
-                    self.app.log_message(self.log_display,
-                        f"    ⚠ Could not find clickable link for MR {msr_no}.", "warning")
+                    self.log_warning(f"Could not find clickable link for MR {msr_no}.")
                     return detail
 
             # Wait for URL to change (navigation to detail page)
@@ -650,12 +647,11 @@ class NmmsAttendanceTab(BaseAutomationTab):
             p1_ok = bool(detail.get("photo1_taken") or detail.get("photo1_uploaded"))
             p2_ok = bool(detail.get("photo2_taken") or detail.get("photo2_uploaded"))
             if p1_ok:
-                self.app.log_message(self.log_display, 
-                    f"      Photo-1: {detail.get('photo1_taken','')} | By: {detail.get('taken_by','')}")
+                self.log_info(f"Photo-1: {detail.get('photo1_taken','')} | By: {detail.get('taken_by','')}")
             else:
                 self.log_warning("      ⚠ Photo-1 info not found")
                 if p2_ok:
-                    self.app.log_message(self.log_display, f"      Photo-2: {detail.get('photo2_taken','')}")
+                    self.log_info(f"      Photo-2: {detail.get('photo2_taken','')}")
 
             # Photos download
             if self._save_photos_var.get():
@@ -987,11 +983,9 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     elif resp.status_code == 502:
                         continue
                     else:
-                        self.app.log_message(self.log_display,
-                            f"      HTTP {resp.status_code} ({len(resp.content)} bytes)", "warning")
+                        self.log_warning(f"HTTP {resp.status_code} ({len(resp.content)} bytes)")
                 except Exception as e:
-                    self.app.log_message(self.log_display,
-                        f"      Request failed: {e}", "warning")
+                    self.log_warning(f"Request failed: {e}")
             return False
 
         try:
@@ -1057,8 +1051,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     return ("Yes", path)
                 if attempt == 0:
                     time.sleep(2)
-                    self.app.log_message(self.log_display,
-                        f"      Retrying photo {photo_no}...", "warning")
+                    self.log_warning(f"Retrying photo {photo_no}...")
 
             self.log_warning(f"    Photo {photo_no}: All download attempts failed.")
             return ("No", "")

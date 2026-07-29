@@ -379,9 +379,7 @@ class MateMrGenTab(BaseAutomationTab):
     def run_automation_logic(self, inputs):
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
-        self.app.log_message(
-            self.log_display,
-            f"Starting Mate/Mistri MR generation for: {inputs['panchayat'] or '(Panchayat not specified)'}")
+        self.log_info(f"Starting Mate/Mistri MR generation for: {inputs['panchayat'] or '(Panchayat not specified)'}")
         self.app.after(0, self.app.set_status, "Running Mate/Mistri MR Generation...")
 
         self.output_dir = self._get_output_dir(inputs['panchayat'] or "MateMistri")
@@ -397,8 +395,7 @@ class MateMrGenTab(BaseAutomationTab):
                 return
             wait = WebDriverWait(driver, 20)
 
-            self.app.log_message(
-                self.log_display, f"Output will be in: {self.output_dir}", "info")
+            self.log_info(f"Output will be in: {self.output_dir}")
 
             if not self._validate_panchayat(driver, wait, inputs['panchayat']):
                 self.app.after(0, self.set_ui_state, False)
@@ -414,9 +411,7 @@ class MateMrGenTab(BaseAutomationTab):
                 if self.is_stopped():
                     self.log_warning("Stop signal received.")
                     break
-                self.app.log_message(
-                    self.log_display,
-                    f"\n--- Processing item ({index + 1}/{total_items}): {item} ---", "info")
+                self.log_info(f"Processing item ({index + 1}/{total_items}): {item}")
                 self.app.after(
                     0, self.update_status,
                     f"Processing {item}", (index + 1) / total_items)
@@ -424,8 +419,7 @@ class MateMrGenTab(BaseAutomationTab):
                     driver, wait, inputs, item, self.output_dir, session_skip_list)
 
         except Exception as e:
-            self.app.log_message(
-                self.log_display, f"A critical error occurred: {e}", "error")
+            self.log_error(f"A critical error occurred: {e}")
             messagebox.showerror(
                 "Critical Error",
                 f"An unexpected error stopped the automation.\n\nError: {e}")
@@ -440,8 +434,7 @@ class MateMrGenTab(BaseAutomationTab):
                    f"Success: {self.success_count}\n"
                    f"Skipped/Failed: {self.skipped_count}")
         if "macro" in self.app.active_automations:
-            self.app.log_message(
-                self.log_display, f"Batch Finished. Output: {output_dir}", "info")
+            self.log_info(f"Batch Finished. Output: {output_dir}")
             return
         if self.success_count > 0 and output_dir and os.path.exists(output_dir):
             if messagebox.askyesno("Task Finished",
@@ -472,8 +465,7 @@ class MateMrGenTab(BaseAutomationTab):
             self.log_success("Panchayat name is valid.")
             return True
         except Exception as e:
-            self.app.log_message(
-                self.log_display, f"Validation failed: {e}", "error")
+            self.log_error(f"Validation failed: {e}")
             return False
 
     #  Items to process                                                    #
@@ -484,8 +476,7 @@ class MateMrGenTab(BaseAutomationTab):
         Manual mode – return provided search keys as-is.
         """
         if inputs['auto_mode']:
-            self.app.log_message(
-                self.log_display, "Auto Mode: Fetching available work codes...")
+            self.log_info("Auto Mode: Fetching available work codes...")
             try:
                 # Select panchayat (case-insensitive)
                 agency_select = Select(driver.find_element(By.ID, "exe_agency"))
@@ -502,18 +493,13 @@ class MateMrGenTab(BaseAutomationTab):
                     for opt in Select(driver.find_element(By.ID, "ddlWorkCode")).options
                     if opt.get_attribute("value")
                 ]
-                self.app.log_message(
-                    self.log_display, f"Found {len(items)} available work codes.")
+                self.log_info(f"Found {len(items)} available work codes.")
                 return items
             except Exception as e:
-                self.app.log_message(
-                    self.log_display,
-                    f"Could not fetch work codes automatically: {e}", "error")
+                self.log_error(f"Could not fetch work codes automatically: {e}")
                 return []
         else:
-            self.app.log_message(
-                self.log_display,
-                f"Processing {len(inputs['work_codes'])} provided work keys.")
+            self.log_info(f"Processing {len(inputs['work_codes'])} provided work keys.")
             return inputs['work_codes']
 
     #  Skilled/Semi-Skilled checkbox helper                               #
@@ -547,20 +533,17 @@ class MateMrGenTab(BaseAutomationTab):
                     "/following-sibling::input"
                 )
             except NoSuchElementException:
-                self.app.log_message(
-                    self.log_display,
-                    "   - Warning: Could not locate Skilled/Semi-Skilled checkbox. "
-                    "Page may have changed.", "warning")
+                self.log_warning(
+                    "   - Could not locate Skilled/Semi-Skilled checkbox. "
+                    "Page may have changed.")
                 return
 
         if not skilled_cb.is_selected():
             driver.execute_script("arguments[0].click();", skilled_cb)
-            self.app.log_message(
-                self.log_display, "   - Clicked 'Skilled/Semi-Skilled' checkbox.")
+            self.log_info("   - Clicked 'Skilled/Semi-Skilled' checkbox.")
             time.sleep(1)   # brief wait for any page reload triggered by the click
         else:
-            self.app.log_message(
-                self.log_display, "   - 'Skilled/Semi-Skilled' already selected.")
+            self.log_info("   - 'Skilled/Semi-Skilled' already selected.")
 
     #  Single item processing                                             #
     def _process_single_item(self, driver, wait, inputs, item, output_dir, session_skip_list):
@@ -577,18 +560,14 @@ class MateMrGenTab(BaseAutomationTab):
                 self._select_by_text_case_insensitive(
                     Select(panchayat_dropdown), config.AGENCY_PREFIX + inputs['panchayat'])
             else:
-                self.app.log_message(
-                    self.log_display,
-                    "   - Panchayat not provided, skipping selection.")
+                self.log_info("   - Panchayat not provided, skipping selection.")
 
             # 2. Select Skilled/Semi-Skilled worker category
-            self.app.log_message(
-                self.log_display, "   - Selecting Skilled/Semi-Skilled category...")
+            self.log_info("   - Selecting Skilled/Semi-Skilled category...")
             self._select_skilled_checkbox(driver, wait)
 
             # 3. Select Work Code
-            self.app.log_message(
-                self.log_display, f"   - Selecting work code for '{item}'...")
+            self.log_info(f"   - Selecting work code for '{item}'...")
             full_work_code_text = self._select_work_code(
                 driver, wait, item, inputs['auto_mode'])
 
@@ -612,18 +591,12 @@ class MateMrGenTab(BaseAutomationTab):
                         "arguments[0].value = arguments[1]; "
                         "arguments[0].dispatchEvent(new Event('change', {bubbles:true}));",
                         num_mr_field, str(inputs['num_mr']))
-                    self.app.log_message(
-                        self.log_display,
-                        f"   - Set No. of MRs to print: {inputs['num_mr']}")
+                    self.log_info(f"   - Set No. of MRs to print: {inputs['num_mr']}")
                 except (NoSuchElementException, TimeoutException):
-                    self.app.log_message(
-                        self.log_display,
-                        "   - Warning: 'No. of MRs' field not found, skipping.", "warning")
+                    self.log_warning("   - 'No. of MRs' field not found, skipping.")
 
             # 6. Fill number of workers per MR form (field ID: txtMsrPage)
-            self.app.log_message(
-                self.log_display,
-                f"   - Setting workers per MR: {inputs['workers_per_mr']}...")
+            self.log_info(f"   - Setting workers per MR: {inputs['workers_per_mr']}...")
             try:
                 workers_field = wait.until(
                     EC.presence_of_element_located((By.ID, "txtMsrPage")))
@@ -633,13 +606,9 @@ class MateMrGenTab(BaseAutomationTab):
                     "arguments[0].value = arguments[1]; "
                     "arguments[0].dispatchEvent(new Event('change', {bubbles:true}));",
                     workers_field, str(inputs['workers_per_mr']))
-                self.app.log_message(
-                    self.log_display,
-                    f"   - Set Workers per MR: {inputs['workers_per_mr']}")
+                self.log_info(f"   - Set Workers per MR: {inputs['workers_per_mr']}")
             except (TimeoutException, NoSuchElementException):
-                self.app.log_message(
-                    self.log_display,
-                    "   - Warning: 'Workers per MR' field not found, skipping.", "warning")
+                self.log_warning("   - 'Workers per MR' field not found, skipping.")
 
             # 7. Submit
             self.log_info("   - Submitting form...")
@@ -669,8 +638,7 @@ class MateMrGenTab(BaseAutomationTab):
                 return
 
             # 10. Save PDF
-            self.app.log_message(
-                self.log_display, "   - Muster Roll is valid. Generating PDF...")
+            self.log_info("   - Muster Roll is valid. Generating PDF...")
             pdf_path = self._save_mr_as_pdf(
                 driver, full_work_code_text, output_dir,
                 inputs['orientation'], inputs['scale'])
@@ -687,13 +655,11 @@ class MateMrGenTab(BaseAutomationTab):
             session_skip_list.add(full_work_code_text)
 
         except TimeoutException:
-            self.app.log_message(
-                self.log_display, f"Error on '{item}': Timeout (Slow Network)", "error")
+            self.log_error(f"Error on '{item}': Timeout (Slow Network)")
             self._log_result(item, "Failed", "Timeout - Slow Network")
         except Exception as e:
             error_msg = str(e).splitlines()[0] if str(e) else "Unknown Error"
-            self.app.log_message(
-                self.log_display, f"Error on '{item}': {error_msg}", "error")
+            self.log_error(f"Error on '{item}': {error_msg}")
             self._log_result(item, "Failed", error_msg)
 
     #  Page error checker                                                 #
@@ -728,8 +694,7 @@ class MateMrGenTab(BaseAutomationTab):
                          if opt.text == item and opt.get_attribute("value")), None)
                     if found:
                         dd.select_by_visible_text(found.text)
-                        self.app.log_message(
-                            self.log_display, f"   - Selected: {found.text}")
+                        self.log_info(f"   - Selected: {found.text}")
                         return found.text
                     raise NoSuchElementException(
                         f"Work '{item}' not found in dropdown.")
@@ -754,16 +719,13 @@ class MateMrGenTab(BaseAutomationTab):
                          if item in opt.text and opt.get_attribute("value")), None)
                     if found:
                         dd.select_by_visible_text(found.text)
-                        self.app.log_message(
-                            self.log_display, f"   - Selected: {found.text}")
+                        self.log_info(f"   - Selected: {found.text}")
                         return found.text
                     raise NoSuchElementException(
                         f"No work found for search key '{item}'.")
             except StaleElementReferenceException:
                 if attempt < 2:
-                    self.app.log_message(
-                        self.log_display,
-                        "   - Stale element, retrying...", "warning")
+                    self.log_warning("   - Stale element, retrying...")
                     time.sleep(2)
                     continue
                 raise
@@ -858,8 +820,7 @@ class MateMrGenTab(BaseAutomationTab):
                 with open(save_path, 'wb') as f:
                     f.write(base64.b64decode(pdf_data_base64))
                 return save_path
-            self.app.log_message(
-                self.log_display, "Error: PDF data not generated.", "error")
+            self.log_error("PDF data not generated.")
             return None
 
         except Exception as e:
@@ -870,15 +831,13 @@ class MateMrGenTab(BaseAutomationTab):
     def _print_file(self, file_path):
         try:
             if not os.path.exists(file_path):
-                self.app.log_message(
-                    self.log_display, f"Print Error: File not found at {file_path}", "error")
+                self.log_error(f"Print Error: File not found at {file_path}")
                 return
             if sys.platform == "win32":
                 os.startfile(file_path, "print")
             else:
                 subprocess.run(["lpr", file_path], check=True)
-            self.app.log_message(
-                self.log_display, f"Sent {os.path.basename(file_path)} to printer.")
+            self.log_info(f"Sent {os.path.basename(file_path)} to printer.")
             time.sleep(2)
         except Exception as e:
             msg = f"An unexpected error occurred while printing: {e}"
@@ -950,18 +909,14 @@ class MateMrGenTab(BaseAutomationTab):
         self.log_info("Starting PDF merge...")
         pdf_files = self.current_session_files
         if not pdf_files:
-            self.app.log_message(
-                self.log_display,
-                "No PDFs generated in this session to merge.", "warning")
+            self.log_warning("No PDFs generated in this session to merge.")
             messagebox.showinfo(
                 "No Files",
                 "No MRs have been successfully generated in this cycle yet.\n"
                 "Run the automation first.", parent=self)
             return
 
-        self.app.log_message(
-            self.log_display,
-            f"Merging {len(pdf_files)} files generated in this session.")
+        self.log_info(f"Merging {len(pdf_files)} files generated in this session.")
 
         dialog = ctk.CTkInputDialog(
             text="Enter a base name for the merged file:", title="Merge PDFs")

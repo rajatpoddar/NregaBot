@@ -328,13 +328,13 @@ class BaseAutomationTab(ctk.CTkFrame):
         """Centralized error handler."""
         error_msg = str(e).lower()
         if "no such window" in error_msg or "target window already closed" in error_msg or "web view not found" in error_msg:
-            self.app.log_message(self.log_display, "Automation Stopped: Browser tab/window was closed.", "error")
+            self.log_error("Automation Stopped: Browser tab/window was closed.")
             messagebox.showwarning("Browser Closed", "Automation stopped because the browser window was closed.")
         elif "invalid session id" in error_msg:
-            self.app.log_message(self.log_display, "Error: Browser session lost.", "error")
+            self.log_error("Error: Browser session lost.")
             messagebox.showwarning("Connection Lost", "Browser session was lost. Please restart the browser.")
         else:
-            self.app.log_message(self.log_display, f"Error: {e}", "error")
+            self.log_error(f"Error: {e}")
             messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
 
     def _get_wkhtml_path(self) -> str:
@@ -664,10 +664,20 @@ class BaseAutomationTab(ctk.CTkFrame):
             else:
                 messagebox.showwarning("Empty", "There are no logs to copy.", parent=self.app)
 
-        copy_button = ctk.CTkButton(log_actions_frame, text="Copy Logs", width=100, command=copy_logs_to_clipboard)
-        copy_button.pack(side="right")
+        def clear_log_display():
+            self.log_display.configure(state="normal")
+            self.log_display.delete("1.0", tkinter.END)
+            self.log_display.configure(state="disabled")
+            self.update_status("Logs cleared", None)
 
-        self.log_display = ctk.CTkTextbox(log_frame, state="disabled")
+        copy_button = ctk.CTkButton(log_actions_frame, text="📋 Copy Logs", width=110, command=copy_logs_to_clipboard)
+        copy_button.pack(side="right", padx=(0, 5))
+
+        self.clear_logs_button = ctk.CTkButton(log_actions_frame, text="🗑 Clear Logs", width=110, command=clear_log_display,
+                                                fg_color=("#DC2626", "#EF4444"), hover_color=("#B91C1C", "#DC2626"))
+        self.clear_logs_button.pack(side="right", padx=(0, 5))
+
+        self.log_display = ctk.CTkTextbox(log_frame, state="disabled", font=("Consolas", 12))
         self.log_display.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         
         status_bar_frame = ctk.CTkFrame(log_frame, height=30)
@@ -715,7 +725,7 @@ class BaseAutomationTab(ctk.CTkFrame):
 
     def stop_automation(self) -> None:
         self.app.stop_events[self.automation_key].set()
-        self.app.log_message(self.log_display, "Stop signal sent. Finishing current task...", "warning")
+        self.log_warning("Stop signal sent. Finishing current task...")
 
     def update_status(self, message: str, progress: Optional[float] = None) -> None:
         """Update status label and progress bar.
@@ -791,7 +801,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             self.results_tree.delete(item)
 
         # 3. Auto Start
-        self.app.log_message(self.log_display, f"Retrying {len(failed_items)} failed items...", "info")
+        self.log_info(f"Retrying {len(failed_items)} failed items...")
         self.start_automation()
 
     def _get_style(self) -> ttk.Style:

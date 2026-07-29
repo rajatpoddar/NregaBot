@@ -320,8 +320,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                     self.info_lbl.configure(
                         text=f"📅 Date: {datetime.now().strftime('%d/%m/%Y')}  |  "
                              f"🌐 Panchayat: {self.excel_panchayat}")
-                self.app.log_message(self.log_display,
-                    f"📂 eKYC Excel loaded: {loaded} records. Panchayat: {self.excel_panchayat or 'N/A'}")
+                self.log_info(f"eKYC Excel loaded: {loaded} records. Panchayat: {self.excel_panchayat or 'N/A'}")
             else:
                 self.excel_status_lbl.configure(text="❌ No valid records.", text_color=config.COLORS["red_error"])
 
@@ -425,8 +424,7 @@ class DeleteApplicantTab(BaseAutomationTab):
 
                 self.update_status(f"Jobcard {jc_idx+1}/{total_jc}: {jobcard}",
                                    (jc_idx + 1) / total_jc)
-                self.app.log_message(self.log_display,
-                    f"\n{'─'*50}\n🔄 Jobcard {jc_idx+1}/{total_jc}: {jobcard}\n{'─'*50}")
+                self.log_info(f"Jobcard {jc_idx+1}/{total_jc}: {jobcard}")
 
                 self.log_info("🌐 Opening Delete Applicant page...")
                 driver.get(config.DELETE_APPLICANT_CONFIG["url"])
@@ -533,8 +531,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                         norm_name = " ".join(nu.split())  # collapse spaces
                         normalized_applicants.append((norm_name, ov, nu))
 
-                    self.app.log_message(self.log_display,
-                        f"     Found {len(portal_names)} applicants on portal. Matching {len(normalized_applicants)} selected...")
+                    self.log_info(f"Found {len(portal_names)} applicants on portal. Matching {len(normalized_applicants)} selected...")
 
                     filled_ok = []
                     for norm_name, ov, original_upper in normalized_applicants:
@@ -624,8 +621,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                         # Step B: If "cannot delete all" → schedule registration deletion, DONE with this jobcard
                         if alert_fired and "cannot delete all" in alert_text.lower():
                             pending_reg_del.add(jobcard)
-                            self.app.log_message(self.log_display,
-                                f"     ⚠️  Cannot delete last applicant. Will delete full registration for {jobcard}.")
+                            self.log_warning(f"Cannot delete last applicant. Will delete full registration for {jobcard}.")
                             for nu, ov in filled_ok:
                                 log_one(jobcard, ov[3], "Failed",
                                         "Cannot delete last applicant. Registration will be deleted.")
@@ -657,7 +653,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                     else:
                         self.log_warning("⚠️  No applicants were filled.")
                 except Exception as e:
-                    self.log_error(f"❌ Table error: {e}")
+                    self.log_error(f"Table error: {e}")
                     for nu, ov in applicants:
                         log_one(jobcard, ov[3], "Failed", f"Table error: {str(e).splitlines()[0]}")
 
@@ -666,8 +662,7 @@ class DeleteApplicantTab(BaseAutomationTab):
             #  (for jobcards where last member couldn't be deleted)
             # ═══════════════════════════════════════════
             if pending_reg_del and not self.is_stopped():
-                self.app.log_message(self.log_display,
-                    f"\n{'='*50}\n🗑️  PHASE 2: Deleting {len(pending_reg_del)} full registration(s)\n{'='*50}")
+                self.log_info(f"PHASE 2: Deleting {len(pending_reg_del)} full registration(s)")
                 self.update_status(f"Deleting {len(pending_reg_del)} registrations...", 0.0)
 
                 for reg_idx, jobcard in enumerate(sorted(pending_reg_del)):
@@ -725,8 +720,7 @@ class DeleteApplicantTab(BaseAutomationTab):
         Delete a full registration on DelReg.aspx page.
         Called when applicant deletion fails because only 1 member remains.
         """
-        self.app.log_message(self.log_display,
-            f"\n{'─'*40}\n🗑️  Reg-Deletion {reg_idx+1}/{total_reg}: {jobcard}\n{'─'*40}")
+        self.log_info(f"Reg-Deletion {reg_idx+1}/{total_reg}: {jobcard}")
         self.update_status(f"Reg-Deletion {reg_idx+1}/{total_reg}: {jobcard}",
                            (reg_idx + 1) / total_reg)
 

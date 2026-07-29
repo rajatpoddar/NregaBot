@@ -290,7 +290,7 @@ class WorkAllocationTab(BaseAutomationTab):
             except (TimeoutException, NoSuchElementException):
                 self.log_info("Panchayat dropdown not found. Assuming GP Login.")
             except ValueError as e:
-                self.app.log_message(self.log_display, str(e), "error"); messagebox.showerror("Input Error", str(e)); self.app.after(0, self.set_ui_state, False); return
+                self.log_error(str(e)); messagebox.showerror("Input Error", str(e)); self.app.after(0, self.set_ui_state, False); return
 
             self.app.after(0, self.app.set_status, "Setting Work Category...")
             category_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
@@ -447,7 +447,7 @@ class WorkAllocationTab(BaseAutomationTab):
             error_msg = f"Page error (Timeout/Alert): {str(e).splitlines()[0]}"
             self.log_error(f"   - FAILED: {error_msg}")
             self._log_result(work_key, selected_work_code_text, "Failed", error_msg)
-            try: driver.get(config.WORK_ALLOCATION_CONFIG["url"]); self.app.log_message(self.log_display, "   - Refreshing page..."); return
+            try: driver.get(config.WORK_ALLOCATION_CONFIG["url"]); self.log_info("   - Refreshing page..."); return
             except Exception: return
         
         except Exception as e:

@@ -388,7 +388,7 @@ class MbEntryTab(BaseAutomationTab):
 
             for i, work_code in enumerate(work_codes_raw):
                 if self.is_stopped():
-                    self.app.log_message(self.log_display, "Automation stopped.", "warning"); break
+                    self.log_warning("Automation stopped."); break
                 
                 self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {work_code}", (i+1) / total)
                 
@@ -768,7 +768,7 @@ class MbEntryTab(BaseAutomationTab):
                 element = driver.find_element(By.ID, activity_id)
                 text = element.get_attribute("innerText").lower()
                 if "earth work" in text:
-                    self.log_success(f"✅ Found 'Earth work' in row #{i}.")
+                    self.log_success(f"Found 'Earth work' in row #{i}.")
                     return f"ctl00$ContentPlaceHolder1$activity$ctl{str(i).zfill(2)}"
             except NoSuchElementException: continue 
         self.log_warning("⚠️ 'Earth work' not found, defaulting to first row (ctl01).")

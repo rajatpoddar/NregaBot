@@ -120,9 +120,18 @@ class SadUpdateTab(BaseAutomationTab):
         
         log_tools = ctk.CTkFrame(log_tab, fg_color="transparent")
         log_tools.grid(row=0, column=0, sticky="ew", pady=5)
-        ctk.CTkButton(log_tools, text="Copy Logs", width=100, command=self.copy_logs).pack(side="right", padx=5)
+
+        def clear_logs():
+            self.log_display.configure(state="normal")
+            self.log_display.delete("1.0", tkinter.END)
+            self.log_display.configure(state="disabled")
+
+        ctk.CTkButton(log_tools, text="🗑 Clear Logs", width=110,
+                       fg_color=("#DC2626", "#EF4444"), hover_color=("#B91C1C", "#DC2626"),
+                       command=clear_logs).pack(side="right", padx=5)
+        ctk.CTkButton(log_tools, text="📋 Copy Logs", width=110, command=self.copy_logs).pack(side="right", padx=5)
         
-        self.log_display = ctk.CTkTextbox(log_tab, state="disabled")
+        self.log_display = ctk.CTkTextbox(log_tab, state="disabled", font=("Consolas", 12))
         self.log_display.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
 
         # --- Control Buttons (Bottom) ---

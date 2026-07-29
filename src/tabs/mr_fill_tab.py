@@ -241,7 +241,7 @@ class MrFillTab(BaseAutomationTab):
             total = len(work_keys)
             for i, work_key in enumerate(work_keys, 1):
                 if self.is_stopped(): 
-                    self.app.log_message(self.log_display, "Automation stopped by user.", "warning"); break
+                    self.log_warning("Automation stopped by user."); break
                 
                 self.app.after(0, self.update_status, f"Processing {i}/{total}: {work_key}", (i/total))
                 

@@ -313,7 +313,7 @@ class DashboardReportTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
             self.app.after(0, self.update_status, "Ready", 0.0)
             if hasattr(self, 'success_message') and self.success_message:
-                self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 Dashboard Report Complete: {self.success_message}"))
+                self.log_info(f"📊 Dashboard Report Complete: {self.success_message}")
                 if inputs['delay_column'] == "Attendance not filled in T+2 days":
                     self.app.after(0, lambda: self.run_mr_fill_button.pack(side="left", padx=(10, 0)))
 

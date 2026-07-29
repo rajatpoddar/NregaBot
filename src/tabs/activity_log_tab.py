@@ -119,12 +119,12 @@ class ActivityLogTab(ctk.CTkFrame):
         self._refresh_btn.grid(row=0, column=3, sticky="e", padx=(5, 5))
 
         self._clear_btn = ctk.CTkButton(
-            filter_frame, text="🗑️ Clear Log", width=100, height=28,
+            filter_frame, text="🗑 Clear Logs", width=110, height=28,
             font=ctk.CTkFont(size=11),
-            fg_color=("#FEE2E2", "#450A0A"),
-            text_color=("#DC2626", "#F87171"),
-            hover_color=("#FECACA", "#7F1D1D"),
-            command=self._clear_log,
+            fg_color=("#DC2626", "#EF4444"),
+            text_color="white",
+            hover_color=("#B91C1C", "#DC2626"),
+            command=self.clear_logs,
         )
         self._clear_btn.grid(row=0, column=4, sticky="e")
 
@@ -336,9 +336,13 @@ class ActivityLogTab(ctk.CTkFrame):
         finally:
             self._refresh_in_progress = False
 
-    # ── Clear Log ─────────────────────────────────────────────────
-    def _clear_log(self) -> None:
-        """Clear all activity log entries after confirmation."""
+    # ── Clear Logs ────────────────────────────────────────────────
+    def clear_logs(self) -> None:
+        """
+        Clear all activity log entries from the database after confirmation.
+        
+        Standardized name matching other tabs — replaces legacy _clear_log().
+        """
         if not messagebox.askyesno(
             "Clear Activity Log",
             "Kya aap saari activity history delete karna chahte hain?\n\n"

@@ -168,7 +168,7 @@ class MsrTab(BaseAutomationTab):
             except TimeoutException: self.log_info("Panchayat selection not found/required (GP Login). Proceeding...")
             total = len(work_keys)
             for i, work_key in enumerate(work_keys, 1):
-                if self.is_stopped(): self.app.log_message(self.log_display, "Automation stopped by user.", "warning"); break
+                if self.is_stopped(): self.log_warning("Automation stopped by user."); break
                 # --- MODIFICATION ---
                 status_msg = f"Processing {i}/{total}: {work_key}"
                 progress = (i / total)

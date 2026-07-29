@@ -247,7 +247,7 @@ class ZeroMrTab(BaseAutomationTab):
                 final_status = "Automation Stopped"
             self.app.after(0, self.app.set_status, final_status)
             self.app.after(0, self.update_status, final_status, 1.0)
-            self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 {final_status}"))
+            self.log_info(f"📊 {final_status}")
 
     def _process_single_item(self, driver, wait, work_key, msr_no):
         try:
@@ -365,14 +365,14 @@ class ZeroMrTab(BaseAutomationTab):
 
         except (TimeoutException, NoSuchElementException) as e:
             error_msg = f"Element not found/timeout. {str(e).splitlines()[0]}"
-            self.app.log_message(self.log_display, f"   - FAILED: {error_msg}", "error")
+            self.log_error(f"   - FAILED: {error_msg}")
             self._log_result(work_key, msr_no, "Failed", error_msg)
         except Exception as e:
             if "stale element" in str(e).lower():
                 error_msg = "Page refreshed unexpectedly."
             else:
                 error_msg = f"Unexpected error: {e}"
-            self.app.log_message(self.log_display, f"   - FAILED: {error_msg}", "error")
+            self.log_error(f"   - FAILED: {error_msg}")
             self._log_result(work_key, msr_no, "Failed", error_msg)
     def retry_logic_handler(self) -> None:
         """
@@ -427,7 +427,7 @@ class ZeroMrTab(BaseAutomationTab):
 
         # 4. Auto Start with a slight delay
         # The delay ensures the text box is fully updated before the automation reads it
-        self.app.log_message(self.log_display, f"Retrying {len(failed_keys)} failed work keys...", "info")
+        self.log_info(f"Retrying {len(failed_keys)} failed work keys...")
         self.app.after(200, self.start_automation)
 
     def _log_result(self, work_key, msr_no, status, details):
@@ -497,7 +497,7 @@ class ZeroMrTab(BaseAutomationTab):
             messagebox.showwarning("No Data", "No data was received from the MR Tracking tab.", parent=self)
             return
 
-        self.app.log_message(self.log_display, f"Received {len(data_list)} items from MR Tracking.")
+        self.log_info(f"Received {len(data_list)} items from MR Tracking.")
         
         # Clear current form and results
         self.panchayat_var.set("")
@@ -511,7 +511,7 @@ class ZeroMrTab(BaseAutomationTab):
             return
             
         self.panchayat_entry.insert(0, target_panchayat)
-        self.app.log_message(self.log_display, f"Set Panchayat to: {target_panchayat}")
+        self.log_info(f"Set Panchayat to: {target_panchayat}")
 
         work_list_entries = []
         other_panchayats_found = []
@@ -522,7 +522,7 @@ class ZeroMrTab(BaseAutomationTab):
             msr_no = item.get("msr_no")
 
             if not all([panchayat, work_code, msr_no]):
-                self.app.log_message(self.log_display, f"Skipping invalid item: {item}", "warning")
+                self.log_warning(f"Skipping invalid item: {item}")
                 continue
 
             if panchayat == target_panchayat:
@@ -535,7 +535,7 @@ class ZeroMrTab(BaseAutomationTab):
         # Populate the textbox
         if work_list_entries:
             self.work_list_text.insert("1.0", "\n".join(work_list_entries))
-            self.app.log_message(self.log_display, f"Loaded {len(work_list_entries)} items for {target_panchayat}.", "success")
+            self.log_success(f"Loaded {len(work_list_entries)} items for {target_panchayat}.")
         
         # Show warning if other panchayats were skipped
         if other_panchayats_found:
@@ -550,7 +550,7 @@ class ZeroMrTab(BaseAutomationTab):
                 f"Please run the 'T+8 to T+15' filter again for those panchayats individually.",
                 parent=self
             )
-            self.app.log_message(self.log_display, f"Skipped items for other panchayats: {skipped_panchayats_str}", "warning")
+            self.log_warning(f"Skipped items for other panchayats: {skipped_panchayats_str}")
 
     def _save_inputs(self, inputs):
         """Saves the financial year and panchayat name."""

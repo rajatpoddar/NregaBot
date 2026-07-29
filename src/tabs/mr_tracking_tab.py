@@ -359,7 +359,7 @@ class MrTrackingTab(BaseAutomationTab):
                     self.log_info(f"✅ '{step_name}' dropdown populated with options.")
                     time.sleep(0.5)
                 except TimeoutException:
-                    self.log_warning(f"⚠️ '{step_name}' dropdown ({dropdown_id}) populate nahi hua (postback timeout).")
+                    self.log_warning(f"'{step_name}' dropdown ({dropdown_id}) populate nahi hua (postback timeout).")
                     raise TimeoutException(f"Dropdown '{step_name}' ({dropdown_id}) did not populate after state selection.")
 
             self.app.after(0, self.app.set_status, f"Selecting State: {inputs['state']}")
@@ -535,7 +535,7 @@ class MrTrackingTab(BaseAutomationTab):
                 self.log_error("❌ Session expired. Please Login again and retry.")
                 messagebox.showerror("Session Expired", "Session expired. Please Login again and retry.")
             else:
-                self.log_error(f"❌ {err_text}")
+                self.log_error(f"{err_text}")
                 messagebox.showerror("Automation Error",
                     f"{err_text}\n\n"
                     f"💡 Tip: Check if the page has changed. "
@@ -565,7 +565,7 @@ class MrTrackingTab(BaseAutomationTab):
                  self.app.after(5000, lambda: self.update_status("Ready", 0.0)) 
 
             if hasattr(self, 'success_message') and self.success_message and not self.is_stopped():
-                self.app.after(100, lambda: self.app.log_message(self.log_display, f"📊 MR Tracking Complete: {self.success_message}"))
+                self.log_info(f"📊 MR Tracking Complete: {self.success_message}")
                 
                 if inputs.get('zero_mr_filter', False):
                     self.app.after(0, lambda: self.run_zero_mr_button.pack(side="left", padx=(10, 0)))
