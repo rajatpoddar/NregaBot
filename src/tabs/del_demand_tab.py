@@ -254,7 +254,8 @@ class DelDemandTab(BaseAutomationTab):
                                 self.log_warning(f"   ⚠️ Village dropdown didn't populate after panchayat re-select.")
                     except NoSuchElementException:
                             self.log_info(f"   ⚠️ Panchayat dropdown not found (GP Login?).")
-                            self._process_village(driver, wait, target_panchayat, v_name)
+
+                self._process_village(driver, wait, target_panchayat, v_name)
             # Count results from tree
             success_count = 0
             fail_count = 0
@@ -272,7 +273,7 @@ class DelDemandTab(BaseAutomationTab):
 
             final_msg = "Finished" if not self.is_stopped() else "Stopped"
             self.app.after(0, self.update_status, final_msg, 1.0)
-            self.log_info("{'='*50}")
+            self.log_info(f"{'='*50}")
             self.log_info(f"📊 Delete Demand: ✅ {success_count} deleted, ❌ {fail_count} failed, ⏭️ {skip_count} skipped (of {total_v} villages)")
             self.log_info(f"{'='*50}")
         except Exception as e:

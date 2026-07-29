@@ -116,8 +116,11 @@ class PDFMergerTab(BaseAutomationTab):
         self.file_name_entry.configure(state=state) 
 
     def select_files(self):
+        mr_path = self.app.get_nregabot_path("PDF_Output/MR_Output")
+        initial_dir = mr_path if os.path.isdir(mr_path) else None
         files = filedialog.askopenfilenames(
             title="Select PDF files to merge",
+            initialdir=initial_dir,
             filetypes=[("PDF files", "*.pdf")]
         )
         if files:

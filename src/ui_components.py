@@ -498,7 +498,11 @@ class ToastNotification(ctk.CTkToplevel):
 
     def __init__(self, parent: Any, message: str, kind: str = "success",
                  duration: int = 4000, title: str = "", details: str = "") -> None:
-        super().__init__(parent)
+        # IMPORTANT: Do NOT pass parent to super().__init__(). A standalone
+        # Toplevel (no parent) with -topmost=True stays above ALL windows
+        # including the main app, browser, etc. A child Toplevel may stack
+        # behind other windows in some window managers despite -topmost.
+        super().__init__()
         self.parent = parent
         self._duration = duration
         self._start_time: Optional[float] = None
