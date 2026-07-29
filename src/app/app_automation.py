@@ -10,6 +10,7 @@ import subprocess
 import socket
 import os
 import json
+import base64
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -189,6 +190,9 @@ class AutomationMixin:
                     key, panchayat, status, duration, details
                 )
                 
+                # ── WhatsApp Excel File send (if enabled) ──
+                self._send_excel_whatsapp_notification(key, status, tab_instance)
+                
                 # ── Sync activity log to server (Phase 2) ──
                 lic = getattr(self.app_state, 'license_info', {}) or {}
                 server_license_key = lic.get('key', '')
@@ -261,6 +265,110 @@ class AutomationMixin:
                 logger.debug("WhatsApp notification error: %s", e)
         
         threading.Thread(target=_send, daemon=True).start()
+
+    def _send_excel_whatsapp_notification(self, key, status, tab_instance=None):
+        """
+        Automation finish par Excel file ko nrega-server par upload karta hai,
+        aur server OpenWA ke through WhatsApp pe document bhejta hai.
+
+        Ye tab kaam karta hai jab:
+        - User ne setting mein "whatsapp_excel_send" enable kiya ho
+        - User ke paas mobile number ho
+        - Tab ke results_tree mein data ho
+        - Status "success" ya "failed" ho (stopped par nahi bhejenge)
+        """
+        # Only send on success or failure (not stopped)
+        if status not in ("success", "failed"):
+            return
+
+        # Check if Excel WhatsApp is enabled
+        excel_enabled = get_config("whatsapp_excel_send", False)
+        if not excel_enabled:
+            return
+
+        # Check if license_info has mobile number
+        lic = getattr(self.app_state, 'license_info', {})
+        if not lic or not lic.get('user_mobile'):
+            return
+        user_mobile = lic.get('user_mobile', '')
+        if not user_mobile:
+            return
+
+        # Check if tab has results_tree with data
+        if tab_instance is None:
+            return
+        results_tree = getattr(tab_instance, 'results_tree', None)
+        if results_tree is None:
+            return
+        all_items = results_tree.get_children()
+        if not all_items:
+            return
+
+        # Run in background thread
+        def _send_excel():
+            try:
+                # ── Step 1: Auto-save Excel to temp ──
+                if not hasattr(tab_instance, 'export_treeview_to_excel_auto'):
+                    return
+                title_prefix = key.replace('_', ' ').title()
+                filename = f"{key}_report.xlsx"
+                file_path = tab_instance.export_treeview_to_excel_auto(
+                    results_tree, default_filename=filename, title_prefix=title_prefix
+                )
+                if not file_path or not os.path.exists(file_path):
+                    logger.debug(f"Excel auto-save failed for {key}, skipping WhatsApp send")
+                    return
+
+                # ── Step 2: Check file size (limit ~15MB) ──
+                file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                if file_size_mb > 15:
+                    logger.debug(f"Excel file too large ({file_size_mb:.1f}MB), skipping WhatsApp send")
+                    try:
+                        os.remove(file_path)
+                    except Exception:
+                        pass
+                    return
+
+                # ── Step 3: Upload to nrega-server and send via OpenWA ──
+                server_url = config.LICENSE_SERVER_URL
+                if not server_url:
+                    logger.debug("No server URL configured, skipping WhatsApp send")
+                    return
+
+                # Read file as base64 for upload
+                with open(file_path, "rb") as f:
+                    file_data = f.read()
+                file_b64 = base64.b64encode(file_data).decode('utf-8')
+
+                caption = f"📊 {title_prefix} — NREGA Bot"
+                upload_payload = {
+                    "user_mobile": user_mobile,
+                    "filename": filename,
+                    "file_data": file_b64,
+                    "caption": caption,
+                    "license_key": lic.get('key', ''),
+                }
+
+                resp = requests.post(
+                    f"{server_url}/api/whatsapp-send-excel",
+                    json=upload_payload,
+                    timeout=60
+                )
+                if resp.status_code in (200, 201):
+                    logger.info(f"Excel WhatsApp sent for {key} to {user_mobile}")
+                else:
+                    logger.debug(f"Excel WhatsApp send failed: {resp.status_code} {resp.text}")
+
+                # ── Step 4: Clean up temp file ──
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
+
+            except Exception as e:
+                logger.debug(f"Excel WhatsApp send failed for {key}: {e}")
+
+        threading.Thread(target=_send_excel, daemon=True).start()
 
     def _emergency_stop_all(self) -> None:
         """Emergency stop ALL running automations immediately.

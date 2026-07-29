@@ -859,6 +859,16 @@ class SettingsTab(ctk.CTkFrame):
         else:
             self._set_fr_status("📱 WhatsApp notifications disabled", "gray")
 
+    def _on_whatsapp_excel_toggle(self) -> None:
+        """Toggle WhatsApp Excel send on automation finish."""
+        val = self._whatsapp_excel_var.get()
+        save_config("whatsapp_excel_send", val)
+        self._update_excel_status_badge()
+        if val:
+            self._set_fr_status("📊 WhatsApp Excel send enabled!", "green")
+        else:
+            self._set_fr_status("📊 WhatsApp Excel send disabled", "gray")
+
     def _update_notif_status_badge(self) -> None:
         """Update the notification status badge ON/OFF."""
         if not hasattr(self, '_notif_status_badge') or not self._notif_status_badge.winfo_exists():
@@ -871,6 +881,22 @@ class SettingsTab(ctk.CTkFrame):
             )
         else:
             self._notif_status_badge.configure(
+                text="⏸️ OFF",
+                text_color=("gray50", "gray60"),
+            )
+
+    def _update_excel_status_badge(self) -> None:
+        """Update the Excel status badge ON/OFF."""
+        if not hasattr(self, '_excel_status_badge') or not self._excel_status_badge.winfo_exists():
+            return
+        val = self._whatsapp_excel_var.get()
+        if val:
+            self._excel_status_badge.configure(
+                text="✅ ON",
+                text_color=("#16A34A", "#4ADE80"),
+            )
+        else:
+            self._excel_status_badge.configure(
                 text="⏸️ OFF",
                 text_color=("gray50", "gray60"),
             )
@@ -1358,6 +1384,61 @@ class SettingsTab(ctk.CTkFrame):
         ).pack(padx=15, pady=(2, 10), anchor="w")
 
         # Thin separator below notification card
+        ctk.CTkFrame(scroll, height=1, corner_radius=0,
+                     fg_color=("gray85", "gray35"),
+                     ).grid(row=row_num[0], column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 5))
+        row_num[0] += 1
+
+        # ── Excel WhatsApp Send Card ──
+        excel_card = ctk.CTkFrame(scroll, fg_color=("#F0FDF4", "#0F2A1D"), corner_radius=10,
+                                   border_width=1, border_color=("#BBF7D0", "#166534"))
+        excel_card.grid(row=row_num[0], column=0, columnspan=3, sticky="ew", padx=10, pady=(2, 10))
+        row_num[0] += 1
+
+        # Icon + Title
+        excel_header = ctk.CTkFrame(excel_card, fg_color="transparent")
+        excel_header.pack(fill="x", padx=15, pady=(10, 2))
+        ctk.CTkLabel(excel_header, text="📊", font=ctk.CTkFont(size=22)).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(excel_header,
+                     text="WhatsApp Excel Report Send",
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color=("#166534", "#4ADE80")).pack(side="left")
+
+        # Switch row
+        excel_switch_row = ctk.CTkFrame(excel_card, fg_color="transparent")
+        excel_switch_row.pack(fill="x", padx=15, pady=(2, 2))
+
+        self._whatsapp_excel_var = tkinter.BooleanVar(
+            value=get_config("whatsapp_excel_send", False)
+        )
+        self._whatsapp_excel_switch = ctk.CTkSwitch(
+            excel_switch_row, text="📥  Automation ke baad Excel file WhatsApp pe bhejein",
+            variable=self._whatsapp_excel_var,
+            command=self._on_whatsapp_excel_toggle,
+            font=ctk.CTkFont(size=13),
+            switch_width=50, switch_height=24,
+        )
+        self._whatsapp_excel_switch.pack(side="left", padx=(0, 12), pady=5)
+
+        # Status indicator (ON/OFF badge)
+        self._excel_status_badge = ctk.CTkLabel(
+            excel_switch_row, text="", font=ctk.CTkFont(size=11, weight="bold"),
+            corner_radius=4,
+        )
+        self._excel_status_badge.pack(side="left", padx=(0, 10))
+        self._update_excel_status_badge()
+
+        # Description
+        ctk.CTkLabel(excel_card,
+            text="ℹ️ Jab bhi koi automation finish hogi, uska result auto-generated Excel file (base64) "
+                 "aapke registered WhatsApp number par bhej diya jayega.\n"
+                 "File temporary save karke bheji jaati hai aur fir delete kar di jaati hai.",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray50", "gray60"),
+            wraplength=650, justify="left",
+        ).pack(padx=15, pady=(2, 10), anchor="w")
+
+        # Thin separator below Excel card
         ctk.CTkFrame(scroll, height=1, corner_radius=0,
                      fg_color=("gray85", "gray35"),
                      ).grid(row=row_num[0], column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 5))

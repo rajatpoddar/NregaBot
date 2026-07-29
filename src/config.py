@@ -15,6 +15,16 @@ LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://license.
 MAIN_WEBSITE_URL: str = "https://nregabot.com"
 SUPPORT_EMAIL: str = "nregabot@gmail.com"
 
+# --- OpenWA Configuration (for WhatsApp messaging) ---
+OWA_BASE_URL: str = "http://192.168.29.101:2785"
+OWA_SESSION_ID: str = "cee322ad-7cbc-4b9f-b355-670f42d24e7c"
+OWA_API_KEY: str = "owa_k1_5e5cb7ef8cb40297fec613f3cba9c699daa2513a3fda0a0fa251c662e14faa8f"
+
+# ── Legacy Evolution API config (kept for backwards compat, will be removed) ──
+EVO_BASE_URL: str = OWA_BASE_URL
+EVO_INSTANCE: str = OWA_SESSION_ID
+EVO_API_KEY: str = OWA_API_KEY
+
 # --- Platform & UI Configuration ---
 import platform
 OS_SYSTEM: str = platform.system()

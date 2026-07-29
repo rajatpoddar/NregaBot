@@ -2,7 +2,7 @@
 """
 WhatsApp Chat Tab — Modern Chat UI.
 
-Users send messages that are forwarded to admin's WhatsApp via Evolution API.
+Users send messages that are forwarded to admin's WhatsApp via OpenWA.
 Admin replies from WhatsApp, replies come back via webhook.
 
 Uses config.LICENSE_SERVER_URL which can be overridden via env variable:
