@@ -3,7 +3,7 @@ import tkinter
 from tkinter import messagebox, filedialog, ttk
 import customtkinter as ctk
 import json
-import os, time, csv, re, sys, subprocess
+import os, time, csv, re, sys
 from datetime import datetime
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
@@ -139,14 +139,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         export_frame = ctk.CTkFrame(res_tab, fg_color="transparent")
         export_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        self.export_button = ctk.CTkButton(export_frame, text="Export Result", width=100, command=self.export_report)
+        self.export_button = ctk.CTkButton(export_frame, text="📥 Export to Excel", width=100, command=self.export_report)
         self.export_button.pack(side="left", padx=(0, 5))
-        
-        self.export_format_menu = ctk.CTkOptionMenu(export_frame, width=120, values=["PDF (.pdf)", "CSV (.csv)"], command=self._on_format_change)
-        self.export_format_menu.pack(side="left", padx=5)
-        
-        self.export_filter_menu = ctk.CTkOptionMenu(export_frame, width=120, values=["Export All", "Success Only", "Failed Only"])
-        self.export_filter_menu.pack(side="left", padx=5)
 
         # Treeview
         cols = ("Time", "Applicant Name", "Scheme Remarks", "Status", "Ack Number")
@@ -198,9 +192,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
     def _on_mode_switch(self):
         pass
 
-    def _on_format_change(self, selected_format):
-        if "CSV" in selected_format: self.export_filter_menu.configure(state="disabled")
-        else: self.export_filter_menu.configure(state="normal")
+
 
     def _log_result(self, name, scheme_rem, status, ack_no):
         """Adds a row to the Result Treeview."""
@@ -235,8 +227,6 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.file_path_entry.configure(state=state)
         self.backlog_switch.configure(state=state)
         self.export_button.configure(state=state)
-        
-        if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     def _update_remarks_state(self, has_file):
         """Disables remark fields if file is loaded, indicating file data takes precedence."""
@@ -611,63 +601,9 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
 
     # --- Export Logic ---
     def export_report(self):
-        export_format = self.export_format_menu.get()
-        if "CSV" in export_format:
-            self.export_treeview_to_csv(self.results_tree, "sad_entry_results.csv")
-            return
-            
-        data, file_path = self._get_filtered_data_and_filepath(export_format)
-        if not data: return
-
-        # Map data for PDF: [Time, Name, Scheme Remarks, Status, Ack No]
-        report_data = [[row[0], row[1], row[2], row[3], row[4]] for row in data]
-        report_headers = ["Time", "Applicant Name", "Scheme Remarks", "Status", "Ack Number"]
-        col_widths = [40, 100, 100, 40, 80]
-
-        if "PDF" in export_format:
-            self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
-
-    def _get_filtered_data_and_filepath(self, export_format):
-        if not self.results_tree.get_children():
-            messagebox.showinfo("No Data", "No results to export.")
-            return None, None
-        
-        filter_option = self.export_filter_menu.get()
-        data_to_export = []
-        for item_id in self.results_tree.get_children():
-            row_values = self.results_tree.item(item_id)['values']
-            status = row_values[3].upper() # Status is column 3 (0-based)
-            
-            if filter_option == "Export All":
-                data_to_export.append(row_values)
-            elif filter_option == "Success Only" and "SUCCESS" in status:
-                data_to_export.append(row_values)
-            elif filter_option == "Failed Only" and "SUCCESS" not in status:
-                data_to_export.append(row_values)
-                
-        if not data_to_export:
-            messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'.")
-            return None, None
-
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        details = {"PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}
-        if export_format not in details: return None, None
-        
-        filename = f"SAD_Report_{timestamp}{details[export_format]['ext']}"
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=details[export_format]['ext'],
-            filetypes=details[export_format]['types'],
-            initialdir=self.app.get_nregabot_path("Reports"),
-            initialfile=filename,
-            title="Save Report"
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename="sad_entry_results.xlsx",
+            filter_mode="Export All",
+            title_prefix="Sarkar Aapke Dwar Report"
         )
-        return (data_to_export, file_path) if file_path else (None, None)
-
-    def _handle_pdf_export(self, data, headers, col_widths, file_path):
-        title = f"Sarkar Aapke Dwar Report"
-        report_date = datetime.now().strftime('%d %b %Y')
-        success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
-        
-        if success and messagebox.askyesno("Success", f"PDF Report saved to:\n{file_path}\n\nDo you want to open it?"):
-            if sys.platform == "win32": os.startfile(file_path)
-            else: subprocess.call(['open', file_path])

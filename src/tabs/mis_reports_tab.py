@@ -121,6 +121,11 @@ class MisReportsTab(BaseAutomationTab):
         action_frame.grid(row=2, column=0, pady=10)
 
         # 2. Populate the "Results" Tab
+        res_btn_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
+        res_btn_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=5, pady=(5, 0))
+        self.export_button = ctk.CTkButton(res_btn_frame, text="📥 Export to Excel", fg_color="#107C10", hover_color="#0B5E0B", command=self.export_report)
+        self.export_button.pack(side="right")
+
         cols = ("Report Name", "Status", "Details")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
@@ -145,6 +150,13 @@ class MisReportsTab(BaseAutomationTab):
         self.state_menu.configure(state=state)
         self.district_menu.configure(state=state)
         self.block_menu.configure(state=state)
+
+        # Disable export button during automation
+        if hasattr(self, 'export_button'):
+            try:
+                self.export_button.configure(state=state)
+            except Exception:
+                pass
 
         # Disable all widgets within the reports_frame (checkboxes, buttons)
         # This is the corrected logic that avoids the winfo_descendants error.
@@ -384,6 +396,15 @@ class MisReportsTab(BaseAutomationTab):
             self.state_var.set(data.get('state', ''))
             self.district_var.set(data.get('district', ''))
             self.block_var.set(data.get('block', ''))
+    def export_report(self):
+        """Export results log to professional Excel using the base class method."""
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename="mis_reports_results.xlsx",
+            filter_mode="Export All",
+            title_prefix="MIS Reports — Results Log"
+        )
+
     def reset_ui(self) -> None:
         """Resets inputs and checkboxes."""
         super().reset_ui() # Call base to clear logs/status

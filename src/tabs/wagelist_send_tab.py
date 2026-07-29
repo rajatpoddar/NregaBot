@@ -65,7 +65,7 @@ class WagelistSendTab(BaseAutomationTab):
         self.export_csv_button = ctk.CTkButton(
             results_action_frame, 
             text="Export to CSV", 
-            command=lambda: self.export_treeview_to_csv(self.results_tree, "wagelist_send_results.csv")
+            command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="wagelist_send_results.xlsx", filter_mode="Export All")
         )
         self.export_csv_button.pack(side="left")
 

@@ -900,6 +900,267 @@ class BaseAutomationTab(ctk.CTkFrame):
         except Exception as e:
             messagebox.showerror("Export Failed", f"An error occurred while saving the CSV file:\n{e}", parent=self)
 
+    def export_treeview_to_excel(self, tree: Any, default_filename: str = "report.xlsx",
+                                  filter_mode: str = "Export All",
+                                  title_prefix: str = "") -> Optional[str]:
+        """
+        Professional Excel export with openpyxl styling.
+
+        Features:
+        - ✅ Auto-detects Status column from column headings
+        - ✅ Filter support (Export All / Success Only / Failed Only)
+        - ✅ Summary statistics row (Total / Success / Failed / Skipped)
+        - ✅ Dark blue header row with white text
+        - ✅ Alternating row colors (white/gray)
+        - ✅ Conditional formatting — Success=Green, Failed=Red
+        - ✅ Auto column widths (capped at 50 chars)
+        - ✅ Thin borders on all cells
+        - ✅ Timestamp footer with NregaBot branding
+
+        Args:
+            tree: The ttk.Treeview widget containing data
+            default_filename: Suggested filename for the save dialog
+            filter_mode: 'Export All', 'Success Only', or 'Failed Only'
+            title_prefix: Title text for the report header (e.g. 'MB Entry Report')
+
+        Returns:
+            File path if saved, None otherwise
+        """
+        all_items = tree.get_children()
+        if not all_items:
+            messagebox.showinfo("No Data", "No records to export.")
+            return None
+
+        # ── Auto-detect Status column index ──
+        columns = list(tree["columns"])
+        status_idx: Optional[int] = None
+        for i, col in enumerate(columns):
+            if col.lower().strip() == 'status':
+                status_idx = i
+                break
+        if status_idx is None:
+            # Heuristic: status is usually second-to-last or at index 1 for 3-col layouts
+            n = len(columns)
+            if n == 3:
+                status_idx = 1
+            elif n >= 8:
+                status_idx = n - 3  # wide tables (mb_entry=8, demand=10)
+            elif n >= 6:
+                status_idx = n - 2
+            elif n >= 4:
+                status_idx = n - 3
+            else:
+                status_idx = 1 if n > 1 else 0
+
+        # ── Filter data & count statistics ──
+        data_to_export: List[List] = []
+        total_count = len(all_items)
+        success_count = 0
+        failed_count = 0
+
+        for item_id in all_items:
+            values = tree.item(item_id)['values']
+            if not values or len(values) <= status_idx:
+                continue
+
+            status_text = str(values[status_idx]).upper()
+
+            if "SUCCESS" in status_text:
+                success_count += 1
+            elif "FAIL" in status_text or "ERROR" in status_text:
+                failed_count += 1
+
+            if filter_mode == "Export All":
+                data_to_export.append(values)
+            elif filter_mode == "Success Only" and "SUCCESS" in status_text:
+                data_to_export.append(values)
+            elif filter_mode == "Failed Only" and "SUCCESS" not in status_text and status_text:
+                data_to_export.append(values)
+
+        if not data_to_export:
+            messagebox.showinfo("Empty", "No data matches the selected filter.")
+            return None
+
+        # ── Save file dialog ──
+        reports_dir = self.app.get_nregabot_path("Reports")
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel Workbook", "*.xlsx")],
+            initialdir=reports_dir,
+            initialfile=default_filename,
+            title="Save Excel Report"
+        )
+        if not file_path:
+            return None
+
+        try:
+            # ── Lazy import openpyxl ──
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.utils import get_column_letter
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Report"
+
+            # ═══════════════════════════════════════════════
+            # STYLES
+            # ═══════════════════════════════════════════════
+            header_font = Font(bold=True, color="FFFFFF", size=11)
+            header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+            white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+            gray_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+            success_fill = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
+            failed_fill = PatternFill(start_color="FFEBEE", end_color="FFEBEE", fill_type="solid")
+            summary_fill = PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
+            center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            left_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
+            thin_border = Border(
+                left=Side(style='thin', color='B0B0B0'),
+                right=Side(style='thin', color='B0B0B0'),
+                top=Side(style='thin', color='B0B0B0'),
+                bottom=Side(style='thin', color='B0B0B0')
+            )
+
+            ncols = len(columns)
+
+            # ═══════════════════════════════════════════════
+            # ROW 1: Main Title (merged across all columns)
+            # ═══════════════════════════════════════════════
+            title_text = title_prefix.strip() if title_prefix.strip() else "Automation Report"
+            ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
+            c = ws.cell(row=1, column=1, value=title_text)
+            c.font = Font(size=14, bold=True, color="FFFFFF")
+            c.fill = header_fill
+            c.alignment = center_align
+
+            # ═══════════════════════════════════════════════
+            # ROW 2: Subtitle — generated by + timestamp
+            # ═══════════════════════════════════════════════
+            ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncols)
+            c = ws.cell(row=2, column=1,
+                       value=f"Generated by NregaBot.com | {datetime.now().strftime('%d-%b-%Y %I:%M %p')}")
+            c.font = Font(italic=True, size=9, color="555555")
+            c.alignment = center_align
+            c.fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
+
+            # ═══════════════════════════════════════════════
+            # ROW 4-5: Summary statistics
+            # ═══════════════════════════════════════════════
+            skip_count = total_count - success_count - failed_count
+            summary_headers = ["Total", "✅ Success", "❌ Failed", "⏭️ Skipped"]
+            summary_values = [total_count, success_count, failed_count, skip_count]
+
+            # Centre summary block under the title
+            n_summary = len(summary_headers)
+            start_col = max(1, (ncols - n_summary) // 2 + 1)
+
+            for i, (h, v) in enumerate(zip(summary_headers, summary_values)):
+                col = start_col + i
+                if col > ncols:
+                    break
+
+                # Header cells
+                h_cell = ws.cell(row=4, column=col, value=h)
+                h_cell.font = Font(bold=True, size=10)
+                h_cell.fill = summary_fill
+                h_cell.alignment = center_align
+                h_cell.border = thin_border
+
+                # Value cells
+                v_cell = ws.cell(row=5, column=col, value=v)
+                v_cell.font = Font(bold=True, size=11)
+                v_cell.alignment = center_align
+                v_cell.border = thin_border
+                if "Failed" in h and v > 0:
+                    v_cell.font = Font(color="CC0000", bold=True, size=11)
+                elif "Success" in h:
+                    v_cell.font = Font(color="006100", bold=True, size=11)
+
+            # ═══════════════════════════════════════════════
+            # ROW 7: Data table header
+            # ═══════════════════════════════════════════════
+            data_start_row = 7
+            for i, col_name in enumerate(columns, 1):
+                c = ws.cell(row=data_start_row, column=i, value=col_name)
+                c.font = header_font
+                c.fill = header_fill
+                c.alignment = center_align
+                c.border = thin_border
+
+            # ═══════════════════════════════════════════════
+            # DATA ROWS with conditional formatting
+            # ═══════════════════════════════════════════════
+            for idx, row_data in enumerate(data_to_export):
+                r = data_start_row + 1 + idx
+                is_even = idx % 2 == 0
+
+                # Determine row fill based on status
+                status_text = str(row_data[status_idx]).upper() if len(row_data) > status_idx else ""
+                if "SUCCESS" in status_text:
+                    row_fill = success_fill if is_even else PatternFill(start_color="F1F8E9", end_color="F1F8E9", fill_type="solid")
+                elif "FAIL" in status_text or "ERROR" in status_text:
+                    row_fill = failed_fill if is_even else PatternFill(start_color="FFF3E0", end_color="FFF3E0", fill_type="solid")
+                else:
+                    row_fill = gray_fill if is_even else white_fill
+
+                for j, val in enumerate(row_data):
+                    c = ws.cell(row=r, column=j + 1, value=str(val))
+                    c.fill = row_fill
+                    c.border = thin_border
+
+                    # Alignment — first column & status column centred
+                    if j == 0:
+                        c.alignment = center_align
+                    elif j == status_idx:
+                        c.alignment = center_align
+                        if "SUCCESS" in status_text:
+                            c.font = Font(color="006100", bold=True)
+                        elif "FAIL" in status_text or "ERROR" in status_text:
+                            c.font = Font(color="CC0000", bold=True)
+                    else:
+                        c.alignment = left_align
+
+            # ═══════════════════════════════════════════════
+            # AUTO COLUMN WIDTHS
+            # ═══════════════════════════════════════════════
+            for i, col_name in enumerate(columns, 1):
+                max_width = len(str(col_name)) + 2
+                for row_idx in range(data_start_row + 1, data_start_row + 1 + len(data_to_export)):
+                    cell_val = ws.cell(row=row_idx, column=i).value or ""
+                    # Unicode/Hindi text needs wider approximation
+                    width = len(str(cell_val)) * 1.3
+                    if width > max_width:
+                        max_width = min(width, 50)  # cap at 50 chars
+                ws.column_dimensions[get_column_letter(i)].width = max(max_width, 8)  # min 8
+
+            # ═══════════════════════════════════════════════
+            # SAVE
+            # ═══════════════════════════════════════════════
+            wb.save(file_path)
+            messagebox.showinfo("Success", f"✅ Excel report saved successfully!\n{file_path}")
+
+            # Try to open the file automatically
+            try:
+                if sys.platform == "win32":
+                    os.startfile(file_path)
+                elif sys.platform == "darwin":
+                    import subprocess
+                    subprocess.call(['open', file_path])
+            except Exception:
+                pass
+
+            return file_path
+
+        except ImportError:
+            messagebox.showerror("Missing Library",
+                                "Excel export requires 'openpyxl'.\n"
+                                "Please install it: pip install openpyxl")
+            return None
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to export Excel:\n{e}")
+            return None
+
     def _extract_and_update_workcodes(self, textbox_widget: Any) -> None:
         try:
             input_content = textbox_widget.get("1.0", tkinter.END)

@@ -20,17 +20,7 @@ from selenium.common.exceptions import (
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
-# PDF Imports (ReportLab)
-try:
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-    HAS_REPORTLAB = True
-except ImportError:
-    HAS_REPORTLAB = False
+
 
 from src import config
 from .base_tab import BaseAutomationTab
@@ -162,20 +152,8 @@ class MbEntryTab(BaseAutomationTab):
         export_controls_frame.pack(side='right', padx=(10, 0))
         
         # Updated Export Menu
-        self.export_button = ctk.CTkButton(export_controls_frame, text="Download Report", command=self.export_report, fg_color="#107C10")
+        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report, fg_color="#107C10")
         self.export_button.pack(side='left')
-        
-        self.export_format_menu = ctk.CTkOptionMenu(
-            export_controls_frame, 
-            width=160, 
-            values=["Excel Professional (.xlsx)", "PDF Professional (.pdf)", "CSV (.csv)"], 
-            command=self._on_format_change
-        )
-        self.export_format_menu.set("Excel Professional (.xlsx)") # Default
-        self.export_format_menu.pack(side='left', padx=5)
-        
-        self.export_filter_menu = ctk.CTkOptionMenu(export_controls_frame, width=150, values=["Export All", "Success Only", "Failed Only"])
-        self.export_filter_menu.pack(side='left', padx=(0, 5))
 
         # --- Results Treeview ---
         cols = ("Panchayat", "Work Code", "Work Name", "Muster Roll No", "MR Period", "Status", "Details", "Timestamp")
@@ -212,9 +190,7 @@ class MbEntryTab(BaseAutomationTab):
                 except (json.JSONDecodeError, IOError): pass
             self.config_vars["measurement_book_no"].set(saved_data.get("measurement_book_no", ""))
 
-    def _on_format_change(self, selected_format):
-        if "CSV" in selected_format: self.export_filter_menu.configure(state="disabled")
-        else: self.export_filter_menu.configure(state="normal")
+
 
     def _create_field(self, parent, key, text, r, c):
         ctk.CTkLabel(parent, text=text).grid(row=r, column=c, sticky='w', padx=15, pady=5)
@@ -281,11 +257,8 @@ class MbEntryTab(BaseAutomationTab):
         self.mate_name_entry.configure(state=state)
         self.pit_count_entry.configure(state=state)
         self.export_button.configure(state=state)
-        self.export_format_menu.configure(state=state)
-        self.export_filter_menu.configure(state=state)
         self.auto_mb_no_checkbox.configure(state=state)
         if state == "normal":
-            self._on_format_change(self.export_format_menu.get())
             self._toggle_mb_no_entry()
         else:
             self.mb_no_entry.configure(state="disabled")
@@ -802,354 +775,15 @@ class MbEntryTab(BaseAutomationTab):
         return "ctl00$ContentPlaceHolder1$activity$ctl01"
     
     def export_report(self):
-        """Routes the export request to the correct handler."""
-        export_format = self.export_format_menu.get()
-        
-        if "Excel" in export_format:
-            self.export_professional_report()
-        elif "CSV" in export_format:
-            self.export_treeview_to_csv(self.results_tree, "mb_entry_results.csv")
-        elif "PDF" in export_format:
-            self.export_professional_pdf()
-
-    def export_professional_report(self):
-        """Generates a professional Excel report similar to eKYC Report."""
-        all_items = self.results_tree.get_children()
-        if not all_items:
-            messagebox.showinfo("No Data", "No records to export."); return
-
+        """Export results to professional Excel using the base class method."""
         panchayat = self.config_vars["location_panchayat"].get().strip()
-        if not panchayat:
-            messagebox.showwarning("Required", "Panchayat Name missing."); return
-
-        # --- Filter Data ---
-        filter_mode = self.export_filter_menu.get()
-        data_export = []
-        
-        total_recs = 0
-        success_count = 0
-        failed_count = 0
-
-        for item_id in all_items:
-            vals = self.results_tree.item(item_id)['values']
-            # Indexes: 0=Panch, 1=WC, 2=Name, 3=MR, 4=Period, 5=Status, 6=Detail, 7=Time
-            status = vals[5].upper()
-            
-            if "SUCCESS" in status: success_count += 1
-            else: failed_count += 1
-            total_recs += 1
-
-            if filter_mode == "Export All": data_export.append(vals)
-            elif filter_mode == "Success Only" and "SUCCESS" in status: data_export.append(vals)
-            elif filter_mode == "Failed Only" and "SUCCESS" not in status: data_export.append(vals)
-
-        if not data_export:
-            messagebox.showinfo("Empty", "No data matches the selected filter."); return
-
-        # --- Setup Path (Downloads/NregaBot/MB Reports {Year}/{Panchayat}) ---
-        year = date.today().year
-        date_str = date.today().strftime("%d-%m-%Y")
-        user_downloads = self.app.get_user_downloads_path()
-        save_dir = os.path.join(user_downloads, "NregaBot", f"Reports {year}", "MB Report", panchayat)
-        
-        if not os.path.exists(save_dir): os.makedirs(save_dir)
-        
-        default_name = f"eMB_Report_{panchayat}_{date_str}.xlsx"
-        filename = filedialog.asksaveasfilename(
-            initialdir=save_dir, 
-            initialfile=default_name, 
-            defaultextension=".xlsx", 
-            filetypes=[("Excel Files", "*.xlsx")]
+        date_str = datetime.now().strftime("%d-%m-%Y")
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename=f"eMB_Report_{panchayat or 'Report'}_{date_str}.xlsx",
+            filter_mode="Export All",
+            title_prefix=f"e-MB Entry Report: {panchayat or 'N/A'}"
         )
-        if not filename: return
-
-        try:
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "eMB Report"
-
-            # Styles
-            header_font = Font(bold=True, color="FFFFFF")
-            # Green Theme for MB (Payment related)
-            header_fill = PatternFill(start_color="107C10", end_color="107C10", fill_type="solid") 
-            white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
-            gray_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-            center = Alignment(horizontal="center", vertical="center")
-            border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-
-            # Main Header
-            ws.merge_cells('A1:G1')
-            ws['A1'] = f"e-MB ENTRY REPORT: {panchayat.upper()}"
-            ws['A1'].font = Font(size=14, bold=True, color="FFFFFF")
-            ws['A1'].fill = header_fill
-            ws['A1'].alignment = center
-
-            ws.merge_cells('A2:G2')
-            ws['A2'] = f"Report Generated from NregaBot.com | Date: {datetime.now().strftime('%d-%m-%Y %I:%M %p')}"
-            ws['A2'].font = Font(italic=True, size=9)
-            ws['A2'].alignment = center
-
-            # Summary Stats (Row 4 & 5)
-            headers = ["Total Processed", "Success", "Failed"]
-            vals = [total_recs, success_count, failed_count]
-            
-            # Place summary starting at Col C to E to center it roughly
-            start_col = 3 
-            for i, (h, v) in enumerate(zip(headers, vals)):
-                col_idx = start_col + i
-                c_h = ws.cell(row=4, column=col_idx, value=h)
-                c_h.font = Font(bold=True)
-                c_h.fill = PatternFill(start_color="DCE6F1", fill_type="solid")
-                c_h.alignment = center
-                c_h.border = border
-                
-                c_v = ws.cell(row=5, column=col_idx, value=v)
-                c_v.font = Font(bold=True, size=11)
-                c_v.alignment = center
-                c_v.border = border
-                if h == "Failed" and v > 0: c_v.font = Font(color="FF0000", bold=True)
-                if h == "Success": c_v.font = Font(color="006100", bold=True)
-
-            # Data Table (Row 7)
-            # Tree Columns: 0=Panch, 1=WC, 2=Name, 3=MR, 4=Period, 5=Status, 6=Detail, 7=Time
-            # Excel Cols: SNo, WorkCode, WorkName, MR No, Period, Status, Detail
-            
-            table_headers = ["S.No", "Work Code", "Work Name", "Muster Roll No", "Period", "Status", "Details"]
-            t_row = 7
-
-            for i, h in enumerate(table_headers, 1):
-                c = ws.cell(row=t_row, column=i, value=h)
-                c.font = header_font
-                c.fill = header_fill
-                c.alignment = center
-                c.border = border
-
-            for idx, r in enumerate(data_export, 1):
-                r_idx = t_row + idx
-                fill = gray_fill if idx % 2 == 0 else white_fill
-                
-                # SNo
-                c1 = ws.cell(row=r_idx, column=1, value=idx)
-                c1.alignment = center; c1.fill = fill; c1.border = border
-                
-                # WC
-                c2 = ws.cell(row=r_idx, column=2, value=r[1])
-                c2.fill = fill; c2.border = border
-                
-                # Name (Handles Hindi Automatically)
-                c3 = ws.cell(row=r_idx, column=3, value=r[2])
-                c3.fill = fill; c3.border = border
-                
-                # MR
-                c4 = ws.cell(row=r_idx, column=4, value=r[3])
-                c4.alignment = center; c4.fill = fill; c4.border = border
-                
-                # Period
-                c5 = ws.cell(row=r_idx, column=5, value=r[4])
-                c5.alignment = center; c5.fill = fill; c5.border = border
-
-                # Status
-                c6 = ws.cell(row=r_idx, column=6, value=r[5])
-                c6.alignment = center; c6.fill = fill; c6.border = border
-                if "SUCCESS" in r[5].upper(): c6.font = Font(color="006100", bold=True)
-                else: c6.font = Font(color="FF0000", bold=True)
-
-                # Details
-                c7 = ws.cell(row=r_idx, column=7, value=r[6])
-                c7.fill = fill; c7.border = border
-
-            # Widths
-            ws.column_dimensions['A'].width = 6
-            ws.column_dimensions['B'].width = 20
-            ws.column_dimensions['C'].width = 40 # Wide for Name
-            ws.column_dimensions['D'].width = 18
-            ws.column_dimensions['E'].width = 20
-            ws.column_dimensions['F'].width = 12
-            ws.column_dimensions['G'].width = 30
-
-            wb.save(filename)
-            messagebox.showinfo("Success", f"Professional Report Saved!\n{filename}")
-            try:
-                if os.name == 'nt': os.startfile(filename)
-                else: subprocess.call(['open', filename])
-            except Exception as e: logger.debug("MBEntry: Could not open exported Excel: %s", e)
-
-        except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to save Excel: {e}")
-
-    def export_professional_pdf(self):
-        """Generates a professional PDF report with Hindi font support."""
-        # --- Check if Library Exists ---
-        if not HAS_REPORTLAB:
-            messagebox.showerror("Missing Library", "PDF generation requires 'reportlab'.\nPlease run in terminal: pip install reportlab")
-            return
-
-        all_items = self.results_tree.get_children()
-        if not all_items:
-            messagebox.showinfo("No Data", "No records to export."); return
-
-        panchayat = self.config_vars["location_panchayat"].get().strip()
-        if not panchayat:
-            messagebox.showwarning("Required", "Panchayat Name missing."); return
-
-        # --- Filter Data ---
-        filter_mode = self.export_filter_menu.get()
-        data_to_export = []
-        
-        total_recs = 0
-        success_count = 0
-        failed_count = 0
-
-        for item_id in all_items:
-            vals = self.results_tree.item(item_id)['values']
-            status = vals[5].upper()
-            
-            if "SUCCESS" in status: success_count += 1
-            else: failed_count += 1
-            total_recs += 1
-
-            if filter_mode == "Export All": data_to_export.append(vals)
-            elif filter_mode == "Success Only" and "SUCCESS" in status: data_to_export.append(vals)
-            elif filter_mode == "Failed Only" and "SUCCESS" not in status: data_to_export.append(vals)
-
-        if not data_to_export:
-            messagebox.showinfo("Empty", "No data matches the selected filter."); return
-
-        # --- Path Setup ---
-        year = date.today().year
-        date_str = date.today().strftime("%d-%m-%Y")
-        user_downloads = self.app.get_user_downloads_path()
-        save_dir = os.path.join(user_downloads, "NregaBot", f"Reports {year}", "MB Report", panchayat)
-        if not os.path.exists(save_dir): os.makedirs(save_dir)
-        
-        default_name = f"eMB_Report_{panchayat}_{date_str}.pdf"
-        filename = filedialog.asksaveasfilename(
-            initialdir=save_dir, 
-            initialfile=default_name, 
-            defaultextension=".pdf", 
-            filetypes=[("PDF Document", "*.pdf")]
-        )
-        if not filename: return
-
-        try:
-            # --- 1. Font Registration (Fix for Hindi/Question Marks) ---
-            font_name = "Helvetica" # Default fallback
-            
-            try:
-                # Common Fonts paths
-                font_paths = [
-                    "C:\\Windows\\Fonts\\arial.ttf", 
-                    "C:\\Windows\\Fonts\\Nirmala.ttf", 
-                    "C:\\Windows\\Fonts\\mangal.ttf",
-                    "/Library/Fonts/Arial Unicode.ttf", # Mac
-                    "/System/Library/Fonts/Supplemental/Arial.ttf" # Mac
-                ]
-                
-                selected_font = None
-                for fp in font_paths:
-                    if os.path.exists(fp):
-                        selected_font = fp
-                        break
-                
-                if selected_font:
-                    pdfmetrics.registerFont(TTFont('HindiFont', selected_font))
-                    font_name = 'HindiFont'
-            except Exception as e:
-                print(f"Font registration failed: {e}")
-
-            # --- 2. Build PDF Elements ---
-            doc = SimpleDocTemplate(filename, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
-            elements = []
-            styles = getSampleStyleSheet()
-            
-            # Title
-            title_style = ParagraphStyle(
-                'TitleStyle', 
-                parent=styles['Heading1'], 
-                fontName=font_name, 
-                fontSize=16, 
-                alignment=1, 
-                spaceAfter=10,
-                textColor=colors.white,
-                backColor=colors.HexColor("#107C10"),
-                borderPadding=5
-            )
-            elements.append(Paragraph(f"e-MB ENTRY REPORT: {panchayat.upper()}", title_style))
-            
-            # Subtitle
-            sub_style = ParagraphStyle('SubStyle', parent=styles['Normal'], fontName=font_name, fontSize=9, alignment=1, spaceAfter=20)
-            elements.append(Paragraph(f"Generated by NregaBot.com | Date: {datetime.now().strftime('%d-%m-%Y %I:%M %p')}", sub_style))
-
-            # Summary Table
-            summary_data = [
-                ["Total Processed", "Success", "Failed"],
-                [str(total_recs), str(success_count), str(failed_count)]
-            ]
-            
-            sum_table = Table(summary_data, colWidths=[120, 100, 100])
-            sum_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#DCE6F1")),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, -1), font_name),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('TEXTCOLOR', (2, 1), (2, 1), colors.red), 
-                ('TEXTCOLOR', (1, 1), (1, 1), colors.green),
-                ('FONTSIZE', (0, 1), (-1, 1), 12),
-            ]))
-            elements.append(sum_table)
-            elements.append(Spacer(1, 20))
-
-            # Main Data Table
-            table_header = ["S.No", "Work Code", "Work Name", "Muster Roll", "Period", "Status", "Details"]
-            table_data = [table_header]
-
-            row_style = ParagraphStyle('RowStyle', fontName=font_name, fontSize=9)
-            
-            for idx, item in enumerate(data_to_export, 1):
-                row = [
-                    str(idx),
-                    Paragraph(str(item[1]), row_style),
-                    Paragraph(str(item[2]), row_style),
-                    str(item[3]),
-                    str(item[4]),
-                    str(item[5]),
-                    Paragraph(str(item[6]), row_style)
-                ]
-                table_data.append(row)
-
-            col_widths = [40, 100, 200, 80, 110, 70, 160]
-            
-            main_table = Table(table_data, colWidths=col_widths, repeatRows=1)
-            main_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#107C10")),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, -1), font_name),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F2F2")]),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ]))
-            
-            elements.append(main_table)
-            doc.build(elements)
-            
-            messagebox.showinfo("Success", f"Professional PDF Saved!\n{filename}")
-            try:
-                if os.name == 'nt': os.startfile(filename)
-                else: subprocess.call(['open', filename])
-            except Exception as e: logger.debug("MBEntry: Could not open exported PDF: %s", e)
-
-        except Exception as e:
-            messagebox.showerror("PDF Error", f"Failed to generate PDF: {e}")
     
     def load_data_from_mr_tracking(self, workcodes, panchayat_name: str):
         self.config_vars["location_panchayat"].set(panchayat_name)

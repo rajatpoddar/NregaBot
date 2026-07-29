@@ -171,11 +171,8 @@ class MrTrackingTab(BaseAutomationTab):
         export_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         export_frame.grid(row=0, column=0, sticky="w", padx=5, pady=5)
         
-        self.export_button = ctk.CTkButton(export_frame, text="Export Report", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side="left")
-        
-        self.export_format_menu = ctk.CTkOptionMenu(export_frame, values=["Excel (.xlsx)", "PDF (.pdf)", "PNG (.png)"])
-        self.export_format_menu.pack(side="left", padx=5)
 
         self.generate_pendency_btn = ctk.CTkButton(export_frame, text="Generate Pendency Report (T0-T8)", command=self._open_pendency_report_window, fg_color="#B45309", hover_color="#92400E")
         self.generate_pendency_btn.pack(side="left", padx=15)
@@ -1037,160 +1034,39 @@ class MrTrackingTab(BaseAutomationTab):
             messagebox.showwarning("Empty", "There are no workcodes to copy.", parent=self)
 
     def export_report(self):
+        """Export results to professional Excel."""
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "There are no results to export.")
             return
             
         panchayat = self.panchayat_var.get().strip() or "Report"
         safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat) 
-        export_format = self.export_format_menu.get()
-        
-        current_year = datetime.now().strftime("%Y")
-        current_date_str = datetime.now().strftime("%d-%b-%Y") 
-        
-        headers = self.results_tree['columns']
-        data = [self.results_tree.item(item, 'values') for item in self.results_tree.get_children()]
-        
+        current_date_str = datetime.now().strftime("%d-%b-%Y")
         title = f"MR Tracking Report Panchayat - {panchayat}"
-        date_str = f"Date - {datetime.now().strftime('%d-%m-%Y')}"
         
-        downloads_path = self.app.get_user_downloads_path() 
-        target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", safe_panchayat) 
-        try:
-            os.makedirs(target_dir, exist_ok=True)
-        except OSError as e:
-             messagebox.showerror("Folder Error", f"Could not create report directory:\n{target_dir}\nError: {e}")
-             return
-
-        if "Excel" in export_format:
-            ext = ".xlsx"
-            file_type_tuple = ("Excel Workbook", "*.xlsx")
-            default_filename = f"MR_Tracking_{safe_panchayat}-{current_date_str}{ext}"
-            
-            file_path = filedialog.asksaveasfilename(
-                initialdir=target_dir,
-                initialfile=default_filename,
-                defaultextension=ext,
-                filetypes=[file_type_tuple, ("All Files", "*.*")],
-                title="Save Report As"
-            )
-            if not file_path: return
-            success = self._save_to_excel(data, headers, f"{title} {date_str}", file_path)
-            if success:
-                messagebox.showinfo("Success", f"Excel report saved successfully to:\n{file_path}")
-
-        elif "PDF" in export_format:
-            ext = ".pdf"
-            file_type_tuple = ("PDF Document", "*.pdf")
-            default_filename = f"MR_Tracking_{safe_panchayat}-{current_date_str}{ext}"
-
-            file_path = filedialog.asksaveasfilename(
-                initialdir=target_dir,
-                initialfile=default_filename,
-                defaultextension=ext,
-                filetypes=[file_type_tuple, ("All Files", "*.*")],
-                title="Save Report As"
-            )
-            if not file_path: return
-
-            col_widths = [10, 20, 25, 30, 15, 45, 20, 45, 20, 25, 25, 20, 20, 20] 
-            total_width_ratio = sum(col_widths)
-            effective_page_width = 297 - 20 
-            actual_col_widths = [(w / total_width_ratio) * effective_page_width for w in col_widths]
-            
-            success = self.generate_report_pdf(data, headers, actual_col_widths, title, date_str, file_path)
-            if success:
-                messagebox.showinfo("Success", f"PDF report saved successfully to:\n{file_path}")
-        
-        elif "PNG" in export_format:
-            ext = ".png"
-            file_type_tuple = ("PNG Image", "*.png")
-            default_filename = f"MR_Tracking_{safe_panchayat}-{current_date_str}{ext}"
-            
-            file_path = filedialog.asksaveasfilename(
-                initialdir=target_dir,
-                initialfile=default_filename,
-                defaultextension=ext,
-                filetypes=[file_type_tuple, ("All Files", "*.*")],
-                title="Save Report As"
-            )
-            if not file_path: return
-            success = self._save_to_png(data, headers, title, date_str, file_path)
-            if success:
-                messagebox.showinfo("Success", f"PNG report saved successfully to:\n{file_path}")
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename=f"MR_Tracking_{safe_panchayat}-{current_date_str}.xlsx",
+            filter_mode="Export All",
+            title_prefix=title
+        )
 
     def _export_abps_report(self):
+        """Export ABPS results to professional Excel."""
         if not self.abps_results_tree.get_children():
             messagebox.showinfo("No Data", "There are no ABPS results to export.")
             return
             
         panchayat = self.panchayat_var.get().strip() or "Report"
         safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat) 
-        
-        current_year = datetime.now().strftime("%Y")
         current_date_str = datetime.now().strftime("%d-%b-%Y")
         
-        headers = self.abps_report_headers
-        data = [self.abps_results_tree.item(item, 'values') for item in self.abps_results_tree.get_children()]
-        
-        title = f"ABPS Pendency Report - {panchayat}"
-        date_str = f"Date - {datetime.now().strftime('%d-%m-%Y')}"
-        
-        downloads_path = self.app.get_user_downloads_path() 
-        target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", safe_panchayat) 
-        try:
-            os.makedirs(target_dir, exist_ok=True)
-        except OSError as e:
-             messagebox.showerror("Folder Error", f"Could not create report directory:\n{target_dir}\nError: {e}")
-             return
-
-        ext = ".xlsx"
-        file_type_tuple = ("Excel Workbook", "*.xlsx")
-        default_filename = f"ABPS_Pendency_{safe_panchayat}-{current_date_str}{ext}"
-        
-        file_path = filedialog.asksaveasfilename(
-            initialdir=target_dir,
-            initialfile=default_filename,
-            defaultextension=ext,
-            filetypes=[file_type_tuple, ("All Files", "*.*")],
-            title="Save ABPS Report As"
+        self.export_treeview_to_excel(
+            tree=self.abps_results_tree,
+            default_filename=f"ABPS_Pendency_{safe_panchayat}-{current_date_str}.xlsx",
+            filter_mode="Export All",
+            title_prefix=f"ABPS Pendency Report - {panchayat}"
         )
-        if not file_path: return
-        success = self._save_to_excel(data, headers, f"{title} {date_str}", file_path)
-        if success:
-            messagebox.showinfo("Success", f"ABPS Excel report saved successfully to:\n{file_path}")
-
-    def _save_to_excel(self, data, headers, full_title, file_path):
-        try:
-            df = pd.DataFrame(data, columns=headers)
-            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
-                sheet_name = 'Report'
-                df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=1)
-                worksheet = writer.sheets[sheet_name]
-                
-                worksheet['A1'] = full_title
-                worksheet['A1'].font = Font(bold=True, size=14)
-                worksheet['A1'].alignment = Alignment(horizontal='center', vertical='center')
-                worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
-                
-                header_font = Font(bold=True)
-                header_fill = PatternFill(start_color="DDEEFF", end_color="DDEEFF", fill_type="solid")
-                for cell in worksheet["2:2"]: 
-                    cell.font = header_font
-                    cell.fill = header_fill
-
-                for col_idx, col in enumerate(df.columns, 1):
-                    column_letter = get_column_letter(col_idx)
-                    try:
-                        max_length = max(len(str(col)), df[col].astype(str).map(len).max())
-                    except (TypeError, ValueError):
-                         max_length = len(str(col)) 
-                    adjusted_width = min((max_length + 2), 50) 
-                    worksheet.column_dimensions[column_letter].width = adjusted_width
-            return True
-        except Exception as e:
-            messagebox.showerror("Excel Export Error", f"Could not generate Excel report.\nError: {e}", parent=self)
-            return False
 
     def generate_report_pdf(self, data, headers, col_widths, title, date_str, file_path):
         class PDFWithFooter(FPDF):
@@ -1274,142 +1150,6 @@ class MrTrackingTab(BaseAutomationTab):
             return True
         except Exception as e:
             messagebox.showerror("PDF Export Error", f"Could not generate PDF report.\nError: {e}", parent=self)
-            return False
-
-    def _save_to_png(self, data, headers, title, date_str, file_path):
-        try:
-            try:
-                font_path_regular = resource_path("assets/fonts/NotoSansDevanagari-Regular.ttf")
-                font_path_bold = resource_path("assets/fonts/NotoSansDevanagari-Bold.ttf")
-                font_title = ImageFont.truetype(font_path_bold, 28)
-                font_date = ImageFont.truetype(font_path_regular, 18)
-                font_header = ImageFont.truetype(font_path_bold, 16)
-                font_body = ImageFont.truetype(font_path_regular, 14)
-            except IOError:
-                self.log_warning("Warning: NotoSansDevanagari fonts not found. Using default PIL fonts. Ensure 'assets/fonts' exist.")
-                font_title = ImageFont.load_default(size=28)
-                font_date = ImageFont.load_default(size=18)
-                font_header = ImageFont.load_default(size=16)
-                font_body = ImageFont.load_default(size=14)
-
-            img_width = 2400  
-            margin_x = 80
-            margin_y = 60
-            
-            header_bg_color = (220, 235, 255) 
-            row_even_bg_color = (255, 255, 255) 
-            row_odd_bg_color = (245, 245, 245)  
-            text_color = (0, 0, 0) 
-            border_color = (180, 180, 180) 
-
-            draw_start_y = margin_y 
-
-            col_widths_pixels = []
-            min_col_width = 100 
-            
-            for i, header in enumerate(headers):
-                text_width = font_header.getlength(header)
-                col_widths_pixels.append(max(min_col_width, text_width + 40)) 
-
-            for row_data in data:
-                for i, cell_text in enumerate(row_data):
-                    lines = self._wrap_text(str(cell_text), font_body, col_widths_pixels[i] - 20) 
-                    max_text_width = 0
-                    for line in lines:
-                        max_text_width = max(max_text_width, font_body.getlength(line))
-                    col_widths_pixels[i] = max(col_widths_pixels[i], max_text_width + 40) 
-
-            current_total_width = sum(col_widths_pixels)
-            available_width = img_width - 2 * margin_x
-            if current_total_width < available_width:
-                extra_space_per_col = (available_width - current_total_width) / len(col_widths_pixels)
-                col_widths_pixels = [w + extra_space_per_col for w in col_widths_pixels]
-
-            current_total_width = sum(col_widths_pixels) 
-            
-            estimated_row_height = font_body.getbbox("Tg")[3] - font_body.getbbox("Tg")[1] + 20 
-            estimated_header_height = font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] + 20 
-
-            title_bbox = font_title.getbbox(title)
-            date_bbox = font_date.getbbox(date_str)
-            title_height = title_bbox[3] - title_bbox[1]
-            date_height = date_bbox[3] - date_bbox[1]
-
-            total_estimated_height = margin_y * 2 + title_height + date_height + 20 + estimated_header_height + (len(data) * estimated_row_height)
-            
-            img = Image.new("RGB", (img_width, int(total_estimated_height)), (255, 255, 255))
-            draw = ImageDraw.Draw(img)
-
-            current_y = margin_y
-            
-            title_text_width = font_title.getlength(title)
-            title_x = (img_width - title_text_width) / 2
-            draw.text((title_x, current_y), title, font=font_title, fill=text_color)
-            current_y += title_height + 5
-
-            date_text_width = font_date.getlength(date_str)
-            date_x = img_width - margin_x - date_text_width
-            draw.text((date_x, current_y), date_str, font=font_date, fill=text_color)
-            current_y += date_height + 20 
-
-            header_y_start = current_y
-            header_height = 0
-            for i, header in enumerate(headers):
-                wrapped_header = self._wrap_text(header, font_header, col_widths_pixels[i] - 10)
-                line_height = font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] 
-                header_height = max(header_height, len(wrapped_header) * line_height + 10) 
-            
-            current_x = margin_x
-            for i, header in enumerate(headers):
-                draw.rectangle([current_x, header_y_start, current_x + col_widths_pixels[i], header_y_start + header_height], fill=header_bg_color, outline=border_color, width=1)
-                
-                wrapped_header = self._wrap_text(header, font_header, col_widths_pixels[i] - 20)
-                text_y = header_y_start + (header_height - len(wrapped_header) * font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] ) / 2 
-                
-                for line in wrapped_header:
-                    line_width = font_header.getlength(line)
-                    draw.text((current_x + (col_widths_pixels[i] - line_width) / 2, text_y), line, font=font_header, fill=text_color)
-                    text_y += font_header.getbbox("Tg")[3] - font_header.getbbox("Tg")[1] 
-                current_x += col_widths_pixels[i]
-            current_y += header_height
-
-            for row_idx, row_data in enumerate(data):
-                row_bg_color = row_even_bg_color if row_idx % 2 == 0 else row_odd_bg_color
-
-                max_row_text_height = 0
-                temp_wrapped_cells = []
-                for i, cell_text in enumerate(row_data):
-                    wrapped_lines = self._wrap_text(str(cell_text), font_body, col_widths_pixels[i] - 20) 
-                    temp_wrapped_cells.append(wrapped_lines)
-                    line_height = font_body.getbbox("Tg")[3] - font_body.getbbox("Tg")[1] 
-                    max_row_text_height = max(max_row_text_height, len(wrapped_lines) * line_height)
-
-                row_data_height = max_row_text_height + 10 
-
-                if current_y + row_data_height + margin_y > img.height:
-                    new_height = int(img.height + (row_data_height + margin_y) * 1.5) 
-                    new_img = Image.new("RGB", (img_width, new_height), (255, 255, 255))
-                    new_img.paste(img, (0, 0))
-                    img = new_img
-                    draw = ImageDraw.Draw(img) 
-
-                current_x = margin_x
-                for i, cell_text in enumerate(row_data):
-                    draw.rectangle([current_x, current_y, current_x + col_widths_pixels[i], current_y + row_data_height], fill=row_bg_color, outline=border_color, width=1)
-                    
-                    wrapped_lines = temp_wrapped_cells[i]
-                    text_y = current_y + 5 
-                    for line in wrapped_lines:
-                        draw.text((current_x + 10, text_y), line, font=font_body, fill=text_color) 
-                        text_y += font_body.getbbox("Tg")[3] - font_body.getbbox("Tg")[1] 
-                    current_x += col_widths_pixels[i]
-                current_y += row_data_height
-
-            final_img = img.crop((0, 0, img_width, current_y + margin_y))
-            final_img.save(file_path, "PNG", dpi=(300, 300)) 
-            return True
-        except Exception as e:
-            messagebox.showerror("PNG Export Error", f"Could not generate PNG report.\nError: {e}", parent=self)
             return False
 
     def _wrap_text(self, text, font, max_width):

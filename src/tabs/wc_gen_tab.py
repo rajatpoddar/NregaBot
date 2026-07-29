@@ -148,8 +148,8 @@ class WcGenTab(BaseAutomationTab):
 
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="Export for IF Editor", command=self._export_wc_gen_results)
-        self.export_csv_button.pack(side="left")
+        self.export_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", fg_color="#107C10", hover_color="#0B5E0B", command=self.export_report)
+        self.export_button.pack(side="left")
         
         cols = ("Work Code", "Job Card", "Beneficiary Type")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
@@ -241,29 +241,14 @@ class WcGenTab(BaseAutomationTab):
             result_data.get('beneficiary_type', 'N/A')
         ))
 
-    def _export_wc_gen_results(self):
-        if not self.successful_wcs_data:
-            messagebox.showinfo("No Data", "There are no successful work codes to export.")
-            return
-        
-        path = filedialog.asksaveasfilename(
-            defaultextension=".csv",
-            filetypes=[("CSV files", "*.csv")],
-            initialfile="wc_gen_for_if_edit.csv",
-            title="Save Work Code Results for IF Editor"
+    def export_report(self):
+        """Export results to professional Excel using the base class method."""
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename="wc_gen_results.xlsx",
+            filter_mode="Export All",
+            title_prefix="Work Code Generation Report"
         )
-        if not path:
-            return
-        
-        try:
-            headers = ["work_code", "beneficiary_type", "job_card"]
-            with open(path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=headers)
-                writer.writeheader()
-                writer.writerows(self.successful_wcs_data)
-            messagebox.showinfo("Success", f"Successfully exported {len(self.successful_wcs_data)} rows to\n{path}")
-        except Exception as e:
-            messagebox.showerror("Export Error", f"An error occurred while exporting:\n{e}")
 
     def _create_field(self, parent, key, text, row, is_dropdown=False):
         ctk.CTkLabel(parent, text=text).grid(row=row, column=0, sticky="w", padx=15, pady=5)

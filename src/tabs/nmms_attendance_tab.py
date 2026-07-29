@@ -16,7 +16,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ._imports import *  # noqa: F403,F401
 
-import pandas as pd
 
 logger = get_logger()
 
@@ -48,6 +47,12 @@ class NmmsAttendanceTab(BaseAutomationTab):
     PAN_OVERVIEW_HEADERS = [
         "S No.", "Panchayat", "No. of Works", "No. of Muster Rolls", "Persondays Generated",
     ]
+    # Known CSS color for header styling per sheet
+    _SHEET_COLORS = {
+        "MR Summary": "1565C0",
+        "Workers Detail": "2E7D32",
+        "Block Overview": "6A1B9A",
+    }
 
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="nmms_attendance")
@@ -75,26 +80,38 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         # Instructions
         instr = (
-            "STEPS:  1. In browser: manually open the NMMS portal, select State, "
-            "Attendance Date, Block and click Go.  "
-            "2. Come back here and click 'Scrape Current Page'.  "
+            "STEPS:  1. In browser: manually open the NMMS portal.  "
+            "2. Set Attendance Date below, then click '📅 Set Date & Scrape'.  "
             "3. Select panchayats and click ▶ Start."
         )
         ctk.CTkLabel(top, text=instr, justify="left", wraplength=950,
                      fg_color=("gray90", "#2A2A2A"), corner_radius=8,
                      padx=10, pady=8).grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
 
-        # Button row
-        btn_row = ctk.CTkFrame(top, fg_color="transparent")
-        btn_row.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 4))
+        # Date row
+        date_row = ctk.CTkFrame(top, fg_color="transparent")
+        date_row.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 4))
+        date_row.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(date_row, text="Attendance Date:",
+                     font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 8))
+        from tkcalendar import DateEntry as TKDateEntry
+        try:
+            self._date_picker = TKDateEntry(date_row, width=14, date_pattern="dd/MM/yyyy")
+            self._date_picker.pack(side="left", padx=(0, 16))
+        except Exception:
+            # Fallback: simple entry if tkcalendar not available
+            self._date_var = ctk.StringVar(value=datetime.now().strftime("%d/%m/%Y"))
+            self._date_picker = ctk.CTkEntry(date_row, textvariable=self._date_var, width=100)
+            self._date_picker.pack(side="left", padx=(0, 16))
 
         self._scrape_btn = ctk.CTkButton(
-            btn_row, text="🔍 Scrape Current Page", width=190,
+            date_row, text="📅 Set Date & Scrape", width=190,
             fg_color="#2E7D32", hover_color="#1B5E20", command=self._scrape_current_page_thread)
         self._scrape_btn.pack(side="left", padx=(0, 16))
 
         self._save_photos_var = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(btn_row, text="Download Group Photos",
+        ctk.CTkCheckBox(date_row, text="Download Group Photos",
                         variable=self._save_photos_var).pack(side="left")
 
         # Panchayat selection
@@ -166,9 +183,9 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         toolbar = ctk.CTkFrame(tab, fg_color="transparent")
         toolbar.grid(row=0, column=0, columnspan=2, sticky="w", padx=5, pady=5)
-        ctk.CTkButton(toolbar, text="📋 Export Workers CSV",
-                      command=lambda: self.export_treeview_to_csv(
-                          self.workers_tree, "NMMS_Workers_Detail.csv")).pack(side="left")
+        ctk.CTkButton(toolbar, text="📥 Export Workers Excel",
+                      command=lambda: self.export_treeview_to_excel(
+                          self.workers_tree, default_filename="NMMS_Workers_Detail.xlsx", filter_mode="Export All")).pack(side="left")
 
         self.workers_tree = ttk.Treeview(tab, columns=self.WORKER_HEADERS, show="headings")
         _ww = {"S No.": 45, "Panchayat": 100, "Work Code": 180, "Msr No.": 55,
@@ -238,10 +255,13 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
     def _scrape_current_page_logic(self, driver):
         try:
+            # Set attendance date on portal first
+            self._set_attendance_date(driver)
+
             self.log_info("Reading panchayat table from current browser page...")
             self.log_info(f"  Current URL: {driver.current_url}")
             try:
-                WebDriverWait(driver, 6).until(EC.presence_of_element_located((By.XPATH, "//table//tr[td]")))
+                WebDriverWait(driver, 6).until(EC.presence_of_element_located((By.XPATH, "//table[contains(@class,'table')]//tr[td]")))
             except TimeoutException:
                 body = driver.find_element(By.TAG_NAME, "body").text[:400]
                 self.app.after(0, lambda t=body: messagebox.showwarning(
@@ -422,39 +442,71 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
     # SCRAPING HELPERS
     def _click_and_scrape_mr_list(self, pan_info: dict, driver, pan_name: str) -> list:
-        """Navigate to MR list page by clicking the link (not via URL), then scrape MR rows."""
+        """Navigate to MR list page via click (site blocks direct URL access), then scrape MR rows."""
         mr_rows = []
         try:
-            # Always click the link on the current page — never use driver.get(href)
             self.log_info(f"  Clicking MR link for '{pan_name}'...")
+            url_before = driver.current_url
+
+            # Click the MR count link on the main page
             try:
                 link = driver.find_element(
                     By.XPATH,
                     f"//tr[td[normalize-space()='{pan_name}']]//td[4]//a"
                 )
-                link.click()
             except NoSuchElementException:
-                # Fallback: find any link in a row containing pan_name
                 try:
                     link = driver.find_element(
                         By.XPATH,
                         f"//tr[td[contains(normalize-space(),'{pan_name}')]]//a"
                     )
-                    link.click()
                 except NoSuchElementException:
                     self.log_warning(f"  ⚠ MR link not found for '{pan_name}'.")
+                    return []
+            # Click the found link (with JS fallback for intercepted clicks)
+            try:
+                link.click()
+            except Exception:
+                driver.execute_script("arguments[0].click();", link)
+
+            # Wait for URL to change (ensures navigation completed)
+            try:
+                WebDriverWait(driver, 15).until(EC.url_changes(url_before))
+            except TimeoutException:
+                self.log_warning("  ⚠ URL did not change after clicking MR link.")
+                # Try one more time
+                driver.back()
+                time.sleep(1)
+                try:
+                    link = driver.find_element(
+                        By.XPATH,
+                        f"//tr[td[normalize-space()='{pan_name}']]//td[4]//a"
+                    )
+                except NoSuchElementException:
+                    return []
+                try:
+                    link.click()
+                except Exception:
+                    driver.execute_script("arguments[0].click();", link)
+                try:
+                    WebDriverWait(driver, 15).until(EC.url_changes(url_before))
+                except TimeoutException:
+                    return []
+                except (NoSuchElementException, TimeoutException):
                     return []
 
             time.sleep(2)
 
+            # Wait for data table on the summary page
             try:
                 WebDriverWait(driver, 15).until(
-                    EC.presence_of_element_located((By.XPATH, "//table//tr[td]")))
+                    EC.presence_of_element_located((By.XPATH, "//table[contains(@class,'table')]//tr[td]")))
             except TimeoutException:
-                self.log_warning("  ⚠ Timeout on MR list page.")
+                self.log_warning("  ⚠ Timeout waiting for MR list table.")
                 return []
 
-            for row in driver.find_elements(By.XPATH, "//table//tr"):
+            # Parse MR summary table (7 columns: SNo, District, Block, Panchayat, Work Code, MR No, Persondays)
+            for row in driver.find_elements(By.XPATH, "//table[contains(@class,'table')]//tr"):
                 cells = row.find_elements(By.TAG_NAME, "td")
                 if len(cells) < 6:
                     continue
@@ -465,10 +517,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     work_code  = cells[4].text.strip()
                     msr_cell   = cells[5]
                     msr_no     = msr_cell.text.strip()
-                    # Skip column-number header rows (work_code is a plain digit like "5")
-                    if work_code.isdigit() and not msr_no or msr_no.isdigit() and len(msr_no) <= 2:
-                        continue
-                    # Skip if work_code looks like a column number (single digit, no slash)
+                    # Skip column-number header rows
                     if work_code.isdigit() and "/" not in work_code:
                         continue
                     persondays = cells[6].text.strip() if len(cells) > 6 else ""
@@ -483,10 +532,43 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     continue
         except Exception as e:
             self.log_error(f"  MR list error: {e}")
-            return mr_rows
+        if not mr_rows:
+            self.log_warning("  ⚠ No MR data rows parsed on summary page.")
+        return mr_rows
+
+    def _set_attendance_date(self, driver) -> bool:
+        """Set the attendance date dropdown on the NMMS portal using Selenium Select (no JS)."""
+        try:
+            if not hasattr(self, '_date_picker'):
+                return False
+            # Get selected date
+            try:
+                selected_date = self._date_picker.get()
+            except Exception:
+                try:
+                    selected_date = self._date_var.get() if hasattr(self, '_date_var') else datetime.now().strftime("%d/%m/%Y")
+                except Exception:
+                    selected_date = datetime.now().strftime("%d/%m/%Y")
+
+            # Check if date select dropdown exists on page
+            ddl_elements = driver.find_elements(By.ID, "ContentPlaceHolder1_ddl_attendance")
+            if not ddl_elements:
+                return False
+
+            # Use Select class to choose the option — triggers ASP.NET __doPostBack naturally
+            from selenium.webdriver.support.ui import Select
+            select = Select(ddl_elements[0])
+            select.select_by_value(selected_date)
+            # The onchange event fires naturally, triggering __doPostBack
+            time.sleep(3)  # Wait for postback to complete
+            self.log_info(f"  📅 Attendance date set to {selected_date}")
+            return True
+        except Exception as e:
+            self.log_warning(f"  ⚠ Could not set attendance date: {e}")
+            return False
 
     def _scrape_mr_detail(self, mr_info: dict, driver, pan_name: str, photos_dir: str) -> dict:
-        """Navigate to MR detail page by clicking the link, scrape photo info + worker table."""
+        """Navigate to MR detail page via click, scrape photo info + worker table."""
         detail = {
             "work_name": "",
             "photo1_taken": "", "photo1_uploaded": "", "photo1_geo": "",
@@ -504,25 +586,38 @@ class NmmsAttendanceTab(BaseAutomationTab):
         try:
             self.app.log_message(self.log_display,
                 f"    MR {msr_no} | {mr_info.get('work_code','')}")
-            # Click the link instead of navigating via URL
+            url_before = driver.current_url
+
+            # Click the MR number link on the summary page
             try:
                 link = driver.find_element(
                     By.XPATH,
                     f"//a[normalize-space()='{msr_no}']"
                 )
-                link.click()
+                try:
+                    link.click()
+                except Exception:
+                    driver.execute_script("arguments[0].click();", link)
             except NoSuchElementException:
-                # Fallback: find link in row containing this msr_no
                 try:
                     link = driver.find_element(
                         By.XPATH,
                         f"//tr[td[normalize-space()='{msr_no}']]//a"
                     )
-                    link.click()
+                    try:
+                        link.click()
+                    except Exception:
+                        driver.execute_script("arguments[0].click();", link)
                 except NoSuchElementException:
                     self.app.log_message(self.log_display,
                         f"    ⚠ Could not find clickable link for MR {msr_no}.", "warning")
                     return detail
+
+            # Wait for URL to change (navigation to detail page)
+            try:
+                WebDriverWait(driver, 15).until(EC.url_changes(url_before))
+            except TimeoutException:
+                self.log_warning(f"    ⚠ URL did not change after clicking MR {msr_no}.")
             time.sleep(2)
             page_src = driver.page_source
 
@@ -859,89 +954,132 @@ class NmmsAttendanceTab(BaseAutomationTab):
     def _download_photo(self, photo_no: int, pan_name: str,
                         mr_info: dict, photos_dir: str, driver) -> tuple:
         """
-        Download a group photo via the 'Click here for large image' link.
-        HTML structure: <a href="ShowImage.aspx?...">Click here for large image</a>
-        This link is inside "Uploaded Group Photo-{N}" section.
-        
-        Returns: (status_str, file_path) where status is "Yes"/"No"/"Not Uploaded"/"Error"
+        Download a group photo for the given photo_no (1 or 2).
+        Only collects URLs specific to this photo_no to avoid duplicating Photo 1 as Photo 2.
+        Tries: specific anchor, specific img tag, then alternative server fallback.
+        Returns: (status_str, file_path)
         """
-        try:
-            photo_src = ""
+        def _resolve_url(url: str) -> str:
+            if not url:
+                return ""
+            if url.startswith("//"):
+                return "https:" + url
+            if url.startswith("http"):
+                return url
+            base = NMMS_BASE_URL.rsplit("/", 1)[0]
+            return base + "/" + url.lstrip("/")
 
-            # Find all "Click here for large image" anchors on the page
+        def _try_download(urls: list, file_path: str) -> bool:
+            cookies = {c["name"]: c["value"] for c in driver.get_cookies()}
+            for url in urls:
+                if not url:
+                    continue
+                try:
+                    resp = self.app.http_session.get(
+                        url,
+                        headers={"User-Agent": "Mozilla/5.0",
+                                 "Referer": driver.current_url},
+                        cookies=cookies, timeout=30)
+                    if resp.status_code == 200 and len(resp.content) > 500:
+                        with open(file_path, "wb") as f:
+                            f.write(resp.content)
+                        return True
+                    elif resp.status_code == 502:
+                        continue
+                    else:
+                        self.app.log_message(self.log_display,
+                            f"      HTTP {resp.status_code} ({len(resp.content)} bytes)", "warning")
+                except Exception as e:
+                    self.app.log_message(self.log_display,
+                        f"      Request failed: {e}", "warning")
+            return False
+
+        try:
+            # ── 1. Collect URLs specific to this photo_no ──
+            photo_urls = []
+
+            # Strategy A: Nth 'Click here for large image' anchor
             anchors = driver.find_elements(
                 By.XPATH,
-                "//a[contains(normalize-space(.),'large image') or contains(normalize-space(.),'Large Image') or contains(normalize-space(.),'large Image')]"
+                "//a[contains(normalize-space(.),'large image') or contains(normalize-space(.),'Large Image')]"
             )
             if len(anchors) >= photo_no:
                 href = anchors[photo_no - 1].get_attribute("href") or ""
                 if href and not href.startswith("javascript"):
-                    photo_src = href
+                    photo_urls.append(_resolve_url(href))
 
-            # Fallback: any anchor whose href contains ShowImage or photo keyword
-            if not photo_src:
-                all_anchors = driver.find_elements(By.TAG_NAME, "a")
-                photo_anchors = [
-                    a for a in all_anchors
-                    if any(k in (a.get_attribute("href") or "").lower()
-                           for k in ("showimage", "photo", "grpphoto", "nmmsphoto"))
-                ]
-                if len(photo_anchors) >= photo_no:
-                    photo_src = photo_anchors[photo_no - 1].get_attribute("href") or ""
+            # Strategy B: Nth <img> tag for group photo
+            imgs = driver.find_elements(By.XPATH,
+                "//img[contains(@id,'groupPhoto') or contains(@alt,'Group Photo')]")
+            if len(imgs) >= photo_no:
+                src = imgs[photo_no - 1].get_attribute("src") or ""
+                if src:
+                    photo_urls.append(_resolve_url(src))
 
-            if not photo_src:
+            # Strategy C: Nth photo-related anchor (case-insensitive href match)
+            all_anchors = driver.find_elements(By.TAG_NAME, "a")
+            photo_anchors = []
+            for a in all_anchors:
+                href = (a.get_attribute("href") or "").lower()
+                if any(k in href for k in ("showimage", "attpics", "grpphoto", "nmmsphoto")):
+                    photo_anchors.append(a)
+            if len(photo_anchors) >= photo_no:
+                href = photo_anchors[photo_no - 1].get_attribute("href") or ""
+                if href:
+                    photo_urls.append(_resolve_url(href))
+
+            if not photo_urls:
                 return ("Not Uploaded", "")
 
-            # Resolve relative URLs
-            if photo_src.startswith("//"):
-                photo_src = "https:" + photo_src
-            elif not photo_src.startswith("http"):
-                base = NMMS_BASE_URL.rsplit("/", 1)[0]
-                photo_src = base + "/" + photo_src.lstrip("/")
+            # ── 2. Add alternative server URLs ──
+            alt_urls = []
+            for url in photo_urls:
+                alt_urls.append(url)
+                if "vbgramgrep" in url:
+                    alt_urls.append(url.replace("vbgramgrep", "nregamms2"))
+            seen = set()
+            photo_urls = [u for u in alt_urls if not (u in seen or seen.add(u))]
 
-            # Build filename and download
+            # ── 3. Build filename ──
             safe_pan = re.sub(r'[\\/*?:"<>|]', "_", pan_name)
             safe_wc  = re.sub(r'[\\/*?:"<>|/]', "_", mr_info.get("work_code", "WC"))
-            ext      = os.path.splitext(photo_src.split("?")[0])[-1]
-            if not ext or len(ext) > 5:
-                ext = ".jpg"
-            fname = f"{safe_pan}_MR{mr_info.get('msr_no','0')}_{safe_wc}_Photo{photo_no}{ext}"
-            path  = os.path.join(photos_dir, fname)
+            first_ext = os.path.splitext(photo_urls[0].split("?")[0])[-1]
+            if not first_ext or len(first_ext) > 5:
+                first_ext = ".jpg"
+            fname = f"{safe_pan}_MR{mr_info.get('msr_no','0')}_{safe_wc}_Photo{photo_no}{first_ext}"
+            path = os.path.join(photos_dir, fname)
 
-            cookies = {c["name"]: c["value"] for c in driver.get_cookies()}
-            resp    = self.app.http_session.get(
-                photo_src,
-                headers={"User-Agent": "Mozilla/5.0",
-                         "Referer": driver.current_url},
-                cookies=cookies, timeout=30)
+            # ── 4. Download with retry ──
+            max_attempts = 2
+            for attempt in range(max_attempts):
+                if _try_download(photo_urls, path):
+                    self.log_info(f"    📷 Photo {photo_no}: {fname}")
+                    return ("Yes", path)
+                if attempt == 0:
+                    time.sleep(2)
+                    self.app.log_message(self.log_display,
+                        f"      Retrying photo {photo_no}...", "warning")
 
-            if resp.status_code == 200 and len(resp.content) > 500:
-                with open(path, "wb") as f:
-                    f.write(resp.content)
-                self.log_info(f"    📷 Photo {photo_no}: {fname}")
-                return ("Yes", path)
-
-            self.app.log_message(self.log_display,
-                f"    Photo {photo_no}: HTTP {resp.status_code} ({len(resp.content)} bytes)", "warning")
+            self.log_warning(f"    Photo {photo_no}: All download attempts failed.")
             return ("No", "")
 
         except Exception as e:
             self.log_warning(f"    Photo {photo_no} failed: {e}")
             return ("Error", "")
 
-    # EXCEL EXPORT
+    # EXCEL EXPORT — Multi-sheet with photos
     def _export_excel(self):
+        """Export professional multi-sheet Excel with embedded photos."""
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "No results to export. Run the scrape first.")
             return
 
         date_safe = datetime.now().strftime("%d-%m-%Y")
-        target_dir = os.path.join(self.app.get_user_downloads_path(), "NregaBot", "NMMS_Attendance", date_safe)
-        os.makedirs(target_dir, exist_ok=True)
+        default_fn = f"NMMS_Attendance_Report_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
         file_path = filedialog.asksaveasfilename(
-            initialdir=target_dir,
-            initialfile=f"NMMS_Attendance_Report_{date_safe}.xlsx",
+            initialdir=os.path.join(self.app.get_user_downloads_path(), "NregaBot", "NMMS_Attendance", date_safe),
+            initialfile=default_fn,
             defaultextension=".xlsx",
             filetypes=[("Excel Files", "*.xlsx")],
             title="Save NMMS Attendance Report")
@@ -950,32 +1088,37 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         try:
             self._write_excel(file_path, date_safe)
-            messagebox.showinfo("Exported", f"Report saved!\n\n{file_path}")
+            messagebox.showinfo("Exported", f"Report saved!\\n\\n{file_path}")
             if os.name == "nt":
                 try: os.startfile(file_path)
-                except Exception as e_open:
-                    logger.debug("NMMS: Could not open file: %s", e_open)
+                except Exception: pass
         except Exception as e:
-            messagebox.showerror("Export Error", f"Could not save report:\n{e}")
+            messagebox.showerror("Export Error", f"Could not save report:\\n{e}")
 
     def _write_excel(self, path: str, date_str: str):
+        """Write multi-sheet Excel with MR Summary, Workers Detail, Block Overview, and embedded photos."""
+        import pandas as pd
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+
         summary_data = [self.results_tree.item(i, "values") for i in self.results_tree.get_children()]
         worker_data  = [self.workers_tree.item(i, "values")  for i in self.workers_tree.get_children()]
 
         with pd.ExcelWriter(path, engine="openpyxl") as writer:
-            # Sheet 1 — MR Summary
+            # ── Sheet 1 — MR Summary ──
             pd.DataFrame(summary_data, columns=self.SUMMARY_HEADERS).to_excel(
                 writer, sheet_name="MR Summary", index=False, startrow=4)
             ws_summary = writer.sheets["MR Summary"]
             self._style_sheet(ws_summary,
                 len(summary_data), self.SUMMARY_HEADERS,
-                f"NMMS Daily Attendance — MR Summary",
+                "NMMS Daily Attendance — MR Summary",
                 f"Date: {date_str}  |  Generated by NregaBot", "1565C0")
 
             # Embed photos into Photo-1 Saved / Photo-2 Saved columns
-            self._embed_photos_in_sheet(ws_summary, summary_data)
+            if hasattr(self, '_photo_paths_map') and self._photo_paths_map:
+                self._embed_photos_in_sheet(ws_summary, summary_data)
 
-            # Sheet 2 — Workers Detail
+            # ── Sheet 2 — Workers Detail ──
             pd.DataFrame(worker_data, columns=self.WORKER_HEADERS).to_excel(
                 writer, sheet_name="Workers Detail", index=False, startrow=4)
             self._style_sheet(writer.sheets["Workers Detail"],
@@ -983,7 +1126,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
                 "NMMS Daily Attendance — Workers Detail",
                 f"Date: {date_str}  |  Generated by NregaBot", "2E7D32")
 
-            # Sheet 3 — Block Overview
+            # ── Sheet 3 — Block Overview ──
             if self._panchayat_data:
                 pan_rows = [[d["sno"], d["name"], d["no_works"], d["no_mr"], d["persondays"]]
                             for d in self._panchayat_data]
@@ -995,72 +1138,51 @@ class NmmsAttendanceTab(BaseAutomationTab):
                     f"Date: {date_str}  |  Generated by NregaBot", "6A1B9A")
 
     def _embed_photos_in_sheet(self, ws, summary_data: list):
-        """
-        For each data row that has a saved photo, embed the image in the
-        'Photo-1 Saved' and/or 'Photo-2 Saved' cell and clear the text label.
-
-        Photo paths are stored in self._photo_paths_map keyed by 1-based row index
-        (matching summary_sno order used during scraping).
-        """
-        # Column indices (1-based) for the saved-photo columns
+        """Embed downloaded photos into the 'Photo-1 Saved' and 'Photo-2 Saved' cells."""
+        from openpyxl.drawing.image import Image as OpxlImage
+        from openpyxl.utils import get_column_letter
         try:
             p1_col = self.SUMMARY_HEADERS.index("Photo-1 Saved") + 1
             p2_col = self.SUMMARY_HEADERS.index("Photo-2 Saved") + 1
         except ValueError:
-            return  # headers changed — skip silently
-
-        # Photo display size in the cell (pixels at 96 dpi)
+            return
         IMG_W, IMG_H = 120, 90
-
-        # Data starts at Excel row 6 (rows 1-3 header/subtitle/generated-by, row 4 blank, row 5 col headers)
         DATA_START_ROW = 6
 
-        # Build a sorted list of (row_key, paths) so we can walk in order
-        # row_key is summary_sno which starts at whatever was in the treeview before this run.
-        # The simplest mapping: use the order of self._photo_paths_map entries.
-        # But we stored them by summary_sno (1-based cumulative).
-        # Map them to the order of summary_data rows by matching S No. in column 0.
-        sno_to_paths: dict = {}
-        for k, v in self._photo_paths_map.items():
-            sno_to_paths[k] = v  # k is summary_sno int
-
+        # Build sno -> paths map from _photo_paths_map
+        # _photo_paths_map keys are summary_sno (int), values are (p1_path, p2_path)
+        # Match to summary_data by finding sno in column 0
         for row_idx, row_vals in enumerate(summary_data):
             excel_row = DATA_START_ROW + row_idx
             try:
                 sno_val = int(row_vals[0])
             except (ValueError, IndexError):
                 continue
-
-            paths = sno_to_paths.get(sno_val)
+            paths = self._photo_paths_map.get(sno_val)
             if not paths:
                 continue
-
             p1_path, p2_path = paths
-
             for col_idx, img_path in [(p1_col, p1_path), (p2_col, p2_path)]:
                 if not img_path or not os.path.isfile(img_path):
                     continue
                 try:
-                    img = XLImage(img_path)
-                    img.width  = IMG_W
+                    img = OpxlImage(img_path)
+                    img.width = IMG_W
                     img.height = IMG_H
-
-                    # Anchor the image to the target cell
-                    cell_addr = f"{get_column_letter(col_idx)}{excel_row}"
-                    img.anchor = cell_addr
-
-                    # Clear text in that cell and size the row/col to fit the image
-                    ws[cell_addr].value = ""
-                    ws.row_dimensions[excel_row].height = IMG_H * 0.75  # pt ≈ px * 0.75
-                    ws.column_dimensions[get_column_letter(col_idx)].width = IMG_W / 7  # approx chars
-
-                    ws.add_image(img)
+                    cell_ref = f"{get_column_letter(col_idx)}{excel_row}"
+                    ws.add_image(img, cell_ref)
+                    # Clear text in that cell
+                    ws[cell_ref].value = None
+                    ws.row_dimensions[excel_row].height = max(ws.row_dimensions[excel_row].height or 0, IMG_H + 4)
                 except Exception:
-                    pass  # leave text value as-is if image fails
+                    continue
 
     def _style_sheet(self, ws, n_data_rows: int, headers: list,
                      title: str, subtitle: str, hdr_color: str):
-        """Apply title, subtitle, generated-by, header styling, and zebra striping."""
+        """Apply professional styling: title, subtitle, zebra striping, auto-size columns."""
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+
         n = len(headers)
         WHITE = "FFFFFF"
         thin  = Side(style="thin", color="BDBDBD")
@@ -1077,33 +1199,34 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         # Row 2 — Subtitle
         ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=n)
-        c2 = ws.cell(row=2, column=1, value=subtitle)
-        c2.font = Font(italic=True, size=9); c2.alignment = ctr
+        ws.cell(row=2, column=1, value=subtitle).font = Font(italic=True, size=9)
+        ws.cell(row=2, column=1).alignment = ctr
 
         # Row 3 — Generated by
         ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=n)
         c3 = ws.cell(row=3, column=1,
-                     value=f"Generated by NregaBot  |  {datetime.now().strftime('%d-%m-%Y %I:%M %p')}")
-        c3.font = Font(italic=True, size=8, color="808080"); c3.alignment = ctr
+                     value=f"Generated by NregaBot  |  {datetime.now():%d-%m-%Y %I:%M %p}")
+        c3.font = Font(italic=True, size=8, color="808080")
+        c3.alignment = ctr
 
-        # Row 5 — Column headers (pandas wrote them at row 5 due to startrow=4)
-        hdr_fill = PatternFill(start_color="E8EAF6", end_color="E8EAF6", fill_type="solid")
-        for cell in ws[5]:
-            cell.font = Font(bold=True, size=10)
-            cell.fill = hdr_fill
-            cell.alignment = ctr
-            cell.border = bdr
-
-        # Rows 6+ — Data with zebra striping
-        EVEN = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
-        ODD  = PatternFill(start_color=WHITE, end_color=WHITE, fill_type="solid")
-        for r_idx, row_cells in enumerate(
-                ws.iter_rows(min_row=6, max_row=5 + n_data_rows, min_col=1, max_col=n)):
-            fill = EVEN if r_idx % 2 == 0 else ODD
-            for cell in row_cells:
-                cell.fill   = fill
+        # Row 5 — Column headers
+        if n_data_rows > 0:
+            hdr_fill = PatternFill(start_color="E8EAF6", end_color="E8EAF6", fill_type="solid")
+            for cell in ws[5]:
+                cell.font = Font(bold=True, size=10)
+                cell.fill = hdr_fill
+                cell.alignment = ctr
                 cell.border = bdr
-                cell.alignment = Alignment(vertical="center")
+
+            # Data rows with zebra striping
+            EVEN = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
+            ODD  = PatternFill(start_color=WHITE, end_color=WHITE, fill_type="solid")
+            for r_idx, row_cells in enumerate(
+                ws.iter_rows(min_row=6, max_row=6 + n_data_rows - 1), start=0):
+                for cell in row_cells:
+                    cell.border = bdr
+                    cell.alignment = Alignment(vertical="center")
+                    cell.fill = EVEN if r_idx % 2 == 0 else ODD
 
         # Auto-size columns
         for col_idx, col_name in enumerate(headers, start=1):

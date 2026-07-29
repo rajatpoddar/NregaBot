@@ -123,7 +123,7 @@ class DelWorkAllocTab(BaseAutomationTab):
 
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="Export to CSV", command=lambda: self.export_treeview_to_csv(self.results_tree, "delete_work_alloc_results.csv"))
+        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="delete_work_alloc_results.xlsx", filter_mode="Export All"))
         self.export_csv_button.pack(side="left")
 
         cols = ("Timestamp", "Panchayat", "Jobcard/RegID", "Status", "Details")

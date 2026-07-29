@@ -247,9 +247,9 @@ class MaterialEntryTab(BaseAutomationTab):
         results_tab.grid_rowconfigure(0, weight=1)
         res_btn_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         res_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(5, 0))
-        ctk.CTkButton(res_btn_frame, text="📤 Export CSV", width=110,
-                      fg_color="#7C3AED", hover_color="#6D28D9",
-                      command=lambda: self.export_treeview_to_csv(self.results_tree, "material_entry_results.csv")
+        ctk.CTkButton(res_btn_frame, text="📥 Export to Excel", width=110,
+                      fg_color="#107C10", hover_color="#0B5E0B",
+                      command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="material_entry_results.xlsx", filter_mode="Export All")
                       ).pack(side="right")
         ctk.CTkButton(res_btn_frame, text="🗑 Clear", width=80,
                       fg_color=("gray70", "gray30"),

@@ -104,12 +104,8 @@ class WorkAllocationTab(BaseAutomationTab):
         
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="Export Report", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side='left')
-        self.export_format_menu = ctk.CTkOptionMenu(export_controls_frame, width=130, values=["PDF (.pdf)", "CSV (.csv)"], command=self._on_format_change)
-        self.export_format_menu.pack(side='left', padx=5)
-        self.export_filter_menu = ctk.CTkOptionMenu(export_controls_frame, width=150, values=["Export All", "Success Only", "Failed Only"])
-        self.export_filter_menu.pack(side='left', padx=(0, 5))
 
         # --- Results Treeview ---
         cols = ("Work Key", "Selected Work Code", "Status", "Details", "Timestamp")
@@ -126,11 +122,7 @@ class WorkAllocationTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
         self._setup_treeview_sorting(self.results_tree)
 
-    def _on_format_change(self, selected_format):
-        if "CSV" in selected_format:
-            self.export_filter_menu.configure(state="disabled")
-        else:
-            self.export_filter_menu.configure(state="normal")
+
 
     def set_ui_state(self, running: bool):
         if not self._is_alive():
@@ -141,9 +133,6 @@ class WorkAllocationTab(BaseAutomationTab):
         self.work_category_menu.configure(state=state)
         self.work_list_text.configure(state=state)
         self.export_button.configure(state=state)
-        self.export_format_menu.configure(state=state)
-        self.export_filter_menu.configure(state=state)
-        if state == "normal": self._on_format_change(self.export_format_menu.get())
     def reset_ui(self) -> None:
         self.panchayat_var.set("")
         self.work_list_text.delete("1.0", tkinter.END)
@@ -578,67 +567,13 @@ class WorkAllocationTab(BaseAutomationTab):
         self.start_automation()
 
     def export_report(self):
-        export_format = self.export_format_menu.get()
         panchayat_name = self.panchayat_var.get().strip()
-
-        if not panchayat_name:
-            messagebox.showwarning("Input Needed", "Please enter a Panchayat Name for the report filename.", parent=self)
-            return
-
-        if "CSV" in export_format:
-            safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            default_filename = f"Work_Allocation_Report_{safe_name}_{timestamp}.csv"
-            self.export_treeview_to_csv(self.results_tree, default_filename)
-            return
-            
-        data, file_path = self._get_filtered_data_and_filepath(export_format)
-        if not data: return
-
-        if "PDF" in export_format:
-            self._handle_pdf_export(data, file_path)
-
-    def _get_filtered_data_and_filepath(self, export_format):
-        all_items = self.results_tree.get_children()
-        if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
-        
-        filter_option = self.export_filter_menu.get()
-        data_to_export = []
-        for item_id in all_items:
-            row_values = self.results_tree.item(item_id)['values']
-            status = row_values[2].upper()
-            if filter_option == "Export All": data_to_export.append(row_values)
-            elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
-            elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)
-        if not data_to_export: messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
-
-        safe_name = "".join(c for c in self.panchayat_entry.get().strip() if c.isalnum() or c in (' ', '_')).rstrip()
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        
-        file_details = {"PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")], "title": "Save Report as PDF"}}
-        details = file_details[export_format]
-        filename = f"Work_Allocation_Report_{safe_name}_{timestamp}{details['ext']}"
-
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title=details['title'])
-        return (data_to_export, file_path) if file_path else (None, None)
-    
-    def _handle_pdf_export(self, data, file_path):
-        try:
-            headers = self.results_tree['columns']
-            col_widths = [40, 70, 40, 70, 40] # Adjusted widths
-            title = f"Work Allocation Report: {self.panchayat_entry.get().strip()}"
-            report_date = datetime.now().strftime('%d %b %Y')
-            
-            success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
-            
-            if success:
-                if messagebox.askyesno("Success", f"PDF Report exported to:\n{file_path}\n\nDo you want to open the file?"):
-                    if sys.platform == "win32":
-                        os.startfile(file_path)
-                    else:
-                        subprocess.call(['open', file_path])
-        except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to create PDF file.\nError: {e}")
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename=f"Work_Allocation_Report_{panchayat_name or 'Report'}_{datetime.now():%Y%m%d_%H%M}.xlsx",
+            filter_mode="Export All",
+            title_prefix=f"Work Allocation Report: {panchayat_name or 'N/A'}"
+        )
 
     def _save_inputs(self, inputs):
         """Saves the panchayat name and work category."""

@@ -82,7 +82,7 @@ class DelDemandTab(BaseAutomationTab):
 
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="Export to CSV", command=lambda: self.export_treeview_to_csv(self.results_tree, "delete_demand_results.csv"))
+        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="delete_demand_results.xlsx", filter_mode="Export All"))
         self.export_csv_button.pack(side="left")
 
         # Naya Column add kiya gaya hai: Applicant Info

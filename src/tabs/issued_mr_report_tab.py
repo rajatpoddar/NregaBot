@@ -1,6 +1,6 @@
 # tabs/issued_mr_report_tab.py
 import tkinter
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 import customtkinter as ctk
 import time, os, re, json
 from datetime import datetime
@@ -8,9 +8,6 @@ from datetime import datetime
 # --- Imports ---
 # --- End Imports ---
 
-
-from fpdf import FPDF
-from PIL import Image, ImageDraw, ImageFont 
 from src.utils import resource_path, get_logger
 from .base_tab import BaseAutomationTab
 
@@ -20,7 +17,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ._imports import *  # noqa: F403,F401
 
-import pandas as pd
 from webdriver_manager.chrome import ChromeDriverManager
 
 class IssuedMrReportTab(BaseAutomationTab):
@@ -145,11 +141,8 @@ class IssuedMrReportTab(BaseAutomationTab):
         
         export_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         export_frame.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.export_button = ctk.CTkButton(export_frame, text="Export Report", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side="left")
-        
-        self.export_format_menu = ctk.CTkOptionMenu(export_frame, values=["Excel (.xlsx)", "PDF (.pdf)", "PNG (.png)"])
-        self.export_format_menu.pack(side="left", padx=5)
 
         self.results_tree = ttk.Treeview(results_tab, columns=self.report_headers, show='headings')
         for col in self.report_headers: 
@@ -191,7 +184,6 @@ class IssuedMrReportTab(BaseAutomationTab):
         abps_scrollbar = ctk.CTkScrollbar(abps_tab, command=self.abps_tree.yview)
         self.abps_tree.configure(yscroll=abps_scrollbar.set); abps_scrollbar.grid(row=1, column=1, sticky='ns')
         self.style_treeview(self.abps_tree)
-
 
     def set_ui_state(self, running: bool):
         if not self._is_alive():
@@ -551,245 +543,42 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.app.switch_to_duplicate_mr_with_data(workcodes, panchayat_name)
 
     def export_report(self):
-        # Existing Export Logic for Main Report
+        """Export results to professional Excel."""
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "There are no results to export.")
             return
 
         panchayat = self.panchayat_var.get().strip() or "Report"
-        safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat) 
-        export_format = self.export_format_menu.get()
-        
-        current_year = datetime.now().strftime("%Y")
+        safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat)
         current_date_str = datetime.now().strftime("%d-%b-%Y")
         
-        headers = self.report_headers
-        data = [self.results_tree.item(item, 'values') for item in self.results_tree.get_children()]
-        
-        title = f"Issued MR Report - {panchayat}"
-        date_str = f"Date - {datetime.now().strftime('%d-%m-%Y')}"
-        
-        self._generic_export(export_format, safe_panchayat, current_year, current_date_str, data, headers, title, date_str, "Issued_MR")
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename=f"Issued_MR_{safe_panchayat}-{current_date_str}.xlsx",
+            filter_mode="Export All",
+            title_prefix=f"Issued MR Report - {panchayat}"
+        )
 
     def export_abps_report(self):
-        # --- NEW PROFESSIONAL EXCEL EXPORT LOGIC ---
+        """Export ABPS report to professional Excel."""
         if not self.abps_tree.get_children():
             messagebox.showinfo("No Data", "There are no ABPS results to export.")
             return
             
         block = self.block_var.get().strip() or "Block"
         safe_name = re.sub(r'[\\/*?:"<>|]', '_', block)
-        
-        current_year = datetime.now().strftime("%Y")
         current_date_str = datetime.now().strftime("%d-%b-%Y")
         
-        # Data preparation
-        headers = self.abps_report_headers
-        data = [self.abps_tree.item(item, 'values') for item in self.abps_tree.get_children()]
-        
-        # Paths
-        downloads_path = self.app.get_user_downloads_path() 
-        target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", safe_name) 
-        try: os.makedirs(target_dir, exist_ok=True)
-        except OSError as e: logger.debug("Failed to create dirs: %s", e)
-
-        filename = f"ABPS_Pending_Report_{safe_name}_{current_date_str}.xlsx"
-        file_path = filedialog.asksaveasfilename(
-            initialdir=target_dir,
-            initialfile=filename,
-            defaultextension=".xlsx",
-            filetypes=[("Excel Files", "*.xlsx")],
-            title="Save ABPS Report"
+        self.export_treeview_to_excel(
+            tree=self.abps_tree,
+            default_filename=f"ABPS_Pending_Report_{safe_name}_{current_date_str}.xlsx",
+            filter_mode="Export All",
+            title_prefix=f"ABPS Pendency Report - {block}"
         )
-        
-        if not file_path: return
-
-        try:
-            # Create DataFrame
-            df = pd.DataFrame(data, columns=headers)
-            
-            # Write to Excel with Professional Styles
-            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
-                sheet_name = 'ABPS_Pending'
-                # Data starts from Row 5 (Leaving space for Title/Subtitle)
-                df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=4)
                 
-                wb = writer.book
-                ws = writer.sheets[sheet_name]
-                
-                # --- Styles Definition ---
-                # 1. Colors & Fonts
-                header_fill = PatternFill(start_color="8E24AA", end_color="8E24AA", fill_type="solid") # Purple (Matching button)
-                title_font = Font(size=14, bold=True, color="FFFFFF")
-                subtitle_font = Font(italic=True, size=9)
-                
-                col_header_fill = PatternFill(start_color="F3E5F5", fill_type="solid") # Light Purple
-                col_header_font = Font(bold=True)
-                
-                white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
-                gray_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-                
-                # 2. Alignment & Borders
-                center_align = Alignment(horizontal="center", vertical="center")
-                left_align = Alignment(horizontal="left", vertical="center")
-                thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), 
-                                     top=Side(style='thin'), bottom=Side(style='thin'))
-
-                # --- Apply Styles ---
-                
-                # Row 1: Main Title
-                ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
-                cell = ws.cell(row=1, column=1)
-                cell.value = f"PENDING DEMAND LABOUR FOR ABPS: {block.upper()}"
-                cell.font = title_font
-                cell.fill = header_fill
-                cell.alignment = center_align
-                
-                # Row 2: Subtitle / Timestamp
-                ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(headers))
-                cell = ws.cell(row=2, column=1)
-                cell.value = f"Generated by NregaBot | Date: {datetime.now().strftime('%d-%m-%Y %I:%M %p')}"
-                cell.font = subtitle_font
-                cell.alignment = center_align
-
-                # Row 5: Column Headers
-                for cell in ws[5]:
-                    cell.font = col_header_font
-                    cell.fill = col_header_fill
-                    cell.alignment = center_align
-                    cell.border = thin_border
-
-                # Row 6+: Data Rows (Zebra Striping)
-                data_start_row = 6
-                for row_idx, row in enumerate(ws.iter_rows(min_row=data_start_row, max_row=data_start_row + len(data) - 1, min_col=1, max_col=len(headers))):
-                    fill = gray_fill if row_idx % 2 == 0 else white_fill
-                    for cell in row:
-                        cell.fill = fill
-                        cell.border = thin_border
-                        
-                        # Special alignment
-                        # Panchayat (Col 2) & Worker Name (Col 4) -> Left Align
-                        # Others -> Center Align
-                        if cell.column in [2, 4]: 
-                            cell.alignment = left_align
-                        else:
-                            cell.alignment = center_align
-
-                # Column Widths
-                # S No (A), Pan (B), Jobcard (C), Name (D), Status (E)
-                widths = [8, 25, 22, 25, 15] 
-                # Adjust if headers are different in future
-                for i, width in enumerate(widths, 1):
-                    col_letter = get_column_letter(i)
-                    ws.column_dimensions[col_letter].width = width
-
-            messagebox.showinfo("Success", f"Professional ABPS Report saved successfully to:\n{file_path}")
-            
-            # Auto-open file
-            try:
-                if os.name == 'nt': os.startfile(file_path)
-                else: subprocess.call(['open', file_path])
-            except Exception as e: logger.debug("Failed to open exported file: %s", e)
-
-        except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to save Excel report:\n{e}")
-
-    def _generic_export(self, export_format, safe_name, year, date_str, data, headers, title, date_text, prefix):
-        downloads_path = self.app.get_user_downloads_path()
-        target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {year}", safe_name)
-        try: os.makedirs(target_dir, exist_ok=True)
-        except OSError: return
-
-        if "Excel" in export_format:
-            ext = ".xlsx"
-            fname = f"{prefix}_{safe_name}-{date_str}{ext}"
-            fpath = filedialog.asksaveasfilename(initialdir=target_dir, initialfile=fname, defaultextension=ext, filetypes=[("Excel", "*.xlsx")])
-            if fpath and self._save_to_excel(data, headers, f"{title} {date_text}", fpath):
-                messagebox.showinfo("Success", f"Saved to:\n{fpath}")
-                
-        elif "PDF" in export_format:
-            ext = ".pdf"
-            fname = f"{prefix}_{safe_name}-{date_str}{ext}"
-            fpath = filedialog.asksaveasfilename(initialdir=target_dir, initialfile=fname, defaultextension=ext, filetypes=[("PDF", "*.pdf")])
-            if fpath:
-                col_widths = [12, 30, 60, 100, 40, 40, 30] 
-                # Adjust col widths dynamically if headers length changes
-                total_w = sum(col_widths)
-                eff_w = 277
-                adj_widths = [(w/total_w)*eff_w for w in col_widths]
-                
-                if self.generate_report_pdf(data, headers, adj_widths, title, date_text, fpath):
-                    messagebox.showinfo("Success", f"Saved to:\n{fpath}")
-
-        elif "PNG" in export_format:
-            ext = ".png"
-            fname = f"{prefix}_{safe_name}-{date_str}{ext}"
-            fpath = filedialog.asksaveasfilename(initialdir=target_dir, initialfile=fname, defaultextension=ext, filetypes=[("PNG", "*.png")])
-            if fpath and self._save_to_png(data, headers, title, date_text, fpath):
-                messagebox.showinfo("Success", f"Saved to:\n{fpath}")
-
-    def _save_to_excel(self, data, headers, title, file_path):
-        try:
-            df = pd.DataFrame(data, columns=headers)
-            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
-                sheet_name = 'Report'
-                df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=1)
-                worksheet = writer.sheets[sheet_name]
-                
-                worksheet['A1'] = title
-                worksheet['A1'].font = Font(bold=True, size=14)
-                worksheet['A1'].alignment = Alignment(horizontal='center', vertical='center')
-                worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers)) 
-                
-                header_font = Font(bold=True)
-                header_fill = PatternFill(start_color="DDEEFF", end_color="DDEEFF", fill_type="solid")
-                for cell in worksheet["2:2"]:
-                    cell.font = header_font
-                    cell.fill = header_fill
-
-                for col_idx, col in enumerate(df.columns, 1):
-                    column_letter = get_column_letter(col_idx)
-                    try: max_length = max(len(str(col)), df[col].astype(str).map(len).max())
-                    except: max_length = len(str(col)) 
-                    worksheet.column_dimensions[column_letter].width = min((max_length + 2), 50) 
-            return True
-        except Exception as e:
-            messagebox.showerror("Export Error", f"{e}", parent=self)
-            return False
 
     def generate_report_pdf(self, data, headers, col_widths, title, date_str, file_path):
         return super().generate_report_pdf(data, headers, col_widths, title, date_str, file_path)
-
-    def _save_to_png(self, data, headers, title, date_str, file_path):
-        # Reusing the logic from base class but ensuring context fits
-        # We need specific column width ratios for this report type
-        # SNo, Pan, WC, Name, Cat, Type, Agency
-        base_col_widths = [0.05, 0.10, 0.20, 0.30, 0.15, 0.15, 0.05]
-        
-        try:
-            font_path_regular = resource_path("assets/fonts/NotoSansDevanagari-Regular.ttf")
-            font_path_bold = resource_path("assets/fonts/NotoSansDevanagari-Bold.ttf")
-            font_title = ImageFont.truetype(font_path_bold, 28)
-            font_date = ImageFont.truetype(font_path_regular, 18)
-            font_header = ImageFont.truetype(font_path_bold, 16)
-            font_body = ImageFont.truetype(font_path_regular, 14)
-        except IOError:
-            font_title = ImageFont.load_default(size=28)
-            font_date = ImageFont.load_default(size=18)
-            font_header = ImageFont.load_default(size=16)
-            font_body = ImageFont.load_default(size=14)
-        
-        img_width = 2400; margin_x = 80; margin_y = 60
-        header_bg_color = (220, 235, 255); row_even_bg_color = (255, 255, 255); row_odd_bg_color = (245, 245, 245); text_color = (0, 0, 0); border_color = (180, 180, 180)
-
-        available_width = img_width - (2 * margin_x)
-        col_widths_pixels = [w * available_width for w in base_col_widths]
-
-        # Simple logic to render PNG using Pillow (simplified from mr_tracking logic)
-        # This implementation assumes standard columns. 
-        # Since logic is identical to previous, just calling it done.
-        return True # Placeholder as exact logic is lengthy, assuming BaseAutomationTab doesn't implement it fully generic yet.
-        # Note: If BaseAutomationTab doesn't have a generic _save_to_png, copy the implementation from the previous version of this file.
 
     def _wrap_text(self, text, font, max_width):
         return super()._wrap_text(text, font, max_width)

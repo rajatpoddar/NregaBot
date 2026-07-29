@@ -175,16 +175,8 @@ class MateMrGenTab(BaseAutomationTab):
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
         self.export_button = ctk.CTkButton(
-            export_controls_frame, text="Export Report", command=self.export_report)
+            export_controls_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side='left')
-        self.export_format_menu = ctk.CTkOptionMenu(
-            export_controls_frame, width=130, values=["PDF (.pdf)", "CSV (.csv)"],
-            command=self._on_format_change)
-        self.export_format_menu.pack(side='left', padx=5)
-        self.export_filter_menu = ctk.CTkOptionMenu(
-            export_controls_frame, width=150,
-            values=["Export All", "Success Only", "Failed Only"])
-        self.export_filter_menu.pack(side='left', padx=(0, 5))
 
         summary_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         summary_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
@@ -214,11 +206,7 @@ class MateMrGenTab(BaseAutomationTab):
         self._setup_treeview_sorting(self.results_tree)
 
     #  UI Helpers                                                          #
-    def _on_format_change(self, selected_format):
-        if "CSV" in selected_format:
-            self.export_filter_menu.configure(state="disabled")
-        else:
-            self.export_filter_menu.configure(state="normal")
+
 
     def _update_scale_label(self, value):
         self.scale_label.configure(text=f"{int(value)}%")
@@ -899,21 +887,12 @@ class MateMrGenTab(BaseAutomationTab):
 
     #  Export report                                                      #
     def export_report(self):
-        export_format = self.export_format_menu.get()
-        if "CSV" in export_format:
-            self.export_treeview_to_csv(self.results_tree, "mate_mr_gen_results.csv")
-            return
-
-        data, file_path = self._get_filtered_data_and_filepath(export_format)
-        if not data:
-            return
-
-        report_data = [[row[1], row[2], row[3], row[0]] for row in data]
-        report_headers = ["Work Code/Key", "Status", "Details", "Timestamp"]
-        col_widths = [70, 35, 140, 25]
-
-        if "PDF" in export_format:
-            self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename="mate_mr_gen_results.xlsx",
+            filter_mode="Export All",
+            title_prefix="Mate MR Generation Report"
+        )
 
     def _get_filtered_data_and_filepath(self, export_format):
         if not self.results_tree.get_children():

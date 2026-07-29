@@ -114,12 +114,8 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="Export Report", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side='left')
-        self.export_format_menu = ctk.CTkOptionMenu(export_controls_frame, width=130, values=["PDF (.pdf)", "CSV (.csv)"], command=self._on_format_change)
-        self.export_format_menu.pack(side='left', padx=5)
-        self.export_filter_menu = ctk.CTkOptionMenu(export_controls_frame, width=150, values=["Export All", "Success Only", "Failed Only"])
-        self.export_filter_menu.pack(side='left', padx=(0, 5))
 
         cols = ("Timestamp", "Work Code", "Status", "Details")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
@@ -149,9 +145,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             self.work_codes_textbox.insert("1.0", "No matching full work codes found.")
         self.work_codes_textbox.configure(state="disabled")
 
-    def _on_format_change(self, selected_format):
-        if "CSV" in selected_format: self.export_filter_menu.configure(state="disabled")
-        else: self.export_filter_menu.configure(state="normal")
+
 
     def _get_inputs(self):
         inputs = {
@@ -396,25 +390,14 @@ class PhysicalCompleteTab(BaseAutomationTab):
         self.auto_forward_checkbox.configure(state=state)
         self.forward_btn.configure(state=state)
         self.export_button.configure(state=state)
-        self.export_format_menu.configure(state=state)
-        self.export_filter_menu.configure(state=state)
-        if state == "normal": self._on_format_change(self.export_format_menu.get())
 
     def export_report(self):
-        export_format = self.export_format_menu.get()
-        if "CSV" in export_format:
-            self.export_treeview_to_csv(self.results_tree, "physical_complete_results.csv")
-            return
-            
-        data, file_path = self._get_filtered_data_and_filepath(export_format)
-        if not data: return
-        
-        report_data = [[row[1], row[2], row[3], row[0]] for row in data]
-        report_headers = ["Work Code", "Status", "Details", "Timestamp"]
-        col_widths = [70, 35, 140, 25]
-
-        if "PDF" in export_format:
-            self._handle_pdf_export(report_data, report_headers, col_widths, file_path)
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename="physical_complete_results.xlsx",
+            filter_mode="Export All",
+            title_prefix="Physical Complete Report"
+        )
 
     def _get_filtered_data_and_filepath(self, export_format):
         if not self.results_tree.get_children(): 

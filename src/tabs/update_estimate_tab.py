@@ -1,8 +1,8 @@
 # tabs/update_estimate_tab.py
 import tkinter
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 import customtkinter as ctk
-import time, csv, sys, os, subprocess, re  # <-- ADD 're'
+import time, csv, sys, os, re  # <-- ADD 're'
 from datetime import datetime
 from src import config
 from src.utils import truncate_workcode
@@ -73,10 +73,8 @@ class UpdateEstimateTab(BaseAutomationTab):
         # Export Controls
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 5))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="Export Report", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side='left')
-        self.export_format_menu = ctk.CTkOptionMenu(export_controls_frame, width=130, values=["PDF (.pdf)", "CSV (.csv)"])
-        self.export_format_menu.pack(side='left', padx=5)
 
         # Results Treeview
         cols = ("Work Code", "Outcome Value", "Status", "Details", "Timestamp")
@@ -103,7 +101,6 @@ class UpdateEstimateTab(BaseAutomationTab):
         self.estimated_outcome_entry.configure(state=state)
         self.work_key_text.configure(state=state)
         self.export_button.configure(state=state)
-        self.export_format_menu.configure(state=state)
     def start_automation(self) -> None:
         """Starts the automation logic in a separate thread."""
         self.safe_tree_clear()
@@ -261,42 +258,12 @@ class UpdateEstimateTab(BaseAutomationTab):
         self.safe_tree_insert((work_code, outcome, status.upper(), details, timestamp), tags)
     
     def export_report(self):
-        """Exports the data from the results tree to the selected format."""
-        export_format = self.export_format_menu.get()
-        
-        all_items = self.results_tree.get_children()
-        if not all_items:
-            messagebox.showinfo("No Data", "There are no results to export.")
-            return
-
-        data_to_export = [self.results_tree.item(item_id)['values'] for item_id in all_items]
-        
+        """Export results to professional Excel."""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"Update_Estimate_Report_{timestamp}"
-
-        if "CSV" in export_format:
-            self.export_treeview_to_csv(self.results_tree, f"{filename}.csv")
-        elif "PDF" in export_format:
-            file_path = filedialog.asksaveasfilename(
-                defaultextension=".pdf",
-                filetypes=[("PDF Document", "*.pdf")],
-                initialdir=self.app.get_nregabot_path("Reports"),
-                initialfile=f"{filename}.pdf",
-                title="Save PDF Report"
-            )
-            if not file_path: return
-            
-            try:
-                headers = self.results_tree['columns']
-                col_widths = [70, 35, 35, 110, 25] # Adjusted for A4 Landscape
-                title = "Update Estimate Report"
-                report_date = datetime.now().strftime('%d %b %Y')
-                
-                success = self.generate_report_pdf(data_to_export, headers, col_widths, title, report_date, file_path)
-                
-                if success:
-                    if messagebox.askyesno("Success", f"PDF Report exported to:\n{file_path}\n\nDo you want to open the file?"):
-                        if sys.platform == "win32": os.startfile(file_path)
-                        else: subprocess.call(['open', file_path])
-            except Exception as e:
-                messagebox.showerror("Export Error", f"Failed to create PDF file.\n\nError: {e}")
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename=f"{filename}.xlsx",
+            filter_mode="Export All",
+            title_prefix="Update Estimate Report"
+        )

@@ -1,8 +1,8 @@
 # tabs/dashboard_report_tab.py
 import tkinter
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 import customtkinter as ctk
-import time, os, re, json, subprocess
+import time, os, re, json
 from datetime import datetime
 
 # --- EXCEL IMPORT ---
@@ -130,11 +130,8 @@ class DashboardReportTab(BaseAutomationTab):
         
         export_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         export_frame.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.export_button = ctk.CTkButton(export_frame, text="Export Report", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side="left")
-        
-        self.export_format_menu = ctk.CTkOptionMenu(export_frame, values=["Excel (.xlsx)", "PDF (.pdf)", "PNG (.png)"])
-        self.export_format_menu.pack(side="left", padx=5)
 
         # --- Treeview Config ---
         self.results_tree = ttk.Treeview(results_tab, columns=self.report_headers, show='headings')
@@ -344,25 +341,11 @@ class DashboardReportTab(BaseAutomationTab):
     # =========================================================================
 
     def export_report(self):
+        """Export results to professional Excel."""
         if not self.results_tree.get_children():
             messagebox.showinfo("No Data", "No results to export.")
             return
 
-        # Basic Info
-        state = self.state_var.get().strip()
-        district = self.district_var.get().strip()
-        block = self.block_var.get().strip()
-        panchayat = self.panchayat_var.get().strip()
-        safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat or "Report") 
-        
-        export_format = self.export_format_menu.get()
-        current_year = datetime.now().strftime("%Y")
-        current_date_str = datetime.now().strftime("%d-%b-%Y")
-
-        headers = self.report_headers # ["S No.", "Project Name...", "E-MR No.", "Date..."]
-        data = [self.results_tree.item(item, 'values') for item in self.results_tree.get_children()]
-
-        # Titles & Headers
         delay_type = self.delay_column_var.get()
         if "Attendance" in delay_type: report_type = "Attendance Pending Report"
         elif "Measurement" in delay_type: report_type = "Measurement Book Pending Report"
@@ -371,111 +354,15 @@ class DashboardReportTab(BaseAutomationTab):
         else: report_type = "Delay Compensation Report"
 
         main_title = f"{report_type.upper()}"
-        sub_title = f"District: {district}  |  Block: {block}  |  Panchayat: {panchayat}"
-        
-        # Directory
-        target_dir = os.path.join(self.app.get_user_downloads_path(), "NregaBot", f"Reports_{current_year}", "Dashboard", safe_panchayat)
-        try: os.makedirs(target_dir, exist_ok=True)
-        except Exception as e: logger.debug("Failed to create dirs: %s", e)
+        current_date_str = datetime.now().strftime("%d-%b-%Y")
+        safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', self.panchayat_var.get().strip() or "Report")
 
-        # --- EXCEL EXPORT ---
-        if "Excel" in export_format:
-            file_path = filedialog.asksaveasfilename(
-                initialdir=target_dir, initialfile=f"{report_type.replace(' ','_')}_{safe_panchayat}_{current_date_str}.xlsx", 
-                defaultextension=".xlsx", filetypes=[("Excel Workbook", "*.xlsx")])
-            if file_path:
-                if self._save_to_excel(data, headers, main_title, sub_title, file_path):
-                    messagebox.showinfo("Success", f"Excel report saved:\n{file_path}")
-
-        # --- PDF EXPORT ---
-        elif "PDF" in export_format:
-            file_path = filedialog.asksaveasfilename(
-                initialdir=target_dir, initialfile=f"{report_type.replace(' ','_')}_{safe_panchayat}_{current_date_str}.pdf", 
-                defaultextension=".pdf", filetypes=[("PDF Document", "*.pdf")])
-            if file_path:
-                # 4 Columns Widths (Normalized for A4 Landscape)
-                col_widths = [15, 177, 35, 50] # Total ~277mm
-                
-                if self.generate_report_pdf(data, headers, col_widths, main_title, sub_title, file_path):
-                    messagebox.showinfo("Success", f"PDF report saved:\n{file_path}")
-
-        # --- PNG EXPORT ---
-        elif "PNG" in export_format:
-            file_path = filedialog.asksaveasfilename(
-                initialdir=target_dir, initialfile=f"{report_type.replace(' ','_')}_{safe_panchayat}_{current_date_str}.png", 
-                defaultextension=".png", filetypes=[("PNG Image", "*.png")])
-            if file_path:
-                if self._save_to_png(data, headers, main_title, sub_title, file_path):
-                    messagebox.showinfo("Success", f"PNG report saved:\n{file_path}")
-
-    def _save_to_excel(self, data, headers, title, subtitle, file_path):
-        try:
-            wb = openpyxl.Workbook(); ws = wb.active
-            ws.title = "Report"
-            
-            # Use fixed number of columns (4) to prevent bleed into 'E'
-            num_cols = 4 
-            last_col_char = get_column_letter(num_cols) # Should be 'D'
-
-            # Styles
-            header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid") 
-            gray_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-            white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
-            border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-            center = Alignment(horizontal="center", vertical="center")
-            
-            # Row 1: Title
-            ws.merge_cells(f'A1:{last_col_char}1')
-            ws['A1'] = title
-            ws['A1'].font = Font(size=14, bold=True, color="FFFFFF")
-            ws['A1'].fill = header_fill
-            ws['A1'].alignment = center
-
-            # Row 2: Location Subtitle
-            ws.merge_cells(f'A2:{last_col_char}2')
-            ws['A2'] = subtitle
-            ws['A2'].font = Font(size=11, bold=True)
-            ws['A2'].alignment = center
-            ws['A2'].fill = PatternFill(start_color="DCE6F1", fill_type="solid")
-
-            # Row 3: Generated Date & Promo
-            ws.merge_cells(f'A3:{last_col_char}3')
-            ws['A3'] = f"Generated: {datetime.now().strftime('%d-%m-%Y %I:%M %p')} | Visit NregaBot.com"
-            ws['A3'].font = Font(italic=True, size=9)
-            ws['A3'].alignment = center
-
-            # Row 5: Headers
-            for col_idx, text in enumerate(headers, 1):
-                c = ws.cell(row=5, column=col_idx, value=text)
-                c.font = Font(bold=True, color="FFFFFF")
-                c.fill = header_fill
-                c.alignment = center
-                c.border = border
-
-            # Data
-            for r_idx, row_data in enumerate(data, 6):
-                fill = gray_fill if r_idx % 2 == 0 else white_fill
-                for c_idx, val in enumerate(row_data, 1):
-                    # SAFETY: Ensure we don't write beyond column 4
-                    if c_idx > num_cols: break 
-                    c = ws.cell(row=r_idx, column=c_idx, value=val)
-                    c.fill = fill
-                    c.border = border
-                    # Center align SNo(1), EMR(3), Date(4). Left align Project(2)
-                    c.alignment = Alignment(horizontal="left", vertical="center") if c_idx == 2 else center
-
-            # Widths (S No, Project, EMR, Date)
-            ws.column_dimensions['A'].width = 8
-            ws.column_dimensions['B'].width = 65
-            ws.column_dimensions['C'].width = 20
-            ws.column_dimensions['D'].width = 25
-
-            wb.save(file_path)
-            try: os.startfile(file_path) if os.name == 'nt' else subprocess.call(['open', file_path])
-            except Exception as e: logger.debug("Failed to open file: %s", e)
-            return True
-        except Exception as e:
-            messagebox.showerror("Export Error", f"{e}"); return False
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename=f"{report_type.replace(' ','_')}_{safe_panchayat}_{current_date_str}.xlsx",
+            filter_mode="Export All",
+            title_prefix=main_title
+        )
 
     def generate_report_pdf(self, data, headers, col_widths, title, subtitle, file_path):
         class ProPDF(FPDF):
@@ -577,100 +464,6 @@ class DashboardReportTab(BaseAutomationTab):
             return True
         except Exception as e:
             messagebox.showerror("PDF Error", f"{e}"); return False
-
-    def _save_to_png(self, data, headers, title, subtitle, file_path):
-        try:
-            # Font Setup
-            try:
-                fr = resource_path("assets/fonts/NotoSansDevanagari-Regular.ttf")
-                fb = resource_path("assets/fonts/NotoSansDevanagari-Bold.ttf")
-                font_title = ImageFont.truetype(fb, 40)
-                font_sub = ImageFont.truetype(fb, 30)
-                font_head = ImageFont.truetype(fb, 28)
-                font_body = ImageFont.truetype(fr, 24)
-            except:
-                font_title = ImageFont.load_default()
-                font_sub = font_head = font_body = font_title
-
-            # Layout Config
-            W = 2400; margin = 50
-            # Width Ratios: SNo(0.05), Proj(0.60), EMR(0.15), Date(0.20)
-            col_ws = [W*0.05, W*0.60, W*0.15, W*0.20 - (2*margin)] 
-            col_ws = [int(x) for x in col_ws]
-            
-            # Colors
-            c_head_bg = (31, 73, 125); c_head_txt = (255, 255, 255)
-            c_row_odd = (242, 242, 242); c_row_even = (255, 255, 255)
-            
-            # Start Image
-            H = 2000 # Dynamic
-            img = Image.new("RGB", (W, H), (255, 255, 255))
-            draw = ImageDraw.Draw(img)
-            y = margin
-
-            # Draw Title
-            w_text = font_title.getlength(title)
-            draw.text(((W-w_text)/2, y), title, font=font_title, fill=(0,0,0))
-            y += 60
-
-            # Draw Subtitle Box
-            draw.rectangle([margin, y, W-margin, y+50], fill=(220, 230, 241))
-            w_sub = font_sub.getlength(subtitle)
-            draw.text(((W-w_sub)/2, y+8), subtitle, font=font_sub, fill=(0,0,0))
-            y += 80
-
-            # Draw Headers
-            x = margin; h_height = 60
-            for i, h in enumerate(headers):
-                draw.rectangle([x, y, x+col_ws[i], y+h_height], fill=c_head_bg, outline=(0,0,0))
-                th_w = font_head.getlength(h)
-                draw.text((x + (col_ws[i]-th_w)/2, y+15), h, font=font_head, fill=c_head_txt)
-                x += col_ws[i]
-            y += h_height
-
-            # Draw Rows
-            line_h = 40
-            for idx, row in enumerate(data):
-                bg = c_row_odd if idx%2==0 else c_row_even
-                
-                wrapped_cells = []
-                max_lines = 1
-                for i, txt in enumerate(row):
-                    lines = self._wrap_text(str(txt), font_body, col_ws[i]-20) 
-                    wrapped_cells.append(lines)
-                    max_lines = max(max_lines, len(lines))
-                
-                row_h = max_lines * line_h + 30 
-                
-                if y + row_h + margin + 50 > img.height:
-                    new_img = Image.new("RGB", (W, img.height + 2500), (255, 255, 255))
-                    new_img.paste(img, (0,0))
-                    img = new_img; draw = ImageDraw.Draw(img)
-
-                x = margin
-                for i, lines in enumerate(wrapped_cells):
-                    draw.rectangle([x, y, x+col_ws[i], y+row_h], fill=bg, outline=(100,100,100))
-                    
-                    ty = y + 15
-                    for line in lines:
-                        tw = font_body.getlength(line)
-                        tx = x + 15 if i == 1 else x + (col_ws[i]-tw)/2
-                        draw.text((tx, ty), line, font=font_body, fill=(0,0,0))
-                        ty += line_h
-                    x += col_ws[i]
-                y += row_h
-
-            # Footer
-            y += 20
-            draw.text((margin, y), "Report Generated by NregaBot.com", font=font_body, fill=(100,100,100))
-            y += 50
-
-            # Crop
-            final_img = img.crop((0, 0, W, y))
-            final_img.save(file_path)
-            return True
-        except Exception as e:
-            messagebox.showerror("PNG Error", f"{e}"); return False
 
     def save_inputs(self, inputs):
         d = {k: inputs.get(k) for k in ('state', 'district', 'block', 'panchayat')}

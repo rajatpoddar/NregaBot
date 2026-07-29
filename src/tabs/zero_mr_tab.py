@@ -78,12 +78,8 @@ class ZeroMrTab(BaseAutomationTab):
         
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="Export Report", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side='left')
-        self.export_format_menu = ctk.CTkOptionMenu(export_controls_frame, width=130, values=["PDF (.pdf)", "CSV (.csv)"], command=self._on_format_change)
-        self.export_format_menu.pack(side='left', padx=5)
-        self.export_filter_menu = ctk.CTkOptionMenu(export_controls_frame, width=150, values=["Export All", "Success Only", "Failed Only"])
-        self.export_filter_menu.pack(side='left', padx=(0, 5))
 
         # --- Results Treeview ---
         cols = ("Search Key", "MSR No", "Status", "Details", "Timestamp")
@@ -100,12 +96,6 @@ class ZeroMrTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
         self._setup_treeview_sorting(self.results_tree)
 
-    def _on_format_change(self, selected_format):
-        if "CSV" in selected_format:
-            self.export_filter_menu.configure(state="disabled")
-        else:
-            self.export_filter_menu.configure(state="normal")
-
     def set_ui_state(self, running: bool):
         if not self._is_alive():
             return
@@ -115,9 +105,6 @@ class ZeroMrTab(BaseAutomationTab):
         self.panchayat_menu.configure(state=state)
         self.work_list_text.configure(state=state)
         self.export_button.configure(state=state)
-        self.export_format_menu.configure(state=state)
-        self.export_filter_menu.configure(state=state)
-        if state == "normal": self._on_format_change(self.export_format_menu.get())
     def reset_ui(self) -> None:
         self.panchayat_var.set("")
         self.work_list_text.delete("1.0", tkinter.END)
@@ -450,25 +437,12 @@ class ZeroMrTab(BaseAutomationTab):
         self.safe_tree_insert(values, tags)
 
     def export_report(self):
-        export_format = self.export_format_menu.get()
-        panchayat_name = self.panchayat_var.get().strip()
-
-        if not panchayat_name:
-            messagebox.showwarning("Input Needed", "Please enter a Panchayat Name for the report filename.", parent=self)
-            return
-
-        if "CSV" in export_format:
-            safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            default_filename = f"Zero_MR_Report_{safe_name}_{timestamp}.csv"
-            self.export_treeview_to_csv(self.results_tree, default_filename)
-            return
-            
-        data, file_path = self._get_filtered_data_and_filepath(export_format)
-        if not data: return
-
-        if "PDF" in export_format:
-            self._handle_pdf_export(data, file_path)
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename="zero_mr_results.xlsx",
+            filter_mode="Export All",
+            title_prefix="Zero MR Report"
+        )
 
     def _get_filtered_data_and_filepath(self, export_format):
         all_items = self.results_tree.get_children()

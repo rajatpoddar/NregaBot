@@ -81,7 +81,7 @@ class AddActivityTab(BaseAutomationTab):
 
         results_action_frame = ctk.CTkFrame(results_frame, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="Export to CSV", command=lambda: self.export_treeview_to_csv(self.results_tree, "add_activity_results.csv"))
+        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="add_activity_results.xlsx", filter_mode="Export All"))
         self.export_csv_button.pack(side="left")
 
         cols = ("Work Key", "Status", "Details", "Timestamp")

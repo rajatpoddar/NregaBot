@@ -6,7 +6,6 @@ import os, csv, time, threading, json, re, requests
 from datetime import datetime
 
 from src import config
-import sys, subprocess
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -416,18 +415,12 @@ class DemandTab(BaseAutomationTab):
         self.retry_failed_button = ctk.CTkButton(results_button_frame, text="Retry Failed Applicants", command=self._retry_failed_applicants)
         self.retry_failed_button.pack(side="left", padx=5)
 
-        # Right Side: Unified Export Controls
+        # Right Side: Export Button
         export_controls_frame = ctk.CTkFrame(results_button_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
 
-        self.export_button = ctk.CTkButton(export_controls_frame, text="Export Report", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side='left')
-        
-        self.export_format_menu = ctk.CTkOptionMenu(export_controls_frame, width=130, values=["PDF (.pdf)", "CSV (.csv)"], command=self._on_format_change)
-        self.export_format_menu.pack(side='left', padx=5)
-
-        self.export_filter_menu = ctk.CTkOptionMenu(export_controls_frame, width=150, values=["Export All", "Success Only", "Failed Only"])
-        self.export_filter_menu.pack(side='left', padx=(0, 5))
 
         self._setup_results_treeview()
 
@@ -952,9 +945,6 @@ class DemandTab(BaseAutomationTab):
         
         # New Export Controls
         self.export_button.configure(state=state)
-        self.export_format_menu.configure(state=state)
-        self.export_filter_menu.configure(state=state)
-        if state == "normal": self._on_format_change(self.export_format_menu.get())
     def _get_village_code(self, job_card, state_logic_key):
         """
         Extracts the village code from a job card number based on state-specific logic.
@@ -1784,111 +1774,15 @@ class DemandTab(BaseAutomationTab):
             self.export_filter_menu.configure(state="normal")
 
     def export_report(self):
-        """
-        Central function to handle exporting results to PDF or CSV.
-        """
-        export_format = self.export_format_menu.get()
+        """Export results to professional Excel."""
         panchayat_name = self.panchayat_var.get().strip()
-        state_name = self.state_var.get().strip()
-
-        # Ensure Panchayat name is provided for the filename
         if not panchayat_name:
             messagebox.showwarning("Input Needed", "Please enter a Panchayat Name to include in the report filename.")
             return
-
-        # CSV Logic
-        if "CSV" in export_format:
-            # Use existing CSV logic, but allow custom filename
-            safe_p = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
-            safe_s = "".join(c for c in state_name if c.isalnum() or c in (' ', '_')).rstrip()
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-            default_filename = f"Demand_Report_{safe_s}_{safe_p}_{timestamp}.csv"
-            self.export_treeview_to_csv(self.results_tree, default_filename)
-            return
-            
-        # PDF Logic
-        data, file_path = self._get_filtered_data_and_filepath(export_format)
-        if not data: return
-
-        if "PDF" in export_format:
-            self._handle_pdf_export(data, file_path)
-
-    def _get_filtered_data_and_filepath(self, export_format):
-        """
-        Gathers data from Treeview based on filters (Success/Failed) and asks user for save path.
-        """
-        all_items = self.results_tree.get_children()
-        if not all_items: 
-            messagebox.showinfo("No Data", "There are no results to export.")
-            return None, None
-            
-        panchayat_name = self.panchayat_var.get().strip()
-        state_name = self.state_var.get().strip()
-
-        filter_option = self.export_filter_menu.get()
-        data_to_export = []
-        
-        for item_id in all_items:
-            # Treeview columns: ("#", "Job Card No", "Applicant Name", "Status")
-            # Values index: 0=RowID, 1=JC, 2=Name, 3=Status
-            row_values = self.results_tree.item(item_id)['values']
-            status = str(row_values[3]).upper() # Status is at index 3
-            
-            should_include = False
-            if filter_option == "Export All": 
-                should_include = True
-            elif filter_option == "Success Only" and ("SUCCESS" in status or "ALREADY" in status): 
-                should_include = True
-            elif filter_option == "Failed Only" and not ("SUCCESS" in status or "ALREADY" in status): 
-                should_include = True
-                
-            if should_include:
-                data_to_export.append(row_values)
-                
-        if not data_to_export: 
-            messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'.")
-            return None, None
-
         safe_p = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
-        safe_s = "".join(c for c in state_name if c.isalnum() or c in (' ', '_')).rstrip()
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-        
-        file_details = {
-            "PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")], "title": "Save Report as PDF"},
-        }
-        details = file_details.get(export_format, file_details["PDF (.pdf)"])
-        filename = f"Demand_Report_{safe_s}_{safe_p}_{timestamp}{details['ext']}"
-
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=details['ext'], 
-            filetypes=details['types'], 
-            initialdir=self.app.get_nregabot_path("Reports"), 
-            initialfile=filename, 
-            title=details['title']
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename=f"Demand_Report_{safe_p}_{datetime.now():%Y%m%d_%H%M}.xlsx",
+            filter_mode="Export All",
+            title_prefix=f"Demand Report: {panchayat_name}"
         )
-        return (data_to_export, file_path) if file_path else (None, None)
-
-    def _handle_pdf_export(self, data, file_path):
-        """Handles the generation of the PDF report."""
-        try:
-            # Treeview columns: ("#", "Job Card No", "Applicant Name", "Status")
-            headers = ["#", "Job Card No", "Applicant Name", "Status"]
-            
-            # Adjusted column widths for A4 Landscape (Approx total 280mm)
-            # Row ID(15), JC(65), Name(60), Status(140)
-            col_widths = [15, 65, 60, 140] 
-            
-            title = f"Demand Automation Report: {self.panchayat_var.get().strip()} ({self.state_var.get()})"
-            report_date = datetime.now().strftime('%d %b %Y')
-            
-            # Using base_tab.py's generate_report_pdf
-            success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
-            
-            if success:
-                if messagebox.askyesno("Success", f"PDF Report exported to:\n{file_path}\n\nDo you want to open the file?"):
-                    if sys.platform == "win32":
-                        os.startfile(file_path)
-                    else:
-                        subprocess.call(['open', file_path])
-        except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to create PDF file.\n\nError: {e}")

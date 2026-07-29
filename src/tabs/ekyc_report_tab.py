@@ -4,9 +4,8 @@ import threading
 import json
 import os
 import datetime
-import subprocess
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 import customtkinter as ctk
 
 # Excel Imports
@@ -84,7 +83,7 @@ class EKycReportTab(BaseAutomationTab):
         # --- 2. Action Buttons ---
         self._create_action_buttons(self).pack(fill="x", padx=10, pady=5)
         
-        self.export_btn = ctk.CTkButton(self, text="Download Professional Excel Report", command=self.export_professional_report, 
+        self.export_btn = ctk.CTkButton(self, text="📥 Export to Excel", command=self.export_professional_report, 
                                         state="disabled", fg_color=config.COLORS["green_export"])
         self.export_btn.pack(pady=5)
 
@@ -479,241 +478,16 @@ class EKycReportTab(BaseAutomationTab):
         for r in self.all_scraped_data: self.check_and_insert_to_tree(r)
 
     def export_professional_report(self):
-        if not self.all_scraped_data: return
-
-        # --- 1. Stats Calculation (per-Panchayat) ---
-        from collections import defaultdict
-        panchayat_stats = defaultdict(lambda: {"total": 0, "done": 0, "abps_pending": 0})
-        
-        for r in self.all_scraped_data:
-            p = r.get("panchayat", "Unknown")
-            panchayat_stats[p]["total"] += 1
-            if "yes" in r["ekyc"].lower():
-                panchayat_stats[p]["done"] += 1
-            if "no" in r["abps"].lower():
-                panchayat_stats[p]["abps_pending"] += 1
-        
-        all_data = self.all_scraped_data
-        total = len(all_data)
-        done = sum(1 for r in all_data if 'yes' in r['ekyc'].lower())
-        pending = total - done
-        abps_pending = sum(1 for r in all_data if 'no' in r['abps'].lower())
-
-        # --- 2. Filter Rows for Table ---
-        data_export = [r for r in all_data if self._should_show_record(r)]
-
-        # File Setup
-        panchayat = self.panchayat_var.get()
-        village_input = self.village_var.get()
-        
-        if panchayat and village_input:
-            file_part = f"{panchayat}_{village_input}"
-            header_text = f"eKYC & ABPS REPORT: {village_input}, {panchayat.upper()}"
-        elif panchayat:
-            file_part = f"Panchayat - {panchayat}"
-            header_text = f"eKYC & ABPS REPORT: Panchayat - {panchayat.upper()}"
-        else:
-            file_part = "All_Panchayats"
-            header_text = "eKYC & ABPS REPORT: ALL PANCHAYATS"
-        
-        year = datetime.date.today().year
-        date_str = datetime.date.today().strftime("%d-%m-%Y")
-        
-        user_downloads = self.app.get_user_downloads_path()
-        save_dir = os.path.join(user_downloads, "NregaBot", f"Reports {year}", "eKYC Reports")
-        if not os.path.exists(save_dir): os.makedirs(save_dir)
-            
-        default_name = f"ekyc_report_{file_part}_{date_str}.xlsx"
-        filename = filedialog.asksaveasfilename(initialdir=save_dir, initialfile=default_name, defaultextension=".xlsx", filetypes=[("Excel Files", "*.xlsx")])
-
-        if not filename: return
-
-        try:
-            wb = openpyxl.Workbook()
-            
-            # --- SHEET 1: DETAILED DATA ---
-            ws = wb.active
-            ws.title = "Detailed Report"
-
-            # Styles
-            header_font = Font(bold=True, color="FFFFFF")
-            header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
-            white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
-            gray_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-            center = Alignment(horizontal="center", vertical="center")
-            border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-
-            # Header
-            ws.merge_cells('A1:G1')
-            ws['A1'] = header_text
-            ws['A1'].font = Font(size=14, bold=True, color="FFFFFF")
-            ws['A1'].fill = header_fill
-            ws['A1'].alignment = center
-
-            ws.merge_cells('A2:G2')
-            ws['A2'] = f"Report Generated from NregaBot.com | Date: {datetime.datetime.now().strftime('%d-%m-%Y %I:%M %p')}"
-            ws['A2'].font = Font(italic=True, size=9)
-            ws['A2'].alignment = center
-
-            # Grand Summary (Row 4 & 5)
-            headers = ["Total Laborers", "eKYC Done", "eKYC Pending", "ABPS Pending (No)"]
-            vals = [total, done, pending, abps_pending]
-            
-            for i, (h, v) in enumerate(zip(headers, vals), start=2):
-                c_h = ws.cell(row=4, column=i, value=h)
-                c_h.font = Font(bold=True)
-                c_h.fill = PatternFill(start_color="DCE6F1", fill_type="solid")
-                c_h.alignment = center
-                c_h.border = border
-                
-                c_v = ws.cell(row=5, column=i, value=v)
-                c_v.font = Font(bold=True, size=11)
-                c_v.alignment = center
-                c_v.border = border
-                if i == 4 and v > 0: c_v.font = Font(color="FF0000", bold=True)
-
-            # Data Table
-            t_row = 7
-            cols = ["S.No", "Panchayat", "Village", "Job Card No", "Applicant Name", "ABPS Enabled?", "eKYC Done?"]
-            for i, h in enumerate(cols, 1):
-                c = ws.cell(row=t_row, column=i, value=h)
-                c.font = header_font
-                c.fill = header_fill
-                c.alignment = center
-                c.border = border
-
-            for idx, r in enumerate(data_export, 1):
-                r_idx = t_row + idx
-                fill = gray_fill if idx % 2 == 0 else white_fill
-                
-                ws.cell(row=r_idx, column=1, value=idx).fill = fill
-                ws.cell(row=r_idx, column=1).border = border
-                ws.cell(row=r_idx, column=1).alignment = center
-                
-                ws.cell(row=r_idx, column=2, value=r['panchayat']).fill = fill
-                ws.cell(row=r_idx, column=2).border = border
-                
-                ws.cell(row=r_idx, column=3, value=r['village']).fill = fill
-                ws.cell(row=r_idx, column=3).border = border
-                
-                ws.cell(row=r_idx, column=4, value=r['jobcard']).fill = fill
-                ws.cell(row=r_idx, column=4).border = border
-                
-                ws.cell(row=r_idx, column=5, value=r['name']).fill = fill
-                ws.cell(row=r_idx, column=5).border = border
-                
-                c6 = ws.cell(row=r_idx, column=6, value=r['abps'])
-                c6.alignment = center; c6.fill = fill; c6.border = border
-                if "no" in r['abps'].lower(): c6.font = Font(color="FF0000", bold=True)
-                else: c6.font = Font(color="006100", bold=True)
-                
-                c7 = ws.cell(row=r_idx, column=7, value=r['ekyc'])
-                c7.alignment = center; c7.fill = fill; c7.border = border
-                if "no" in r['ekyc'].lower(): c7.font = Font(color="FF0000", bold=True)
-                else: c7.font = Font(color="006100", bold=True)
-
-            # Widths
-            ws.column_dimensions['A'].width = 6
-            ws.column_dimensions['B'].width = 20
-            ws.column_dimensions['C'].width = 20
-            ws.column_dimensions['D'].width = 22
-            ws.column_dimensions['E'].width = 30
-            ws.column_dimensions['F'].width = 16
-            ws.column_dimensions['G'].width = 13
-
-            # --- SHEET 2: PANCHAYAT-WISE SUMMARY ---
-            if len(panchayat_stats) > 1:
-                ws2 = wb.create_sheet("Panchayat Summary")
-                
-                ws2.merge_cells('A1:E1')
-                ws2['A1'] = "📊 PANCHAYAT-WISE SUMMARY"
-                ws2['A1'].font = Font(size=13, bold=True, color="FFFFFF")
-                ws2['A1'].fill = header_fill
-                ws2['A1'].alignment = center
-                
-                # Header Row
-                summary_cols = ["Panchayat", "Total", "eKYC Done", "eKYC Pending", "ABPS Pending"]
-                for i, h in enumerate(summary_cols, 1):
-                    c = ws2.cell(row=3, column=i, value=h)
-                    c.font = header_font
-                    c.fill = header_fill
-                    c.alignment = center
-                    c.border = border
-                
-                row_idx = 4
-                for p_name, s in sorted(panchayat_stats.items()):
-                    p_pending = s["total"] - s["done"]
-                    fill = gray_fill if row_idx % 2 == 0 else white_fill
-                    
-                    ws2.cell(row=row_idx, column=1, value=p_name).fill = fill
-                    ws2.cell(row=row_idx, column=1).border = border
-                    
-                    ws2.cell(row=row_idx, column=2, value=s["total"]).fill = fill
-                    ws2.cell(row=row_idx, column=2).border = border
-                    ws2.cell(row=row_idx, column=2).alignment = center
-                    
-                    ws2.cell(row=row_idx, column=3, value=s["done"]).fill = fill
-                    ws2.cell(row=row_idx, column=3).border = border
-                    ws2.cell(row=row_idx, column=3).alignment = center
-                    ws2.cell(row=row_idx, column=3).font = Font(color="006100", bold=True)
-                    
-                    ws2.cell(row=row_idx, column=4, value=p_pending).fill = fill
-                    ws2.cell(row=row_idx, column=4).border = border
-                    ws2.cell(row=row_idx, column=4).alignment = center
-                    if p_pending > 0:
-                        ws2.cell(row=row_idx, column=4).font = Font(color="FF0000", bold=True)
-                    
-                    ws2.cell(row=row_idx, column=5, value=s["abps_pending"]).fill = fill
-                    ws2.cell(row=row_idx, column=5).border = border
-                    ws2.cell(row=row_idx, column=5).alignment = center
-                    if s["abps_pending"] > 0:
-                        ws2.cell(row=row_idx, column=5).font = Font(color="FF6600", bold=True)
-                    
-                    row_idx += 1
-                
-                # Grand Total Row
-                ws2.cell(row=row_idx, column=1, value="GRAND TOTAL").fill = PatternFill(start_color="FFC000", fill_type="solid")
-                ws2.cell(row=row_idx, column=1).border = border
-                ws2.cell(row=row_idx, column=1).font = Font(bold=True)
-                
-                ws2.cell(row=row_idx, column=2, value=total).fill = PatternFill(start_color="FFC000", fill_type="solid")
-                ws2.cell(row=row_idx, column=2).border = border
-                ws2.cell(row=row_idx, column=2).alignment = center
-                ws2.cell(row=row_idx, column=2).font = Font(bold=True)
-                
-                ws2.cell(row=row_idx, column=3, value=done).fill = PatternFill(start_color="FFC000", fill_type="solid")
-                ws2.cell(row=row_idx, column=3).border = border
-                ws2.cell(row=row_idx, column=3).alignment = center
-                ws2.cell(row=row_idx, column=3).font = Font(bold=True, color="006100")
-                
-                ws2.cell(row=row_idx, column=4, value=pending).fill = PatternFill(start_color="FFC000", fill_type="solid")
-                ws2.cell(row=row_idx, column=4).border = border
-                ws2.cell(row=row_idx, column=4).alignment = center
-                ws2.cell(row=row_idx, column=4).font = Font(bold=True, color="FF0000" if pending > 0 else "000000")
-                
-                ws2.cell(row=row_idx, column=5, value=abps_pending).fill = PatternFill(start_color="FFC000", fill_type="solid")
-                ws2.cell(row=row_idx, column=5).border = border
-                ws2.cell(row=row_idx, column=5).alignment = center
-                ws2.cell(row=row_idx, column=5).font = Font(bold=True, color="FF6600" if abps_pending > 0 else "000000")
-                
-                # Widths
-                ws2.column_dimensions['A'].width = 25
-                ws2.column_dimensions['B'].width = 12
-                ws2.column_dimensions['C'].width = 12
-                ws2.column_dimensions['D'].width = 14
-                ws2.column_dimensions['E'].width = 14
-
-            wb.save(filename)
-            messagebox.showinfo("Success", f"File saved!\n{filename}")
-            
-            try:
-                if os.name == 'nt': os.startfile(filename)
-                else: subprocess.call(['open', filename])
-            except Exception as e:
-                logger.debug("Failed to open exported file: %s", e)
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Save Failed: {e}")
+        """Export using the base class professional Excel method."""
+        if not self.tree.get_children():
+            messagebox.showinfo("No Data", "No records to export. Run automation first.")
+            return
+        self.export_treeview_to_excel(
+            tree=self.tree,
+            default_filename="ekyc_report.xlsx",
+            filter_mode="Export All",
+            title_prefix="eKYC & ABPS Report"
+        )
 
     def save_inputs(self):
         data = {

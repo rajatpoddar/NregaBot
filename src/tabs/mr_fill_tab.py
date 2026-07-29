@@ -109,12 +109,8 @@ class MrFillTab(BaseAutomationTab):
         
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="Export Report", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side='left')
-        self.export_format_menu = ctk.CTkOptionMenu(export_controls_frame, width=130, values=["PDF (.pdf)", "CSV (.csv)"], command=self._on_format_change)
-        self.export_format_menu.pack(side='left', padx=5)
-        self.export_filter_menu = ctk.CTkOptionMenu(export_controls_frame, width=150, values=["Export All", "Success Only", "Failed Only"])
-        self.export_filter_menu.pack(side='left', padx=(0, 5))
 
         # Results Treeview
         cols = ("Workcode", "MR No.", "Status", "Details", "Timestamp")
@@ -179,9 +175,6 @@ class MrFillTab(BaseAutomationTab):
         self.manual_mode_checkbox.configure(state=state)
         self.work_key_text.configure(state=state)
         self.export_button.configure(state=state)
-        self.export_format_menu.configure(state=state)
-        self.export_filter_menu.configure(state=state)
-        if state == "normal": self._on_format_change(self.export_format_menu.get())
     def reset_ui(self) -> None:
         """Resets the form to its default state."""
         if messagebox.askokcancel("Reset Form?", "Clear all inputs, results, and logs?"):
@@ -497,26 +490,12 @@ class MrFillTab(BaseAutomationTab):
         self.safe_tree_insert((work_key, mr_no, status.upper(), details, timestamp), (tag,))
 
     def export_report(self):
-        """Exports the data in the results tree to PDF or CSV."""
-        export_format = self.export_format_menu.get()
-        panchayat_name = self.panchayat_var.get() # Get from variable
-
-        if not panchayat_name:
-            messagebox.showwarning("Input Needed", "Please enter a Panchayat Name to include in the report filename.", parent=self)
-            return
-
-        if "CSV" in export_format:
-            safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            default_filename = f"MR_Fill_Report_{safe_name}_{timestamp}.csv"
-            self.export_treeview_to_csv(self.results_tree, default_filename)
-            return
-            
-        data, file_path = self._get_filtered_data_and_filepath(export_format)
-        if not data: return
-
-        if "PDF" in export_format:
-            self._handle_pdf_export(data, file_path)
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename="mr_fill_results.xlsx",
+            filter_mode="Export All",
+            title_prefix="MR Fill Report"
+        )
 
     def _get_filtered_data_and_filepath(self, export_format):
         """Filters data based on UI selection and gets a save file path from the user."""

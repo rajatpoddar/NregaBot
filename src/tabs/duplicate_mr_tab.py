@@ -1,6 +1,6 @@
 # tabs/duplicate_mr_tab.py
 import tkinter
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 import customtkinter as ctk
 import os
 import base64
@@ -110,7 +110,7 @@ class DuplicateMrTab(BaseAutomationTab):
         self.merge_pdfs_button.pack(side='left', padx=(0, 10))
         # --- END ---
 
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="Export to CSV", command=lambda: self.export_treeview_to_csv(self.results_tree, "duplicate_mr_results.csv"))
+        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="duplicate_mr_results.xlsx", filter_mode="Export All"))
         self.export_csv_button.pack(side="left") # Changed to left
 
         cols = ("Timestamp", "Work Code", "MSR No", "Status")
