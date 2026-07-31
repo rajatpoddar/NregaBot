@@ -492,8 +492,10 @@ class LicenseMixin:
                     f"{config.LICENSE_SERVER_URL}/api/send-otp",
                     json={"identifier": email_val}, timeout=10)
                 if resp.status_code == 200:
-                    messagebox.showinfo("OTP Sent", "Check your email for the OTP code.",
-                                        parent=win)
+                    result = resp.json()
+                    channel = result.get("channel", "email")
+                    msg = f"OTP sent to your {channel}. Please check."
+                    messagebox.showinfo("OTP Sent", msg, parent=win)
                 else:
                     try:
                         reason = resp.json().get("reason", "Failed")

@@ -465,7 +465,7 @@ class ZeroMrTab(BaseAutomationTab):
         details = file_details[export_format]
         filename = f"Zero_MR_Report_{safe_name}_{timestamp}{details['ext']}"
 
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title=details['title'])
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_report_path("Zero MR"), initialfile=filename, title=details['title'])
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):

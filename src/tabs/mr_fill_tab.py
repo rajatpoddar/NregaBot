@@ -486,7 +486,14 @@ class MrFillTab(BaseAutomationTab):
 
         timestamp = datetime.now().strftime("%H:%M:%S")
         
-        self.log_info(f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}", level=level)        
+        if level == "success":
+            self.log_success(f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}")
+        elif level == "warning":
+            self.log_warning(f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}")
+        elif level == "error":
+            self.log_error(f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}")
+        else:
+            self.log_info(f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}")        
         self.safe_tree_insert((work_key, mr_no, status.upper(), details, timestamp), (tag,))
 
     def export_report(self):
@@ -523,7 +530,7 @@ class MrFillTab(BaseAutomationTab):
         details = file_details[export_format] # Assume PDF
         filename = f"MR_Fill_Report_{safe_name}_{timestamp}{details['ext']}"
 
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title=details['title'])
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_report_path("MR Fill"), initialfile=filename, title=details['title'])
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, file_path):

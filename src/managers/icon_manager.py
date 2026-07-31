@@ -151,6 +151,7 @@ def create_icon_manager() -> LazyIconManager:
     mgr._add("emoji_ekyc_report",       "assets/icons/emojis/ekyc_report.png",        size=(16, 16))
     mgr._add("emoji_social_audit",      "assets/icons/emojis/social_audit.png",       size=(16, 16))
     mgr._add("emoji_nmms_attendance",   "assets/icons/emojis/mis_reports.png",        size=(16, 16))
+    mgr._add("emoji_pending_bills",      "assets/icons/emojis/demand.png",              size=(16, 16))
 
     # 6. Smart Tools
     mgr._add("emoji_tools",             "assets/icons/emojis/emoji_tools.png",        size=(16, 16))

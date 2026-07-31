@@ -36,5 +36,15 @@ STATE_DISTRICT_MAP = {
         "North 24 Parganas", "Paschim Bardhaman", "Paschim Medinipur",
         "Purba Bardhaman", "Purba Medinipur", "Purulia", "South 24 Parganas",
         "Uttar Dinajpur", "Others"
-    ]
+    ],
+    "Karnataka": [
+        "Bagalkote", "Ballari", "Belagavi", "Bengaluru Rural",
+        "Bengaluru Urban", "Bidar", "Chamarajanagar", "Chikkaballapur",
+        "Chikkamagaluru", "Chitradurga", "Dakshina Kannada", "Davanagere",
+        "Dharwad", "Gadag", "Hassan", "Haveri", "Kalaburagi",
+        "Kodagu", "Kolar", "Koppal", "Mandya", "Mysuru",
+        "Raichur", "Ramanagara", "Shivamogga", "Tumakuru",
+        "Udupi", "Uttara Kannada", "Vijayapura", "Vijayanagara",
+        "Yadgir", "Others"
+    ],
 }

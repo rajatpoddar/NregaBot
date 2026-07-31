@@ -15,15 +15,10 @@ LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://license.
 MAIN_WEBSITE_URL: str = "https://nregabot.com"
 SUPPORT_EMAIL: str = "nregabot@gmail.com"
 
-# --- OpenWA Configuration (for WhatsApp messaging) ---
-OWA_BASE_URL: str = "http://192.168.29.101:2785"
-OWA_SESSION_ID: str = "cee322ad-7cbc-4b9f-b355-670f42d24e7c"
-OWA_API_KEY: str = "owa_k1_5e5cb7ef8cb40297fec613f3cba9c699daa2513a3fda0a0fa251c662e14faa8f"
-
-# ── Legacy Evolution API config (kept for backwards compat, will be removed) ──
-EVO_BASE_URL: str = OWA_BASE_URL
-EVO_INSTANCE: str = OWA_SESSION_ID
-EVO_API_KEY: str = OWA_API_KEY
+# --- Evolution API Configuration (for WhatsApp messaging) ---
+EVO_BASE_URL: str = "http://192.168.29.101:8087"
+EVO_INSTANCE: str = "NregaBot"
+EVO_API_KEY: str = "NregaBotSecretKey123"
 
 # --- Platform & UI Configuration ---
 import platform
@@ -368,7 +363,7 @@ ICONS: Dict[str, object] = {
     # Reports & Tracking
     "MR Tracking": "🕵️", "Dashboard Report": "📈", "MIS Reports": "📊",
     "Issued MR Details": "📋", "eKYC Report": "🆔", "Social Audit Report": "📝",
-    "NMMS Attendance": "📋",
+    "NMMS Attendance": "📋", "Pending Bills": "💸",
     # Smart Tools
     "Macro Manager": "⚙️", "Login Automation": "🤖", "PDF Merger": "📑",
     "Workcode Extractor": "✂️", "File Manager": "📁",
@@ -512,7 +507,12 @@ STATE_DEMAND_CONFIG: Dict[str, Dict[str, str]] = {
         "base_url": "https://nregade2.dord.gov.in/netnrega/demand_new.aspx",
         # Logic to parse village code from 'RJ-270200209000394400/00022652' -> '400'
         "village_code_logic": "rj"
+    },
+    "Karnataka": {
+        "base_url": "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx",
+        "village_code_logic": "ka"
     }
+    # Add more states here
     # You can add more states here
 }
 
@@ -562,6 +562,38 @@ WORK_ALLOCATION_CONFIG: Dict[str, str] = {
 
 DEL_DEMAND_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/deletedemand.aspx"
+}
+
+# --- Pending Bills (Unpaid MR/Bill) Scraper Configuration ---
+# This automation scrapes the public "Liability & Expenditure Report" (Pending Bills)
+# page from the MGNREGA website and prepares an Excel sheet of unpaid muster rolls
+# and bills for the selected district → block → panchayat.
+#
+# The MGNREGA liability report pages require a per-query "Digest" parameter (they
+# reject URL tampering). Digests are embedded in the links of every report page, so
+# the automation only needs ONE valid *seed* digest for the state page (page=S) of
+# the seed financial year — all deeper digests (district → block → panchayat) are
+# read from the page links at runtime, and other financial years are reached through
+# the ASP.NET financial-year dropdown postback.
+#
+# seed_digest: a valid Digest for page=S of seed_fin_year. If the site regenerates
+#              digests and scraping starts failing with "URL TEMPERED", refresh this
+#              value by opening the liability report in a browser and copying the
+#              Digest from the address bar.
+#
+# To add another state: add an entry with its state_code, the liability report URL,
+# the state_out data base URL and a fresh seed digest.
+PENDING_BILLS_CONFIG: Dict[str, Dict[str, str]] = {
+    "JHARKHAND": {
+        "state_code": "34",
+        "report_url": "https://mnregaweb2.dord.gov.in/netnrega/liability_exp_report.aspx",
+        "data_base_url": "https://mnregaweb2.dord.gov.in/Netnrega/writereaddata/state_out/",
+        "seed_fin_year": "2026-2027",
+        "seed_digest": "9OGth4UYNHlos5R4NI/k3A",
+    },
+    # Add more states here, e.g.:
+    # "BIHAR": {"state_code": "10", "report_url": "...", "data_base_url": "...",
+    #           "seed_fin_year": "2026-2027", "seed_digest": "..."},
 }
 
 MATERIAL_ENTRY_CONFIG: Dict[str, str] = {

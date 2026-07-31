@@ -269,7 +269,7 @@ class AutomationMixin:
     def _send_excel_whatsapp_notification(self, key, status, tab_instance=None):
         """
         Automation finish par Excel file ko nrega-server par upload karta hai,
-        aur server OpenWA ke through WhatsApp pe document bhejta hai.
+        aur server Evolution API ke through WhatsApp pe document bhejta hai.
 
         Ye tab kaam karta hai jab:
         - User ne setting mein "whatsapp_excel_send" enable kiya ho
@@ -329,7 +329,7 @@ class AutomationMixin:
                         pass
                     return
 
-                # ── Step 3: Upload to nrega-server and send via OpenWA ──
+                # ── Step 3: Upload to nrega-server and send via Evolution API ──
                 server_url = config.LICENSE_SERVER_URL
                 if not server_url:
                     logger.debug("No server URL configured, skipping WhatsApp send")

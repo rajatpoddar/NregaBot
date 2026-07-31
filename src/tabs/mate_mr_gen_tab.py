@@ -888,7 +888,7 @@ class MateMrGenTab(BaseAutomationTab):
         file_path = filedialog.asksaveasfilename(
             defaultextension=details['ext'],
             filetypes=details['types'],
-            initialdir=self.app.get_nregabot_path("Reports"),
+            initialdir=self.app.get_report_path("Mate MR"),
             initialfile=filename,
             title="Save Report")
         return (data_to_export, file_path) if file_path else (None, None)

@@ -74,6 +74,7 @@ class NavMixin:
             "eKYC Report": "emoji_ekyc_report",
             "Social Audit Report": "emoji_social_audit",
             "NMMS Attendance": "emoji_nmms_attendance",
+            "Pending Bills": "emoji_pending_bills",
             # Smart Tools
             "Macro Manager": "emoji_tools",
             "PDF Merger": "emoji_pdf_merger",
@@ -822,7 +823,7 @@ class NavMixin:
             if not all_logs:
                 messagebox.showinfo("No Data", "No logs to export.", parent=win)
                 return
-            reports_dir = self.get_nregabot_path("Reports")
+            reports_dir = self.get_report_path("Activity Log")
             file_path = filedialog.asksaveasfilename(
                 defaultextension=".txt",
                 filetypes=[("Text File", "*.txt"), ("CSV File", "*.csv")],

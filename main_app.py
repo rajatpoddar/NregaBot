@@ -63,7 +63,7 @@ from src.tabs.macro_manager_tab import MacroManagerTab
 from src.state import AppState
 from src.utils import (
     resource_path, get_data_path, get_user_downloads_path, get_nregabot_path,
-    get_config, save_config, validate_config,
+    get_report_path, get_config, save_config, validate_config,
     setup_logging, get_logger
 )
 
@@ -692,6 +692,8 @@ del "%~f0" & exit
     def get_data_path(self, filename): return get_data_path(filename)
     def get_user_downloads_path(self) -> str: return get_user_downloads_path()
     def get_nregabot_path(self, subdir: str = "") -> str: return get_nregabot_path(subdir)
+    def get_report_path(self, category: str = "", fin_year: str = "") -> str:
+        return get_report_path(category, fin_year)
 
     def open_folder(self, path):
         try:

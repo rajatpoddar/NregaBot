@@ -882,33 +882,29 @@ class HistoryManager:
         import threading
         def _do_sync():
             try:
-                import json
-                import urllib.request
+                import requests as req_lib
 
-                payload = json.dumps({
+                payload = {
                     "license_key": license_key,
                     "entries": entries,
-                }).encode('utf-8')
+                }
 
-                req = urllib.request.Request(
+                resp = req_lib.post(
                     f"{server_url}/api/activity-log/sync",
-                    data=payload,
-                    headers={'Content-Type': 'application/json'},
-                    method='POST',
+                    json=payload,
+                    timeout=15,
                 )
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    body = resp.read().decode('utf-8')
-                    if resp.status == 200:
-                        result = json.loads(body)
-                        synced_count = result.get('synced_count', 0)
-                        if synced_count > 0:
-                            local_ids = [e['local_id'] for e in entries[:synced_count]]
-                            self.mark_entries_as_synced(local_ids)
-                            logger.info(f"✅ Activity log sync: {synced_count} entries synced successfully to server.")
-                        else:
-                            logger.warning(f"⚠️ Activity log sync: Server returned synced_count=0 for {len(entries)} entries.")
+                if resp.status_code == 200:
+                    result = resp.json()
+                    synced_count = result.get('synced_count', 0)
+                    if synced_count > 0:
+                        local_ids = [e['local_id'] for e in entries[:synced_count]]
+                        self.mark_entries_as_synced(local_ids)
+                        logger.info(f"✅ Activity log sync: {synced_count} entries synced successfully to server.")
                     else:
-                        logger.warning(f"⚠️ Activity log sync: Server returned HTTP {resp.status}: {body[:200]}")
+                        logger.warning(f"⚠️ Activity log sync: Server returned synced_count=0 for {len(entries)} entries.")
+                else:
+                    logger.warning(f"⚠️ Activity log sync: Server returned HTTP {resp.status_code}: {resp.text[:200]}")
             except Exception as e:
                 logger.warning(f"⚠️ Activity log sync failed (will retry on next automation finish): {e}")
 

@@ -54,7 +54,7 @@ from src.managers.icon_manager import create_icon_manager
 from src.app.app_license import LicenseMixin
 from src.utils import (
     resource_path, get_data_path, get_user_downloads_path, get_nregabot_path,
-    get_config, save_config, validate_config,
+    get_report_path, get_config, save_config, validate_config,
     setup_logging, get_logger, _suppress_overscroll
 )
 
@@ -931,6 +931,9 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
     def get_nregabot_path(self, subdir: str = "") -> str:
         return get_nregabot_path(subdir)
+
+    def get_report_path(self, category: str = "", fin_year: str = "") -> str:
+        return get_report_path(category, fin_year)
 
     def log_message(self, log, msg: str, level: str = "info") -> None:
         """Append a timestamped message to a log textbox.

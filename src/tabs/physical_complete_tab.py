@@ -422,7 +422,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {"Image (.jpg)": { "ext": ".jpg", "types": [("JPEG Image", "*.jpg")]}, "PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
         filename = f"Physical_Complete_Report_{safe_name}_{timestamp}{details['ext']}"
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title="Save Report")
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_report_path("Physical Complete"), initialfile=filename, title="Save Report")
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):

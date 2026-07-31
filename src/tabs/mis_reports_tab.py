@@ -187,15 +187,9 @@ class MisReportsTab(BaseAutomationTab):
         self.save_inputs({'state': inputs['state'], 'district': inputs['district'], 'block': inputs['block']})
         self.app.update_history("location_state", inputs['state']); self.app.update_history("location_district", inputs['district']); self.app.update_history("location_block", inputs['block'])
         
-        # --- NEW: Create suggested directory structure ---
+        # --- NEW: Create suggested directory structure (standardized) ---
         try:
-            downloads_path = self.app.get_user_downloads_path()
-            current_year = datetime.now().strftime("%Y")
-            current_date_str_folder = datetime.now().strftime("%d-%m-%Y")
-            
-            target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", "MIS", current_date_str_folder)
-            os.makedirs(target_dir, exist_ok=True)
-            
+            target_dir = self.app.get_report_path("MIS")
             today_str_file = datetime.now().strftime("%d-%m-%Y")
             initial_filename = f"MIS_Reports_{today_str_file}.xlsx"
         except Exception as e:

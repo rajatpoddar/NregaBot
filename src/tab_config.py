@@ -243,6 +243,11 @@ def get_tabs_definition(app: Any) -> Dict[str, Dict[str, Any]]:
                 "icon": app.icon_images.get("emoji_nmms_attendance"),
                 "key": "nmms_attendance"
             },
+            "Pending Bills": {
+                "creation_func": _lazy_import("PendingBillsTab", "src.tabs.pending_bills_tab"),
+                "icon": app.icon_images.get("emoji_pending_bills"),
+                "key": "pending_bills"
+            },
         },
 
         # 6. Smart Tool

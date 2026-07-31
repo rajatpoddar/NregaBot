@@ -74,7 +74,8 @@ class AbpsVerifyTab(BaseAutomationTab):
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
         
         # --- Export Buttons ---
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="abps_verify_results.xlsx", filter_mode="Export All"))
+        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel",
+                                               command=self._export_excel_report)
         self.export_csv_button.pack(side="left", padx=(0, 10))
 
         # NEW: PDF Export Button
@@ -330,6 +331,20 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.log_info(f"{'='*40}\n📊 ABPS Verification Summary\n{summary}\n{'='*40}")
         if total > 0:
             self.log_info(f"📊 ABPS Verification Complete: {summary}")
+    def _export_excel_report(self):
+        """Export ABPS verification results to Excel (standard report folder)."""
+        if not self.results_tree.get_children():
+            messagebox.showinfo("No Data", "There are no results to export.")
+            return
+        panchayat = self.panchayat_var.get().strip() or "Report"
+        safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat)
+        date_str = datetime.now().strftime("%d-%m-%Y")
+        self.export_treeview_to_excel(
+            tree=self.results_tree,
+            default_filename=f"ABPS_Verify_{safe_panchayat}_{date_str}.xlsx",
+            filter_mode="Export All",
+            category="ABPS Verify")
+
     def export_to_pdf(self):
         """Exports the current Treeview results to a Professional PDF using base_tab utility."""
         
@@ -347,12 +362,10 @@ class AbpsVerifyTab(BaseAutomationTab):
         # 3. Setup Filename and Directory
         panchayat = self.panchayat_var.get().strip() or "Report"
         safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat)
-        current_year = datetime.now().strftime("%Y")
         date_str = datetime.now().strftime("%d-%m-%Y")
         
-        # Create Folder Structure
-        downloads_path = self.app.get_user_downloads_path()
-        target_dir = os.path.join(downloads_path, "NregaBot", f"Reports {current_year}", safe_panchayat)
+        # Create Folder Structure (standardized)
+        target_dir = self.app.get_report_path("ABPS Verify")
         
         try:
             os.makedirs(target_dir, exist_ok=True)

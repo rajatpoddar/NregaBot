@@ -896,9 +896,58 @@ class BaseAutomationTab(ctk.CTkFrame):
         for index, (val, k) in enumerate(l): tv.move(k, '', index)
         tv.heading(col, command=lambda: self._treeview_sort_column(tv, col, not reverse))
         
-    def export_treeview_to_csv(self, tree: Any, default_filename: str) -> None:
-        """Export treeview contents to CSV inside ~/Downloads/NregaBot/Reports/."""
-        reports_dir = self.app.get_nregabot_path("Reports")
+    # automation_key -> friendly report folder name (kept consistent so every
+    # tab's exports land in the same-named folder under Report {fin_year}/).
+    _REPORT_CATEGORY_NAMES: Dict[str, str] = {
+        "pending_bills": "Pending Bills",
+        "mr_tracking": "MR Tracking",
+        "issued_mr_report": "Issued MR",
+        "fto_gen": "FTO Generation",
+        "nmms_attendance": "NMMS Attendance",
+        "work_allocation": "Work Allocation",
+        "gen": "Wagelist",
+        "mr_fill": "MR Fill",
+        "emb_verify": "eMB Verify",
+        "material_entry": "Material Entry",
+        "mis_reports": "MIS",
+        "physical_complete": "Physical Complete",
+        "sad_update_status": "SAD Update",
+        "add_activity": "Add Activity",
+        "del_demand": "Delete Demand",
+        "sad_auto": "Sarkar Aapke Dwar",
+        "mb_entry": "MB Entry",
+        "zero_mr": "Zero MR",
+        "delete_applicant": "Delete Applicant",
+        "demand": "Demand",
+        "resend_wg": "Resend Rejected Wagelist",
+        "update_estimate": "Update Estimate",
+        "wc_gen": "Work Code Generation",
+        "send": "Wagelist Send",
+        "duplicate_mr": "Duplicate MR",
+        "social_audit_respond": "Social Audit",
+        "muster": "Muster Roll",
+        "mate_mr": "Mate MR",
+        "pdf_merger": "PDF Merger",
+        "msr": "MSR",
+        "dashboard_report": "Dashboard Report",
+        "abps_verify": "ABPS Verify",
+        "if_edit": "IF Edit",
+        "jc_verify": "Jobcard Verify",
+        "del_work_alloc": "Delete Work Allocation",
+        "macro": "Macro",
+        "scheme_closing": "Scheme Closing",
+        "ekyc_report": "eKYC Report",
+    }
+
+    def _report_category(self) -> str:
+        """Human-readable category folder name for this tab's reports."""
+        key = self.automation_key or ""
+        return self._REPORT_CATEGORY_NAMES.get(
+            key, key.replace("_", " ").title() or "Reports")
+
+    def export_treeview_to_csv(self, tree: Any, default_filename: str, category: str = "") -> None:
+        """Export treeview contents to CSV inside the standard report folder."""
+        reports_dir = self.app.get_report_path(category or self._report_category())
         file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialdir=reports_dir, initialfile=default_filename, title="Save CSV Report")
         if not file_path: return
         try:
@@ -912,7 +961,8 @@ class BaseAutomationTab(ctk.CTkFrame):
 
     def export_treeview_to_excel(self, tree: Any, default_filename: str = "report.xlsx",
                                   filter_mode: str = "Export All",
-                                  title_prefix: str = "") -> Optional[str]:
+                                  title_prefix: str = "",
+                                  category: str = "") -> Optional[str]:
         """
         Professional Excel export with openpyxl styling.
 
@@ -992,7 +1042,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             return None
 
         # ── Save file dialog ──
-        reports_dir = self.app.get_nregabot_path("Reports")
+        reports_dir = self.app.get_report_path(category or self._report_category())
         file_path = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel Workbook", "*.xlsx")],

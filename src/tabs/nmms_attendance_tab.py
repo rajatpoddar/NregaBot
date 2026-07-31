@@ -1071,7 +1071,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         default_fn = f"NMMS_Attendance_Report_{datetime.now():%Y%m%d_%H%M}.xlsx"
 
         file_path = filedialog.asksaveasfilename(
-            initialdir=os.path.join(self.app.get_user_downloads_path(), "NregaBot", "NMMS_Attendance", date_safe),
+            initialdir=self.app.get_report_path("NMMS Attendance"),
             initialfile=default_fn,
             defaultextension=".xlsx",
             filetypes=[("Excel Files", "*.xlsx")],

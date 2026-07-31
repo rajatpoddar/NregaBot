@@ -438,7 +438,7 @@ class WagelistGenTab(BaseAutomationTab):
         details = file_details.get(export_format, {"ext": ".txt", "types": [("Text File", "*.txt")]}) # Fallback
         filename = f"WagelistGen_Report_{safe_name}_{timestamp}{details['ext']}"
 
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_nregabot_path("Reports"), initialfile=filename, title="Save Report")
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_report_path("Wagelist"), initialfile=filename, title="Save Report")
         return (data_to_export, file_path) if file_path else (None, None)
 
     def _prepare_report_data(self, raw_data):

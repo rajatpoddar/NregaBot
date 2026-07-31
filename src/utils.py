@@ -184,6 +184,33 @@ def get_nregabot_path(subdir: str = "") -> str:
     os.makedirs(base, exist_ok=True)
     return base
 
+
+def current_financial_year() -> str:
+    """Current Indian financial year as 'YYYY-YYYY' (starts 1 April)."""
+    from datetime import datetime
+    now = datetime.now()
+    start = now.year if now.month >= 4 else now.year - 1
+    return f"{start}-{start + 1}"
+
+
+def get_report_path(category: str = "", fin_year: str = "") -> str:
+    """
+    Standard report directory: ~/Downloads/NregaBot/Report {fin_year}/{category}/
+
+    All report exports (Excel/CSV/PDF/image) should use this so every report
+    lands in one consistent place per financial year.
+
+    Examples:
+        get_report_path("Pending Bills")              -> ~/Downloads/NregaBot/Report 2026-2027/Pending Bills/
+        get_report_path("Pending Bills", "2025-2026") -> ~/Downloads/NregaBot/Report 2025-2026/Pending Bills/
+        get_report_path()                              -> ~/Downloads/NregaBot/Report 2026-2027/
+    """
+    fy = fin_year or current_financial_year()
+    subdir = f"Report {fy}"
+    if category:
+        subdir = os.path.join(subdir, category)
+    return get_nregabot_path(subdir)
+
 # --- UPDATED CONFIG FUNCTIONS ---
 
 CONFIG_FILE: str = get_data_path('config.json')

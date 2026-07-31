@@ -819,6 +819,7 @@ class MrTrackingTab(BaseAutomationTab):
         filename = f"Pendency_Report_{datetime.now().strftime('%d-%m-%Y')}.xlsx"
         save_path = filedialog.asksaveasfilename(
             defaultextension=".xlsx", 
+            initialdir=self.app.get_report_path("MR Tracking"),
             initialfile=filename,
             filetypes=[("Excel Files", "*.xlsx")]
         )

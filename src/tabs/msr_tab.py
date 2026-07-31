@@ -164,7 +164,7 @@ class MsrTab(BaseAutomationTab):
                 if not match: raise ValueError(f"Panchayat '{location_panchayat}' not found.")
                 panchayat_select.select_by_visible_text(match)
                 self.app.update_history("location_panchayat", location_panchayat)
-                self.log_info(f"Successfully selected Panchayat: {match}", "success"); time.sleep(2)
+                self.log_success(f"Successfully selected Panchayat: {match}"); time.sleep(2)
             except TimeoutException: self.log_info("Panchayat selection not found/required (GP Login). Proceeding...")
             total = len(work_keys)
             for i, work_key in enumerate(work_keys, 1):
@@ -332,8 +332,13 @@ class MsrTab(BaseAutomationTab):
         elif "Muster Roll (MSR) not found" in msg: details = "MR not Filled yet."
         elif "Work code not found" in msg: details = "Work Code not found."
         
-        # Log to the text box
-        self.log_info(f"'{work_key}' - {status.upper()}: {details}", level=level)        
+        # Log to the text box (use appropriate log level)
+        if level == "success":
+            self.log_success(f"'{work_key}' - {status.upper()}: {details}")
+        elif level == "error":
+            self.log_error(f"'{work_key}' - {status.upper()}: {details}")
+        else:
+            self.log_info(f"'{work_key}' - {status.upper()}: {details}")        
         # --- FIX: Set the tag to 'success' explicitly for Green color ---
         tags = ('success',) if 'success' in status.lower() else ('failed',)
         
