@@ -57,7 +57,14 @@ class ActivityLogTab(ctk.CTkFrame):
         header.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         header.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(header, text="📋", font=ctk.CTkFont(size=24)
+        _a_icon = None
+        try:
+            _a_icon = self.app.icon_images.get_sized("history", (24, 24))
+        except Exception:
+            _a_icon = None
+        ctk.CTkLabel(header, text="📋" if _a_icon is None else "",
+                     image=_a_icon,
+                     font=ctk.CTkFont(size=24)
                      ).grid(row=0, column=0, padx=(0, 10))
 
         title_frame = ctk.CTkFrame(header, fg_color="transparent")

@@ -13,8 +13,8 @@ from datetime import datetime
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException, Alignment, Border, Font, PatternFill, Side, get_column_letter, pd  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 
 logger = get_logger()
@@ -72,25 +72,29 @@ class NmmsAttendanceTab(BaseAutomationTab):
         outer_scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         outer_scroll.grid_columnconfigure(0, weight=1)
         # Make rows expand so the notebook fills remaining space
-        outer_scroll.grid_rowconfigure(1, weight=1)
+        outer_scroll.grid_rowconfigure(3, weight=1)
 
-        top = ctk.CTkFrame(outer_scroll)
-        top.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
-        top.grid_columnconfigure(0, weight=1)
+        # ── Header card ──
+        self._create_header_card(outer_scroll, "📷", "NMMS Attendance",
+                                 "Record NMMS attendance with date, group photos and geo-coordinates.",
+                                 icon_key="emoji_nmms_attendance")
 
-        # Instructions
-        instr = (
-            "STEPS:  1. In browser: manually open the NMMS portal.  "
-            "2. Set Attendance Date below, then click '📅 Set Date & Scrape'.  "
-            "3. Select panchayats and click ▶ Start."
-        )
-        ctk.CTkLabel(top, text=instr, justify="left", wraplength=950,
-                     fg_color=("gray90", "#2A2A2A"), corner_radius=8,
-                     padx=10, pady=8).grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
+        top = ctk.CTkFrame(outer_scroll, corner_radius=12, border_width=1,
+                           border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        top.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 6))
+        top.grid_columnconfigure(0, weight=1)   # left: date + panchayat selection
+        top.grid_columnconfigure(1, weight=1)   # right: instructions
+        top.grid_rowconfigure(0, weight=1)
+
+        # ── LEFT column: Date row + Panchayat selection ──
+        left_col = ctk.CTkFrame(top, fg_color="transparent")
+        left_col.grid(row=0, column=0, sticky="nsew", padx=(8, 4), pady=8)
+        left_col.grid_columnconfigure(0, weight=1)
+        left_col.grid_rowconfigure(2, weight=1)
 
         # Date row
-        date_row = ctk.CTkFrame(top, fg_color="transparent")
-        date_row.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 4))
+        date_row = ctk.CTkFrame(left_col, fg_color="transparent")
+        date_row.grid(row=0, column=0, sticky="ew", pady=(0, 4))
         date_row.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(date_row, text="Attendance Date:",
@@ -110,14 +114,16 @@ class NmmsAttendanceTab(BaseAutomationTab):
             fg_color="#2E7D32", hover_color="#1B5E20", command=self._scrape_current_page_thread)
         self._scrape_btn.pack(side="left", padx=(0, 16))
 
+        # Download photos checkbox — its own row so the half-width column never clips it
         self._save_photos_var = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(date_row, text="Download Group Photos",
-                        variable=self._save_photos_var).pack(side="left")
+        ctk.CTkCheckBox(left_col, text="Download Group Photos",
+                        variable=self._save_photos_var).grid(row=1, column=0, sticky="w", pady=(0, 2))
 
         # Panchayat selection
-        pan_outer = ctk.CTkFrame(top, fg_color="transparent")
-        pan_outer.grid(row=2, column=0, sticky="ew", padx=8, pady=(4, 2))
+        pan_outer = ctk.CTkFrame(left_col, fg_color="transparent")
+        pan_outer.grid(row=2, column=0, sticky="nsew", pady=(4, 0))
         pan_outer.grid_columnconfigure(0, weight=1)
+        pan_outer.grid_rowconfigure(1, weight=1)
 
         pan_hdr = ctk.CTkFrame(pan_outer, fg_color="transparent")
         pan_hdr.grid(row=0, column=0, sticky="ew")
@@ -127,21 +133,40 @@ class NmmsAttendanceTab(BaseAutomationTab):
                       command=self._select_all).pack(side="right", padx=(4, 0))
         ctk.CTkButton(pan_hdr, text="Clear All", width=90, command=self._clear_all).pack(side="right")
 
-        self._pan_scroll = ctk.CTkScrollableFrame(pan_outer, height=120)
-        self._pan_scroll.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        self._pan_scroll = ctk.CTkScrollableFrame(pan_outer, height=170)
+        self._pan_scroll.grid(row=1, column=0, sticky="nsew", pady=(4, 0))
         self._pan_checkboxes: dict = {}
 
         self._pan_info_lbl = ctk.CTkLabel(
-            pan_outer, text_color="gray50", justify="left", wraplength=950,
+            pan_outer, text_color="gray50", justify="left", wraplength=430,
             text="No panchayats loaded. Navigate to panchayat list in browser, then click 'Scrape Current Page'.")
         self._pan_info_lbl.grid(row=2, column=0, sticky="w", pady=(2, 2))
 
+        # ── RIGHT column: Instructions ──
+        howto = ctk.CTkFrame(top, corner_radius=10, border_width=1,
+                             border_color=("gray85", "gray30"), fg_color=("gray90", "#2A2A2A"))
+        howto.grid(row=0, column=1, sticky="nsew", padx=(4, 8), pady=8)
+        howto.grid_columnconfigure(0, weight=1)
+        howto.grid_rowconfigure(1, weight=1)
+        ctk.CTkLabel(howto, text="💡 How to Use",
+                     font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color=("#1565C0", "#64B5F6")).grid(row=0, column=0, sticky="w", padx=14, pady=(10, 4))
+        instr = (
+            "1. In the browser, manually open the NMMS portal.\n"
+            "2. Set the Attendance Date below, then click '📅 Set Date & Scrape'.\n"
+            "3. Select panchayats and click ▶ Start."
+        )
+        ctk.CTkLabel(howto, text=instr, justify="left", anchor="nw", wraplength=330,
+                     font=ctk.CTkFont(size=11),
+                     text_color=("#475569", "#94A3B8")).grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 10))
+
         # Start / Stop / Retry / Reset buttons
-        self._create_action_buttons(parent_frame=top).grid(row=3, column=0, pady=(8, 10))
+        # ── Action buttons (OUTSIDE the card) ──
+        self._create_action_buttons(parent_frame=outer_scroll).grid(row=2, column=0, padx=10, pady=(0, 6))
 
         # Bottom notebook — placed inside the scrollable wrapper
         nb = ctk.CTkTabview(outer_scroll)
-        nb.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        nb.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self._build_summary_tab(nb.add("MR Summary"))
         self._build_workers_tab(nb.add("Workers Detail"))
         self._create_log_and_status_area(parent_notebook=nb)

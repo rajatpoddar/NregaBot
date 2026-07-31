@@ -480,6 +480,23 @@ class LicenseMixin:
                                   font=ctk.CTkFont(size=13))
         otp_entry.pack(side="left", fill="x", expand=True, padx=(0, 8), ipady=4)
 
+        # ── OTP resend countdown state ──
+        _otp_timer = [None]
+        _otp_remaining = [0]
+
+        def _update_otp_btn():
+            try:
+                if not send_otp_btn.winfo_exists():
+                    return
+            except Exception:
+                return
+            if _otp_remaining[0] > 0:
+                send_otp_btn.configure(state="disabled", text=f"Resend in {_otp_remaining[0]}s")
+                _otp_remaining[0] -= 1
+                _otp_timer[0] = win.after(1000, _update_otp_btn)
+            else:
+                send_otp_btn.configure(state="normal", text="Send OTP")
+
         def send_otp_login():
             email_val = email_entry.get().strip()
             if "@" not in email_val:
@@ -487,6 +504,8 @@ class LicenseMixin:
                                         parent=win)
                 return
             send_otp_btn.configure(state="disabled", text="⏳ Sending...")
+            email_status.configure(text="⏳  Sending OTP...",
+                                   text_color=("#2563EB", "#60A5FA"))
             try:
                 resp = self.app_state.http_session.post(
                     f"{config.LICENSE_SERVER_URL}/api/send-otp",
@@ -494,23 +513,30 @@ class LicenseMixin:
                 if resp.status_code == 200:
                     result = resp.json()
                     channel = result.get("channel", "email")
-                    msg = f"OTP sent to your {channel}. Please check."
-                    messagebox.showinfo("OTP Sent", msg, parent=win)
+                    self.play_sound("success")
+                    email_status.configure(
+                        text=f"✅  OTP sent to your {channel}. Please check.",
+                        text_color=("#059669", "#10B981"))
+                    _otp_remaining[0] = 30
+                    _update_otp_btn()
                 else:
                     try:
                         reason = resp.json().get("reason", "Failed")
                     except Exception:
                         reason = f"Server returned status {resp.status_code}"
-                    messagebox.showerror("Error", reason, parent=win)
+                    self.play_sound("error")
+                    email_status.configure(text=f"❌  {reason}",
+                                           text_color=("#DC2626", "#EF4444"))
+                    send_otp_btn.configure(state="normal", text="Send OTP")
             except Exception as e:
-                messagebox.showerror("Error", str(e), parent=win)
-            finally:
-                win.after(30000, lambda: send_otp_btn.winfo_exists()
-                          and send_otp_btn.configure(state="normal", text="Send OTP"))
+                self.play_sound("error")
+                email_status.configure(text=f"❌  {str(e)}",
+                                       text_color=("#DC2626", "#EF4444"))
+                send_otp_btn.configure(state="normal", text="Send OTP")
 
         send_otp_btn = ctk.CTkButton(
             otp_row, text="Send OTP", command=send_otp_login,
-            fg_color="gray", width=100, height=34,
+            fg_color="gray", width=110, height=34,
             font=ctk.CTkFont(size=12)
         )
         send_otp_btn.pack(side="right")
@@ -637,7 +663,8 @@ class LicenseMixin:
         # Trial link inside email tab
         def _start_trial():
             win.withdraw()
-            if self.show_trial_registration_window():
+            if self.show_trial_registration_window(
+                    on_login=lambda: tab_view.set("📧  Email & OTP")):
                 activated.set(True)
                 win.destroy()
             else:
@@ -672,83 +699,468 @@ class LicenseMixin:
     # TRIAL REGISTRATION
     # ------------------------------------------------------------------
 
-    def show_trial_registration_window(self) -> bool:
-        win = ctk.CTkToplevel(self); win.title("Trial Registration")
+    def show_trial_registration_window(self, on_login: Optional[Any] = None) -> bool:
+        """30-day free trial signup (compact).
+
+        On open, the server is asked whether this device (machine id) is
+        already registered. If it is, only two options are shown:
+        Login (existing license) or Renew Subscription.
+        """
+        win = ctk.CTkToplevel(self)
+        win.title(f"{config.APP_SHORT_NAME} - Free Trial")
         win.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        w, h = min(540, sw-40), min(650, sh-40)
+        w, h = min(500, sw-40), min(580, sh-40)
         win.geometry(f'{w}x{h}+{(sw//2)-(w//2)}+{(sh//2)-(h//2)}')
         win.resizable(False, False); win.transient(self); win.grab_set()
-        scroll = ctk.CTkScrollableFrame(win, fg_color="transparent")
-        scroll.pack(expand=True, fill="both", padx=10, pady=10)
-        ctk.CTkLabel(scroll, text="Start Your Free Trial", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(0, 5))
-        entries = {}
-        def add_field(p, label, key):
-            ctk.CTkLabel(p, text=label, anchor="w").pack(fill="x")
-            e=ctk.CTkEntry(p); e.pack(fill="x", pady=(0,10)); entries[key]=e
-        add_field(scroll, "Full Name", "full_name")
-        add_field(scroll, "Email", "email")
-        otp_frame = ctk.CTkFrame(scroll, fg_color="transparent")
-        otp_frame.pack(fill="x", pady=(0, 10))
-        entries['otp'] = ctk.CTkEntry(otp_frame, placeholder_text="Enter OTP from Email")
-        entries['otp'].pack(side="left", fill="x", expand=True, padx=(0, 5))
 
-        def send_otp_action():
-            email_val = entries['email'].get().strip()
-            if not email_val or "@" not in email_val:
-                messagebox.showerror("Error", "Enter valid email first", parent=win); return
-            send_otp_btn.configure(state="disabled", text="Sending...")
-            try:
-                resp = self.app_state.http_session.post(f"{config.LICENSE_SERVER_URL}/api/send-otp", json={"identifier": email_val}, timeout=10)
-                if resp.status_code == 200: messagebox.showinfo("OTP Sent", "Check your email for OTP", parent=win)
-                else:
-                    try: reason = resp.json().get("reason", "Failed")
-                    except Exception: reason = f"Server returned status {resp.status_code}"
-                    messagebox.showerror("Error", reason, parent=win)
-            except Exception as e: messagebox.showerror("Error", str(e), parent=win)
-            finally: win.after(30000, lambda: send_otp_btn.configure(state="normal", text="Resend OTP"))
+        outer = ctk.CTkFrame(win, fg_color="transparent")
+        outer.pack(expand=True, fill="both", padx=18, pady=12)
 
-        send_otp_btn = ctk.CTkButton(otp_frame, text="Send OTP", width=100, command=send_otp_action)
-        send_otp_btn.pack(side="right")
-        add_field(scroll, "Mobile", "mobile"); add_field(scroll, "Block", "block"); add_field(scroll, "Pincode", "pincode")
-        ctk.CTkLabel(scroll, text="State", anchor="w").pack(fill="x")
-        state_var = tkinter.StringVar(value="Select a State"); state_menu = ctk.CTkOptionMenu(scroll, values=sorted(list(STATE_DISTRICT_MAP.keys())), variable=state_var); state_menu.pack(fill="x", pady=(0,10)); entries['state']=state_var
-        ctk.CTkLabel(scroll, text="District", anchor="w").pack(fill="x")
-        dist_var = tkinter.StringVar(value="Select State First"); dist_menu = ctk.CTkOptionMenu(scroll, values=["Select State First"], variable=dist_var, state="disabled"); dist_menu.pack(fill="x", pady=(0,10)); entries['district']=dist_var
-        def on_state(s):
-            dists = STATE_DISTRICT_MAP.get(s, [])
-            if dists: dist_menu.configure(values=dists, state="normal"); dist_var.set("Select District")
-            else: dist_menu.configure(state="disabled")
-        state_var.trace_add("write", lambda *args: on_state(state_var.get()))
-        add_field(scroll, "Referral Code (Optional)", "referral_code")
+        # ── Branding header (compact) ──
+        brand = ctk.CTkFrame(outer, fg_color="transparent")
+        brand.pack(fill="x", pady=(0, 8))
+        try:
+            logo_img = ctk.CTkImage(Image.open(resource_path("assets/logo.png")), size=(34, 34))
+            ctk.CTkLabel(brand, image=logo_img, text="").pack(side="left", padx=(0, 8))
+        except Exception:
+            ctk.CTkLabel(brand, text="🎯", font=ctk.CTkFont(size=22)).pack(side="left", padx=(0, 8))
+        text_col = ctk.CTkFrame(brand, fg_color="transparent")
+        text_col.pack(side="left")
+        ctk.CTkLabel(text_col, text="Start Your 30-Day Free Trial",
+                     font=ctk.CTkFont(size=16, weight="bold"), anchor="w").pack(fill="x")
+        ctk.CTkLabel(text_col, text="No payment needed. Full access to most features.",
+                     font=ctk.CTkFont(size=10), text_color="gray60", anchor="w").pack(fill="x")
+
+        # ── Progress bar (shown while submitting) ──
+        progress_bar = ctk.CTkProgressBar(outer, height=4, corner_radius=2, mode="indeterminate")
+        progress_bar.pack(fill="x", pady=(0, 6))
+        progress_bar.pack_forget()
+
+        # ── Shared inline status line ──
+        status_label = ctk.CTkLabel(outer, text="", font=ctk.CTkFont(size=11),
+                                    anchor="w", justify="left", wraplength=w-50)
+        status_label.pack(fill="x", pady=(6, 2))
+
+        # ── Content area (swapped between states) ──
+        content = ctk.CTkFrame(outer, fg_color="transparent")
+        content.pack(expand=True, fill="both")
+
         successful = tkinter.BooleanVar(value=False)
 
-        def submit():
-            data = {k: v.get().strip() for k, v in entries.items()}
-            if not all(data.get(f) for f in ["full_name", "email", "mobile", "state", "otp"]):
-                self.play_sound("error"); messagebox.showwarning("Error", "Missing fields or OTP", parent=win); return
-            data["name"] = data.pop("full_name");            data["machine_id"] = self.app_state.machine_id
-            submit_btn.configure(state="disabled", text="Requesting...")
+        # ══════════════════════════════════════════════════════════════
+        # STATE 1 — Device already registered → only Login / Renew
+        # ══════════════════════════════════════════════════════════════
+        def show_registered_panel():
+            for wgt in content.winfo_children():
+                wgt.destroy()
+
+            ctk.CTkLabel(content, text="⚠️  Device Already Registered",
+                         font=ctk.CTkFont(size=15, weight="bold"),
+                         text_color=config.COLORS["red_expired"]).pack(pady=(10, 2))
+            ctk.CTkLabel(content, text=("This device is already associated with a license.\n"
+                                        "Only one trial is allowed per device."),
+                         font=ctk.CTkFont(size=11), text_color="gray60",
+                         justify="center").pack(pady=(0, 12))
+
+            def _go_login():
+                if on_login:
+                    try:
+                        on_login()
+                    except Exception:
+                        logger.debug("on_login callback failed", exc_info=True)
+                win.destroy()
+
+            def _go_renew():
+                webbrowser.open_new_tab(f"{config.LICENSE_SERVER_URL}/buy")
+
+            login_btn = ctk.CTkButton(content, text="🔑  Login with Email & OTP",
+                                      command=_go_login,
+                                      fg_color=("#2563EB", "#3B82F6"),
+                                      hover_color=("#1D4ED8", "#2563EB"),
+                                      height=38, corner_radius=8,
+                                      font=ctk.CTkFont(size=13, weight="bold"))
+            login_btn.pack(fill="x", padx=10, pady=(0, 8))
+
+            renew_btn = ctk.CTkButton(content, text="🛒  Renew Subscription",
+                                      command=_go_renew,
+                                      fg_color=("#059669", "#10B981"),
+                                      hover_color=("#047857", "#059669"),
+                                      height=38, corner_radius=8,
+                                      font=ctk.CTkFont(size=13, weight="bold"))
+            renew_btn.pack(fill="x", padx=10, pady=(0, 6))
+
+            back_lbl = ctk.CTkLabel(content, text="←  Back", cursor="hand2",
+                                    text_color=("#2563EB", "#60A5FA"),
+                                    font=ctk.CTkFont(size=12))
+            back_lbl.pack(pady=(10, 0))
+            back_lbl.bind("<Button-1>", lambda e: win.destroy())
+
+        # ══════════════════════════════════════════════════════════════
+        # STATE 2 — Compact trial form
+        # ══════════════════════════════════════════════════════════════
+        entries: Dict[str, Any] = {}
+        _dupe_timers: Dict[str, Any] = {}
+        _otp_timer = [None]
+        _otp_remaining = [0]
+
+        def build_form():
+            for wgt in content.winfo_children():
+                wgt.destroy()
+
+            # ── Card container — groups the fields into one polished card ──
+            card = ctk.CTkFrame(content, fg_color=config.COLORS["gray_card_bg"], corner_radius=12)
+            card.pack(expand=True, fill="both", pady=(0, 8))
+            card.grid_columnconfigure(0, weight=1, uniform="f")
+            card.grid_columnconfigure(1, weight=1, uniform="f")
+
+            def _pad(col, span):
+                left = 14 if col == 0 else 3
+                right = 14 if (span == 2 or col == 1) else 3
+                return (left, right)
+
+            def add_field(row, col, label, key, placeholder="", span=1, with_check=False):
+                cell = ctk.CTkFrame(card, fg_color="transparent")
+                cell.grid(row=row, column=col, columnspan=span, sticky="ew",
+                          padx=_pad(col, span), pady=(6, 3))
+                ctk.CTkLabel(cell, text=label, anchor="w",
+                             font=ctk.CTkFont(size=11, weight="bold")).pack(fill="x")
+                entry = ctk.CTkEntry(cell, placeholder_text=placeholder,
+                                     font=ctk.CTkFont(size=12), height=32)
+                entry.pack(fill="x", pady=(2, 0))
+                check = None
+                if with_check:
+                    check = ctk.CTkLabel(cell, text="", font=ctk.CTkFont(size=9), anchor="w")
+                    check.pack(fill="x")
+                entries[key] = entry
+                return entry, check
+
+            def add_menu(row, col, label, key, values, initial, state="normal"):
+                cell = ctk.CTkFrame(card, fg_color="transparent")
+                cell.grid(row=row, column=col, sticky="ew",
+                          padx=_pad(col, 1), pady=(6, 3))
+                ctk.CTkLabel(cell, text=label, anchor="w",
+                             font=ctk.CTkFont(size=11, weight="bold")).pack(fill="x")
+                var = tkinter.StringVar(value=initial)
+                menu = ctk.CTkOptionMenu(cell, values=values, variable=var,
+                                         height=32, font=ctk.CTkFont(size=12), state=state)
+                menu.pack(fill="x", pady=(2, 0))
+                entries[key] = var
+                return var, menu
+
+            # Row 0: Full Name | Mobile Number — both keep a check-label slot
+            # (with_check=True) so the two cells are the SAME height and the
+            # entries align perfectly (grid centers unequal-height cells).
+            _, _ = add_field(0, 0, "Full Name", "name", placeholder="e.g. Ramesh Kumar",
+                             with_check=True)
+            mobile_entry, mobile_check = add_field(0, 1, "Mobile Number", "mobile",
+                                                   placeholder="10-digit mobile",
+                                                   with_check=True)
+
+            # Row 1: Email (full width, with live duplicate check)
+            email_entry, email_check = add_field(1, 0, "Email", "email",
+                                                 placeholder="you@example.com", span=2, with_check=True)
+            if get_config('last_used_email'):
+                email_entry.insert(0, get_config('last_used_email'))
+
+            # Row 2: OTP (full width) + inline Send button
+            otp_cell = ctk.CTkFrame(card, fg_color="transparent")
+            otp_cell.grid(row=2, column=0, columnspan=2, sticky="ew",
+                          padx=_pad(0, 2), pady=(6, 3))
+            ctk.CTkLabel(otp_cell, text="One-Time Passcode", anchor="w",
+                         font=ctk.CTkFont(size=11, weight="bold")).pack(fill="x")
+            otp_inner = ctk.CTkFrame(otp_cell, fg_color="transparent")
+            otp_inner.pack(fill="x", pady=(2, 0))
+            otp_entry = ctk.CTkEntry(otp_inner, placeholder_text="Enter OTP (email / WhatsApp)",
+                                     font=ctk.CTkFont(size=12), height=32)
+            otp_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
+            entries['otp'] = otp_entry
+
+            # Row 3: State | District (dependent dropdowns, aligned together)
+            state_var, state_menu = add_menu(3, 0, "State", "state",
+                                             sorted(list(STATE_DISTRICT_MAP.keys())), "Select a State")
+            dist_var, dist_menu = add_menu(3, 1, "District", "district",
+                                           ["Select State First"], "Select State First", state="disabled")
+
+            def on_state(s):
+                dists = STATE_DISTRICT_MAP.get(s, [])
+                if dists:
+                    dist_menu.configure(values=dists, state="normal")
+                    if dist_var.get() not in dists:
+                        dist_var.set("Select District")
+                else:
+                    dist_menu.configure(state="disabled")
+            state_var.trace_add("write", lambda *args: on_state(state_var.get()))
+
+            # Row 4: Block | Referral Code (optional, both entries, aligned)
+            _, _ = add_field(4, 0, "Block", "block", placeholder="Block name")
+            _, _ = add_field(4, 1, "Referral Code (Optional)", "referral_code",
+                             placeholder="Ask your friend for a code")
+
+            # ── Real-time duplicate checks (debounced) ──
+            def _check_duplicate(field, value, lbl):
+                value = value.strip()
+                if not value:
+                    lbl.configure(text="", text_color="gray60")
+                    return
+                if field == 'email' and '@' not in value:
+                    return
+                if field == 'mobile' and len(value) < 10:
+                    return
+                lbl.configure(text="⏳ Checking availability...", text_color=("gray40", "gray60"))
+
+                def _thread():
+                    try:
+                        resp = self.app_state.http_session.post(
+                            f"{config.LICENSE_SERVER_URL}/api/check-duplicate",
+                            json={"field": field, "value": value}, timeout=8)
+                        res = resp.json()
+                        ok = resp.status_code == 200 and res.get("status") == "success"
+                        reason = res.get("reason", "")
+
+                        def _update():
+                            if not win.winfo_exists():
+                                return
+                            lbl.configure(text=reason,
+                                          text_color=("#059669", "#10B981") if ok else ("#DC2626", "#EF4444"))
+                        self.after(0, _update)
+                    except Exception:
+                        # Silent on network errors; the final check happens at submit time.
+                        pass
+                threading.Thread(target=_thread, daemon=True).start()
+
+            def _debounced_check(field, entry, lbl):
+                def _on_change(*_):
+                    t = _dupe_timers.get(field)
+                    if t:
+                        try:
+                            win.after_cancel(t)
+                        except Exception:
+                            pass
+                    _dupe_timers[field] = win.after(700, lambda: _check_duplicate(field, entry.get(), lbl))
+                return _on_change
+
+            email_entry.bind("<KeyRelease>", _debounced_check('email', email_entry, email_check))
+            mobile_entry.bind("<KeyRelease>", _debounced_check('mobile', mobile_entry, mobile_check))
+
+            # ── OTP send with resend countdown ──
+            def _update_otp_btn():
+                try:
+                    if not send_otp_btn.winfo_exists():
+                        return
+                except Exception:
+                    return
+                if _otp_remaining[0] > 0:
+                    send_otp_btn.configure(state="disabled", text=f"Resend in {_otp_remaining[0]}s")
+                    _otp_remaining[0] -= 1
+                    _otp_timer[0] = win.after(1000, _update_otp_btn)
+                else:
+                    send_otp_btn.configure(state="normal", text="Send OTP")
+
+            def send_otp_action():
+                email_val = email_entry.get().strip()
+                if '@' not in email_val:
+                    self.play_sound("error")
+                    status_label.configure(text="⚠️  Enter a valid email first.",
+                                           text_color=("#DC2626", "#EF4444"))
+                    return
+                send_otp_btn.configure(state="disabled", text="⏳ Sending...")
+                payload: Dict[str, Any] = {"identifier": email_val}
+                mobile_val = mobile_entry.get().strip()
+                if mobile_val and len(mobile_val) >= 10:
+                    payload["mobile"] = mobile_val  # OTP also goes to WhatsApp
+
+                def _thread():
+                    try:
+                        resp = self.app_state.http_session.post(
+                            f"{config.LICENSE_SERVER_URL}/api/send-otp", json=payload, timeout=10)
+                        res = resp.json()
+                        ok = resp.status_code == 200 and res.get("status") == "success"
+                        if ok:
+                            channel = res.get("channel", "email")
+                            msg = "✅  OTP sent to your email" + (" & WhatsApp" if "whatsapp" in channel else "") + "."
+
+                            # Set countdown BEFORE scheduling the callback to avoid a
+                            # race where the main loop runs _success before the value lands.
+                            _otp_remaining[0] = 30
+
+                            def _success():
+                                if not win.winfo_exists():
+                                    return
+                                status_label.configure(text=msg, text_color=("#059669", "#10B981"))
+                                self.play_sound("success")
+                                _update_otp_btn()
+                            self.after(0, _success)
+                        else:
+                            reason = res.get("reason", "Failed")
+
+                            def _fail(r=reason):
+                                if not win.winfo_exists():
+                                    return
+                                self.play_sound("error")
+                                status_label.configure(text=f"❌  {r}", text_color=("#DC2626", "#EF4444"))
+                                send_otp_btn.configure(state="normal", text="Send OTP")
+                            self.after(0, _fail)
+                    except Exception as e:
+                        err = str(e)
+
+                        def _error(err=err):
+                            if not win.winfo_exists():
+                                return
+                            self.play_sound("error")
+                            status_label.configure(text=f"❌  {err}", text_color=("#DC2626", "#EF4444"))
+                            send_otp_btn.configure(state="normal", text="Send OTP")
+                        self.after(0, _error)
+                threading.Thread(target=_thread, daemon=True).start()
+
+            send_otp_btn = ctk.CTkButton(otp_inner, text="Send OTP", width=110, height=30,
+                                         command=send_otp_action, fg_color="gray",
+                                         font=ctk.CTkFont(size=12))
+            send_otp_btn.pack(side="right")
+
+            # ── Submit ──
+            def submit():
+                data: Dict[str, Any] = {
+                    "name": entries['name'].get().strip().title(),
+                    "email": entries['email'].get().strip().lower(),
+                    "mobile": entries['mobile'].get().strip(),
+                    "otp": entries['otp'].get().strip(),
+                    "block": entries['block'].get().strip(),
+                    "state": entries['state'].get(),
+                    "district": entries['district'].get(),
+                    "referral_code": entries['referral_code'].get().strip(),
+                }
+                missing = []
+                if not data['name']:
+                    missing.append("Full Name")
+                if '@' not in data['email']:
+                    missing.append("Email")
+                if len(data['mobile']) < 10:
+                    missing.append("Mobile")
+                if not data['otp']:
+                    missing.append("OTP")
+                if not data['state'] or data['state'] == "Select a State":
+                    missing.append("State")
+                if not data['district'] or data['district'] == "Select District":
+                    missing.append("District")
+                if missing:
+                    self.play_sound("error")
+                    status_label.configure(text=f"⚠️  Please fill: {', '.join(missing)}",
+                                           text_color=("#DC2626", "#EF4444"))
+                    return
+
+                data["machine_id"] = self.app_state.machine_id
+                data["app_version"] = config.APP_VERSION
+                submit_btn.configure(state="disabled", text="⏳ Creating your trial...")
+                progress_bar.pack(fill="x", pady=(0, 6), before=status_label)
+                progress_bar.start()
+                status_label.configure(text="⏳  Activating your free trial...",
+                                       text_color=("#2563EB", "#60A5FA"))
+
+                def _thread():
+                    try:
+                        resp = self.app_state.http_session.post(
+                            f"{config.LICENSE_SERVER_URL}/api/request-trial", json=data, timeout=20)
+                        try:
+                            res = resp.json()
+                        except Exception:
+                            raise Exception(
+                                f"Server returned an unexpected response (status {resp.status_code}). Please try again.")
+
+                        if resp.status_code == 200 and res.get("status") == "success":
+                            def _success():
+                                if not win.winfo_exists():
+                                    return
+                                progress_bar.stop()
+                                progress_bar.pack_forget()
+                                save_config('last_used_email', data['email'])
+                                license_info = {
+                                    'key': res.get("key"),
+                                    'expires_at': res.get("expires_at"),
+                                    'key_type': 'trial',
+                                    'user_name': res.get("user_name") or data['name'],
+                                    'user_email': res.get("user_email") or data['email'],
+                                    'user_mobile': res.get("user_mobile") or data['mobile'],
+                                    'max_devices': res.get("max_devices", 1),
+                                }
+                                self.app_state.license_info.update(license_info)
+                                with open(get_data_path('license.dat'), 'w') as f:
+                                    json.dump(self.app_state.license_info, f)
+                                self.play_sound("success")
+                                status_label.configure(text="✅  Trial activated successfully!",
+                                                       text_color=("#059669", "#10B981"))
+                                successful.set(True)
+                                win.after(500, win.destroy)
+                            self.after(0, _success)
+                        else:
+                            reason = res.get("reason", "Error")
+
+                            def _fail(r=reason):
+                                if not win.winfo_exists():
+                                    return
+                                self.play_sound("error")
+                                progress_bar.stop()
+                                progress_bar.pack_forget()
+                                status_label.configure(text=f"❌  {r}", text_color=("#DC2626", "#EF4444"))
+                                submit_btn.configure(state="normal", text="🎯  Start Free Trial")
+                            self.after(0, _fail)
+                    except Exception as e:
+                        err = str(e)
+
+                        def _error(err=err):
+                            if not win.winfo_exists():
+                                return
+                            self.play_sound("error")
+                            progress_bar.stop()
+                            progress_bar.pack_forget()
+                            status_label.configure(text=f"❌  {err}", text_color=("#DC2626", "#EF4444"))
+                            submit_btn.configure(state="normal", text="🎯  Start Free Trial")
+                        self.after(0, _error)
+                threading.Thread(target=_thread, daemon=True).start()
+
+            submit_btn = ctk.CTkButton(content, text="🎯  Start Free Trial", command=submit,
+                                       fg_color=("#059669", "#10B981"),
+                                       hover_color=("#047857", "#059669"),
+                                       height=38, corner_radius=8,
+                                       font=ctk.CTkFont(size=13, weight="bold"))
+            submit_btn.pack(fill="x", pady=(2, 3))
+
+            ctk.CTkLabel(content,
+                         text="One trial per user/device. Upgrade anytime to unlock all features.",
+                         font=ctk.CTkFont(size=9), text_color="gray60").pack()
+
+        # ══════════════════════════════════════════════════════════════
+        # OPEN: machine pre-check → panel or form
+        # ══════════════════════════════════════════════════════════════
+        checking_lbl = ctk.CTkLabel(content, text="⏳  Checking device status...",
+                                    font=ctk.CTkFont(size=12), text_color="gray60")
+        checking_lbl.pack(pady=(40, 0))
+
+        def _machine_thread():
+            registered = False
             try:
-                resp = self.app_state.http_session.post(f"{config.LICENSE_SERVER_URL}/api/request-trial", json=data, timeout=15)
-                try: res = resp.json()
-                except Exception: raise Exception(f"Server returned an unexpected response (status {resp.status_code}). Please try again.")
-                if resp.status_code == 200 and res.get("status") == "success":
-                    save_config('last_used_email', data['email'])
-                    self.app_state.license_info = {'key': res.get("key"), 'expires_at': res.get('expires_at'), 'user_name': data['name'], 'key_type': 'trial'}
-                    with open(get_data_path('license.dat'), 'w') as f: json.dump(self.app_state.license_info, f)
-                    self.play_sound("success"); messagebox.showinfo("Success", "Trial Started!", parent=win); successful.set(True); win.destroy()
-                else: self.play_sound("error"); messagebox.showerror("Error", res.get("reason", "Error"), parent=win)
-            except Exception as e: self.play_sound("error"); messagebox.showerror("Error", str(e), parent=win)
-            finally:
-                if submit_btn.winfo_exists(): submit_btn.configure(state="normal", text="Start Trial")
+                resp = self.app_state.http_session.post(
+                    f"{config.LICENSE_SERVER_URL}/api/check-duplicate",
+                    json={"field": "machine", "value": self.app_state.machine_id}, timeout=8)
+                registered = resp.status_code == 409
+            except Exception:
+                # Server unreachable → fall through to the form; the server
+                # still enforces the one-trial-per-device rule at submit time.
+                registered = False
 
-        submit_btn = ctk.CTkButton(scroll, text="Start Trial", command=submit); submit_btn.pack(pady=20, fill='x')
-        self.wait_window(win); return successful.get()
+            def _swap():
+                if not win.winfo_exists():
+                    return
+                if registered:
+                    show_registered_panel()
+                else:
+                    build_form()
+            self.after(0, _swap)
 
-    # ------------------------------------------------------------------
-    # PURCHASE, EXPIRY, LOCK/UNLOCK
-    # ------------------------------------------------------------------
+        threading.Thread(target=_machine_thread, daemon=True).start()
+
+        self.wait_window(win)
+        return successful.get()
 
     def show_purchase_window(self, context: str = 'upgrade') -> None:
         if not self.app_state.license_info.get('key'): self.play_sound("error"); messagebox.showerror("Error", "License key missing"); return

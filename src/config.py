@@ -89,7 +89,7 @@ COLORS: Dict[str, ColorValue] = {
     "green_success_bg": "#DCFCE7",    # Success bg light
     "green_success_fg": "#166534",    # Success fg dark
     "green_bg_btn": "#C8E6C9",        # Green button bg light
-    "green_dark_btn": "#1B5E20",      # Green button bg dark
+    "green_dark_btn": "#2E7D32",      # Green button bg dark (softer)
     "green_very_light": "#E8F5E9",   # Green very light
     "green_dashboard": "#4A55A2",      # Dashboard report button
     "green_dashboard_hover": "#5E69B8", # Dashboard report hover
@@ -105,14 +105,14 @@ COLORS: Dict[str, ColorValue] = {
     "red_error": "#EF4444",           # Red error status
     "red_expired": "#E53E3E",         # Red expired/error
     "red_dark_hover": "#7F1D1D",      # Red dark hover
-    "red_text": "#C62828",            # Red text
+    "red_text": "#D32F2F",            # Red text (softer)
     "red_text_light": "#FFCCCC",      # Red light text
     "red_bg": "#FEE2E2",              # Red light bg
     "red_border": "#FECACA",          # Red light border
     "red_bg_alt": "#FEF2F2",          # Red very light bg
     "red_dark_bg": "#450A0A",         # Red dark bg
     "red_very_light": "#FFEBEE",      # Red very light bg
-    "red_dark": "#8B0000",            # Red dark
+    "red_dark": "#B71C1C",            # Red dark (softer)
     "red_dark_bg_alt": "#5c1e1e",     # Fail bg dark
     "red_text_dark": "#991B1B",       # Red dark text
 

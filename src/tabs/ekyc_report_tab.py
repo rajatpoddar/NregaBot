@@ -13,8 +13,8 @@ from src import config
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -32,23 +32,47 @@ class EKycReportTab(BaseAutomationTab):
 
     def _setup_ui(self):
 
-        # --- 1. Input Section ---
-        input_frame = ctk.CTkFrame(self)
-        input_frame.pack(fill="x", padx=10, pady=10)
+        # ── Header card (pack-managed wrapper — tab uses pack layout) ──
+        header_wrap = ctk.CTkFrame(self, fg_color="transparent")
+        header_wrap.pack(fill="x", padx=0, pady=0)
+        self._create_header_card(header_wrap, "📇", "eKYC Report",
+                                 "Scan eKYC & ABPS status for jobcard holders — panchayat-wise summary.",
+                                 icon_key="emoji_ekyc_report")
+
+        # ── Main tab view at the top: Settings / Results / Logs & Status ──
+        self.tab_view = ctk.CTkTabview(self)
+        self.tab_view.pack(fill="both", expand=True, padx=10, pady=(6, 5))
+
+        settings_tab = self.tab_view.add("Settings")
+        results_tab = self.tab_view.add("Results")
+        self._create_log_and_status_area(self.tab_view)
+
+        settings_tab.grid_columnconfigure(0, weight=1)
+        settings_tab.grid_rowconfigure(2, weight=1)
+        results_tab.grid_columnconfigure(0, weight=1)
+        results_tab.grid_rowconfigure(0, weight=1)
+
+        # --- Settings: Input Section ---
+        input_frame = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
+                                   border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        input_frame.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
+        input_frame.grid_columnconfigure(1, weight=1)
+        input_frame.grid_columnconfigure(3, weight=1)
+        input_frame.grid_columnconfigure(5, weight=1)
 
         # Panchayat Input (Autocomplete Linked to Global History)
         ctk.CTkLabel(input_frame, text="Panchayat:").grid(row=0, column=0, padx=(10, 5), pady=10, sticky="w")
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals, width=140)
-        self.panchayat_menu.grid(row=0, column=1, padx=5, pady=10)
+        self.panchayat_menu.grid(row=0, column=1, padx=5, pady=10, sticky="ew")
 
         # Village Input (Autocomplete Linked to Global History)
         ctk.CTkLabel(input_frame, text="Village:").grid(row=0, column=2, padx=(10, 5), pady=10, sticky="w")
         v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
         self.village_var = ctk.StringVar()
         self.village_menu = ctk.CTkOptionMenu(input_frame, variable=self.village_var, values=v_vals, width=140)
-        self.village_menu.grid(row=0, column=3, padx=5, pady=10)
+        self.village_menu.grid(row=0, column=3, padx=5, pady=10, sticky="ew")
 
         # Filter villages when panchayat changes
         def _on_panchayat_change(*_):
@@ -66,37 +90,31 @@ class EKycReportTab(BaseAutomationTab):
         self.filter_var = ctk.StringVar(value="All")
         self.filter_var.trace_add("write", lambda *_: self.apply_filter_visuals())
         self.filter_menu = ctk.CTkOptionMenu(input_frame, variable=self.filter_var, values=["All", "Verified (Yes)", "Not Verified (No)"], width=130)
-        self.filter_menu.grid(row=0, column=5, padx=5, pady=10)
+        self.filter_menu.grid(row=0, column=5, padx=5, pady=10, sticky="ew")
 
-        note_label = ctk.CTkLabel(self, text="ℹ️ Note: Leave Panchayat empty for ALL panchayats to scan all.", 
+        note_label = ctk.CTkLabel(settings_tab, text="💡 Note: Leave Panchayat empty for ALL panchayats to scan all.",
                                   text_color=("gray40", "gray70"), font=("Arial", 11, "italic"))
-        note_label.pack(anchor="w", padx=20, pady=(0, 5))
+        note_label.grid(row=1, column=0, sticky="w", padx=20, pady=(6, 4))
 
-        # --- Stats Frame (per-panchayat summary) ---
-        self.stats_frame = ctk.CTkFrame(self)
-        self.stats_frame.pack(fill="x", padx=10, pady=(0, 5))
+        # --- Settings: Stats Frame (per-panchayat summary) ---
+        self.stats_frame = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
+                                        border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        self.stats_frame.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 5))
+        self.stats_frame.grid_columnconfigure(0, weight=1)
         self.stats_label_header = ctk.CTkLabel(self.stats_frame, text="📊 Panchayat-wise Summary:", font=("Arial", 11, "bold"))
         self.stats_label_header.pack(anchor="w", padx=10, pady=(5, 2))
         self.stats_text = ctk.CTkLabel(self.stats_frame, text="(No data yet)", font=("Arial", 10), justify="left", wraplength=900)
         self.stats_text.pack(anchor="w", padx=15, pady=(0, 5))
 
-        # --- 2. Action Buttons ---
-        self._create_action_buttons(self).pack(fill="x", padx=10, pady=5)
+        # --- Settings: Action Buttons + Export (outside any card) ---
+        self._create_action_buttons(parent_frame=settings_tab).grid(row=3, column=0, pady=(8, 4))
         
-        self.export_btn = ctk.CTkButton(self, text="📥 Export to Excel", command=self.export_professional_report, 
+        self.export_btn = ctk.CTkButton(settings_tab, text="📥 Export to Excel", command=self.export_professional_report, 
                                         state="disabled", fg_color=config.COLORS["green_export"])
-        self.export_btn.pack(pady=5)
-
-        # --- 3. Tabs (Results & Logs) ---
-        self.tab_view = ctk.CTkTabview(self)
-        self.tab_view.pack(fill="both", expand=True, padx=10, pady=5)
-        
-        self.tab_view.add("Results")
-        self._create_log_and_status_area(self.tab_view)
+        self.export_btn.grid(row=4, column=0, pady=(0, 10))
 
         # --- Results Table ---
-        result_frame = self.tab_view.tab("Results")
-        
+        result_frame = results_tab
         columns = ("sno", "panchayat", "village", "jobcard", "name", "abps_status", "ekyc_status")
         self.tree = ttk.Treeview(result_frame, columns=columns, show="headings", selectmode="browse")
         

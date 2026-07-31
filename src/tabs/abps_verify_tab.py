@@ -12,8 +12,8 @@ from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -21,13 +21,19 @@ class AbpsVerifyTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="abps_verify")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(3, weight=1)
         self._create_widgets()
     def _create_widgets(self) -> None:
 
+        # ── Header card ──
+        self._create_header_card(self, "✅", "Verify ABPS",
+                                 "Verify ABPS (UID-linked) accounts for jobcard holders in bulk.",
+                                 icon_key="emoji_verify_abps")
+
         # --- Controls Frame ---
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 6))
         controls_frame.grid_columnconfigure((1, 3), weight=1)
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=0, sticky="w", padx=15, pady=(15, 5))
@@ -54,15 +60,15 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # --- Note for auto-mode ---
-        ctk.CTkLabel(controls_frame, text="ℹ️ Leave Village empty to process all villages automatically.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky="w", padx=15, pady=(0, 15))
+        ctk.CTkLabel(controls_frame, text="💡 Leave Village empty to process all villages automatically.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky="w", padx=15, pady=(0, 15))
 
-        # --- Action Buttons ---
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=2, column=0, columnspan=4, sticky="ew", pady=15, padx=15)
+        # --- Action Buttons (OUTSIDE the card) ---
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
 
         # --- Results and Logs ---
         notebook = ctk.CTkTabview(self)
-        notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         results_frame = notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=notebook)
 

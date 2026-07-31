@@ -19,8 +19,8 @@ logger = get_logger()
 from .base_tab import BaseAutomationTab
 from src import config  # <-- Make sure config is imported
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException, Alignment, Border, Font, PatternFill, Side, pd  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 import pandas as pd
 from webdriver_manager.chrome import ChromeDriverManager
@@ -30,7 +30,7 @@ class MrTrackingTab(BaseAutomationTab):
         super().__init__(parent, app_instance, automation_key="mr_tracking")
         
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1) # Main notebook takes up space
+        self.grid_rowconfigure(3, weight=1) # Main notebook takes up space
         
         self.report_headers = [
             "SNo.", "Panchayat Name", "Muster roll number", "Technical Staff (Designation)", 
@@ -50,9 +50,15 @@ class MrTrackingTab(BaseAutomationTab):
         self.load_inputs()
     def _create_widgets(self) -> None:
 
+        # ── Header card ──
+        self._create_header_card(self, "📍", "MR Tracking",
+                                 "Track muster-roll status, pendency and ABPS — with one-click actions.",
+                                 icon_key="emoji_mr_tracking")
+
         # Frame for all user input controls
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="new", padx=10, pady=10)
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        controls_frame.grid(row=1, column=0, sticky="new", padx=10, pady=(0, 6))
         # Configure 4 columns for compact layout
         controls_frame.grid_columnconfigure(1, weight=1)
         controls_frame.grid_columnconfigure(3, weight=1)
@@ -130,13 +136,13 @@ class MrTrackingTab(BaseAutomationTab):
 
 
 
-        # --- Row 3: Action Buttons ---
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=3, column=0, columnspan=4, pady=10)
+        # --- Row 3: Action Buttons (OUTSIDE the card) ---
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
 
         # --- Output Tabs ---
         notebook = ctk.CTkTabview(self)
-        notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         workcode_tab = notebook.add("Workcode List")
         results_tab = notebook.add("Results Table")
         abps_results_tab = notebook.add("ABPS Pendency Results") 

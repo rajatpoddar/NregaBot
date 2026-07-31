@@ -17,11 +17,17 @@ class MacroManagerTab(BaseAutomationTab):
         self._create_widgets()
     def _create_widgets(self) -> None:
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=1)
+
+        # ── Header card ──
+        self._create_header_card(self, "🔁", "Macro Manager",
+                                 "Chain multiple automations into one queue and run them back-to-back.",
+                                 icon_key="emoji_tools")
 
         # --- 1. Control Panel ---
-        control_frame = ctk.CTkFrame(self)
-        control_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        control_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                     border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        control_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 6))
         control_frame.grid_columnconfigure(1, weight=1)
 
         # Task Selector
@@ -56,9 +62,9 @@ class MacroManagerTab(BaseAutomationTab):
         self.instruction_label = ctk.CTkLabel(control_frame, text="Tip: Ensure 'State/Block' are selected.", text_color="gray60", font=ctk.CTkFont(size=11))
         self.instruction_label.grid(row=2, column=1, sticky="w", padx=10, pady=(0,10))
 
-        # --- 2. Action Buttons ---
+        # --- 2. Action Buttons (OUTSIDE the card) ---
         action_frame = ctk.CTkFrame(self, fg_color="transparent")
-        action_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
         
         self.start_btn = ctk.CTkButton(action_frame, text="▶ Run Macro Queue", fg_color="#2E7D32", hover_color="#1B5E20", height=40, font=ctk.CTkFont(size=14, weight="bold"), command=self.start_macro)
         self.start_btn.pack(side="left", fill="x", expand=True, padx=5)
@@ -68,7 +74,7 @@ class MacroManagerTab(BaseAutomationTab):
 
         # --- 3. Queue & Logs Notebook ---
         self.notebook = ctk.CTkTabview(self)
-        self.notebook.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         
         queue_tab = self.notebook.add("Execution Queue")
         self._create_log_and_status_area(parent_notebook=self.notebook)

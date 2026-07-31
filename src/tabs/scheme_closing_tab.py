@@ -15,15 +15,15 @@ from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Keys, Select, WebDriverWait, EC, NoAlertPresentException, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class SchemeClosingTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="scheme_closing")
         
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
         self.skip_confirmation_var = tkinter.BooleanVar(value=False)
         
@@ -34,10 +34,29 @@ class SchemeClosingTab(BaseAutomationTab):
         main_container = ctk.CTkFrame(self, fg_color="transparent")
         main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         main_container.grid_columnconfigure(0, weight=1)
+        main_container.grid_rowconfigure(0, weight=1)
 
-        # --- Input Frame ---
-        input_frame = ctk.CTkFrame(main_container)
-        input_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        # --- Notebook on top: Settings | Work Codes | Results | Logs ---
+        notebook = ctk.CTkTabview(main_container)
+        notebook.grid(row=0, column=0, sticky="nsew")
+        settings_tab = notebook.add("Settings")
+        work_codes_tab = notebook.add("Work Codes to Close")
+        results_tab = notebook.add("Results")
+        self._create_log_and_status_area(notebook)
+
+        # ════════════════ SETTINGS TAB ════════════════
+        settings_tab.grid_columnconfigure(0, weight=1)
+        settings_tab.grid_rowconfigure(1, weight=1)
+
+        # --- Header / intro card (pending-bills style) ---
+        self._create_header_card(settings_tab, "🏁", "Scheme Closing",
+                                 "Close schemes by filling completion details for the selected Panchayat.",
+                                 icon_key="emoji_scheme_closing")
+
+        # --- Input Card ---
+        input_frame = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
+                                   border_color=("gray85", "gray30"))
+        input_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
         input_frame.grid_columnconfigure(1, weight=1)
 
         # Row 0: Panchayat
@@ -110,20 +129,11 @@ class SchemeClosingTab(BaseAutomationTab):
         )
         self.skip_confirm_checkbox.pack(side="left", padx=(20, 0))
 
-        # Action Buttons (Row 1 of Main Container)
-        action_frame = self._create_action_buttons(main_container)
-        action_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
+        # Action Buttons (outside the card)
+        action_frame = self._create_action_buttons(settings_tab)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=5)
 
-        # Data Notebook (Row 2 of Main Container - Moved Up)
-        notebook = ctk.CTkTabview(main_container)
-        notebook.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
-        
-        work_codes_tab = notebook.add("Work Codes to Close")
-        results_tab = notebook.add("Results")
-        self._create_log_and_status_area(notebook)
-        
-        # ... (Rest of the logic remains same below) ...
-        
+        # ════════════════ WORK CODES TAB ════════════════
         work_codes_tab.grid_columnconfigure(0, weight=1)
         work_codes_tab.grid_rowconfigure(1, weight=1)
 

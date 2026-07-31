@@ -9,22 +9,28 @@ from src import config
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class ResendRejectedWgTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="resend_wg")
         
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=1)
         
         self._create_widgets()
     def _create_widgets(self) -> None:
 
-        # Frame for user controls
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        # ── Header card ──
+        self._create_header_card(self, "📤", "Resend Rejected Wagelist",
+                                 "Resend wagelists that were rejected by the portal, for the selected year.",
+                                 icon_key="emoji_resend_wg")
+
+        # Frame for user controls (bordered card)
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # Financial Year
@@ -52,15 +58,13 @@ class ResendRejectedWgTab(BaseAutomationTab):
         )
         self.process_all_checkbox.grid(row=2, column=1, padx=15, pady=(5,15), sticky="w")
 
-        # Action Buttons
-        action_frame_container = ctk.CTkFrame(self)
-        action_frame_container.grid(row=1, column=0, sticky="ew", padx=10, pady=(0,10))
-        action_frame = self._create_action_buttons(parent_frame=action_frame_container)
-        action_frame.pack(expand=True, fill='x')
+        # Action Buttons (OUTSIDE the card)
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=6)
 
         # Results and Logs
         data_notebook = ctk.CTkTabview(self)
-        data_notebook.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0,10))
+        data_notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0,10))
         results_tab = data_notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=data_notebook)
 
@@ -111,7 +115,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
         
         inputs = {
             'fin_year': self.fin_year_var.get(),
-            'panchayat': self.panchayat_entry.get().strip(),
+            'panchayat': self.panchayat_var.get().strip(),
             'process_all': self.process_all_var.get()
         }
 

@@ -10,8 +10,8 @@ from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoAlertPresentException, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -23,7 +23,7 @@ class MrFillTab(BaseAutomationTab):
     """
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="mr_fill")
-        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(3, weight=1)
         
         # --- Config file for saving inputs ---
         self.config_file = self.app.get_data_path("mr_fill_inputs.json")
@@ -44,15 +44,21 @@ class MrFillTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         """Creates all the UI elements for the tab."""
-        
-        # --- Configuration Frame ---
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+
+        # --- Header / intro card (pending-bills style) ---
+        self._create_header_card(self, "📝", "MR Fill",
+                                 "Mark holiday columns and fill Muster Roll attendance for the selected Panchayat.",
+                                 icon_key="emoji_mr_fill")
+
+        # --- Configuration Card ---
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
         controls_frame.grid_columnconfigure((0, 1), weight=1)
         
         # Panchayat Entry
         panchayat_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        panchayat_frame.grid(row=0, column=0, sticky='ew', padx=15, pady=(10,0))
+        panchayat_frame.grid(row=0, column=0, sticky='ew', padx=15, pady=(12,0))
         ctk.CTkLabel(panchayat_frame, text="Panchayat Name", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
@@ -62,7 +68,7 @@ class MrFillTab(BaseAutomationTab):
         
         # Holiday Columns Entry
         holiday_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        holiday_frame.grid(row=0, column=1, sticky='ew', padx=15, pady=(10,0))
+        holiday_frame.grid(row=0, column=1, sticky='ew', padx=15, pady=(12,0))
         ctk.CTkLabel(holiday_frame, text="Mark Holiday Columns (comma-separated)", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         self.holiday_cols_entry = ctk.CTkEntry(holiday_frame, textvariable=self.holiday_cols_var) # Link to variable
         self.holiday_cols_entry.pack(fill='x', pady=(5,0))
@@ -74,15 +80,15 @@ class MrFillTab(BaseAutomationTab):
             text="Manual Mode (Pause after marking holidays for you to mark absentees)",
             variable=self.manual_mode_var # Link to variable
         )
-        self.manual_mode_checkbox.grid(row=1, column=0, columnspan=2, sticky='w', padx=15, pady=(10,0))
+        self.manual_mode_checkbox.grid(row=1, column=0, columnspan=2, sticky='w', padx=15, pady=(10,15))
 
-        # Action Buttons (Start, Stop, Reset)
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(15, 15))
+        # Action Buttons (Start, Stop, Reset) — outside the card
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 10))
 
         # --- Data Tabs (Work Codes, Results, Logs) ---
         data_notebook = ctk.CTkTabview(self)
-        data_notebook.grid(row=1, column=0, sticky="nsew")
+        data_notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         work_codes_frame = data_notebook.add("Work Codes")
         results_frame = data_notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=data_notebook)

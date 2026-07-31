@@ -9,8 +9,8 @@ from src import config
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -226,11 +226,17 @@ class DemandTab(BaseAutomationTab):
         self._create_log_and_status_area(notebook)
 
         settings_tab.grid_columnconfigure(0, weight=1)
-        settings_tab.grid_rowconfigure(0, weight=1)
+        settings_tab.grid_rowconfigure(1, weight=1)
 
-        # Wrap ALL settings content in a scrollable frame so nothing gets cut off
-        settings_scroll = ctk.CTkScrollableFrame(settings_tab, fg_color="transparent")
-        settings_scroll.grid(row=0, column=0, sticky="nsew")
+        # ── Header card ──
+        self._create_header_card(settings_tab, "📥", "Demand",
+                                 "Create work demands for the selected applicants on the portal.",
+                                 icon_key="emoji_demand")
+
+        # Wrap ALL settings content in a bordered scrollable card
+        settings_scroll = ctk.CTkScrollableFrame(settings_tab, corner_radius=12,
+                                                 border_width=1, border_color=("gray85", "gray30"))
+        settings_scroll.grid(row=1, column=0, sticky="nsew", padx=12, pady=6)
         settings_scroll.grid_columnconfigure(0, weight=1)
 
         # All content goes into settings_scroll, not settings_tab directly
@@ -309,14 +315,9 @@ class DemandTab(BaseAutomationTab):
         
         # --- END Row 3 ---
 
-        # Start/Stop/Reset buttons
-        buttons_frame = ctk.CTkFrame(content); buttons_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
-        buttons_frame.grid_columnconfigure(0, weight=1)
-        action_buttons = self._create_action_buttons(buttons_frame); action_buttons.pack(expand=True, fill="x")
-
         # Applicant selection frame
         applicant_frame = ctk.CTkFrame(content)
-        applicant_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 10))
+        applicant_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
         applicant_frame.grid_columnconfigure(0, weight=1)
         applicant_frame.grid_rowconfigure(2, weight=1)
 
@@ -421,6 +422,10 @@ class DemandTab(BaseAutomationTab):
 
         self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side='left')
+
+        # ── Action buttons (OUTSIDE the card) ──
+        action_buttons = self._create_action_buttons(parent_frame=settings_tab)
+        action_buttons.grid(row=2, column=0, sticky="ew", padx=12, pady=6)
 
         self._setup_results_treeview()
 

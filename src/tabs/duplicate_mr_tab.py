@@ -14,8 +14,8 @@ from src import config
 from .base_tab import BaseAutomationTab
 from src.utils import truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class DuplicateMrTab(BaseAutomationTab):
     """
@@ -37,10 +37,16 @@ class DuplicateMrTab(BaseAutomationTab):
         main_container = ctk.CTkFrame(self, fg_color="transparent")
         main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         main_container.grid_columnconfigure(0, weight=1)
-        main_container.grid_rowconfigure(1, weight=1)
+        main_container.grid_rowconfigure(3, weight=1)
 
-        input_frame = ctk.CTkFrame(main_container)
-        input_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        # ── Header card ──
+        self._create_header_card(main_container, "🖨️", "Duplicate MR Print",
+                                 "Print or save duplicate Muster Rolls for the selected Panchayat.",
+                                 icon_key="emoji_duplicate_mr")
+
+        input_frame = ctk.CTkFrame(main_container, corner_radius=12, border_width=1,
+                                   border_color=("gray85", "gray30"))
+        input_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
         input_frame.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=10, sticky="w")
@@ -72,13 +78,14 @@ class DuplicateMrTab(BaseAutomationTab):
         self.scale_label.grid(row=0, column=1, padx=(10, 0))
         
         # --- NEW INFO LABEL ---
-        ctk.CTkLabel(input_frame, text="ℹ️ Generated PDFs saved in 'Downloads/NregaBot/DuplicateMR_Output/{panchayat}/{date}'.", text_color="gray50").grid(row=4, column=1, sticky='w', padx=15, pady=(0,5))
+        ctk.CTkLabel(input_frame, text="💡 Generated PDFs saved in 'Downloads/NregaBot/DuplicateMR_Output/{panchayat}/{date}'.", text_color="gray50").grid(row=4, column=1, sticky='w', padx=15, pady=(0,5))
         
-        action_frame = self._create_action_buttons(input_frame)
-        action_frame.grid(row=5, column=0, columnspan=2, sticky="ew", padx=15, pady=(10, 15)) # <-- Row changed to 5
+        # ── Action buttons (OUTSIDE the card) ──
+        action_frame = self._create_action_buttons(parent_frame=main_container)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=6)
 
         notebook = ctk.CTkTabview(main_container)
-        notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=10)
         
         work_codes_tab = notebook.add("Work Codes")
         results_tab = notebook.add("Results")

@@ -1,8 +1,9 @@
 # src/tabs/_imports.py
 #
-# Shared imports for all automation tabs.
-# Tabs do:  from ._imports import *
-# at module level instead of repeating lazy imports in every method body.
+# Shared import hub for automation tabs.
+# Tabs import only the names they actually use, e.g.:
+#     from ._imports import By, Select, WebDriverWait, EC  # noqa: F401
+# (previously `from ._imports import *` — migrated by scripts/migrate_explicit_imports.py)
 #
 # ⚠️ These imports are resolved when the tab module is first loaded.
 # Since tab_config.py lazy-imports tab modules via _lazy_import(), this

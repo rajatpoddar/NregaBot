@@ -39,6 +39,25 @@ class LazyIconManager:
                     return default
         return default
 
+    def get_sized(self, name: str, size: Tuple[int, int], default: Any = None) -> Any:
+        """Load an icon at a custom size (fresh decode, not the definition size).
+
+        Unlike get(), this always re-decodes the image at the requested size
+        instead of returning the cached definition-size icon. Used when the
+        same icon needs a larger rendition (e.g. tab header cards at 20x20
+        while the sidebar uses 16x16).
+        """
+        for n, path, _ in self._definitions:
+            if n == name:
+                try:
+                    full_path = resource_path(path)
+                    return ctk.CTkImage(Image.open(full_path), size=size)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning(f"Icon load failed '{name}' from {path}: {e}")
+                    return default
+        return default
+
     def clear_cache(self) -> None:
         """M2: Clear all cached CTkImage objects.
         

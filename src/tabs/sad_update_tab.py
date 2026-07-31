@@ -8,8 +8,8 @@ import threading
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Keys, Select, WebDriverWait, EC, TimeoutException, openpyxl  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -30,26 +30,30 @@ class SadUpdateTab(BaseAutomationTab):
         self.load_inputs()
     def _create_widgets(self) -> None:
 
-        # --- Top Frame: Title & Action Selection ---
-        top_frame = ctk.CTkFrame(self.main_scroll, fg_color="transparent")
-        top_frame.pack(fill="x", padx=10, pady=10)
+        # ── Header card ──
+        # main_scroll children are pack-managed, so wrap the header (grid-based)
+        # in a pack-managed container to avoid mixing geometry managers.
+        header_wrap = ctk.CTkFrame(self.main_scroll, fg_color="transparent")
+        header_wrap.pack(fill="x", padx=0, pady=0)
+        self._create_header_card(header_wrap, "🔄", "SAD Update Status",
+                                 "Update / dispose Sarkar Aapke Dwar applications in bulk.",
+                                 icon_key="emoji_update_outcome")
 
-        ctk.CTkLabel(top_frame, text="Sarkar Aapke Dwar - Update Status / Disposal", 
-                     font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w")
+        # Action Selection (inside a small bordered row)
+        action_container = ctk.CTkFrame(self.main_scroll, corner_radius=10, border_width=1,
+                                        border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        action_container.pack(fill="x", padx=12, pady=(0, 4))
+        action_container.grid_columnconfigure(1, weight=1)
 
-        note_text = ("Smart Mode: Automatically extracts '1905/375853' from full codes.\n"
-                     "If Dropdown is missing (Already Disposed), it skips immediately.")
-        ctk.CTkLabel(top_frame, text=note_text, text_color="gray60", 
-                     font=("Arial", 11), justify="left").pack(anchor="w", pady=(0, 5))
-
-        # Action Selection
-        action_container = ctk.CTkFrame(top_frame)
-        action_container.pack(fill="x", pady=5)
-        
-        ctk.CTkLabel(action_container, text="Select Action:").pack(side="left", padx=10)
+        ctk.CTkLabel(action_container, text="💡 Select Action:", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, padx=12, pady=8, sticky="w")
         self.action_var = ctk.StringVar(value="Dispose")
         self.action_menu = ctk.CTkOptionMenu(action_container, variable=self.action_var, values=["Dispose", "Reject", "In Progress", "Pending"], width=200)
-        self.action_menu.pack(side="left", padx=5)
+        self.action_menu.grid(row=0, column=1, padx=12, pady=8, sticky="ew")
+
+        note_text = ("💡 Smart Mode: Automatically extracts '1905/375853' from full codes.\n"
+                     "💡 If Dropdown is missing (Already Disposed), it skips immediately.")
+        ctk.CTkLabel(self.main_scroll, text=note_text, text_color="gray60", 
+                     font=("Arial", 11), justify="left").pack(anchor="w", padx=16, pady=(2, 4))
 
         # --- Main TabView (Inputs + Results + Logs) ---
         self.main_tabs = ctk.CTkTabview(self.main_scroll, height=400)
@@ -81,7 +85,7 @@ class SadUpdateTab(BaseAutomationTab):
         self.file_entry.grid(row=0, column=1, sticky="ew", padx=10, pady=20)
         ctk.CTkButton(file_tab, text="Browse", width=80, command=self.browse_file).grid(row=0, column=2, padx=10, pady=20)
         
-        ctk.CTkLabel(file_tab, text="ℹ️ Bot will scan all columns for pattern X/Y/Z/A automatically.", 
+        ctk.CTkLabel(file_tab, text="💡 Bot will scan all columns for pattern X/Y/Z/A automatically.", 
                      text_color="gray50").grid(row=1, column=0, columnspan=3, sticky="w", padx=10)
 
         # TAB 3: Results (Treeview)

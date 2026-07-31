@@ -171,7 +171,7 @@ class PendingBillsTab(BaseAutomationTab):
         info.grid(row=2, column=0, sticky="nsew", padx=12, pady=6)
         info.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
-            info, text="ℹ️ How it works",
+            info, text="💡 How it works",
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 2))

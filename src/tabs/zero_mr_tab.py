@@ -10,21 +10,27 @@ from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class ZeroMrTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="zero_mr")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(3, weight=1)
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
 
-        # Frame for all user input controls
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
+        # --- Header / intro card (P7.2: pending-bills style) ---
+        self._create_header_card(self, "🔢", "Zero MR",
+                                 "Generate a zero-value Muster Roll for works with no payments.",
+                                 icon_key="emoji_zero_mr")
+
+        # Frame for all user input controls (bordered card)
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 0))
         controls_frame.grid_columnconfigure((1, 3), weight=1)
 
         # --- Row 0: Financial Year ---
@@ -43,13 +49,13 @@ class ZeroMrTab(BaseAutomationTab):
         self.panchayat_menu.grid(row=1, column=1, columnspan=3, sticky='ew', padx=15, pady=5)
 
 
-        # --- Row 3: Action Buttons ---
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=3, column=0, columnspan=4, sticky='ew', pady=15)
+        # --- Row 3: Action Buttons (outside the card) ---
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
 
         # --- Data Tabs (Work List, Results, Logs) ---
         data_notebook = ctk.CTkTabview(self)
-        data_notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        data_notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         work_list_tab = data_notebook.add("Work List")
         results_tab = data_notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=data_notebook)
@@ -510,7 +516,7 @@ class ZeroMrTab(BaseAutomationTab):
             messagebox.showerror("Data Error", "Received data is missing Panchayat name.", parent=self)
             return
             
-        self.panchayat_entry.insert(0, target_panchayat)
+        self.panchayat_var.set(target_panchayat)
         self.log_info(f"Set Panchayat to: {target_panchayat}")
 
         work_list_entries = []
@@ -572,5 +578,4 @@ class ZeroMrTab(BaseAutomationTab):
         if saved_fin_year:
             if saved_fin_year in self.fin_year_menu.cget("values"):
                 self.fin_year_menu.set(saved_fin_year)
-        self.panchayat_var.set("")
-        self.panchayat_entry.insert(0, data.get('panchayat_name', ''))
+        self.panchayat_var.set(data.get('panchayat_name', ''))

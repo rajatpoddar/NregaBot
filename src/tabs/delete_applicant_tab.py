@@ -9,8 +9,8 @@ from datetime import datetime
 from src import config
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException, openpyxl  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 # Excel export imports
 try:
@@ -22,7 +22,7 @@ class DeleteApplicantTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="delete_applicant")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
         self.selected_items = set()
         self.excel_panchayat = ""
         self._logged_keys = set()  # dedup: (jobcard_upper, name_upper, status)
@@ -45,11 +45,17 @@ class DeleteApplicantTab(BaseAutomationTab):
         main = ctk.CTkFrame(self, fg_color="transparent")
         main.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         main.grid_columnconfigure(0, weight=1)
-        main.grid_rowconfigure(5, weight=1)  # notebook expands
+        main.grid_rowconfigure(6, weight=1)  # notebook expands
 
-        # ── Row 0: Two dropdowns side by side ──
-        dd_frame = ctk.CTkFrame(main)
-        dd_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
+        # ── Header / intro card (pending-bills style) ──
+        self._create_header_card(main, "🗑️", "Delete Applicant",
+                                 "Delete eKYC applicants from an Excel list — auto-match, select, and delete.",
+                                 icon_key="emoji_delete_applicant")
+
+        # ── Row 1: Two dropdowns side by side (bordered card) ──
+        dd_frame = ctk.CTkFrame(main, corner_radius=12, border_width=1,
+                                border_color=("gray85", "gray30"))
+        dd_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
         dd_frame.grid_columnconfigure((1, 3), weight=1)
 
         ctk.CTkLabel(dd_frame, text="App. Reason:",
@@ -72,9 +78,10 @@ class DeleteApplicantTab(BaseAutomationTab):
                                                  values=reg_reason_opts, width=220, height=32)
         self.reg_reason_menu.grid(row=0, column=3, padx=5, pady=8, sticky="w")
 
-        # ── Row 1: Excel upload + status + select buttons ──
-        mid_frame = ctk.CTkFrame(main)
-        mid_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 5))
+        # ── Row 2: Excel upload + status + select buttons (bordered card) ──
+        mid_frame = ctk.CTkFrame(main, corner_radius=12, border_width=1,
+                                 border_color=("gray85", "gray30"))
+        mid_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 5))
         mid_frame.grid_columnconfigure(2, weight=1)
 
         self.upload_btn = ctk.CTkButton(mid_frame, text="📁 Browse eKYC Excel",
@@ -99,9 +106,9 @@ class DeleteApplicantTab(BaseAutomationTab):
             state="disabled", font=ctk.CTkFont(size=12))
         self.deselect_all_btn.grid(row=0, column=4, padx=(0, 15), pady=6, sticky="e")
 
-        # ── Row 2: Info bar ──
+        # ── Row 3: Info bar ──
         info_bar = ctk.CTkFrame(main, fg_color=("gray95", "gray20"), height=32)
-        info_bar.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 5))
+        info_bar.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 5))
         info_bar.grid_columnconfigure(0, weight=1)
 
         self.info_lbl = ctk.CTkLabel(info_bar,
@@ -109,18 +116,18 @@ class DeleteApplicantTab(BaseAutomationTab):
             font=ctk.CTkFont(size=12), text_color=("gray40", "gray60"), anchor="w")
         self.info_lbl.grid(row=0, column=0, sticky="w", padx=15, pady=4)
 
-        # ── Row 3: Select count ──
+        # ── Row 4: Select count ──
         self.sel_count_lbl = ctk.CTkLabel(main,
             text="Selected: 0 / 0  —  Click any row to toggle ☐/☑",
             font=ctk.CTkFont(size=12), text_color=("gray50", "gray60"), anchor="w")
-        self.sel_count_lbl.grid(row=3, column=0, sticky="w", padx=25, pady=(0, 2))
+        self.sel_count_lbl.grid(row=4, column=0, sticky="w", padx=25, pady=(0, 2))
 
-        # ── Row 4: Action Buttons ──
-        self._create_action_buttons(main).grid(row=4, column=0, sticky="ew", padx=10, pady=5)
+        # ── Row 5: Action Buttons ──
+        self._create_action_buttons(main).grid(row=5, column=0, sticky="ew", padx=10, pady=5)
 
-        # ── Row 5: Notebook ──
+        # ── Row 6: Notebook ──
         notebook = ctk.CTkTabview(main)
-        notebook.grid(row=5, column=0, sticky="nsew", padx=10, pady=5)
+        notebook.grid(row=6, column=0, sticky="nsew", padx=10, pady=5)
 
         # --- Tab: 📋 Loaded Data ---
         dt = notebook.add("📋 Loaded Data")

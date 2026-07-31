@@ -11,8 +11,8 @@ from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException, UnexpectedAlertPresentException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -23,14 +23,20 @@ class EmbVerifyTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="emb_verify")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1) 
+        self.grid_rowconfigure(3, weight=1) 
         self._create_widgets()
     def _create_widgets(self) -> None:
 
         """Creates the user interface elements for the tab."""
-        # --- Top Frame for Configuration ---
-        config_frame = ctk.CTkFrame(self)
-        config_frame.grid(row=0, column=0, sticky='ew', padx=10, pady=10)
+        # ── Header card ──
+        self._create_header_card(self, "🔍", "eMB Verify",
+                                 "Verify eMB entries against the sanctioned amount for the selected Panchayat.",
+                                 icon_key="emoji_emb_verify")
+
+        # --- Top Frame for Configuration (bordered card) ---
+        config_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                    border_color=("gray85", "gray30"))
+        config_frame.grid(row=1, column=0, sticky='ew', padx=12, pady=6)
         config_frame.grid_columnconfigure(1, weight=1)
 
         # Panchayat input field
@@ -46,13 +52,13 @@ class EmbVerifyTab(BaseAutomationTab):
         self.verify_amount_entry.insert(0, "300")
         self.verify_amount_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=(0, 15))
 
-        # Action buttons
+        # Action buttons (OUTSIDE the card)
         action_frame = self._create_action_buttons(parent_frame=self)
-        action_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+        action_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 10))
         
         # --- Bottom Frame for Data Tabs ---
         notebook = ctk.CTkTabview(self)
-        notebook.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         
         work_codes_tab = notebook.add("Work Codes")
         results_tab = notebook.add("Results")

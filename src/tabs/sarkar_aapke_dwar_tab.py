@@ -8,8 +8,8 @@ from datetime import datetime
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, openpyxl  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -23,25 +23,29 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.fail_count = 0
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=1)
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
 
-        # --- Configuration Frame ---
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
+        # ── Header card ──
+        self._create_header_card(self, "🏛️", "Sarkar Aapke Dwar",
+                                 "Fill and submit Sarkar Aapke Dwar applications in bulk or monitor mode.",
+                                 icon_key="emoji_sad_status")
+
+        # --- Configuration Frame (bordered card) ---
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
         controls_frame.grid_columnconfigure(1, weight=1)
 
-        # --- Header Row ---
-        header_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, columnspan=3, sticky="ew", padx=5, pady=(5, 0))
-        header_frame.grid_columnconfigure(0, weight=1)
+        # --- Backlog Mode Switch Row ---
+        switch_row = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        switch_row.grid(row=0, column=0, columnspan=3, sticky="ew", padx=10, pady=(8, 0))
+        switch_row.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(header_frame, text="Sarkar Aapke Dwar Automation", font=ctk.CTkFont(size=16, weight="bold")).pack(side="left", padx=10)
-        
         self.backlog_switch = ctk.CTkSwitch(
-            header_frame, 
+            switch_row, 
             text="Backlog Entry Mode", 
             variable=self.backlog_mode_var,
             onvalue=True, 
@@ -67,9 +71,9 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         ctk.CTkButton(btn_frame, text="Get Template", width=100, fg_color="green", command=self.generate_demo_template).pack(side="left", padx=2)
         ctk.CTkButton(btn_frame, text="Clear", width=60, fg_color="#C53030", hover_color="#9B2C2C", command=self.clear_file_selection).pack(side="left", padx=2)
         
-        note_text = ("ℹ️ Monitor Mode: Leave File empty. Bot auto-fills Scheme details when you open a new form.\n"
-                     "ℹ️ Bulk Mode: Select Excel/CSV. Bot fills Applicant + Scheme details and Extracts Ack No.\n"
-                     "ℹ️ Manual Remarks: To enter remarks manually in the UI, click 'Clear' to unlock the fields.")
+        note_text = ("💡 Monitor Mode: Leave File empty. Bot auto-fills Scheme details when you open a new form.\n"
+                     "💡 Bulk Mode: Select Excel/CSV. Bot fills Applicant + Scheme details and Extracts Ack No.\n"
+                     "💡 Manual Remarks: To enter remarks manually in the UI, click 'Clear' to unlock the fields.")
         
         ctk.CTkLabel(bulk_frame, text=note_text, text_color="gray60", 
                      font=ctk.CTkFont(size=11), justify="left", anchor="w").grid(row=2, column=0, columnspan=3, sticky="w", padx=10, pady=(5, 5))
@@ -120,13 +124,13 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.scheme_remarks_entry = ctk.CTkEntry(settings_frame, placeholder_text="Default Scheme Remarks (if not in file)")
         self.scheme_remarks_entry.grid(row=4, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
-        # Action Buttons
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=3, column=0, columnspan=3, sticky="ew", pady=15)
+        # Action Buttons (OUTSIDE the card)
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=6)
 
         # --- Results & Logs Notebook ---
         self.tab_view = ctk.CTkTabview(self)
-        self.tab_view.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.tab_view.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.tab_view.add("Results")
         self.tab_view.add("Logs")
 

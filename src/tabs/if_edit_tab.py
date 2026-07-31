@@ -9,8 +9,8 @@ from src import config
 from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class IfEditTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
@@ -37,13 +37,20 @@ class IfEditTab(BaseAutomationTab):
         settings_tab = notebook.add("Settings")
         results_tab = notebook.add("Results")
 
-        settings_tab.grid_rowconfigure(0, weight=1)
+        settings_tab.grid_rowconfigure(1, weight=1)
         settings_tab.grid_columnconfigure(0, weight=1)
         results_tab.grid_rowconfigure(1, weight=1)
         results_tab.grid_columnconfigure(0, weight=1)
-        
-        settings_container = ctk.CTkScrollableFrame(settings_tab, label_text="Configuration & Actions")
-        settings_container.grid(row=0, column=0, sticky="nsew")
+
+        # ── Header card ──
+        self._create_header_card(settings_tab, "📝", "IF Editor",
+                                 "Edit IF details on the portal for work codes from a CSV or WC Gen.",
+                                 icon_key="emoji_if_editor")
+
+        # ── Settings card (bordered scrollable, pending-bills style) ──
+        settings_container = ctk.CTkScrollableFrame(settings_tab, corner_radius=12,
+                                                    border_width=1, border_color=("gray85", "gray30"))
+        settings_container.grid(row=1, column=0, sticky="nsew", padx=12, pady=6)
         settings_container.grid_columnconfigure(0, weight=1)
 
         # Automation Mode Frame
@@ -95,12 +102,9 @@ class IfEditTab(BaseAutomationTab):
         self.convergence_switch.grid(row=0, column=0, padx=15, pady=10)
         self.ui_fields['run_convergence'] = self.convergence_switch
         
-        action_frame = self._create_action_buttons(parent_frame=settings_container)
-        action_frame.grid(row=4, column=0, sticky="ew", padx=5, pady=(10, 5))
-
-        # Settings Notebook
+        # Settings Notebook (stays inside the card)
         self.settings_notebook = ctk.CTkTabview(settings_container)
-        self.settings_notebook.grid(row=5, column=0, sticky="ew", padx=5, pady=5)
+        self.settings_notebook.grid(row=4, column=0, sticky="ew", padx=5, pady=5)
         tab_p1 = self.settings_notebook.add("Page 1 Settings")
         tab_p2 = self.settings_notebook.add("Page 2 Settings")
         tab_p3 = self.settings_notebook.add("Page 3 Settings")
@@ -109,6 +113,10 @@ class IfEditTab(BaseAutomationTab):
         self._create_page2_widgets(tab_p2)
         self._create_page3_widgets(tab_p3)
         self._toggle_page_settings()
+
+        # ── Action buttons (OUTSIDE the card) ──
+        action_frame = self._create_action_buttons(parent_frame=settings_tab)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=6)
 
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, sticky="ew", pady=(5, 10), padx=5)
@@ -136,17 +144,15 @@ class IfEditTab(BaseAutomationTab):
         self.file_label.configure(text=f"{len(data)} work codes loaded from WC Gen tab.")
         self.log_info(f"Received {len(data)} work codes to process.")        
     def _create_field(self, parent, key, text, row, col=0, widget_type='entry', values=None, **kwargs):
-        if not hasattr(self, 'dynamic_combo_vars'):
-            self.dynamic_combo_vars = {}
-        ctk.CTkLabel(parent, text=text).grid(row=row, column=col, sticky="w", padx=15, pady=5)
-        if widget_type == 'entry':
-            widget = ctk.CTkEntry(parent, **kwargs)
-        elif widget_type == 'combo':
-            widget_var = ctk.StringVar()
-            widget = ctk.CTkOptionMenu(parent, variable=widget_var, values=values or [], **kwargs)
-            self.dynamic_combo_vars[key] = widget_var
-        widget.grid(row=row, column=col+1, sticky="ew", padx=15, pady=5)
-        self.ui_fields[key] = widget
+        """Label + widget stored in self.ui_fields[key] (base implementation).
+
+        widget_type='combo' keeps the var in self.dynamic_combo_vars[key]
+        exactly like the old local helper did.
+        """
+        return super()._create_field(
+            parent, key, text, row, col=col,
+            widget_type='combo' if widget_type == 'combo' else 'entry',
+            values=values, store="ui_fields", **kwargs)
 
     def _create_page1_widgets(self, parent):
         parent.grid_columnconfigure(1, weight=1)
@@ -181,7 +187,7 @@ class IfEditTab(BaseAutomationTab):
 
     def _create_page3_widgets(self, parent):
         parent.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(parent, text="Note: These values will be applied to all work codes in the CSV.", text_color="gray50").grid(row=0, column=0, padx=15, pady=(10,5))
+        ctk.CTkLabel(parent, text="💡 Note: These values will be applied to all work codes in the CSV.", text_color="gray50").grid(row=0, column=0, padx=15, pady=(10,5))
         
         # --- Activity Section ---
         ctk.CTkLabel(parent, text="--- Add Activities ---", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, pady=(10,5))

@@ -14,8 +14,8 @@ from .base_tab import BaseAutomationTab
 from src import config
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, Alignment, Border, Font, PatternFill, Side, get_column_letter, pd  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -41,14 +41,19 @@ class MisReportsTab(BaseAutomationTab):
         self._create_log_and_status_area(notebook) # Creates "Logs & Status" tab
 
         # Configure the layout for the tabs
-        settings_tab.grid_rowconfigure(1, weight=1)
+        settings_tab.grid_rowconfigure(2, weight=1)
         settings_tab.grid_columnconfigure(0, weight=1)
         results_tab.grid_rowconfigure(1, weight=1)
         results_tab.grid_columnconfigure(0, weight=1)
-        
+
+        # ── Header / intro card (pending-bills style) ──
+        self._create_header_card(settings_tab, "📊", "MIS Reports",
+                                 "Download multiple NREGA MIS reports into a single formatted Excel file.",
+                                 icon_key="emoji_mis_reports")
+
         # 1. Populate the "Settings" Tab
         settings_container = ctk.CTkFrame(settings_tab, fg_color="transparent")
-        settings_container.grid(row=0, column=0, sticky="nsew", padx=5)
+        settings_container.grid(row=1, column=0, sticky="nsew", padx=5)
         settings_container.grid_columnconfigure(1, weight=1)
         
         # --- Create all entries first (no cross-references) ---
@@ -84,8 +89,9 @@ class MisReportsTab(BaseAutomationTab):
         self.district_var.trace_add("write", _on_district_change)
 
         # Checkbox list for reports
-        self.reports_frame = ctk.CTkFrame(settings_tab)
-        self.reports_frame.grid(row=1, column=0, sticky='nsew', padx=5, pady=10)
+        self.reports_frame = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
+                                          border_color=("gray85", "gray30"))
+        self.reports_frame.grid(row=2, column=0, sticky='nsew', padx=5, pady=10)
         self.reports_frame.grid_columnconfigure(0, weight=1)
         self.reports_frame.grid_rowconfigure(1, weight=1)
         
@@ -123,7 +129,7 @@ class MisReportsTab(BaseAutomationTab):
             self.report_checkboxes[report_name] = var
 
         action_frame = self._create_action_buttons(parent_frame=settings_tab)
-        action_frame.grid(row=2, column=0, pady=10)
+        action_frame.grid(row=3, column=0, pady=10)
 
         # 2. Populate the "Results" Tab
         res_btn_frame = ctk.CTkFrame(results_tab, fg_color="transparent")

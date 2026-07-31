@@ -287,11 +287,11 @@ class WorkflowManager:
                 self.app.after(3000, lambda: tab.start_automation())
         self._wait_and_execute("Zero MR", _action)
 
-    def send_wagelist_data_and_switch_tab(self, start, end, auto_start=False):
+    def send_wagelist_data_and_switch_tab(self, wagelists, auto_start=False):
         self.app.show_frame("Send Wagelist")
         def _action():
             tab = self.app.tab_instances["Send Wagelist"]
-            tab.populate_wagelist_data(start, end)
+            tab.populate_wagelist_data(wagelists)
             if auto_start and hasattr(tab, 'start_automation'):
                 self.app.after(2000, tab.start_automation)
         self._wait_and_execute("Send Wagelist", _action)

@@ -69,7 +69,14 @@ class SettingsTab(ctk.CTkFrame):
         header.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 5))
         header.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(header, text="⚙️", font=ctk.CTkFont(size=28)
+        _s_icon = None
+        try:
+            _s_icon = self.app.icon_images.get_sized("settings", (28, 28))
+        except Exception:
+            _s_icon = None
+        ctk.CTkLabel(header, text="⚙️" if _s_icon is None else "",
+                     image=_s_icon,
+                     font=ctk.CTkFont(size=28)
                      ).grid(row=0, column=0, padx=(0, 12))
         title_frame = ctk.CTkFrame(header, fg_color="transparent")
         title_frame.grid(row=0, column=1, sticky="w")
@@ -145,7 +152,7 @@ class SettingsTab(ctk.CTkFrame):
                          font=ctk.CTkFont(size=10),
                          text_color=("#166534", "#86EFAC")).pack(side="left", padx=(4, 0))
         else:
-            ctk.CTkLabel(self._srv_vals_frame, text="ℹ️  Server par location data set nahi hai.",
+            ctk.CTkLabel(self._srv_vals_frame, text="💡  Server par location data set nahi hai.",
                          font=ctk.CTkFont(size=11),
                          text_color=("gray50", "gray60")).pack(side="left")
 
@@ -184,7 +191,7 @@ class SettingsTab(ctk.CTkFrame):
         sc_note = ctk.CTkFrame(self._scrape_frame, fg_color="transparent")
         sc_note.pack(fill="x", padx=12, pady=(2, 4))
         ctk.CTkLabel(sc_note,
-            text="ℹ️  Pehle Login Automation se NREGA mein login karein, fir yahan 'Scrape Now' dabayein.\n"
+            text="💡  Pehle Login Automation se NREGA mein login karein, fir yahan 'Scrape Now' dabayein.\n"
                  "Bot automatically Demand page se Panchayat aur Village names scrape karega.",
             font=ctk.CTkFont(size=10),
             text_color=("gray50", "gray60"),
@@ -391,7 +398,7 @@ class SettingsTab(ctk.CTkFrame):
                 self.after(5000, lambda: self._srv_sync_status.configure(text=""))
             else:
                 self._srv_sync_status.configure(
-                    text="ℹ️  Server par koi location data nahi hai",
+                    text="💡  Server par koi location data nahi hai",
                     text_color=("gray50", "gray60")
                 )
                 self.after(5000, lambda: self._srv_sync_status.configure(text=""))
@@ -606,7 +613,7 @@ class SettingsTab(ctk.CTkFrame):
                              font=ctk.CTkFont(size=10),
                              text_color=("#166534", "#86EFAC")).pack(side="left", padx=(4, 0))
             else:
-                ctk.CTkLabel(self._srv_vals_frame, text="ℹ️  Server par location data set nahi hai.",
+                ctk.CTkLabel(self._srv_vals_frame, text="💡  Server par location data set nahi hai.",
                              font=ctk.CTkFont(size=11),
                              text_color=("gray50", "gray60")).pack(side="left")
         except Exception as e:
@@ -846,7 +853,7 @@ class SettingsTab(ctk.CTkFrame):
                                             text_color=("#2563EB", "#60A5FA"))
         else:
             self.map_staff_entry.delete(0, "end")
-            self.map_status_label.configure(text=f"ℹ️ No mapping for '{panch}'",
+            self.map_status_label.configure(text=f"💡 No mapping for '{panch}'",
                                             text_color=("gray50", "gray60"))
 
     def _on_whatsapp_notify_toggle(self) -> None:
@@ -1376,7 +1383,7 @@ class SettingsTab(ctk.CTkFrame):
 
         # Description
         ctk.CTkLabel(notif_card,
-            text="ℹ️ Jab bhi koi automation finish hogi (success/fail), aapke registered WhatsApp number par ek summary message bhej diya jayega.\n"
+            text="💡 Jab bhi koi automation finish hogi (success/fail), aapke registered WhatsApp number par ek summary message bhej diya jayega.\n"
                  "Message mein task ka naam, panchayat, duration aur result details honge.",
             font=ctk.CTkFont(size=11),
             text_color=("gray50", "gray60"),
@@ -1430,7 +1437,7 @@ class SettingsTab(ctk.CTkFrame):
 
         # Description
         ctk.CTkLabel(excel_card,
-            text="ℹ️ Jab bhi koi automation finish hogi, uska result auto-generated Excel file (base64) "
+            text="💡 Jab bhi koi automation finish hogi, uska result auto-generated Excel file (base64) "
                  "aapke registered WhatsApp number par bhej diya jayega.\n"
                  "File temporary save karke bheji jaati hai aur fir delete kar di jaati hai.",
             font=ctk.CTkFont(size=11),

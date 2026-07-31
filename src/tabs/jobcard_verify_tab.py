@@ -9,8 +9,8 @@ from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -24,13 +24,19 @@ class JobcardVerifyTab(BaseAutomationTab):
         super().__init__(parent, app_instance, automation_key="jc_verify")
         self.photo_folder_path = ""
         self.pref_file = os.path.join(os.path.abspath("."), "jc_verify_prefs.json") 
-        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(3, weight=1)
         self._create_widgets()
         self._load_saved_preferences()
     def _create_widgets(self) -> None:
 
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        # ── Header card ──
+        self._create_header_card(self, "🪪", "Verify Jobcard",
+                                 "Verify jobcards with photo upload and account-number checks in bulk.",
+                                 icon_key="emoji_verify_jobcard")
+
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 6))
         controls_frame.grid_columnconfigure(1, weight=1)
         
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=10)
@@ -86,14 +92,15 @@ class JobcardVerifyTab(BaseAutomationTab):
         self.photo_path_label = ctk.CTkLabel(photo_frame, text=f"No folder selected (will use default '{config.JOBCARD_VERIFY_CONFIG['default_photo']}')", text_color="gray", anchor='w')
         self.photo_path_label.grid(row=0, column=1, sticky='ew', padx=10)
         
-        instruction_text = "Note: Name photos with the last part of the Jobcard No. (e.g., 417.jpg for ...01/417)"
+        instruction_text = "💡 Note: Name photos with the last part of the Jobcard No. (e.g., 417.jpg for ...01/417)"
         ctk.CTkLabel(photo_frame, text=instruction_text, text_color="gray50").grid(row=1, column=0, columnspan=2, sticky='w', pady=2)
 
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=4, column=0, columnspan=2, sticky='ew', pady=15)
+        # ── Action buttons (OUTSIDE the card) ──
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
 
         notebook = ctk.CTkTabview(self)
-        notebook.grid(row=1, column=0, sticky="nsew")
+        notebook.grid(row=3, column=0, sticky="nsew")
         self._create_log_and_status_area(parent_notebook=notebook)
         self.progress_bar.grid_forget()
 
@@ -157,7 +164,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
     def start_automation(self) -> None:
         panchayat = self.panchayat_var.get().strip()
-        village = self.village_entry.get().strip()
+        village = self.village_var.get().strip()
         process_all = self.process_all_villages_var.get()
         verify_account_only = self.verify_account_only_var.get()
 

@@ -26,8 +26,8 @@ from src import config
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -63,13 +63,26 @@ class MbEntryTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
         """Creates and places all UI elements for this tab."""
         
-        # --- Top Frame for Configuration ---
-        top_frame = ctk.CTkFrame(self)
-        top_frame.grid(row=0, column=0, sticky='ew', padx=10, pady=(10,0))
-        
-        config_frame = ctk.CTkFrame(top_frame)
-        config_frame.pack(pady=(0, 10), fill='x')
-        
+        # --- Header / intro card (P7.2: pending-bills style) ---
+        self._create_header_card(self, "📝", "eMB Entry",
+                                 "Enter measurements for Muster Rolls directly into the eMB portal.",
+                                 icon_key="emoji_mb_entry")
+
+        # --- Tab View (top): Settings | Work Codes | Results | Logs ---
+        self.notebook = ctk.CTkTabview(self)
+        self.notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0,10))
+        settings_frame = self.notebook.add("Settings")
+        work_codes_frame = self.notebook.add("Work Codes")
+        results_frame = self.notebook.add("Results")
+        self._create_log_and_status_area(parent_notebook=self.notebook)
+
+        # ════════════════ SETTINGS TAB ════════════════
+        settings_frame.grid_columnconfigure(0, weight=1)
+        settings_frame.grid_rowconfigure(0, weight=1)
+
+        config_frame = ctk.CTkFrame(settings_frame, corner_radius=12, border_width=1,
+                                    border_color=("gray85", "gray30"))
+        config_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
         config_frame.grid_columnconfigure((1, 3), weight=1)
         
         # --- Form Fields ---
@@ -101,32 +114,29 @@ class MbEntryTab(BaseAutomationTab):
         self.mate_name_entry = self._create_option_field(config_frame, "mate_name", "Mate Names (comma-separated)", 3, 0)
         self._on_panchayat_change()
 
-        # Note for user
-        note = ctk.CTkLabel(config_frame, text="ℹ️ Note: Use this emb automation only for single activity works.", text_color="#E53E3E", wraplength=450)
-        note.grid(row=4, column=0, columnspan=4, sticky='w', padx=15, pady=(10, 0))
+        # ── 💡 Usage Notes info card (pending-bills style) ──
+        info_card = ctk.CTkFrame(config_frame, corner_radius=10, border_width=1,
+                                 border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        info_card.grid(row=4, column=0, columnspan=4, sticky="ew", padx=15, pady=(10, 15))
+        info_card.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            info_card, text="💡 Usage Notes",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
+        ).grid(row=0, column=0, sticky="w", padx=14, pady=(10, 2))
+        ctk.CTkLabel(
+            info_card,
+            text=("• Use this eMB automation only for single activity works.\n"
+                  "• Workcode box khaali chhod kar 'Start Automation' dabayein — "
+                  "saare available works ek-ek karke auto-fill ho jayenge!"),
+            justify="left", anchor="w", font=ctk.CTkFont(size=11),
+            text_color=(config.COLORS["text_dark_alt"], config.COLORS["text_light"])
+        ).grid(row=1, column=0, sticky="w", padx=14, pady=(0, 10))
 
-        # New feature note — process all works from dropdown
-        auto_note = ctk.CTkLabel(
-            config_frame,
-            text="🆕 Workcode box khaali chhod kar 'Start Automation' dabayein — saare available works ek-ek karke auto-fill ho jayenge!",
-            text_color="#2563EB",
-            wraplength=450,
-            font=ctk.CTkFont(size=13, weight="bold")
-        )
-        auto_note.grid(row=5, column=0, columnspan=4, sticky='w', padx=15, pady=(0, 15))
+        # --- Action Buttons (Start, Stop, Reset) — outside the card ---
+        action_frame = self._create_action_buttons(parent_frame=settings_frame)
+        action_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(5, 15))
 
-        # --- Action Buttons (Start, Stop, Reset) ---
-        action_frame_container = ctk.CTkFrame(top_frame)
-        action_frame_container.pack(pady=10, fill='x')
-        action_frame = self._create_action_buttons(parent_frame=action_frame_container)
-        action_frame.pack(expand=True, fill='x')
-        
-        # --- Tab View for Work Codes, Results, Logs ---
-        self.notebook = ctk.CTkTabview(self)
-        self.notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0,10))
-        work_codes_frame = self.notebook.add("Work Codes")
-        results_frame = self.notebook.add("Results")
-        self._create_log_and_status_area(parent_notebook=self.notebook) 
 
         # --- Work Codes Tab ---
         work_codes_frame.grid_columnconfigure(0, weight=1); work_codes_frame.grid_rowconfigure(1, weight=1)
@@ -192,20 +202,15 @@ class MbEntryTab(BaseAutomationTab):
 
 
 
-    def _create_field(self, parent, key, text, r, c):
-        ctk.CTkLabel(parent, text=text).grid(row=r, column=c, sticky='w', padx=15, pady=5)
-        var = ctk.StringVar(); self.config_vars[key] = var
-        entry = ctk.CTkEntry(parent, textvariable=var)
-        entry.grid(row=r, column=c+1, sticky='ew', padx=15, pady=5)
-        return entry
+    def _create_field(self, parent, key, text, row, col=0, **kwargs):
+        """Label + entry stored in self.config_vars[key] (base implementation)."""
+        kwargs.setdefault("store", "config_vars")
+        return super()._create_field(parent, key, text, row, col=col, **kwargs)
 
-    def _create_option_field(self, parent, key, text, r, c):
-        ctk.CTkLabel(parent, text=text).grid(row=r, column=c, sticky='w', padx=15, pady=5)
-        var = ctk.StringVar(); self.config_vars[key] = var
-        initial_suggestions = self.app.history_manager.get_suggestions(key) or [""]
-        entry = ctk.CTkOptionMenu(parent, variable=var, values=initial_suggestions)
-        entry.grid(row=r, column=c+1, columnspan=3, sticky='ew', padx=15, pady=5)
-        return entry
+    def _create_option_field(self, parent, key, text, row, col=0, **kwargs):
+        """Label + suggestion dropdown stored in self.config_vars[key] (base implementation)."""
+        kwargs.setdefault("store", "config_vars")
+        return super()._create_option_field(parent, key, text, row, col=col, **kwargs)
 
     # --- Panchayat-dependent mate name logic ---
     def _get_current_mate_key(self):

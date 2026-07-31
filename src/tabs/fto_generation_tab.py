@@ -9,8 +9,8 @@ from datetime import datetime
 from src import config
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, StaleElementReferenceException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class FtoGenerationTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
@@ -18,7 +18,7 @@ class FtoGenerationTab(BaseAutomationTab):
         self.automation_has_run = False 
         self.stored_location_data = {} 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(3, weight=1)
         
         # Default common paths for Old Firefox
         self.default_paths = [
@@ -30,12 +30,18 @@ class FtoGenerationTab(BaseAutomationTab):
         self._load_saved_path()
     def _create_widgets(self) -> None:
 
-        # Main container
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", pady=(0, 2)) 
+        # ── Header card ──
+        self._create_header_card(self, "✍️", "FTO Generation",
+                                 "Sign pending FTOs using the DSC-signed Old Firefox session, or delete them.",
+                                 icon_key="emoji_fto_gen")
+
+        # Main settings card (bordered, pending-bills style)
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
         controls_frame.grid_columnconfigure(0, weight=1)
 
-        note_text = "Instructions:\n1. Check/Set Old Firefox Path and Click 'Launch Old Firefox'.\n2. Log in manually, insert DSC Token, go to FTO page.\n3. Click 'Start' to sign pending FTOs or 'Delete' to remove."
+        note_text = "💡 Instructions:\n1. Check/Set Old Firefox Path and Click 'Launch Old Firefox'.\n2. Log in manually, insert DSC Token, go to FTO page.\n3. Click 'Start' to sign pending FTOs or 'Delete' to remove."
         ctk.CTkLabel(controls_frame, text=note_text, justify="left").grid(row=0, column=0, sticky='w', padx=15, pady=(5, 2))
         
         # --- NEW: Browser Setup Frame ---
@@ -57,9 +63,25 @@ class FtoGenerationTab(BaseAutomationTab):
         self.launch_btn = ctk.CTkButton(setup_frame, text="Launch Old Firefox", fg_color=config.COLORS["green_launch"], hover_color=config.COLORS["teal_green_hover"], command=self._launch_firefox)
         self.launch_btn.grid(row=0, column=4, padx=5, pady=5)
 
-        # --- Row 2: Main Action Buttons (Start/Stop/Reset) ---
-        action_frame_wrapper = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame_wrapper.grid(row=2, column=0, sticky='ew', pady=(2, 2), padx=15)
+        # --- ABPS Check Button Container (hidden until used) ---
+        self.abps_container = ctk.CTkFrame(controls_frame, fg_color="transparent", height=0)
+        self.abps_container.grid(row=2, column=0, sticky="ew", pady=(0, 0))
+        self.abps_container.grid_remove() # Hide initially
+        
+        self.check_abps_button = ctk.CTkButton(
+            self.abps_container, 
+            text="Check Pending ABPS Labour", 
+            command=self._go_to_mr_tracking,
+            width=200,
+            height=32,
+            fg_color=config.COLORS["blue"],
+            hover_color=config.COLORS["blue_hover"],
+            font=ctk.CTkFont(size=13, weight="bold")
+        )
+
+        # --- Action buttons (OUTSIDE the card) ---
+        action_frame_wrapper = self._create_action_buttons(parent_frame=self)
+        action_frame_wrapper.grid(row=2, column=0, sticky='ew', pady=(2, 6), padx=15)
 
         # Access inner container to add separator and Delete button
         inner_container = action_frame_wrapper.winfo_children()[0] 
@@ -78,26 +100,10 @@ class FtoGenerationTab(BaseAutomationTab):
             font=ctk.CTkFont(size=13, weight="bold")
         )
         self.delete_btn.pack(side="left", padx=(0, 0))
-
-        # --- Row 3: ABPS Check Button Container ---
-        self.abps_container = ctk.CTkFrame(controls_frame, fg_color="transparent", height=0)
-        self.abps_container.grid(row=3, column=0, sticky="ew", pady=(0, 0))
-        self.abps_container.grid_remove() # Hide initially
-        
-        self.check_abps_button = ctk.CTkButton(
-            self.abps_container, 
-            text="Check Pending ABPS Labour", 
-            command=self._go_to_mr_tracking,
-            width=200,
-            height=32,
-            fg_color=config.COLORS["blue"],
-            hover_color=config.COLORS["blue_hover"],
-            font=ctk.CTkFont(size=13, weight="bold")
-        )
         
         # --- Results Area ---
         notebook = ctk.CTkTabview(self)
-        notebook.grid(row=1, column=0, sticky="nsew", pady=0)
+        notebook.grid(row=3, column=0, sticky="nsew", pady=(0, 10))
         
         self._create_log_and_status_area(parent_notebook=notebook)
         results_frame = notebook.add("Results")

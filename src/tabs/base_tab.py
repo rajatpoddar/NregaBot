@@ -689,7 +689,135 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.progress_bar = ctk.CTkProgressBar(status_bar_frame, mode="determinate")
         self.progress_bar.set(0)
         self.progress_bar.pack(side="right", padx=10, fill="x", expand=True)
-    
+
+    # ────────────────────────────────────────────────────────────────
+    # REUSABLE UI BUILDING BLOCKS (P7.2)
+    # Shared by automation tabs so every tab gets the same modern
+    # card-based look as Pending Bills — without copy-paste.
+    # All helpers are pure additions: they never touch automation logic.
+    # ────────────────────────────────────────────────────────────────
+
+    def _create_header_card(self, parent: Any, emoji: str, title: str,
+                            subtitle: str, row: int = 0,
+                            icon_key: Optional[str] = None) -> ctk.CTkFrame:
+        """Creates the header/intro card (PNG icon or emoji + bold title + subtitle).
+
+        Mirrors the Pending Bills tab header. Placed at the given grid row
+        of `parent` (default row 0). Pass `icon_key` to use the tab's PNG
+        icon instead of an emoji (falls back to emoji if the icon fails to
+        load). Returns the frame for optional styling.
+        """
+        header = ctk.CTkFrame(parent, fg_color=("gray95", "gray20"), corner_radius=12)
+        header.grid(row=row, column=0, sticky="ew", padx=12, pady=(12, 6))
+        icon = None
+        if icon_key:
+            try:
+                icon = self.app.icon_images.get_sized(icon_key, (20, 20))
+            except Exception:
+                icon = None
+        ctk.CTkLabel(
+            header, text=f" {title}" if icon is not None else f"{emoji} {title}",
+            image=icon, compound="left",
+            font=ctk.CTkFont(size=17, weight="bold"),
+            text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
+        ).pack(anchor="w", padx=14, pady=(10, 0))
+        ctk.CTkLabel(
+            header, text=subtitle,
+            font=ctk.CTkFont(size=12),
+            text_color=(config.COLORS["text_dark_alt"], config.COLORS["text_light"])
+        ).pack(anchor="w", padx=14, pady=(0, 10))
+        return header
+
+    def _create_info_card(self, parent: Any, title: str, text: str,
+                          row: int = 2, column: int = 0,
+                          columnspan: int = 1) -> ctk.CTkFrame:
+        """Creates the 'ℹ️ How it works' info card (bordered, muted fill).
+
+        Placed at the given grid row/column of `parent`. The card stretches
+        vertically (sticky nsew) so it fills leftover space in a grid.
+        Returns the frame for optional styling.
+        """
+        info = ctk.CTkFrame(parent, corner_radius=12, border_width=1,
+                            border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        info.grid(row=row, column=column, columnspan=columnspan, sticky="nsew", padx=12, pady=6)
+        info.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            info, text=title,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
+        ).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 2))
+        ctk.CTkLabel(
+            info, text=text, justify="left", anchor="w",
+            font=ctk.CTkFont(size=11),
+            text_color=(config.COLORS["text_dark_alt"], config.COLORS["text_light"])
+        ).grid(row=1, column=0, sticky="w", padx=16, pady=(0, 12))
+        return info
+
+    def _create_field(self, parent: Any, key: str, text: str, row: int,
+                      col: int = 0, widget_type: str = "entry",
+                      values: Optional[List[str]] = None,
+                      store: Optional[str] = None,
+                      columnspan: Optional[int] = None, **kwargs: Any) -> Any:
+        """Generic labelled form field builder shared by all automation tabs.
+
+        Creates a label at (row, col) and a widget at (row, col+1). Returns
+        the created widget. Storage is optional and depends on the caller:
+          - store='config_vars': StringVar stored in self.config_vars[key]
+          - store='ui_fields':   widget stored in self.ui_fields[key]
+            (widget_type='combo' additionally stores its var in
+             self.dynamic_combo_vars[key], matching the old if_edit helper.)
+
+        Args:
+            parent: Parent frame (must have column (col+1) weighted).
+            key: Identifier used for config_vars / ui_fields storage.
+            text: Label text.
+            row: Grid row for label and widget.
+            col: Grid column of the label (widget sits at col+1).
+            widget_type: 'entry' (default), 'dropdown' or 'combo'.
+            values: Dropdown options (ignored for entries).
+            store: Optional storage target ('config_vars' | 'ui_fields').
+            columnspan: Optional columnspan for the widget's grid placement.
+            **kwargs: Passed to the widget constructor.
+        """
+        ctk.CTkLabel(parent, text=text).grid(row=row, column=col, sticky="w", padx=15, pady=5)
+        var = ctk.StringVar()
+        if widget_type in ("dropdown", "combo"):
+            widget = ctk.CTkOptionMenu(parent, variable=var, values=values or [], **kwargs)
+        else:
+            widget = ctk.CTkEntry(parent, textvariable=var, **kwargs)
+        widget.grid(row=row, column=col + 1, sticky="ew", padx=15, pady=5,
+                    columnspan=columnspan if columnspan else 1)
+
+        if store == "config_vars" and hasattr(self, "config_vars") and isinstance(self.config_vars, dict):
+            self.config_vars[key] = var
+        elif store == "ui_fields" and hasattr(self, "ui_fields") and isinstance(self.ui_fields, dict):
+            self.ui_fields[key] = widget
+            if widget_type == "combo":
+                if not hasattr(self, "dynamic_combo_vars") or not isinstance(self.dynamic_combo_vars, dict):
+                    self.dynamic_combo_vars = {}
+                self.dynamic_combo_vars[key] = var
+        return widget
+
+    def _create_option_field(self, parent: Any, key: str, text: str, row: int,
+                             col: int = 0, columnspan: int = 3,
+                             store: Optional[str] = "config_vars",
+                             **kwargs: Any) -> Any:
+        """Label + suggestion dropdown populated from saved history values.
+
+        Convenience wrapper over _create_field() used by the old mb_entry
+        helper: reads suggestions for `key` from history_manager and builds
+        a dropdown (default columnspan=3 to span label + two field columns).
+        """
+        values = kwargs.pop("values", None)
+        if values is None:
+            try:
+                values = self.app.history_manager.get_suggestions(key) or [""]
+            except Exception:
+                values = [""]
+        return self._create_field(
+            parent, key, text, row, col=col, widget_type="dropdown",
+            values=values, columnspan=columnspan, store=store, **kwargs)
+
     def set_common_ui_state(self, running: bool) -> None:
         """Updates Start/Stop/Reset/Retry buttons based on running state.
         

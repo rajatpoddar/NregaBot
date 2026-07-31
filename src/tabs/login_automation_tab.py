@@ -8,8 +8,8 @@ from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger
 from typing import Any, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, StaleElementReferenceException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -21,10 +21,12 @@ class LoginAutomationTab(BaseAutomationTab):
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
         
-        # Title
-        title = ctk.CTkLabel(self.main_frame, text="NREGA Login & Navigation Automation",
-                             font=ctk.CTkFont(size=20, weight="bold"))
-        title.pack(pady=(0, 20))
+        # ── Header card (pack-managed wrapper — this tab uses pack layout) ──
+        header_wrap = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        header_wrap.pack(fill="x", padx=0, pady=(0, 12))
+        self._create_header_card(header_wrap, "🔐", "Login & Navigation Automation",
+                                 "Auto-select Financial Year, District & Block — you only enter User ID & Password.",
+                                 icon_key="emoji_login_automation")
         
         # --- Financial Year (Auto-set, read-only display) ---
         self.current_financial_year = self._get_current_financial_year()
@@ -33,11 +35,12 @@ class LoginAutomationTab(BaseAutomationTab):
         self._auto_detect_location()
 
         # --- Info Section ---
-        info_frame = ctk.CTkFrame(self.main_frame, fg_color=("gray95", "gray25"), corner_radius=8)
-        info_frame.pack(fill='x', padx=10, pady=(10, 5))
+        info_frame = ctk.CTkFrame(self.main_frame, fg_color=("gray95", "gray25"), corner_radius=10,
+                                  border_width=1, border_color=("gray85", "gray30"))
+        info_frame.pack(fill='x', padx=10, pady=(0, 5))
         
         ctk.CTkLabel(info_frame,
-            text="ℹ️  Bot automatically detects your District & Block from saved settings.\n"
+            text="💡  Bot automatically detects your District & Block from saved settings.\n"
                  "Pehle Settings > Location Data > 'Scrape Now' se data sync karein.\n"
                  "Browser launch hone ke baad aapko User ID & Password manual enter karna hoga.",
             font=ctk.CTkFont(size=12),
@@ -102,7 +105,7 @@ class LoginAutomationTab(BaseAutomationTab):
                 self.block = server_block
 
         # Build info card showing detected values
-        loc_frame = ctk.CTkFrame(self.main_frame, fg_color=("#F0FDF4", "#0F2A1D"), corner_radius=8,
+        loc_frame = ctk.CTkFrame(self.main_frame, fg_color=("#F0FDF4", "#0F2A1D"), corner_radius=10,
                                  border_width=1, border_color=("#BBF7D0", "#166534"))
         loc_frame.pack(fill='x', padx=10, pady=(0, 5))
 

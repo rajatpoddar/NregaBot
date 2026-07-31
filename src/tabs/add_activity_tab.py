@@ -9,8 +9,8 @@ from src import config
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException, UnexpectedAlertPresentException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -18,17 +18,23 @@ class AddActivityTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="add_activity")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(3, weight=1)
         self._create_widgets()
     def _create_widgets(self) -> None:
 
-        # Frame for controls and action buttons
-        top_frame = ctk.CTkFrame(self)
-        top_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
+        # ── Header / intro card (pending-bills style) ──
+        self._create_header_card(self, "➕", "Add Activity",
+                                 "Add a new activity (unit price + quantity) for each pending work key.",
+                                 icon_key="emoji_add_activity")
+
+        # ── Settings card: Price & Quantity ──
+        top_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                 border_color=("gray85", "gray30"))
+        top_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(6, 10))
         top_frame.grid_columnconfigure(0, weight=1)
 
         # --- UPDATED: Input fields for Price and Quantity ---
-        input_frame = ctk.CTkFrame(top_frame)
+        input_frame = ctk.CTkFrame(top_frame, fg_color="transparent")
         input_frame.grid(row=0, column=0, sticky="ew", padx=15, pady=(15, 10))
         input_frame.grid_columnconfigure((1, 3), weight=1)
         
@@ -45,13 +51,13 @@ class AddActivityTab(BaseAutomationTab):
         self.quantity_entry.grid(row=1, column=3, sticky="ew", padx=(0, 15))
         self.quantity_entry.insert(0, defaults['quantity'])
 
-        # Action buttons
-        action_frame = self._create_action_buttons(parent_frame=top_frame)
-        action_frame.grid(row=1, column=0, sticky='ew', pady=(10, 15), padx=15)
+        # Action buttons — OUTSIDE the card
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky='ew', padx=10, pady=(0, 6))
 
         # Notebook for inputs and results
         notebook = ctk.CTkTabview(self)
-        notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         work_codes_frame = notebook.add("Work Keys")
         results_frame = notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=notebook)

@@ -10,20 +10,26 @@ from .base_tab import BaseAutomationTab
 
 logger = get_logger()
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class SAReportTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="social_audit_respond")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(3, weight=1)
         self._create_widgets()
     def _create_widgets(self) -> None:
 
-        # Frame for all user input controls
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="new", padx=10, pady=10)
+        # ── Header / intro card (pending-bills style) ──
+        self._create_header_card(self, "🛡️", "Social Audit Report",
+                                 "View and respond to social audit issues for the selected panchayat.",
+                                 icon_key="emoji_social_audit")
+
+        # Frame for all user input controls (settings card)
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="new", padx=10, pady=(6, 10))
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # --- Input Fields for the NEW page ---
@@ -49,11 +55,11 @@ class SAReportTab(BaseAutomationTab):
         self.status_menu = ctk.CTkOptionMenu(controls_frame, variable=self.status_var, values=status_options)
         self.status_menu.grid(row=3, column=1, sticky='ew', padx=15, pady=5)
 
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=4, column=0, columnspan=2, pady=10)
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
 
         notebook = ctk.CTkTabview(self)
-        notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         results_tab = notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=notebook)
 

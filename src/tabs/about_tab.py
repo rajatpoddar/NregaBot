@@ -59,8 +59,14 @@ class AboutTab(ctk.CTkFrame):
         header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=(15, 10))
         header.grid_columnconfigure(2, weight=1)
 
-        # App icon
-        icon_label = ctk.CTkLabel(header, text="🏛️", font=ctk.CTkFont(size=32))
+        # App icon (PNG with emoji fallback)
+        _ab_icon = None
+        try:
+            _ab_icon = self.app.icon_images.get_sized("nrega", (32, 32))
+        except Exception:
+            _ab_icon = None
+        icon_label = ctk.CTkLabel(header, text="🏛️" if _ab_icon is None else "",
+                                  image=_ab_icon, font=ctk.CTkFont(size=32))
         icon_label.grid(row=0, column=0, padx=(0, 12))
 
         # Title block

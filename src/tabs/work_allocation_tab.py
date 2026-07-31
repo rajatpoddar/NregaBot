@@ -12,14 +12,14 @@ from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoAlertPresentException, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class WorkAllocationTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="work_allocation")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(3, weight=1)
 
         # ID for the "Please Wait..." overlay
         self.wait_overlay_id = "ctl00_ContentPlaceHolder1_PageUpdateProgress"
@@ -32,9 +32,15 @@ class WorkAllocationTab(BaseAutomationTab):
         self.load_inputs()
     def _create_widgets(self) -> None:
 
-        # Frame for all user input controls
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
+        # ── Header card ──
+        self._create_header_card(self, "📌", "Work Allocation",
+                                 "Allocate selected work keys to job cards on the portal.",
+                                 icon_key="emoji_work_allocation")
+
+        # Frame for all user input controls (bordered card)
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # --- Row 0: Panchayat Name ---
@@ -70,13 +76,13 @@ class WorkAllocationTab(BaseAutomationTab):
         self.file_label = ctk.CTkLabel(csv_frame, text="No file selected", text_color="gray")
         self.file_label.pack(side="left")
 
-        # --- Row 3: Action Buttons ---
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=3, column=0, columnspan=2, sticky='ew', pady=15)
+        # --- Action buttons (OUTSIDE the card) ---
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky='ew', padx=12, pady=6)
 
         # --- Data Tabs (Work List, Results, Logs) ---
         data_notebook = ctk.CTkTabview(self)
-        data_notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        data_notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         work_list_tab = data_notebook.add("Work Key List")
         results_tab = data_notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=data_notebook)

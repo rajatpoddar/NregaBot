@@ -19,8 +19,8 @@ from src import config
 from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException, WebDriverException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 PROFILES_FILE = os.path.join(os.path.dirname(__file__), "..", "assets", "material_profiles.json")
 MAX_MATERIAL_ROWS = 15
 DEFAULT_MATERIAL_ROWS = 2
@@ -124,9 +124,29 @@ class MaterialEntryTab(BaseAutomationTab):
         outer = ctk.CTkScrollableFrame(self, fg_color="transparent")
         outer.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         outer.grid_columnconfigure(0, weight=1)
-        # --- General Details ---
-        input_frame = ctk.CTkFrame(outer)
-        input_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+
+        # --- Notebook on top: Settings | Input | Results | Logs ---
+        notebook = ctk.CTkTabview(outer)
+        notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        outer.grid_rowconfigure(0, weight=1)
+        settings_tab = notebook.add("Settings")
+        batch_tab = notebook.add("Input: Work Key & Bill No")
+        results_tab = notebook.add("Results")
+        self._create_log_and_status_area(notebook)
+
+        # ════════════════ SETTINGS TAB ════════════════
+        settings_tab.grid_columnconfigure(0, weight=1)
+        settings_tab.grid_rowconfigure(1, weight=1)
+
+        # ── Header / intro card (pending-bills style) ──
+        self._create_header_card(settings_tab, "🧱", "Material Entry",
+                                 "Enter material details (rate, quantity, GST) for multiple work keys and bill numbers.",
+                                 icon_key="emoji_material_entry")
+
+        # --- General Details (settings card) ---
+        input_frame = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
+                                   border_color=("gray85", "gray30"))
+        input_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
         input_frame.grid_columnconfigure(1, weight=1)
         input_frame.grid_columnconfigure(3, weight=1)
         ctk.CTkLabel(input_frame, text="Panchayat (For Block Login):").grid(row=0, column=0, padx=15, pady=5, sticky="w")
@@ -155,9 +175,10 @@ class MaterialEntryTab(BaseAutomationTab):
         self.bill_date_entry.pack(side="left", fill="x", expand=True)
         ctk.CTkButton(date_frame, text="📅", width=35, fg_color=("gray85", "gray25"), text_color=("black", "white"),
                       command=lambda: self.open_date_picker(lambda d: [self.bill_date_entry.delete(0, "end"), self.bill_date_entry.insert(0, d)])).pack(side="right", padx=(5, 0))
-        # --- Profile System ---
-        profile_frame = ctk.CTkFrame(outer)
-        profile_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+        # --- Profile System (settings card) ---
+        profile_frame = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
+                                     border_color=("gray85", "gray30"))
+        profile_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
         profile_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(profile_frame, text="Material Profiles:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=8, sticky="w")
         self.profile_var = ctk.StringVar(value="")
@@ -178,9 +199,10 @@ class MaterialEntryTab(BaseAutomationTab):
         ctk.CTkButton(profile_frame, text="🗑 Delete", width=80,
                       fg_color="#DC2626", hover_color="#B91C1C",
                       command=self._delete_selected_profile).grid(row=0, column=6, padx=5, pady=8)
-        # --- Material Details ---
-        mat_outer = ctk.CTkFrame(outer)
-        mat_outer.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        # --- Material Details (settings card) ---
+        mat_outer = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
+                                 border_color=("gray85", "gray30"))
+        mat_outer.grid(row=3, column=0, sticky="ew", padx=5, pady=5)
         mat_outer.grid_columnconfigure(0, weight=1)
         mat_header = ctk.CTkFrame(mat_outer, fg_color="transparent")
         mat_header.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 2))
@@ -218,14 +240,10 @@ class MaterialEntryTab(BaseAutomationTab):
                                              font=ctk.CTkFont(weight="bold"), anchor="center")
         self.lbl_grand_total.pack(side="left", expand=True, padx=10, pady=6)
         # --- Action Buttons ---
-        action_frame = self._create_action_buttons(outer)
-        action_frame.grid(row=3, column=0, sticky="ew", padx=5, pady=5)
-        # --- Notebook ---
-        notebook = ctk.CTkTabview(outer)
-        notebook.grid(row=4, column=0, sticky="nsew", padx=5, pady=5)
-        outer.grid_rowconfigure(4, weight=1)
-        # Work Key Input Tab
-        batch_tab = notebook.add("Input: Work Key & Bill No")
+        action_frame = self._create_action_buttons(settings_tab)
+        action_frame.grid(row=4, column=0, sticky="ew", padx=5, pady=5)
+
+        # ════════════════ INPUT TAB ════════════════
         batch_tab.grid_columnconfigure(0, weight=1)
         batch_tab.grid_rowconfigure(1, weight=1)
         ctk.CTkLabel(batch_tab, text="Format: WorkSearchKey, BillNumber (One per line)\nExample: 25554, 855").grid(row=0, column=0, sticky="w", padx=5, pady=(5, 0))
@@ -241,8 +259,7 @@ class MaterialEntryTab(BaseAutomationTab):
         wk_scroll_x = ctk.CTkScrollbar(wk_frame, orientation="horizontal", command=self.batch_textbox.xview)
         wk_scroll_x.grid(row=1, column=0, sticky="ew")
         self.batch_textbox.configure(yscrollcommand=wk_scroll_y.set, xscrollcommand=wk_scroll_x.set)
-        # Results Tab
-        results_tab = notebook.add("Results")
+        # ════════════════ RESULTS TAB ════════════════
         results_tab.grid_columnconfigure(0, weight=1)
         results_tab.grid_rowconfigure(0, weight=1)
         res_btn_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
@@ -276,8 +293,6 @@ class MaterialEntryTab(BaseAutomationTab):
         res_scroll_x.grid(row=1, column=0, sticky="ew")
         self.results_tree.configure(yscrollcommand=res_scroll_y.set, xscrollcommand=res_scroll_x.set)
         self.style_treeview(self.results_tree)
-        # Logs & Status Tab
-        self._create_log_and_status_area(notebook)
     # =========================================================================
     # DYNAMIC MATERIAL ROWS
     # =========================================================================

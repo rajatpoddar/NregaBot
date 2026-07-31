@@ -20,8 +20,8 @@ from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -40,27 +40,33 @@ class DelWorkAllocTab(BaseAutomationTab):
         
         # Configure Grid Layout
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1) 
+        self.grid_rowconfigure(3, weight=1) 
         
         self._create_widgets()
     def _create_widgets(self) -> None:
         """Initializes and packs the UI components."""
+
+        # --- Header / intro card (pending-bills style) ---
+        self._create_header_card(self, "🗑️", "Delete Work Allocation",
+                                 "Delete work allocations for a Panchayat, optionally filtered by date(s).",
+                                 icon_key="emoji_del_work_alloc")
         
-        # --- Section 1: Input Controls ---
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        # --- Section 1: Input Controls (card) ---
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # 1. Panchayat Name Input (with Autocomplete)
-        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=15)
+        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=12)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
-        self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=5, pady=15)
+        self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=5, pady=12)
 
         # 2. Date Filter Input (Multiple Dates Support)
         date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        date_frame.grid(row=0, column=2, sticky='e', padx=15, pady=15)
+        date_frame.grid(row=0, column=2, sticky='e', padx=15, pady=12)
 
         ctk.CTkLabel(date_frame, text="From Date(s):").pack(side="left", padx=(5, 5))
         
@@ -80,7 +86,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         self.cal_btn.pack(side="left", padx=2)
 
         # 3. Explanatory Note
-        note_text = "Note: Optional. Select or type multiple dates separated by commas to delete specific allocations. Leave empty to delete ALL."
+        note_text = "💡 Optional: type multiple dates separated by commas to delete specific allocations. Leave empty to delete ALL."
         note_label = ctk.CTkLabel(
             controls_frame, 
             text=note_text, 
@@ -88,7 +94,7 @@ class DelWorkAllocTab(BaseAutomationTab):
             text_color="gray60", 
             justify="left"
         )
-        note_label.grid(row=1, column=0, columnspan=3, sticky="w", padx=15, pady=(0, 10))
+        note_label.grid(row=1, column=0, columnspan=3, sticky="w", padx=15, pady=(0, 12))
 
         # --- Section 2: Action Buttons (Start/Stop) ---
         action_frame = self._create_action_buttons(parent_frame=self)

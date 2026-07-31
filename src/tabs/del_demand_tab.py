@@ -8,8 +8,8 @@ from src import config
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class DelDemandTab(BaseAutomationTab):
     """
@@ -25,29 +25,35 @@ class DelDemandTab(BaseAutomationTab):
         super().__init__(parent, app_instance, automation_key="del_demand")
         
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1) 
+        self.grid_rowconfigure(3, weight=1) 
         
         self._create_widgets()
     def _create_widgets(self) -> None:
-        # --- Section 1: Input Controls ---
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        # --- Header / intro card (pending-bills style) ---
+        self._create_header_card(self, "🗑️", "Delete Demand",
+                                 "Delete demands for one village, or all villages in a Panchayat, on the portal.",
+                                 icon_key="emoji_del_demand")
+
+        # --- Section 1: Input Controls (card) ---
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
         controls_frame.grid_columnconfigure(1, weight=1)
         controls_frame.grid_columnconfigure(3, weight=1)
 
         # 1. Panchayat Name Input
-        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=15)
+        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=12)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
-        self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=5, pady=15)
+        self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=5, pady=12)
 
         # 2. Village Name Input (Optional)
-        ctk.CTkLabel(controls_frame, text="Village Name:").grid(row=0, column=2, sticky='w', padx=(15, 5), pady=15)
+        ctk.CTkLabel(controls_frame, text="Village Name:").grid(row=0, column=2, sticky='w', padx=(15, 5), pady=12)
         v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
         self.village_var = ctk.StringVar()
         self.village_menu = ctk.CTkOptionMenu(controls_frame, variable=self.village_var, values=v_vals)
-        self.village_menu.grid(row=0, column=3, sticky='ew', padx=(5, 15), pady=15)
+        self.village_menu.grid(row=0, column=3, sticky='ew', padx=(5, 15), pady=12)
 
         # Filter villages when panchayat changes
         def _on_panchayat_change(*_):
@@ -61,17 +67,17 @@ class DelDemandTab(BaseAutomationTab):
         self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # 3. Explanatory Note
-        note_text = "Note: If Village Name is left empty, the bot will process ALL villages in the selected Panchayat."
+        note_text = "💡 If Village Name is left empty, the bot will process ALL villages in the selected Panchayat."
         note_label = ctk.CTkLabel(controls_frame, text=note_text, font=ctk.CTkFont(size=11, slant="italic"), text_color="gray60")
-        note_label.grid(row=1, column=0, columnspan=4, sticky="w", padx=15, pady=(0, 10))
+        note_label.grid(row=1, column=0, columnspan=4, sticky="w", padx=15, pady=(0, 12))
 
         # --- Section 2: Action Buttons ---
         action_frame = self._create_action_buttons(parent_frame=self)
-        action_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0,10))
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0,10))
 
         # --- Section 3: Data Notebook ---
         data_notebook = ctk.CTkTabview(self)
-        data_notebook.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0,10))
+        data_notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0,10))
         
         results_tab = data_notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=data_notebook)

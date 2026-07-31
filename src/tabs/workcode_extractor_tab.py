@@ -3,6 +3,7 @@ import tkinter
 import customtkinter as ctk
 import re
 import webbrowser
+from src import config
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class WorkcodeExtractorTab(ctk.CTkFrame):
@@ -16,11 +17,32 @@ class WorkcodeExtractorTab(ctk.CTkFrame):
         main_container = ctk.CTkFrame(self, fg_color="transparent")
         main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         main_container.grid_columnconfigure((0, 1), weight=1)
-        main_container.grid_rowconfigure(1, weight=1)
+        main_container.grid_rowconfigure(2, weight=1)
+
+        # ── Header card (inline — plain CTkFrame tab, no BaseAutomationTab) ──
+        hdr_icon = None
+        try:
+            hdr_icon = self.app.icon_images.get_sized("emoji_wc_extractor", (20, 20))
+        except Exception:
+            hdr_icon = None
+        header = ctk.CTkFrame(main_container, fg_color=("gray95", "gray20"), corner_radius=12)
+        header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, 8))
+        ctk.CTkLabel(
+            header, text=" Workcode Extractor" if hdr_icon is not None else "🔧 Workcode Extractor",
+            image=hdr_icon, compound="left",
+            font=ctk.CTkFont(size=17, weight="bold"),
+            text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
+        ).pack(anchor="w", padx=14, pady=(10, 0))
+        ctk.CTkLabel(
+            header, text="Paste the MR Tracking table and extract workcodes / wagelist IDs instantly.",
+            font=ctk.CTkFont(size=12),
+            text_color=(config.COLORS["text_dark_alt"], config.COLORS["text_light"])
+        ).pack(anchor="w", padx=14, pady=(0, 10))
 
         # --- Input Frame (Left Side) ---
-        input_frame = ctk.CTkFrame(main_container)
-        input_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 5))
+        input_frame = ctk.CTkFrame(main_container, corner_radius=12, border_width=1,
+                                   border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        input_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 5))
         input_frame.grid_columnconfigure(0, weight=1)
         input_frame.grid_rowconfigure(2, weight=1)
 
@@ -29,7 +51,7 @@ class WorkcodeExtractorTab(ctk.CTkFrame):
         note_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
         note_frame.grid(row=1, column=0, sticky="w", padx=15, pady=(2, 8))
         
-        ctk.CTkLabel(note_frame, text="Note: Go to the ").pack(side="left")
+        ctk.CTkLabel(note_frame, text="💡 Note: Go to the ").pack(side="left")
         
         link_label = ctk.CTkLabel(note_frame, text="MR Tracking Page", text_color=("#0000EE", "#ADD8E6"), cursor="hand2")
         link_label.pack(side="left")
@@ -42,8 +64,9 @@ class WorkcodeExtractorTab(ctk.CTkFrame):
         self.input_text.grid(row=2, column=0, sticky="nsew", padx=15, pady=(0, 15))
 
         # --- Output Frame (Right Side) ---
-        output_frame = ctk.CTkFrame(main_container)
-        output_frame.grid(row=1, column=1, sticky="nsew", padx=(5, 0))
+        output_frame = ctk.CTkFrame(main_container, corner_radius=12, border_width=1,
+                                    border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        output_frame.grid(row=2, column=1, sticky="nsew", padx=(5, 0))
         output_frame.grid_columnconfigure(0, weight=1)
         output_frame.grid_rowconfigure(1, weight=1)
         
@@ -59,8 +82,8 @@ class WorkcodeExtractorTab(ctk.CTkFrame):
         self.output_text.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 15))
         
         # --- Action Buttons (Top) ---
-        action_frame = ctk.CTkFrame(main_container)
-        action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        action_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        action_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 6))
         action_frame.grid_columnconfigure(1, weight=1)
         
         self.extract_button = ctk.CTkButton(action_frame, text="▶ Extract Codes", command=self._extract_codes)

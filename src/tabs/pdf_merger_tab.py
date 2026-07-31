@@ -13,7 +13,7 @@ class PDFMergerTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="pdf_merger")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(4, weight=1) 
+        self.grid_rowconfigure(5, weight=1) 
         
         self.selected_files = [] 
 
@@ -26,9 +26,15 @@ class PDFMergerTab(BaseAutomationTab):
         return color
 
     def _create_widgets(self) -> None:
+        # ── Header card ──
+        self._create_header_card(self, "🗂️", "PDF Merger",
+                                 "Merge multiple PDFs in order, name the output and save as one file.",
+                                 icon_key="emoji_pdf_merger")
+
         # --- Controls Frame ---
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 0))
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        controls_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 6))
         controls_frame.grid_columnconfigure(0, weight=1)
         controls_frame.grid_rowconfigure(1, weight=1) 
 
@@ -81,8 +87,9 @@ class PDFMergerTab(BaseAutomationTab):
         self.remove_button.pack(pady=5)
         
         # --- Output File Name ---
-        output_name_frame = ctk.CTkFrame(self)
-        output_name_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(10, 0))
+        output_name_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                         border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        output_name_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 6))
         output_name_frame.grid_columnconfigure(1, weight=1)
         
         ctk.CTkLabel(output_name_frame, text="Output File Name:").grid(row=0, column=0, sticky="w", padx=15, pady=10)
@@ -91,14 +98,14 @@ class PDFMergerTab(BaseAutomationTab):
 
         # --- Action Buttons ---
         action_frame = self._create_action_buttons(parent_frame=self)
-        action_frame.grid(row=3, column=0, sticky="ew", pady=10, padx=10) 
+        action_frame.grid(row=4, column=0, sticky="ew", padx=10, pady=(0, 6)) 
         
         self.start_button.configure(text="Merge Selected PDFs")
         self.reset_button.configure(text="Clear List")
         
         # --- Logs ---
         notebook = ctk.CTkTabview(self)
-        notebook.grid(row=4, column=0, sticky="nsew", padx=10, pady=(0, 10)) 
+        notebook.grid(row=5, column=0, sticky="nsew", padx=10, pady=(0, 10)) 
         self._create_log_and_status_area(parent_notebook=notebook)
         self.progress_bar.pack_forget()
 

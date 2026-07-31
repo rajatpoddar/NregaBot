@@ -12,8 +12,8 @@ from .date_entry_widget import DateEntry
 from .demand_tab import CloudFilePicker 
 from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -41,13 +41,20 @@ class WcGenTab(BaseAutomationTab):
         settings_tab = notebook.add("Settings")
         results_tab = notebook.add("Results")
 
-        settings_tab.grid_rowconfigure(0, weight=1)
+        settings_tab.grid_rowconfigure(1, weight=1)
         settings_tab.grid_columnconfigure(0, weight=1)
         results_tab.grid_rowconfigure(1, weight=1)
         results_tab.grid_columnconfigure(0, weight=1)
 
-        settings_container = ctk.CTkScrollableFrame(settings_tab, label_text="Configuration & Actions")
-        settings_container.grid(row=0, column=0, sticky="nsew")
+        # ── Header card ──
+        self._create_header_card(settings_tab, "🧱", "Work Code Generation",
+                                 "Generate work codes on the NREGA portal from a CSV file.",
+                                 icon_key="emoji_wc_gen")
+
+        # ── Settings card (bordered scrollable, pending-bills style) ──
+        settings_container = ctk.CTkScrollableFrame(settings_tab, corner_radius=12,
+                                                    border_width=1, border_color=("gray85", "gray30"))
+        settings_container.grid(row=1, column=0, sticky="nsew", padx=12, pady=6)
         settings_container.grid_columnconfigure(0, weight=1)
         
         step1_frame = ctk.CTkFrame(settings_container)
@@ -82,16 +89,13 @@ class WcGenTab(BaseAutomationTab):
         self.load_button = ctk.CTkButton(panchayat_frame, text="Load Categories from Website", command=self._start_category_loading_thread)
         self.load_button.grid(row=1, column=0, columnspan=2, padx=5, pady=(5,10), sticky="ew")
 
-        action_frame = self._create_action_buttons(parent_frame=settings_container)
-        action_frame.grid(row=1, column=0, sticky="ew", padx=0, pady=10)
-        
         integration_frame = ctk.CTkFrame(settings_container)
-        integration_frame.grid(row=2, column=0, sticky='ew', pady=(0, 10))
+        integration_frame.grid(row=1, column=0, sticky='ew', pady=(0, 10))
         self.send_to_if_edit_switch = ctk.CTkSwitch(integration_frame, text="Auto-send successful work codes to IF Editor")
         self.send_to_if_edit_switch.grid(row=0, column=0, padx=15, pady=10)
 
         self.step2_frame = ctk.CTkFrame(settings_container)
-        self.step2_frame.grid(row=3, column=0, sticky='ew', pady=(0, 10))
+        self.step2_frame.grid(row=2, column=0, sticky='ew', pady=(0, 10))
         self.step2_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(self.step2_frame, text="Step 2: Configure Work Details", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, padx=15, pady=(10, 5), sticky="w")
         self._create_field(self.step2_frame, "master_category", "Master Category", 1, is_dropdown=True)
@@ -119,7 +123,7 @@ class WcGenTab(BaseAutomationTab):
         self.pdf_label.pack(side="left", padx=10)
 
         step3_frame = ctk.CTkFrame(settings_container)
-        step3_frame.grid(row=4, column=0, sticky='ew', pady=(0, 10))
+        step3_frame.grid(row=3, column=0, sticky='ew', pady=(0, 10))
         step3_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(step3_frame, text="Step 3: Select Data File", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=3, padx=15, pady=(10, 5), sticky="w")
         
@@ -140,7 +144,11 @@ class WcGenTab(BaseAutomationTab):
         
         self.file_label = ctk.CTkLabel(step3_frame, text="No file selected", text_color="gray")
         self.file_label.grid(row=2, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 10))
-        
+
+        # ── Action buttons (OUTSIDE the card) ──
+        action_frame = self._create_action_buttons(parent_frame=settings_tab)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=6)
+
         # Initialize as disabled to prevent editing before loading
         self.set_ui_state(running=False, force_disable_form=True)
         # Ensure PDF button starts disabled until categories are loaded (or you can leave it enabled)
@@ -251,13 +259,15 @@ class WcGenTab(BaseAutomationTab):
         )
 
     def _create_field(self, parent, key, text, row, is_dropdown=False):
-        ctk.CTkLabel(parent, text=text).grid(row=row, column=0, sticky="w", padx=15, pady=5)
+        """Label + field stored in self.ui_fields[key] (base implementation)."""
         if is_dropdown:
-            widget = ctk.CTkOptionMenu(parent, values=[], state="disabled", command=lambda choice, k=key: self._on_dropdown_select(k, choice))
-        else:
-            widget = ctk.CTkEntry(parent, state="disabled")
-        widget.grid(row=row, column=1, sticky="ew", padx=15, pady=5)
-        self.ui_fields[key] = widget
+            return super()._create_field(
+                parent, key, text, row, col=0, widget_type="dropdown", store="ui_fields",
+                values=[], state="disabled",
+                command=lambda choice, k=key: self._on_dropdown_select(k, choice))
+        return super()._create_field(
+            parent, key, text, row, col=0, widget_type="entry",
+            store="ui_fields", state="disabled")
         
     def _populate_defaults(self):
         cfg = config.WC_GEN_CONFIG["defaults"]
@@ -527,7 +537,7 @@ class WcGenTab(BaseAutomationTab):
             self.app.after_idle(self._update_next_combobox, current['next'], new_options, list(dependency_map.keys()))
         except Exception as e:
             error_message = str(e).splitlines()[0]
-            self.log_error(f"Error updating dropdown: {msg}")
+            self.log_error(f"Error updating dropdown: {error_message}")
 
     def _update_next_combobox(self, next_key, options, all_keys):
         self.ui_fields[next_key].configure(values=options, state="normal")

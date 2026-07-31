@@ -9,22 +9,28 @@ from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoAlertPresentException, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class MsrTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="msr")
-        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(3, weight=1)
         self._create_widgets()
     def _create_widgets(self) -> None:
 
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        # --- Header / intro card (P7.2: pending-bills style) ---
+        self._create_header_card(self, "💵", "MR Payment (MSR)",
+                                 "Process & verify Muster Roll payments against the sanctioned wage amount.",
+                                 icon_key="emoji_mr_payment")
+
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         controls_frame.grid_columnconfigure((0, 1), weight=1)
         
         panchayat_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        panchayat_frame.grid(row=0, column=0, sticky='ew', padx=15, pady=(10,0))
+        panchayat_frame.grid(row=0, column=0, sticky='new', padx=15, pady=(10,0))
         ctk.CTkLabel(panchayat_frame, text="Panchayat Name", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
@@ -33,20 +39,20 @@ class MsrTab(BaseAutomationTab):
 
         
         amount_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        amount_frame.grid(row=0, column=1, sticky='ew', padx=15, pady=(10,0))
+        amount_frame.grid(row=0, column=1, sticky='new', padx=15, pady=(10,0))
         ctk.CTkLabel(amount_frame, text="Verify Amount (₹)", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         self.verify_amount_entry = ctk.CTkEntry(amount_frame)
         self.verify_amount_entry.insert(0, "300")
         self.verify_amount_entry.pack(fill='x', pady=(5,0))
         ctk.CTkLabel(amount_frame, text="Reject if amount does not match this value.", text_color="gray50").pack(anchor='w')
 
-        ctk.CTkLabel(controls_frame, text="ℹ️ Note: If using GP Login, Panchayat selection is not required and will be skipped.", text_color="gray50").grid(row=1, column=0, columnspan=2, sticky='w', padx=15, pady=(10,0))
+        ctk.CTkLabel(controls_frame, text="💡 Note: If using GP Login, Panchayat selection is not required and will be skipped.", text_color="gray50").grid(row=1, column=0, columnspan=2, sticky='w', padx=15, pady=(10,15))
 
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(15, 15))
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky='ew', padx=10, pady=(0, 10))
 
         data_notebook = ctk.CTkTabview(self)
-        data_notebook.grid(row=1, column=0, sticky="nsew")
+        data_notebook.grid(row=3, column=0, sticky="nsew")
         work_codes_frame = data_notebook.add("Work Codes"); results_frame = data_notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=data_notebook)
 

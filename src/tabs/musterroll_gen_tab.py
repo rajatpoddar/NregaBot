@@ -18,8 +18,8 @@ from src import config
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class MusterrollGenTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
@@ -37,13 +37,31 @@ class MusterrollGenTab(BaseAutomationTab):
         self._load_mapping_data()
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(1, weight=1)
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
-        # This frame holds all the user input fields
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10,0))
+        # --- Header / intro card (P7.2: pending-bills style) ---
+        self._create_header_card(self, "📄", "Muster Roll Generation",
+                                 "Generate Muster Rolls for workers between the selected dates.",
+                                 icon_key="emoji_mr_gen")
+
+        # --- Main Notebook (Settings | Work Search Keys | Results | Logs) ---
+        data_notebook = ctk.CTkTabview(self)
+        data_notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0,10))
+        settings_tab = data_notebook.add("Settings")
+        work_codes_tab = data_notebook.add("Work Search Keys (or auto)")
+        results_tab = data_notebook.add("Results")
+        self._create_log_and_status_area(parent_notebook=data_notebook)
+
+        # ════════════════ SETTINGS TAB ════════════════
+        settings_tab.grid_columnconfigure(0, weight=1)
+        settings_tab.grid_rowconfigure(0, weight=1)
+
+        # This frame holds all the user input fields (bordered card)
+        controls_frame = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
         controls_frame.grid_columnconfigure((1,3), weight=1)
         
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=(15,0))
@@ -54,7 +72,7 @@ class MusterrollGenTab(BaseAutomationTab):
         self.panchayat_menu.grid(row=0, column=1, columnspan=3, sticky='ew', padx=15, pady=(15,0))
         
         # --- Start Date ---
-        ctk.CTkLabel(controls_frame, text="तारीख से (DD/MM/YYYY):").grid(row=2, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text="तारीख से:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
         start_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         start_date_frame.grid(row=2, column=1, sticky='ew', padx=(15,5), pady=5)
         self.start_date_entry = ctk.CTkEntry(start_date_frame, placeholder_text="DD/MM/YYYY")
@@ -63,7 +81,7 @@ class MusterrollGenTab(BaseAutomationTab):
                     command=lambda: self.open_date_picker(lambda d: [self.start_date_entry.delete(0, "end"), self.start_date_entry.insert(0, d)])).pack(side="right", padx=(5,0))
 
         # --- End Date ---
-        ctk.CTkLabel(controls_frame, text="तारीख को (DD/MM/YYYY):").grid(row=2, column=2, sticky='w', padx=10, pady=5)
+        ctk.CTkLabel(controls_frame, text="तारीख को:").grid(row=2, column=2, sticky='w', padx=10, pady=5)
         end_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         end_date_frame.grid(row=2, column=3, sticky='ew', padx=(5,15), pady=5)
         self.end_date_entry = ctk.CTkEntry(end_date_frame, placeholder_text="DD/MM/YYYY")
@@ -110,18 +128,11 @@ class MusterrollGenTab(BaseAutomationTab):
         self.scale_slider.grid(row=0, column=0, sticky="ew")
         self.scale_label = ctk.CTkLabel(scale_frame, text="75%", width=40)
         self.scale_label.grid(row=0, column=1, padx=(10, 0))
-        ctk.CTkLabel(controls_frame, text="ℹ️ Generated MRs are saved in 'Downloads/NregaBot/MR_Output'.", text_color="gray50").grid(row=6, column=2, columnspan=2, sticky='e', padx=15, pady=(10,15))
+        ctk.CTkLabel(controls_frame, text="💡 Generated MRs are saved in 'Downloads/NregaBot/MR_Output'.", text_color="gray50").grid(row=6, column=2, columnspan=2, sticky='e', padx=15, pady=(10,15))
         
-        action_frame_container = ctk.CTkFrame(self)
-        action_frame_container.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
-        action_frame = self._create_action_buttons(parent_frame=action_frame_container)
-        action_frame.pack(expand=True, fill='x')
-
-        data_notebook = ctk.CTkTabview(self)
-        data_notebook.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0,10))
-        work_codes_tab = data_notebook.add("Work Search Keys (or auto)")
-        results_tab = data_notebook.add("Results")
-        self._create_log_and_status_area(parent_notebook=data_notebook)
+        # Action Buttons (Start, Stop, Reset) — outside the card
+        action_frame = self._create_action_buttons(parent_frame=settings_tab)
+        action_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(5, 15))
         
         work_codes_tab.grid_columnconfigure(0, weight=1)
         work_codes_tab.grid_rowconfigure(1, weight=1)
@@ -186,10 +197,20 @@ class MusterrollGenTab(BaseAutomationTab):
         self.save_to_cloud_checkbox.configure(state=state)
         
         self.export_button.configure(state=state)
-        self.export_format_menu.configure(state=state)
-        self.export_filter_menu.configure(state=state)
+        for menu_name in ("export_format_menu", "export_filter_menu"):
+            menu = getattr(self, menu_name, None)
+            if menu is not None:
+                try:
+                    menu.configure(state=state)
+                except Exception:
+                    pass
         self.merge_pdfs_button.configure(state=state)
-        if state == "normal": self._on_format_change(self.export_format_menu.get())
+        if (state == "normal" and hasattr(self, "_on_format_change")
+                and getattr(self, "export_format_menu", None) is not None):
+            try:
+                self._on_format_change(self.export_format_menu.get())
+            except Exception:
+                pass
 
     def _load_mapping_data(self):
         """Load panchayat→staff mapping from JSON, normalizing keys to lowercase for case-insensitive lookup."""

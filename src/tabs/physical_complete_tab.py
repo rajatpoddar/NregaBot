@@ -15,8 +15,8 @@ from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Keys, Select, WebDriverWait, EC, NoAlertPresentException, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class PhysicalCompleteTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
@@ -36,10 +36,17 @@ class PhysicalCompleteTab(BaseAutomationTab):
         main_container = ctk.CTkFrame(self, fg_color="transparent")
         main_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         main_container.grid_columnconfigure(0, weight=1)
+        main_container.grid_rowconfigure(3, weight=1)
 
-        # --- Input Frame ---
-        input_frame = ctk.CTkFrame(main_container)
-        input_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        # ── Header card ──
+        self._create_header_card(main_container, "✅", "Physical Complete",
+                                 "Mark works as physically complete on the portal for the selected Panchayat.",
+                                 icon_key="emoji_physical_complete")
+
+        # --- Input Frame (bordered card) ---
+        input_frame = ctk.CTkFrame(main_container, corner_radius=12, border_width=1,
+                                   border_color=("gray85", "gray30"))
+        input_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
         input_frame.grid_columnconfigure(1, weight=1)
 
         # Row 0: Panchayat
@@ -70,13 +77,13 @@ class PhysicalCompleteTab(BaseAutomationTab):
         )
         self.auto_forward_checkbox.grid(row=2, column=1, columnspan=3, padx=15, pady=(5, 15), sticky="w")
 
-        # Action Buttons (Row 1 of Main Container)
-        action_frame = self._create_action_buttons(main_container)
-        action_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
+        # Action Buttons (OUTSIDE the card)
+        action_frame = self._create_action_buttons(parent_frame=main_container)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=6)
 
-        # Data Notebook (Row 2 of Main Container)
+        # Data Notebook
         notebook = ctk.CTkTabview(main_container)
-        notebook.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
+        notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=10)
         
         work_codes_tab = notebook.add("Work Codes to Complete")
         results_tab = notebook.add("Results")

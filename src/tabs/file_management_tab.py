@@ -30,11 +30,30 @@ class FileManagementTab(ctk.CTkFrame):
         self._create_widgets()
         self.refresh_files()
     def _create_widgets(self) -> None:
-        header_frame = ctk.CTkFrame(self)
-        header_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        header_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                    border_color=("gray85", "gray30"), fg_color=("gray95", "gray20"))
+        header_frame.grid(row=0, column=0, padx=10, pady=(10, 6), sticky="ew")
         header_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(header_frame, text="Cloud File Manager", font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
+        # Header title with PNG icon (emoji fallback if icon fails to load)
+        fm_icon = None
+        try:
+            fm_icon = self.app.icon_images.get_sized("emoji_file_manager", (20, 20))
+        except Exception:
+            fm_icon = None
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.grid(row=0, column=0, padx=15, pady=10, sticky="w")
+        ctk.CTkLabel(
+            title_frame, text=" Cloud File Manager" if fm_icon is not None else "📁 Cloud File Manager",
+            image=fm_icon, compound="left",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("#1D4ED8", "#60A5FA")
+        ).pack(side="left")
+        ctk.CTkLabel(
+            title_frame, text="Your cloud files, folders and shared links",
+            font=ctk.CTkFont(size=11),
+            text_color=("#475569", "#94A3B8")
+        ).pack(side="left", padx=(10, 0))
 
         storage_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
         storage_frame.grid(row=0, column=1, padx=15, pady=10, sticky="e")
@@ -48,8 +67,9 @@ class FileManagementTab(ctk.CTkFrame):
         self.upgrade_storage_button.pack(anchor="e", pady=(5,0))
 
 
-        nav_frame = ctk.CTkFrame(self)
-        nav_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="ew")
+        nav_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                 border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        nav_frame.grid(row=1, column=0, padx=10, pady=(0, 6), sticky="ew")
         nav_frame.grid_columnconfigure(1, weight=1)
 
         controls_frame = ctk.CTkFrame(nav_frame, fg_color="transparent")

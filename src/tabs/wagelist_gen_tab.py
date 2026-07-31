@@ -12,15 +12,15 @@ from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger, truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, PrintOptions, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
 class WagelistGenTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="gen")
-        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(0, weight=1)
         self._create_widgets()
     def _create_widgets(self) -> None:
 
@@ -39,11 +39,17 @@ class WagelistGenTab(BaseAutomationTab):
 
         # ================== SETTINGS TAB ==================
         settings_tab.grid_columnconfigure(0, weight=1)
-        settings_tab.grid_rowconfigure(0, weight=1) 
+        settings_tab.grid_rowconfigure(1, weight=1)  # controls card expands (row 1)
         
-        # Controls Container (Scrollable or Frame)
-        controls_frame = ctk.CTkFrame(settings_tab)
-        controls_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        # ── Header / intro card (pending-bills style) ──
+        self._create_header_card(settings_tab, "📄", "Wagelist Generation",
+                                 "Generate wagelists for pending work codes and optionally auto-send them.",
+                                 icon_key="emoji_gen_wagelist")
+        
+        # Controls Container (Scrollable or Frame) in a card
+        controls_frame = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         controls_frame.grid_columnconfigure(1, weight=1)
         
         # --- 1. Agency Entry ---
@@ -54,7 +60,7 @@ class WagelistGenTab(BaseAutomationTab):
         self.agency_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15,0))
         
         # Note for Macro usage
-        ctk.CTkLabel(controls_frame, text="Note: Use 'Macro Manager' tab for bulk processing multiple Panchayats.", text_color="gray60", font=ctk.CTkFont(size=11)).grid(row=1, column=1, sticky='w', padx=15, pady=(5,10))
+        ctk.CTkLabel(controls_frame, text="💡 Use 'Macro Manager' tab for bulk processing multiple Panchayats.", text_color="gray60", font=ctk.CTkFont(size=11)).grid(row=1, column=1, sticky='w', padx=15, pady=(5,10))
         
         # --- 2. Settings Checkboxes ---
         self.save_pdf_var = ctk.StringVar(value="off")
@@ -66,14 +72,14 @@ class WagelistGenTab(BaseAutomationTab):
 
         self.send_to_sender_var = ctk.StringVar(value="on")
         self.send_to_sender_checkbox = ctk.CTkCheckBox(
-            controls_frame, text="✓ Auto-start 'Send Wagelist' automation after generation completes",
+            controls_frame, text="✓ Auto-start 'Send Wagelist' automation after generation completes (sends only the generated ones)",
             variable=self.send_to_sender_var, onvalue="on", offvalue="off"
         )
         self.send_to_sender_checkbox.grid(row=3, column=0, columnspan=2, sticky='w', padx=15, pady=10)
 
-        # Action Buttons (Start/Stop)
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=4, column=0, columnspan=2, sticky='ew', pady=(20, 15))
+        # Action Buttons (Start/Stop) — outside the card
+        action_frame = self._create_action_buttons(parent_frame=settings_tab)
+        action_frame.grid(row=2, column=0, sticky='ew', padx=10, pady=(0, 15))
 
         # ================== RESULTS TAB ==================
         results_tab.grid_columnconfigure(0, weight=1)
@@ -337,10 +343,10 @@ class WagelistGenTab(BaseAutomationTab):
             if self.send_to_sender_var.get() == "on" and all_generated_wagelists and not self.is_stopped():
                 self.app.after(0, self.app.set_status, "Auto-starting Send Wagelist...")
                 
-                # Pass auto_start=True to the workflow manager
+                # Pass the FULL generated list so the Send tab only sends these
+                # wagelists (not all of them). auto_start=True triggers it.
                 self.app.after(1000, lambda: self.app.send_wagelist_data_and_switch_tab(
-                    all_generated_wagelists[0], 
-                    all_generated_wagelists[-1],
+                    list(all_generated_wagelists),
                     auto_start=True
                 ))
             else:

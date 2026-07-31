@@ -20,22 +20,24 @@ logger = get_logger()
 
 class DatePickerPopup(ctk.CTkToplevel):
     """
-    R7: Optimized modal popup for selecting a date.
+    Clean, compact modal popup for selecting a date.
 
     Pre-creates all day buttons ONCE in __init__, then reuses them
     on month navigation — no widget destruction/creation overhead.
 
     Features:
     - Centered on the main application window.
-    - Highlights Today (Blue), Mondays (Greenish), and Sundays (Reddish).
+    - Compact rounded day grid with 2-letter weekday headers.
+    - Highlights Today (Blue), Mondays (soft green), Sundays (soft red).
+    - 'Today' shortcut button to jump straight back to the current date.
     """
     def __init__(self, parent: Any, on_date_select: Callable[[str], None]) -> None:
         super().__init__(parent)
         self.on_date_select = on_date_select
         self.title("Select Date")
 
-        # Dimensions
-        width, height = 300, 360
+        # Dimensions (compact & clean)
+        width, height = 285, 330
 
         # Calculate Center Position relative to Parent
         try:
@@ -56,33 +58,37 @@ class DatePickerPopup(ctk.CTkToplevel):
 
         # --- Header Section (Month/Year & Navigation) ---
         self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.header_frame.pack(fill="x", padx=10, pady=(10, 5))
+        self.header_frame.pack(fill="x", padx=10, pady=(12, 4))
 
-        ctk.CTkButton(
-            self.header_frame, text="<", width=30, command=self.prev_month,
-            fg_color="transparent", border_width=1, text_color=("black", "white")
-        ).pack(side="left")
+        nav_style = {
+            "width": 32, "height": 30, "corner_radius": 8,
+            "fg_color": ("gray88", "gray25"), "hover_color": ("gray75", "gray38"),
+            "text_color": ("black", "white"), "font": ctk.CTkFont(size=13, weight="bold"),
+        }
+        ctk.CTkButton(self.header_frame, text="◀", command=self.prev_month, **nav_style).pack(side="left")
 
-        self.lbl_month_year = ctk.CTkLabel(self.header_frame, text="", font=("Arial", 16, "bold"))
+        self.lbl_month_year = ctk.CTkLabel(
+            self.header_frame, text="",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
+        )
         self.lbl_month_year.pack(side="left", expand=True)
 
-        ctk.CTkButton(
-            self.header_frame, text=">", width=30, command=self.next_month,
-            fg_color="transparent", border_width=1, text_color=("black", "white")
-        ).pack(side="right")
+        ctk.CTkButton(self.header_frame, text="▶", command=self.next_month, **nav_style).pack(side="right")
 
         # --- Calendar Grid Section ---
         self.cal_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.cal_frame.pack(expand=True, fill="both", padx=10, pady=5)
+        self.cal_frame.pack(expand=True, fill="both", padx=10, pady=(2, 2))
 
-        # Pre-create weekday headers ONCE (never destroyed)
-        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        # Pre-create weekday headers ONCE (never destroyed) — 2-letter, muted
+        days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
         for i, day_name in enumerate(days):
-            t_color = "red" if i == 6 else ("gray30", "gray70")
+            t_color = (config.COLORS["red_text"], config.COLORS["red_text_light"]) if i == 6 \
+                else (config.COLORS["text_medium"], config.COLORS["text_light"])
             ctk.CTkLabel(
                 self.cal_frame, text=day_name,
-                font=("Arial", 12, "bold"), text_color=t_color
-            ).grid(row=0, column=i, padx=2, pady=5)
+                font=ctk.CTkFont(size=11, weight="bold"), text_color=t_color
+            ).grid(row=0, column=i, padx=2, pady=(0, 4))
 
         # Pre-create 42 reusable day buttons (6 rows x 7 cols)
         self.day_buttons = []  # 2D list: day_buttons[row][col]
@@ -90,9 +96,9 @@ class DatePickerPopup(ctk.CTkToplevel):
             row_btns = []
             for c in range(7):
                 btn = ctk.CTkButton(
-                    self.cal_frame, text="", width=35, height=35,
+                    self.cal_frame, text="", width=32, height=30, corner_radius=8,
                     fg_color="transparent",
-                    hover_color=("gray80", "gray30"),
+                    hover_color=("gray80", "gray32"),
                     text_color=("black", "white"),
                     command=lambda d=0: self._on_day_click(d)
                 )
@@ -102,6 +108,18 @@ class DatePickerPopup(ctk.CTkToplevel):
 
         # Populate buttons for current month
         self._update_calendar()
+
+        # --- Footer: Today shortcut ---
+        self.footer_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.footer_frame.pack(fill="x", padx=10, pady=(4, 10))
+        ctk.CTkButton(
+            self.footer_frame, text="📅 Today", width=80, height=28, corner_radius=8,
+            fg_color=(config.COLORS["blue"], config.COLORS["blue_hover"]),
+            hover_color=(config.COLORS["blue_hover"], config.COLORS["blue_dark"]),
+            text_color="white", font=ctk.CTkFont(size=12, weight="bold"),
+            command=self._select_today
+        ).pack(side="right")
+
         self.focus_force()
 
     def _on_day_click(self, day: int) -> None:
@@ -111,9 +129,17 @@ class DatePickerPopup(ctk.CTkToplevel):
             self.on_date_select(selected_date)
             self.destroy()
 
+    def _select_today(self) -> None:
+        """Jump back to the current month and select today."""
+        now = datetime.now()
+        self.current_year = now.year
+        self.current_month = now.month
+        self._update_calendar()
+        self._on_day_click(now.day)
+
     def _update_calendar(self) -> None:
         """
-        R7: Reuses pre-created day buttons instead of destroying/creating widgets.
+        Reuses pre-created day buttons instead of destroying/creating widgets.
         Only updates text, colors, and commands — no widget creation overhead.
         """
         # Update header
@@ -130,12 +156,12 @@ class DatePickerPopup(ctk.CTkToplevel):
                 if day != 0:
                     # Defaults
                     fg = "transparent"
-                    hov = ("gray80", "gray30")
+                    hov = ("gray80", "gray32")
                     txt = ("black", "white")
 
-                    if c == 0:  # Monday — Greenish
+                    if c == 0:  # Monday — soft green
                         fg = (config.COLORS["green_very_light"], config.COLORS["green_dark_btn"])
-                    elif c == 6:  # Sunday — Reddish
+                    elif c == 6:  # Sunday — soft red
                         fg = (config.COLORS["red_very_light"], config.COLORS["red_dark"])
                         txt = (config.COLORS["red_text"], config.COLORS["red_text_light"])
 
@@ -154,8 +180,14 @@ class DatePickerPopup(ctk.CTkToplevel):
                         command=lambda d=day: self._on_day_click(d)
                     )
                 else:
-                    # Empty cell — hide button
-                    btn.configure(text="", state="disabled")
+                    # Empty cell — hide button (reset colors so a previously
+                    # highlighted green/red/blue cell doesn't linger as a square)
+                    btn.configure(
+                        text="", state="disabled",
+                        fg_color="transparent",
+                        hover_color=("gray80", "gray32"),
+                        text_color=("black", "white"),
+                    )
 
     def prev_month(self) -> None:
         self.current_month -= 1

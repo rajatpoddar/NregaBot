@@ -16,8 +16,8 @@ from src.utils import resource_path, get_logger
 from .base_tab import BaseAutomationTab
 from src import config
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 logger = get_logger()
 
@@ -26,7 +26,7 @@ class DashboardReportTab(BaseAutomationTab):
         super().__init__(parent, app_instance, automation_key="dashboard_report")
         
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1) 
+        self.grid_rowconfigure(3, weight=1) 
         
         # Columns to scrape (Strictly 4 columns)
         self.report_headers = [
@@ -37,8 +37,15 @@ class DashboardReportTab(BaseAutomationTab):
         self.load_inputs()
     def _create_widgets(self) -> None:
 
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="new", padx=10, pady=10)
+        # ── Header / intro card (pending-bills style) ──
+        self._create_header_card(self, "📈", "Dashboard Report",
+                                 "Scrape the delay-monitoring dashboard for pending E-MRs of a panchayat.",
+                                 icon_key="emoji_dashboard_report")
+
+        # ── Settings card: Location + Delay column ──
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="new", padx=10, pady=(6, 10))
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # --- Input Fields ---
@@ -98,12 +105,12 @@ class DashboardReportTab(BaseAutomationTab):
         self.delay_column_menu = ctk.CTkOptionMenu(controls_frame, variable=self.delay_column_var, values=self.delay_column_options)
         self.delay_column_menu.grid(row=4, column=1, sticky='ew', padx=15, pady=5)
 
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=5, column=0, columnspan=2, pady=10)
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
 
         # --- Output Tabs ---
         notebook = ctk.CTkTabview(self)
-        notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         workcode_tab = notebook.add("Workcode List")
         results_tab = notebook.add("Results Table")
         self._create_log_and_status_area(parent_notebook=notebook)

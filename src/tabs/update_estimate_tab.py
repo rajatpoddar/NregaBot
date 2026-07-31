@@ -8,21 +8,27 @@ from src import config
 from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 class UpdateEstimateTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="update_estimate")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(3, weight=1)
         self._create_widgets()
     def _create_widgets(self) -> None:
 
         """Creates the UI elements for the tab, inspired by the MSR Tab layout."""
-        # --- Top Controls Frame ---
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10,0))
+        # ── Header / intro card (pending-bills style) ──
+        self._create_header_card(self, "📝", "Update Estimate",
+                                 "Update the estimated outcome for multiple work codes in one go.",
+                                 icon_key="emoji_update_estimate")
+
+        # --- Top Controls Frame (settings card) ---
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"))
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(6, 10))
         controls_frame.grid_columnconfigure(0, weight=1)
 
         # Estimated Outcome Input
@@ -33,13 +39,13 @@ class UpdateEstimateTab(BaseAutomationTab):
         self.estimated_outcome_entry.pack(fill='x', pady=(5,0))
         ctk.CTkLabel(outcome_frame, text="This value will be used for all work codes processed.", text_color="gray50").pack(anchor='w')
 
-        # Action Buttons (Start, Stop, Reset)
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=1, column=0, columnspan=2, sticky='ew', pady=15)
+        # Action Buttons (Start, Stop, Reset) — OUTSIDE the card
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky='ew', padx=10, pady=(0, 6))
 
         # --- Main Tab View for Inputs and Results ---
         data_notebook = ctk.CTkTabview(self)
-        data_notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        data_notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         work_codes_frame = data_notebook.add("Work Codes")
         results_frame = data_notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=data_notebook)

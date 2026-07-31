@@ -14,8 +14,8 @@ from .base_tab import BaseAutomationTab
 logger = get_logger()
 from src import config
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
-from ._imports import *  # noqa: F403,F401
 
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -24,7 +24,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         super().__init__(parent, app_instance, automation_key="issued_mr_report")
         
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1) 
+        self.grid_rowconfigure(4, weight=1) 
         
         # Headers for Standard Issued MR Report
         self.report_headers = [
@@ -42,9 +42,15 @@ class IssuedMrReportTab(BaseAutomationTab):
         self.load_inputs()
     def _create_widgets(self) -> None:
 
+        # ── Header card ──
+        self._create_header_card(self, "📄", "Issued MR Report",
+                                 "Pull issued muster-roll reports with workcodes, results and ABPS data.",
+                                 icon_key="emoji_issued_mr_report")
+
         # Frame for all user input controls
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, sticky="new", padx=10, pady=10)
+        controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
+                                      border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
+        controls_frame.grid(row=1, column=0, sticky="new", padx=10, pady=(0, 6))
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # --- Input Fields ---
@@ -92,22 +98,23 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.panchayat_menu.configure(values=vals)
         self.block_var.trace_add("write", _on_block_change)
 
-        action_frame = self._create_action_buttons(parent_frame=controls_frame)
-        action_frame.grid(row=4, column=0, columnspan=2, pady=10)
+        # ── Action buttons (OUTSIDE the card) ──
+        action_frame = self._create_action_buttons(parent_frame=self)
+        action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
 
-        # --- NEW BUTTON FOR ABPS CHECK ---
+        # --- NEW BUTTON FOR ABPS CHECK (next to main actions) ---
         self.btn_abps_check = ctk.CTkButton(
-            controls_frame,
+            self,
             text="Pending demand labour for abps",
             command=self.start_abps_automation,
             fg_color=config.COLORS["purple_report"], # Purple color to distinguish
             hover_color=config.COLORS["purple_report_hover"]
         )
-        self.btn_abps_check.grid(row=5, column=0, columnspan=2, pady=(0, 10))
+        self.btn_abps_check.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 6))
 
         # --- Output Tabs ---
         notebook = ctk.CTkTabview(self)
-        notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        notebook.grid(row=4, column=0, sticky="nsew", padx=10, pady=(0, 10))
         workcode_tab = notebook.add("Workcode List")
         results_tab = notebook.add("Results Table")
         
