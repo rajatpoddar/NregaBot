@@ -57,7 +57,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="nmms_attendance")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)   # full tab is the scrollable area
+        self.grid_rowconfigure(0, weight=1)   # top-level notebook fills the tab
         self._panchayat_data: list = []
         self._config_file = self.app.get_data_path("nmms_inputs.json")
         self._photo_paths_map: dict = {}  # row_index → (photo1_path, photo2_path)
@@ -67,21 +67,27 @@ class NmmsAttendanceTab(BaseAutomationTab):
     # UI
     def _create_widgets(self) -> None:
 
-        # ── Outer scrollable wrapper so the entire tab scrolls ──────────────
-        outer_scroll = ctk.CTkScrollableFrame(self)
-        outer_scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-        outer_scroll.grid_columnconfigure(0, weight=1)
-        # Make rows expand so the notebook fills remaining space
-        outer_scroll.grid_rowconfigure(3, weight=1)
+        # ── Notebook at the TOP — like all other automation tabs ──
+        # Tabs: Settings | MR Summary | Workers Detail | Logs & Status
+        nb = ctk.CTkTabview(self)
+        nb.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        # ── Header card ──
-        self._create_header_card(outer_scroll, "📷", "NMMS Attendance",
+        settings_tab = nb.add("Settings")
+        self._build_summary_tab(nb.add("MR Summary"))
+        self._build_workers_tab(nb.add("Workers Detail"))
+        self._create_log_and_status_area(parent_notebook=nb)  # adds "Logs & Status"
+
+        settings_tab.grid_columnconfigure(0, weight=1)
+        settings_tab.grid_rowconfigure(1, weight=1)
+
+        # ── Header card (inside the Settings tab) ──
+        self._create_header_card(settings_tab, "📷", "NMMS Attendance",
                                  "Record NMMS attendance with date, group photos and geo-coordinates.",
                                  icon_key="emoji_nmms_attendance")
 
-        top = ctk.CTkFrame(outer_scroll, corner_radius=12, border_width=1,
+        top = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
                            border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
-        top.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 6))
+        top.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 6))
         top.grid_columnconfigure(0, weight=1)   # left: date + panchayat selection
         top.grid_columnconfigure(1, weight=1)   # right: instructions
         top.grid_rowconfigure(0, weight=1)
@@ -162,14 +168,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         # Start / Stop / Retry / Reset buttons
         # ── Action buttons (OUTSIDE the card) ──
-        self._create_action_buttons(parent_frame=outer_scroll).grid(row=2, column=0, padx=10, pady=(0, 6))
-
-        # Bottom notebook — placed inside the scrollable wrapper
-        nb = ctk.CTkTabview(outer_scroll)
-        nb.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
-        self._build_summary_tab(nb.add("MR Summary"))
-        self._build_workers_tab(nb.add("Workers Detail"))
-        self._create_log_and_status_area(parent_notebook=nb)
+        self._create_action_buttons(parent_frame=settings_tab).grid(row=2, column=0, padx=10, pady=(0, 6))
 
     def _build_summary_tab(self, tab):
         tab.grid_columnconfigure(0, weight=1)

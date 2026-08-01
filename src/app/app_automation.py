@@ -107,9 +107,21 @@ class AutomationMixin:
             )
 
         def wrapper():
+            # Fresh run: forget any browser choice left over from a previous
+            # run so this automation gets to pick (if multiple browsers).
+            try:
+                self.browser_manager.clear_thread_choice()
+            except Exception:
+                pass
             try:
                 target(*args)
             finally:
+                # Run finished: clear the per-run browser choice so the NEXT
+                # automation asks the user again instead of silently reusing it.
+                try:
+                    self.browser_manager.clear_thread_choice()
+                except Exception:
+                    pass
                 # Calculate duration before cleanup
                 end_time = time.time()
                 tab_instance = getattr(target, '__self__', None)

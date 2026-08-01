@@ -18,6 +18,10 @@ from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException  # n
 
 logger = get_logger()
 
+# Dropdown labels used when the user wants to process ALL panchayats / ALL villages
+ALL_PANCHAYATS_LABEL = "🌐 All Panchayats"
+ALL_VILLAGES_LABEL = "🌐 All Villages"
+
 class EKycReportTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, "ekyc_report")
@@ -63,26 +67,28 @@ class EKycReportTab(BaseAutomationTab):
         # Panchayat Input (Autocomplete Linked to Global History)
         ctk.CTkLabel(input_frame, text="Panchayat:").grid(row=0, column=0, padx=(10, 5), pady=10, sticky="w")
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
-        self.panchayat_var = ctk.StringVar()
-        self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals, width=140)
+        self.panchayat_var = ctk.StringVar(value=ALL_PANCHAYATS_LABEL)
+        self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var,
+                                                values=[ALL_PANCHAYATS_LABEL] + [v for v in p_vals if v], width=140)
         self.panchayat_menu.grid(row=0, column=1, padx=5, pady=10, sticky="ew")
 
         # Village Input (Autocomplete Linked to Global History)
         ctk.CTkLabel(input_frame, text="Village:").grid(row=0, column=2, padx=(10, 5), pady=10, sticky="w")
         v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
-        self.village_var = ctk.StringVar()
-        self.village_menu = ctk.CTkOptionMenu(input_frame, variable=self.village_var, values=v_vals, width=140)
+        self.village_var = ctk.StringVar(value=ALL_VILLAGES_LABEL)
+        self.village_menu = ctk.CTkOptionMenu(input_frame, variable=self.village_var,
+                                              values=[ALL_VILLAGES_LABEL] + [v for v in v_vals if v], width=140)
         self.village_menu.grid(row=0, column=3, padx=5, pady=10, sticky="ew")
 
         # Filter villages when panchayat changes
         def _on_panchayat_change(*_):
             pan = self.panchayat_var.get()
-            if pan:
-                vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or [""]
+            if pan and pan != ALL_PANCHAYATS_LABEL:
+                vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or []
             else:
-                vals = self.app.history_manager.get_suggestions("location_village") or [""]
-            self.village_var.set("")
-            self.village_menu.configure(values=vals)
+                vals = self.app.history_manager.get_suggestions("location_village") or []
+            self.village_var.set(ALL_VILLAGES_LABEL)
+            self.village_menu.configure(values=[ALL_VILLAGES_LABEL] + [v for v in vals if v])
         self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # Filter Dropdown
@@ -92,7 +98,7 @@ class EKycReportTab(BaseAutomationTab):
         self.filter_menu = ctk.CTkOptionMenu(input_frame, variable=self.filter_var, values=["All", "Verified (Yes)", "Not Verified (No)"], width=130)
         self.filter_menu.grid(row=0, column=5, padx=5, pady=10, sticky="ew")
 
-        note_label = ctk.CTkLabel(settings_tab, text="💡 Note: Leave Panchayat empty for ALL panchayats to scan all.",
+        note_label = ctk.CTkLabel(settings_tab, text="💡 Note: Select '🌐 All Panchayats' to scan all panchayats.",
                                   text_color=("gray40", "gray70"), font=("Arial", 11, "italic"))
         note_label.grid(row=1, column=0, sticky="w", padx=20, pady=(6, 4))
 
@@ -229,6 +235,11 @@ class EKycReportTab(BaseAutomationTab):
         try:
             panchayat_target = self.panchayat_var.get().strip()
             village_target = self.village_var.get().strip()
+            # Map the "All" dropdown labels back to empty (process everything)
+            if panchayat_target == ALL_PANCHAYATS_LABEL:
+                panchayat_target = ""
+            if village_target == ALL_VILLAGES_LABEL:
+                village_target = ""
 
             self.app.after(0, self.tab_view.set, "Logs & Status")
             driver = self.app.browser_manager.get_driver()
@@ -508,9 +519,15 @@ class EKycReportTab(BaseAutomationTab):
         )
 
     def save_inputs(self):
+        panchayat = self.panchayat_var.get().strip()
+        village = self.village_var.get().strip()
+        if panchayat == ALL_PANCHAYATS_LABEL:
+            panchayat = ""  # Save as empty = all panchayats
+        if village == ALL_VILLAGES_LABEL:
+            village = ""  # Save as empty = all villages
         data = {
-            "panchayat": self.panchayat_var.get().strip(),
-            "village": self.village_var.get().strip(),
+            "panchayat": panchayat,
+            "village": village,
             "filter": self.filter_var.get(),
         }
         try:
@@ -521,7 +538,7 @@ class EKycReportTab(BaseAutomationTab):
     def load_inputs(self):
         data = self.app.history_manager.get_tab_inputs("ekyc_report")
         if data:
-            self.panchayat_var.set(data.get("panchayat", ""))
-            self.village_var.set(data.get("village", ""))
+            self.panchayat_var.set(data.get("panchayat") or ALL_PANCHAYATS_LABEL)
+            self.village_var.set(data.get("village") or ALL_VILLAGES_LABEL)
             saved_filter = data.get("filter", "All")
             self.filter_var.set(saved_filter)

@@ -363,7 +363,8 @@ class MusterrollGenTab(BaseAutomationTab):
             self.orientation_var.set(data.get('orientation', 'Landscape'))
             self.scale_slider.set(float(data.get('scale', 75))); self._update_scale_label(self.scale_slider.get())
             self.output_action_var.set(data.get('output_action', 'Save as PDF'))
-            self.save_to_cloud_var.set(data.get('save_to_cloud', True))
+            # Coerce to a real bool: saved data may hold "", "True", "False", "1", etc.
+            self.save_to_cloud_var.set(str(data.get('save_to_cloud', True)).strip().lower() in ("1", "true", "yes", "on"))
 
     def _print_file(self, file_path):
         try:

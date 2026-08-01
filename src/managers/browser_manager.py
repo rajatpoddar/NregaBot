@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import socket
+import threading
 from tkinter import messagebox
 import tkinter
 from typing import Any, Dict, List, Optional, Tuple
@@ -11,6 +12,11 @@ from src.utils import resource_path, get_logger
 
 logger = get_logger()
 
+# Sentinel stored in _thread_browser_choice when the user cancels the
+# browser picker — lets get_driver() bail out silently for the rest of
+# the run instead of re-showing the dialog on every call.
+_CANCELLED_CHOICE = "__cancelled__"
+
 # Selenium Imports (Lazy loading handled inside methods where possible to speed up start)
 
 
@@ -19,6 +25,13 @@ class BrowserManager:
         self.app = app  # Main App ka reference taaki hum sound/toast use kar sakein
         self.driver: Any = None
         self.active_browser: Optional[str] = None
+        
+        # Per-run browser choice cache (thread id → chosen browser).
+        # Lets get_driver() reuse the user's pick without re-asking the
+        # selection dialog multiple times inside one automation run.
+        self._thread_browser_choice: Dict[int, str] = {}
+        # Session-wide preferred browser (set via "Remember my choice").
+        self.preferred_browser: Optional[str] = None
         
         # Suppress verbose WDM (WebDriver Manager) INFO logs from terminal
         os.environ['WDM_LOG'] = '0'
@@ -255,9 +268,39 @@ class BrowserManager:
             messagebox.showerror("Connection Failed", "No browser is running. Please launch one first.")
             return None
 
-        selected_browser: str = available_browsers[0] if len(available_browsers) == 1 else self._ask_browser_selection(available_browsers)
-        if not selected_browser:
+        # ── Pick the browser to use ────────────────────────────────────
+        # Priority: 1) this run's earlier choice (thread-scoped — avoids
+        #            re-asking the dialog mid-automation)
+        #           2) session-remembered browser (if still available)
+        #           3) the only available browser
+        #           4) ask the user via the improved dialog
+        tid = threading.get_ident()
+        cached = self._thread_browser_choice.get(tid)
+
+        # User cancelled the picker earlier in this run → don't re-ask
+        if cached == _CANCELLED_CHOICE:
             return None
+
+        selected_browser: str = ""
+
+        # 1) This run already picked one — reuse without re-asking
+        if cached in available_browsers:
+            selected_browser = cached
+        # 2) Session-wide remembered browser (set via "Remember my choice")
+        elif self.preferred_browser in available_browsers:
+            selected_browser = self.preferred_browser
+        # 3) Only one candidate
+        elif len(available_browsers) == 1:
+            selected_browser = available_browsers[0]
+        # 4) Multiple → ask user (only once per run thanks to the cache)
+        else:
+            selected_browser, remember = self._ask_browser_selection(available_browsers)
+            if not selected_browser:
+                self._thread_browser_choice[tid] = _CANCELLED_CHOICE
+                return None
+            self._thread_browser_choice[tid] = selected_browser
+            if remember:
+                self.preferred_browser = selected_browser
 
         if selected_browser == "firefox":
             if not self.driver:
@@ -311,35 +354,114 @@ class BrowserManager:
                 return None
         return None
 
-    def _ask_browser_selection(self, options: List[str]) -> str:
+    # Friendly display names + subtitle for each browser in the picker dialog
+    _BROWSER_LABELS: Dict[str, Tuple[str, str]] = {
+        "chrome":  ("Google Chrome", "External · Port 9222"),
+        "edge":    ("Microsoft Edge", "External · Port 9223"),
+        "firefox": ("Firefox", "Managed in-app"),
+    }
+
+    def _ask_browser_selection(self, options: List[str]) -> Tuple[str, bool]:
+        """Show a polished browser-picker dialog.
+
+        Returns (chosen_browser, remember_choice). `chosen_browser` is ""
+        if the user cancelled.
+        """
         selection_var = tkinter.StringVar(value="")
+        remember_var = tkinter.BooleanVar(value=False)
         dialog = ctk.CTkToplevel(self.app)
         dialog.title("Select Browser")
-        dialog.geometry("300x250")
+
+        # Dynamic size based on how many browsers are available
+        rows = len(options)
+        w, h = 400, 170 + rows * 74
         dialog.resizable(False, False)
         dialog.transient(self.app)
         dialog.grab_set()
         dialog.update_idletasks()
-        
-        # Center dialog
+
+        # Center dialog over the main window
         try:
-            x = self.app.winfo_x() + (self.app.winfo_width() // 2) - (300 // 2)
-            y = self.app.winfo_y() + (self.app.winfo_height() // 2) - (250 // 2)
-            dialog.geometry(f"+{x}+{y}")
+            x = self.app.winfo_rootx() + (self.app.winfo_width() // 2) - (w // 2)
+            y = self.app.winfo_rooty() + (self.app.winfo_height() // 2) - (h // 2)
+            dialog.geometry(f"{w}x{h}+{x}+{y}")
         except Exception as e:
             logger.debug("Failed to center browser selection dialog: %s", e)
-        
-        ctk.CTkLabel(dialog, text="Multiple browsers detected.", font=ctk.CTkFont(weight="bold")).pack(pady=(20, 5))
-        ctk.CTkLabel(dialog, text="Which one do you want to use?").pack(pady=(0, 20))
-        
-        def select(choice: str) -> None: 
+            dialog.geometry(f"{w}x{h}")
+
+        # ── Header ──
+        ctk.CTkLabel(
+            dialog,
+            text="🌐 Select Browser",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"]),
+        ).pack(pady=(18, 2))
+        ctk.CTkLabel(
+            dialog,
+            text="Multiple browsers detected —\nchoose which one to use for this automation.",
+            font=ctk.CTkFont(size=12),
+            text_color=(config.COLORS["text_dark_alt"], config.COLORS["text_light"]),
+            justify="center",
+        ).pack(pady=(0, 12))
+
+        # ── Browser option buttons (icon + name + subtitle) ──
+        def select(choice: str) -> None:
             selection_var.set(choice)
             dialog.destroy()
-            
+
         for opt in options:
-            ctk.CTkButton(dialog, text=f"Use {opt.capitalize()}", 
-                          image=self.app.icon_images.get(opt, None), 
-                          command=lambda o=opt: select(o)).pack(pady=5, padx=20, fill="x")
-        
+            label, sub = self._BROWSER_LABELS.get(opt, (opt.capitalize(), ""))
+            try:
+                icon = self.app.icon_images.get_sized(opt, (30, 30)) if hasattr(self.app, "icon_images") else None
+            except Exception:
+                icon = None
+            ctk.CTkButton(
+                dialog,
+                text=f"{label}\n{sub}" if sub else label,
+                image=icon,
+                compound="left",
+                command=lambda o=opt: select(o),
+                height=58,
+                corner_radius=10,
+                font=ctk.CTkFont(size=14, weight="bold"),
+                fg_color=(config.COLORS["blue_bg"], config.COLORS["bg_medium"]),
+                hover_color=(config.COLORS["blue_bg_alt"], config.COLORS["gray35_"]),
+                text_color=(config.COLORS["text_dark"], config.COLORS["text_white"]),
+                anchor="w",
+            ).pack(pady=6, padx=24, fill="x")
+
+        # ── Remember choice (session-wide) ──
+        ctk.CTkCheckBox(
+            dialog,
+            text="Remember my choice for this session",
+            variable=remember_var,
+            font=ctk.CTkFont(size=12),
+            checkbox_width=18,
+            checkbox_height=18,
+        ).pack(pady=(12, 2))
+
+        # ── Cancel ──
+        ctk.CTkButton(
+            dialog,
+            text="✖ Cancel",
+            command=dialog.destroy,
+            width=100,
+            height=30,
+            corner_radius=8,
+            font=ctk.CTkFont(size=12),
+            fg_color=(config.COLORS["gray70"], config.COLORS["gray40_"]),
+            hover_color=(config.COLORS["gray60"], config.COLORS["gray35_"]),
+        ).pack(pady=(4, 14))
+
+        dialog.bind("<Escape>", lambda e: dialog.destroy())
+
         self.app.wait_window(dialog)
-        return selection_var.get()
+        return selection_var.get(), remember_var.get()
+
+    def clear_thread_choice(self) -> None:
+        """Forget the browser choice cached for the current thread.
+
+        Called when an automation run finishes so the NEXT automation asks
+        the user again instead of silently reusing the old pick.
+        """
+        self._thread_browser_choice.pop(threading.get_ident(), None)

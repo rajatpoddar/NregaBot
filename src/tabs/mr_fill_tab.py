@@ -160,7 +160,8 @@ class MrFillTab(BaseAutomationTab):
         # Set values from saved_data, falling back to defaults
         self.panchayat_var.set(saved_data.get("panchayat_name", ""))
         self.holiday_cols_var.set(saved_data.get("holiday_cols", ""))
-        self.manual_mode_var.set(saved_data.get("manual_mode", False))
+        # Coerce to a real bool: saved data may hold "", "True", "False", "1", etc.
+        self.manual_mode_var.set(str(saved_data.get("manual_mode", False)).strip().lower() in ("1", "true", "yes", "on"))
     # --- END ---
 
     def _on_format_change(self, selected_format):

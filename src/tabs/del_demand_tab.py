@@ -11,6 +11,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
 
+# Dropdown label used when the user wants to process ALL villages
+ALL_VILLAGES_LABEL = "🌐 All Villages"
+
+
 class DelDemandTab(BaseAutomationTab):
     """
     Tab for automating the deletion of Demands on the VB-G-RAM-G portal.
@@ -51,23 +55,24 @@ class DelDemandTab(BaseAutomationTab):
         # 2. Village Name Input (Optional)
         ctk.CTkLabel(controls_frame, text="Village Name:").grid(row=0, column=2, sticky='w', padx=(15, 5), pady=12)
         v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
-        self.village_var = ctk.StringVar()
-        self.village_menu = ctk.CTkOptionMenu(controls_frame, variable=self.village_var, values=v_vals)
+        self.village_var = ctk.StringVar(value=ALL_VILLAGES_LABEL)
+        self.village_menu = ctk.CTkOptionMenu(controls_frame, variable=self.village_var,
+                                              values=[ALL_VILLAGES_LABEL] + [v for v in v_vals if v])
         self.village_menu.grid(row=0, column=3, sticky='ew', padx=(5, 15), pady=12)
 
         # Filter villages when panchayat changes
         def _on_panchayat_change(*_):
             pan = self.panchayat_var.get()
             if pan:
-                vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or [""]
+                vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or []
             else:
-                vals = self.app.history_manager.get_suggestions("location_village") or [""]
-            self.village_var.set("")
-            self.village_menu.configure(values=vals)
+                vals = self.app.history_manager.get_suggestions("location_village") or []
+            self.village_var.set(ALL_VILLAGES_LABEL)
+            self.village_menu.configure(values=[ALL_VILLAGES_LABEL] + [v for v in vals if v])
         self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # 3. Explanatory Note
-        note_text = "💡 If Village Name is left empty, the bot will process ALL villages in the selected Panchayat."
+        note_text = "💡 Select '🌐 All Villages' to process ALL villages in the selected Panchayat."
         note_label = ctk.CTkLabel(controls_frame, text=note_text, font=ctk.CTkFont(size=11, slant="italic"), text_color="gray60")
         note_label.grid(row=1, column=0, columnspan=4, sticky="w", padx=15, pady=(0, 12))
 
@@ -121,6 +126,8 @@ class DelDemandTab(BaseAutomationTab):
     def start_automation(self) -> None:
         panchayat = self.panchayat_var.get().strip()
         village = self.village_var.get().strip()
+        if village == ALL_VILLAGES_LABEL:
+            village = ""  # Process ALL villages in the panchayat
 
         if not panchayat:
             messagebox.showwarning("Input Error", "Panchayat Name is required.")

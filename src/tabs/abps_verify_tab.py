@@ -17,6 +17,9 @@ from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, Sta
 
 logger = get_logger()
 
+# Dropdown label used when the user wants to process ALL villages
+ALL_VILLAGES_LABEL = "🌐 All Villages"
+
 class AbpsVerifyTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="abps_verify")
@@ -44,23 +47,24 @@ class AbpsVerifyTab(BaseAutomationTab):
 
         ctk.CTkLabel(controls_frame, text="Village:").grid(row=0, column=2, sticky="w", padx=15, pady=(15, 5))
         v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
-        self.village_var = ctk.StringVar()
-        self.village_menu = ctk.CTkOptionMenu(controls_frame, variable=self.village_var, values=v_vals)
+        self.village_var = ctk.StringVar(value=ALL_VILLAGES_LABEL)
+        self.village_menu = ctk.CTkOptionMenu(controls_frame, variable=self.village_var,
+                                              values=[ALL_VILLAGES_LABEL] + [v for v in v_vals if v])
         self.village_menu.grid(row=0, column=3, sticky="ew", padx=(0, 15), pady=(15, 5))
 
         # Filter villages when panchayat changes
         def _on_panchayat_change(*_):
             pan = self.panchayat_var.get()
             if pan:
-                vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or [""]
+                vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or []
             else:
-                vals = self.app.history_manager.get_suggestions("location_village") or [""]
-            self.village_var.set("")
-            self.village_menu.configure(values=vals)
+                vals = self.app.history_manager.get_suggestions("location_village") or []
+            self.village_var.set(ALL_VILLAGES_LABEL)
+            self.village_menu.configure(values=[ALL_VILLAGES_LABEL] + [v for v in vals if v])
         self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # --- Note for auto-mode ---
-        ctk.CTkLabel(controls_frame, text="💡 Leave Village empty to process all villages automatically.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky="w", padx=15, pady=(0, 15))
+        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Villages' to process all villages automatically.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky="w", padx=15, pady=(0, 15))
 
         # --- Action Buttons (OUTSIDE the card) ---
         action_frame = self._create_action_buttons(parent_frame=self)
@@ -122,6 +126,8 @@ class AbpsVerifyTab(BaseAutomationTab):
     def start_automation(self) -> None:
         panchayat = self.panchayat_var.get().strip()
         village = self.village_var.get().strip()
+        if village == ALL_VILLAGES_LABEL:
+            village = ""  # Process all villages
         if not panchayat:
             messagebox.showwarning("Input Required", "Please enter a Panchayat name.")
             return
@@ -129,7 +135,7 @@ class AbpsVerifyTab(BaseAutomationTab):
     def reset_ui(self) -> None:
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
             self.panchayat_var.set("")
-            self.village_var.set("")
+            self.village_var.set(ALL_VILLAGES_LABEL)
             self.safe_tree_clear()
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
