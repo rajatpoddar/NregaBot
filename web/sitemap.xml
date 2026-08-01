@@ -7,12 +7,6 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://nregabot.com/versions.html</loc>
-    <lastmod>2025-08-05</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://nregabot.com/how-to-use.html</loc>
     <lastmod>2025-08-05</lastmod>
     <changefreq>monthly</changefreq>

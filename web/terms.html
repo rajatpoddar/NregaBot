@@ -10,8 +10,20 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        saffron: { 50: '#FFF7ED', 100: '#FFEDD5', 400: '#FB923C', 500: '#F97316', 600: '#EA580C' },
+                        navy: { 700: '#1E3A5F', 800: '#16324F', 900: '#0F2440', 950: '#0A1A30' },
+                        india: { green: '#138808', blue: '#000080' }
+                    }
+                }
+            }
+        }
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
           document.documentElement.classList.add('dark')
         } else {
@@ -20,50 +32,53 @@
     </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
+        html, body { overflow-x: hidden; max-width: 100vw; position: relative; }
         .prose { max-width: 80ch; }
         .prose h3 { font-size: 1.5rem; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem; }
         .prose p, .prose ul { font-size: 1.125rem; line-height: 1.75; margin-bottom: 1.25rem; }
         .prose ul { padding-left: 1.5rem; list-style-type: disc; }
         .prose li { margin-bottom: 0.5rem; }
-        .prose a { color: #2563eb; text-decoration: none; }
+        .prose a { color: #EA580C; text-decoration: none; }
         .prose a:hover { text-decoration: underline; }
         .dark .prose h1, .dark .prose h3, .dark .prose strong { color: #fff; }
         .dark .prose p, .dark .prose ul, .dark .prose li { color: #d1d5db; }
-        .dark .prose a { color: #60a5fa; }
-        
+        .dark .prose a { color: #FB923C; }
+
         #mobile-menu {
             transition: transform 0.3s ease-in-out;
         }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 antialiased dark:bg-gray-900 dark:text-gray-200">
+<body class="bg-gray-50 text-gray-800 antialiased dark:bg-gray-950 dark:text-gray-200">
 
-    <header class="fixed top-0 w-full z-50 transition-all duration-300 bg-white/70 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800">
+    <!-- Tricolour Government Accent Strip -->
+    <div class="h-1.5 w-full bg-gradient-to-r from-saffron-500 via-white to-india-green"></div>
+
+    <header class="sticky top-0 w-full z-50 transition-all duration-300 bg-white/85 dark:bg-navy-950/85 backdrop-blur-md border-b border-gray-200/60 dark:border-gray-800">
         <div class="container mx-auto px-4 sm:px-6 py-3">
             <div class="flex justify-between items-center">
-                <a href="index.html" class="flex items-center gap-2 group">
+                <a href="index.html" class="flex items-center gap-2.5 group">
                     <div class="relative">
-                        <div class="absolute -inset-1 bg-blue-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-200"></div>
-                        <img src="/logo.png" alt="NREGA Bot Logo" class="relative h-9 w-9 rounded-full ring-2 ring-white dark:ring-gray-800">
+                        <div class="absolute -inset-1 bg-saffron-500 rounded-full blur opacity-30 group-hover:opacity-60 transition duration-200"></div>
+                        <img src="assets/logo.png" alt="NREGA Bot Logo" class="relative h-10 w-10 rounded-full ring-2 ring-white dark:ring-navy-800 dark:hidden">
+                        <img src="assets/logo.png" alt="NREGA Bot Logo" class="relative h-10 w-10 rounded-full hidden dark:inline-block ring-2 ring-navy-800">
                     </div>
-                    <span class="text-xl font-bold text-gray-900 dark:text-white tracking-tight">NREGA Bot</span>
+                    <span class="text-xl font-extrabold text-navy-900 dark:text-white tracking-tight">NREGA <span class="text-saffron-500">Bot</span></span>
                 </a>
 
-                <nav class="hidden md:flex items-center gap-1 bg-gray-100/50 dark:bg-gray-800/50 p-1 rounded-full border border-gray-200/50 dark:border-gray-700">
-                    <a href="index.html#home" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">Home</a>
-                    <a href="how-to-use.html" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">How to Use</a>
-                    <a href="index.html#faq" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">FAQ</a>
-                    <a href="https://tools.nregabot.com" target="_blank" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">Tools</a>
-                    <a href="https://license.nregabot.com/login" target="_blank" class="px-4 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all">My Account</a>
+                <nav class="hidden md:flex items-center gap-1 bg-gray-100/70 dark:bg-navy-800/60 p-1 rounded-full border border-gray-200/60 dark:border-gray-700">
+                    <a href="index.html#home" class="px-4 py-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-saffron-600 dark:hover:text-saffron-400 hover:bg-white dark:hover:bg-navy-700 rounded-full transition-all">Home</a>
+                    <a href="index.html#features" class="px-4 py-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-saffron-600 dark:hover:text-saffron-400 hover:bg-white dark:hover:bg-navy-700 rounded-full transition-all">Features</a>
+                    <a href="index.html#pricing" class="px-4 py-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-saffron-600 dark:hover:text-saffron-400 hover:bg-white dark:hover:bg-navy-700 rounded-full transition-all">Pricing</a>
+                    <a href="how-to-use.html" class="px-4 py-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-saffron-600 dark:hover:text-saffron-400 hover:bg-white dark:hover:bg-navy-700 rounded-full transition-all">How to Use</a>
+                    <a href="https://tools.nregabot.com" target="_blank" class="px-4 py-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-saffron-600 dark:hover:text-saffron-400 hover:bg-white dark:hover:bg-navy-700 rounded-full transition-all">Tools</a>
+                    <a href="/login" class="px-4 py-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-saffron-600 dark:hover:text-saffron-400 hover:bg-white dark:hover:bg-navy-700 rounded-full transition-all">Login</a>
                 </nav>
 
                 <div class="flex items-center gap-3">
-                    <a href="https://license.nregabot.com/check-license"
-                        class="hidden md:inline-flex items-center justify-center px-5 py-2 text-sm font-bold text-white transition-all duration-200 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg hover:from-blue-700 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 shadow-lg shadow-blue-500/30">
-                        Get License Key
-                    </a>
-                    
-                    <button id="mobile-menu-button" class="md:hidden p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 transition-colors">
+                    <a href="/check-license" class="hidden md:inline-flex items-center justify-center px-5 py-2 text-sm font-bold text-white transition-all duration-200 bg-saffron-500 hover:bg-saffron-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-saffron-500 shadow-lg shadow-saffron-500/30">Get License Key</a>
+
+                    <button id="mobile-menu-button" class="md:hidden p-2 text-gray-600 hover:text-saffron-600 dark:text-gray-300 transition-colors">
                         <i class="fa-solid fa-bars text-2xl" id="menu-open-icon"></i>
                         <i class="fa-solid fa-xmark text-2xl hidden" id="menu-close-icon"></i>
                     </button>
@@ -72,35 +87,37 @@
         </div>
     </header>
 
-    <div id="mobile-menu" class="fixed inset-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl transform translate-x-full transition-transform duration-300 md:hidden flex flex-col items-center justify-center">
+    <div id="mobile-menu" class="fixed inset-0 z-40 bg-white/95 dark:bg-navy-950/95 backdrop-blur-xl transform translate-x-full transition-transform duration-300 md:hidden flex flex-col items-center justify-center">
         <nav class="flex flex-col items-center space-y-6 text-center">
-            <a href="index.html#home" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">Home</a>
-            <a href="how-to-use.html" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">How to Use</a>
-            <a href="index.html#faq" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">FAQ</a>
-            <a href="https://tools.nregabot.com" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">Tools</a>
-            <a href="https://license.nregabot.com/login" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-blue-600">My Account</a>
-            
+            <a href="index.html#home" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-saffron-500">Home</a>
+            <a href="how-to-use.html" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-saffron-500">How to Use</a>
+            <a href="index.html#faq" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-saffron-500">FAQ</a>
+            <a href="https://tools.nregabot.com" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-saffron-500">Tools</a>
+            <a href="/login" class="mobile-link text-2xl font-bold text-gray-800 dark:text-white hover:text-saffron-500">Login</a>
+
             <div class="pt-8">
-                <a href="https://license.nregabot.com/check-license" class="px-8 py-4 text-lg font-bold text-white bg-blue-600 rounded-xl shadow-xl hover:bg-blue-700">Get License Key</a>
+                <a href="/check-license" class="px-8 py-4 text-lg font-bold text-white bg-saffron-500 rounded-xl shadow-xl hover:bg-saffron-600">Get License Key</a>
             </div>
         </nav>
     </div>
 
-    <main class="container mx-auto px-6 py-24 lg:py-32">
+    <main class="container mx-auto px-6 py-16 lg:py-24">
         <div class="prose mx-auto">
             <div class="text-center mb-12">
-                <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white">Terms & Conditions</h1>
+                <span class="bg-saffron-100 text-saffron-600 dark:bg-navy-800 dark:text-saffron-400 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest">Legal</span>
+                <h1 class="text-4xl md:text-5xl font-extrabold text-navy-900 dark:text-white mt-4">Terms & Conditions</h1>
                 <p class="text-lg text-gray-600 dark:text-gray-400 mt-4">Last updated: September 05, 2025</p>
             </div>
-            
+
             <p>Please read these Terms and Conditions ("Terms") carefully before using NREGA Bot ("the Application") operated by Rajat Poddar ("us", "we", or "our").</p>
-            
+
             <h3>1. License & Usage</h3>
             <p>We grant you a revocable, non-exclusive, non-transferable, limited license to use the Application.</p>
             <ul>
                 <li><strong>Trial License:</strong> A 30-day free trial is provided for evaluation.</li>
                 <li><strong>Paid License:</strong> Paid licenses are valid for the selected duration (Monthly/Yearly). A license key is locked to the device(s) it is first activated on.</li>
                 <li><strong>Subscriptions:</strong> If you opt for auto-renewal, your license will automatically renew at the end of the billing cycle. You may cancel auto-renewal at any time from your "My Account" page.</li>
+                <li>Licenses are non-transferable between devices beyond your purchased device limit. Each activation requires a unique Machine ID.</li>
             </ul>
 
             <h3>2. Cloud Storage</h3>
@@ -122,7 +139,7 @@
             </ul>
 
             <h3>4. Disclaimer</h3>
-            <p>The Application is provided "AS IS" without warranty of any kind. It is an automation tool designed to assist with data entry on the NREGA portal. We are not affiliated with the government or the MGNREGA scheme. We are not responsible for any errors in data entry, server downtime of the NREGA portal, or changes to the NREGA website that may temporarily break automation features.</p>
+            <p>The Application is provided "AS IS" without warranty of any kind. It is an automation tool designed to assist with data entry on the NREGA / VB-G-RAM-G portal (the official government portal, formerly NREGA). We are <strong>not affiliated with, endorsed by, or connected to</strong> any government body or the MGNREGA/VB-G-RAM-G scheme. We are not responsible for any errors in data entry, server downtime of the portal, or changes to the government website that may temporarily break automation features.</p>
 
             <h3>5. Limitation of Liability</h3>
             <p>In no event shall we be liable for any indirect, incidental, or consequential damages arising out of the use or inability to use the Application.</p>
@@ -132,8 +149,8 @@
         </div>
     </main>
 
-    <footer class="bg-white border-t dark:bg-gray-800 dark:border-gray-700">
-        <div class="container mx-auto px-6 py-8 text-center text-gray-600 dark:text-gray-400 text-sm">
+    <footer class="bg-navy-900 dark:bg-navy-950 text-gray-300 border-t border-gray-800">
+        <div class="container mx-auto px-6 py-10 text-center text-sm">
             <p>&copy; 2025 NREGA Bot by Rajat Poddar. All rights reserved.</p>
         </div>
     </footer>
@@ -144,23 +161,23 @@
             const mobileMenu = document.getElementById('mobile-menu');
             const menuOpenIcon = document.getElementById('menu-open-icon');
             const menuCloseIcon = document.getElementById('menu-close-icon');
-            const mobileLinks = document.querySelectorAll('#mobile-menu .mobile-link'); 
-            
-            function toggleMenu() { 
-                const isHidden = mobileMenu.classList.contains('translate-x-full'); 
+            const mobileLinks = document.querySelectorAll('#mobile-menu .mobile-link');
+
+            function toggleMenu() {
+                const isHidden = mobileMenu.classList.contains('translate-x-full');
                 if (isHidden) {
                     mobileMenu.classList.remove('translate-x-full');
                     menuOpenIcon.classList.add('hidden');
                     menuCloseIcon.classList.remove('hidden');
-                    document.body.style.overflow = 'hidden'; 
+                    document.body.style.overflow = 'hidden';
                 } else {
                     mobileMenu.classList.add('translate-x-full');
                     menuOpenIcon.classList.remove('hidden');
                     menuCloseIcon.classList.add('hidden');
-                    document.body.style.overflow = ''; 
+                    document.body.style.overflow = '';
                 }
             }
-            
+
             if(mobileMenuButton){
                 mobileMenuButton.addEventListener('click', toggleMenu);
                 mobileLinks.forEach(link => { link.addEventListener('click', toggleMenu); });

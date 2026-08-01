@@ -34,20 +34,39 @@
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
         }
     </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        saffron: { 50: '#FFF7ED', 100: '#FFEDD5', 400: '#FB923C', 500: '#F97316', 600: '#EA580C' },
+                        navy: { 700: '#1E3A5F', 800: '#16324F', 900: '#0F2440', 950: '#0A1A30' },
+                        india: { green: '#138808', blue: '#000080' }
+                    }
+                }
+            }
+        }
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark')
+        } else {
+          document.documentElement.classList.remove('dark')
+        }
+    </script>
 </head>
 
-<body class="bg-gray-50 text-gray-800 antialiased dark:bg-gray-900 dark:text-gray-200">
+<body class="bg-gray-50 text-gray-800 antialiased dark:bg-navy-950 dark:text-gray-200">
 
-    <header
-        class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm sticky top-0 z-50 dark:border-b dark:border-gray-800">
-        <div class="container mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
-            <a href="index.html" class="text-xl font-bold text-gray-900 flex items-center gap-2 dark:text-white">
-                <img src="/logo.png" alt="NREGA Bot Logo" class="h-8 w-8 rounded-full">
-                <span>NREGA Bot</span>
+    <!-- Tricolour Government Accent Strip -->
+    <div class="h-1.5 w-full bg-gradient-to-r from-saffron-500 via-white to-india-green"></div>
+    <header class="bg-white/85 dark:bg-navy-950/85 backdrop-blur-md sticky top-0 z-50 border-b border-gray-200/60 dark:border-navy-700">
+        <div class="container mx-auto px-4 sm:px-6 py-3 flex justify-between items-center">
+            <a href="index.html" class="text-xl font-extrabold text-navy-900 dark:text-white flex items-center gap-2.5">
+                <img src="assets/logo.png" alt="NREGA Bot Logo" class="h-9 w-9 rounded-full dark:hidden">
+                <img src="assets/logo.png" alt="NREGA Bot Logo" class="h-9 w-9 rounded-full hidden dark:inline-block">
+                <span>NREGA <span class="text-saffron-500">Bot</span></span>
             </a>
-            <a href="index.html"
-                class="bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600">&larr;
-                Back to Main Page</a>
+            <a href="index.html" class="bg-saffron-500 text-white font-semibold px-5 py-2 rounded-lg hover:bg-saffron-600 transition-colors shadow-lg shadow-saffron-500/30">&larr; Back to Main Page</a>
         </div>
     </header>
 
@@ -61,11 +80,11 @@
                 </div>
                 <div class="space-y-16 max-w-5xl mx-auto">
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">1. Demand Automation
                             </h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Prepare a CSV file containing two columns: `Name of Applicant` and `Job card number`.</li>
                                 <li>In the app, select the 'State', 'Panchayat', 'Demand/Work Date', and 'Days'.</li>
                                 <li>(Optional) 'Work Key (Auto-Allocate)' field mein ek work key search key (e.g., 94297) enter karein.</li>
@@ -76,7 +95,7 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2">
-                            <video class="rounded-lg shadow-md border dark:border-gray-700 w-full" 
+                            <video class="rounded-lg shadow-md border dark:border-navy-700 w-full" 
                                    controls 
                                    autoplay 
                                    muted 
@@ -92,11 +111,11 @@
                         </div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">2. Muster Roll (MR) Generator
                             </h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter your full Panchayat name (e.g., KASRAYDIH).</li>
                                 <li>Select the 'From' and 'To' dates using the calendar.</li>
                                 <li>Enter the exact Designation and Technical Staff names.</li>
@@ -108,14 +127,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/Muster_Roll_Generator.png"
-                                alt="Muster Roll Generator" class="rounded-lg shadow-md border dark:border-gray-700">
+                                alt="Muster Roll Generator" class="rounded-lg shadow-md border dark:border-navy-700">
                         </div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">3. MSR Processor</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>First, manually navigate to the MSR Payment page in the launched browser.</li>
                                 <li>Enter the Panchayat name exactly as it appears on the website.</li>
                                 <li>Paste the list of Work Codes to process.</li>
@@ -123,13 +142,13 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/MSR_Processor.png" alt="MSR Processor"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">4. Duplicate MR Print</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the Panchayat Name.</li>
                                 <li>Choose an output action (Save or Print).</li>
                                 <li>Paste a list of work code search keys (e.g., 94297) or full workcodes.</li>
@@ -139,28 +158,28 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/Duplicate_MR_Print.png"
-                                alt="Duplicate MR Print" class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                alt="Duplicate MR Print" class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">5. Update Estimated Outcome
                             </h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the desired "Estimated Outcome" value (e.g., 0.20).</li>
                                 <li>Paste a list of full work codes into the text box.</li>
                                 <li>Click "Start Automation".</li>
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Update_Outcome.png"
-                                alt="Update Estimated Outcome" class="rounded-lg shadow-md border dark:border-gray-700">
+                                alt="Update Estimated Outcome" class="rounded-lg shadow-md border dark:border-navy-700">
                         </div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">6. FTO Generation</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>First, log in to the 1st Signatory account in the launched browser.</li>
                                 <li>Return to the app and click "Start FTO Generation".</li>
                                 <li>The app will automatically visit the 'Aadhaar FTO' and 'Top-Up FTO' verification pages and process all entries.</li>
@@ -168,13 +187,13 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/FTO_Generation.png" alt="FTO Generation"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">7. Wagelist Generator</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Manually navigate to the "Send MSR to PO" page in the browser.</li>
                                 <li>Enter the Agency name (e.g., BURKUNDI) without "Gram Panchayat -".</li>
                                 <li>(Optional) Check "Save generated wagelist page as PDF" to save a PDF copy of each wagelist as it's generated.</li>
@@ -183,13 +202,13 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Generate_Wagelist.png"
-                                alt="Wagelist Generator" class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                alt="Wagelist Generator" class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">8. Send Wagelist</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Select the Financial Year in the app.</li>
                                 <li>Enter the Start and End Row numbers for the checkboxes you want to select on the
                                     page.</li>
@@ -198,14 +217,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/Send_Wagelist.png" alt="Send Wagelist"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">9. Jobcard Verification & Photo
                             </h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the Panchayat and Village name.</li>
                                 <li>Click "Select Photo Folder" and choose a folder containing photos named after the
                                     job card suffix (e.g., `417.jpg` for `.../417`).</li>
@@ -214,65 +233,65 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Jobcard_Verify.png" alt="Jobcard Verification"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">10. eMB Entry</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Fill in all the configuration details like Panchayat, MB No., Page No., etc.</li>
                                 <li>Paste the list of Work Codes to process.</li>
                                 <li>Click "Start Automation" to fill and save the MB Entry form for each work code.</li>
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/eMB_entry.png" alt="MB Entry"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">11. eMB Verify</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the Panchayat name.</li>
                                 <li>Paste a list of full Work Codes into the text box.</li>
                                 <li>Click "Start Automation". The bot will verify the eMB for each work code provided.</li>
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/eMB_Verify.png" alt="eMB Verify"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">12. Scheme Closing</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the Panchayat name.</li>
                                 <li>Paste a list of full Work Codes of the schemes you want to close.</li>
                                 <li>Click "Start Automation". The bot will process and close each scheme.</li>
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/Scheme_Closing.png" alt="Scheme Closing"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">13. Delete Work Allocation</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the Panchayat name.</li>
                                 <li>Paste a list of Muster Roll Numbers (not work codes) to process.</li>
                                 <li>Click "Start Automation". The bot will delete the work allocation for each MSR number.</li>
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Del_Work_Alloc.png" alt="Delete Work Allocation"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">14. Verify ABPS</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the Panchayat name.</li>
                                 <li>Optionally, enter a Village name. If you leave this blank, the app will process all
                                     villages in that Panchayat.</li>
@@ -281,26 +300,26 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/Verify_ABPS.png" alt="Verify ABPS"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">15. Add Activity</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the desired Unit Price and Quantity.</li>
                                 <li>Paste the list of Work Keys (not full work codes) to process.</li>
                                 <li>Click "Start Automation" to add the default activity (ACT105) to each work key.</li>
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Add_Activity.png" alt="Add Activity"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">16. Workcode Extractor</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>This is a simple utility tool.</li>
                                 <li>Paste any block of text that contains NREGA work codes into the text area.</li>
                                 <li>Click the "Extract Work Codes" button.</li>
@@ -309,15 +328,15 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/Workcode_Extractor.png"
-                                alt="Workcode Extractor" class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                alt="Workcode Extractor" class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
-                    <div class="instruction-card bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                    <div class="instruction-card bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <h3 class="text-2xl font-bold text-gray-900 dark:text-white text-center mb-6">17. Workcode
                             Generator (Dynamic)</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
                             <div class="space-y-4">
                                 <h4 class="font-semibold text-lg dark:text-white">Instructions</h4>
-                                <ol class="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
+                                <ol class="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-200">
                                     <li>Enter the Panchayat name and click "Load Categories from Website".</li>
                                     <li>Make your selections for all dropdowns from top to bottom.</li>
                                     <li>Prepare a CSV file with the 9 required columns (see demo).</li>
@@ -329,7 +348,7 @@
                             <div class="space-y-4">
                                 <h4 class="font-semibold text-lg dark:text-white">Demo CSV Format</h4>
                                 <pre
-                                    class="bg-gray-100 text-gray-800 p-4 rounded-md text-sm overflow-x-auto dark:bg-gray-900 dark:text-gray-300"><code>priority,work_name,...,total_saplings</code></pre>
+                                    class="bg-gray-100 text-gray-800 p-4 rounded-md text-sm overflow-x-auto dark:bg-navy-950 dark:text-gray-200"><code>priority,work_name,...,total_saplings</code></pre>
                                 <a href="data:text/csv;charset=utf-8,priority%2Cwork_name%2Ckhata_no%2Cplot_no%2Cvillage_name%2Ctotal_plants%2Ccovered_area%2Carea_plantation%2Ctotal_saplings%0AP1%2C%22ABUA%20Awas%20for%20Beneficiary%20One%22%2C101%2C202%2C%22Example%20Village%201%22%2C150%2C1.5%2C%2C%0AP2%2C%22Block%20Plantation%20for%20Beneficiary%20Two%22%2C102%2C203%2C%22Example%20Village%202%22%2C200%2C2.0%2C1.5%2C200"
                                     download="demo_wc_gen.csv"
                                     class="inline-block bg-green-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-700 transition-colors dark:bg-green-500 dark:hover:bg-green-600">Download
@@ -337,13 +356,13 @@
                             </div>
                         </div>
                     </div>
-                    <div class="instruction-card bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                    <div class="instruction-card bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <h3 class="text-2xl font-bold text-gray-900 dark:text-white text-center mb-6">18. IF Editor
                             (Dynamic)</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
                             <div class="space-y-4">
                                 <h4 class="font-semibold text-lg dark:text-white">Instructions</h4>
-                                <ol class="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
+                                <ol class="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-200">
                                     <li>Prepare a CSV file with 7 columns (see demo). One row for each Activity/Material
                                         to add.</li>
                                     <li>In the app, configure the settings for Page 1 and Page 2.</li>
@@ -355,7 +374,7 @@
                             <div class="space-y-4">
                                 <h4 class="font-semibold text-lg dark:text-white">Demo CSV Format</h4>
                                 <pre
-                                    class="bg-gray-100 text-gray-800 p-4 rounded-md text-sm overflow-x-auto dark:bg-gray-900 dark:text-gray-300"><code>work_code,beneficiary_type,...,quantity</code></pre>
+                                    class="bg-gray-100 text-gray-800 p-4 rounded-md text-sm overflow-x-auto dark:bg-navy-950 dark:text-gray-200"><code>work_code,beneficiary_type,...,quantity</code></pre>
                                 <a href="data:text/csv;charset=utf-8,work_code%2Cbeneficiary_type%2Cjob_card%2Citem_type%2Citem_code_or_name%2Cunit_price%2Cquantity%0A34...90%2CSC%2CJH.../01%2CActivity%2CACT102%2C272%2C63%0A34...90%2CSC%2CJH.../01%2CMaterial%2CMisc.%20Material%2C7235%2C1"
                                     download="demo_if_edit.csv"
                                     class="inline-block bg-green-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-700 transition-colors dark:bg-green-500 dark:hover:bg-green-600">Download
@@ -364,10 +383,10 @@
                         </div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">19. Cloud Storage Manager</h3>
-                             <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                             <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Access your personal cloud storage included with your license.</li>
                                 <li>Upload, download, and manage your important files directly within the app.</li>
                                 <li>Create folders to keep your documents organized.</li>
@@ -376,13 +395,13 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Cloud_Storage.png" alt="Cloud Storage"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">20. MR Fill (Attendance)</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the Panchayat Name (this is required if you are using a Block login).</li>
                                 <li>Enter "Holiday Columns" (e.g., 7, 14) to have the bot automatically mark those days as holidays.</li>
                                 <li>Check "Manual Mode" to pause the bot after it marks holidays. This allows you to manually mark absentees before clicking 'Save' in the browser.</li>
@@ -392,13 +411,13 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/MR_Fill.png" alt="MR Fill Automation"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">21. MR Tracking</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Select your State, District, Block, and Panchayat.</li>
                                 <li>Check one of the filters: "Pending for filling", "Pending for ABPS", or "Find T+8 to T+15 (for Zero MR)".</li>
                                 <li>Click "Start Automation".</li>
@@ -408,13 +427,13 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/MR_Tracking.png" alt="MR Tracking Report"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">22. Dashboard Report</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Select your State, District, Block, and Panchayat.</li>
                                 <li>Choose the "Delay Column" you want to investigate from the dropdown (e.g., "Attendance not filled in T+2 days").</li>
                                 <li>Click "Start Automation".</li>
@@ -423,14 +442,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/Dashboard_Report.png" alt="Dashboard Report"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
                 
                 <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">23. Issued MR Details</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Select your State, District, Block, and Panchayat.</li>
                                 <li>Click "Start Automation".</li>
                                 <li>The bot will navigate to the 'MGNREGS daily status as per e-muster issued' report for your block.</li>
@@ -440,15 +459,15 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Issued_MR_Details.png"
-                                alt="Issued MR Details Report" class="rounded-lg shadow-md border dark:border-gray-700">
+                                alt="Issued MR Details Report" class="rounded-lg shadow-md border dark:border-navy-700">
                         </div>
                     </div>
                     
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">24. PDF Merger</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>This is a standalone utility to combine multiple PDF files.</li>
                                 <li>Click "Select PDF Files..." and choose two or more PDFs.</li>
                                 <li>The files will appear in the list. You can use "Move Up", "Move Down", or "Remove" to set the correct merge order.</li>
@@ -458,14 +477,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/PDF_Merger.png" alt="PDF Merger"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">25. Zero MR</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Select the correct "Financial Year".</li>
                                 <li>Enter the "Panchayat Name" exactly as it appears on the website.</li>
                                 <li>In the "Work List" tab, paste your items. Each line must be in the format: <b>SearchKey,MSRNo</b> (e.g., 58744,32158).</li>
@@ -474,14 +493,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Zero_MR.png" alt="Zero MR"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">26. Work Allocation</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>(Optional) Agar PO/Block login hai toh "Panchayat Name" enter karein. GP login ke liye yeh zaroori nahi hai.</li>
                                 <li>"Work Category" select karein (default 'Provision of Irrigation...' hai).</li>
                                 <li>"Work Key List" tab mein ek ya zyada Work Keys (search keys, e.g., 94297) paste karein.</li>
@@ -490,7 +509,7 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2">
-                            <video class="rounded-lg shadow-md border dark:border-gray-700 w-full" 
+                            <video class="rounded-lg shadow-md border dark:border-navy-700 w-full" 
                                    controls 
                                    autoplay 
                                    muted 
@@ -507,10 +526,10 @@
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">27. Delete Demand</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>NREGA portal par Data Entry login karein.</li>
                                 <li><strong>Panchayat</strong> select karein.</li>
                                 <li>Agar aapko sirf ek gaon ka demand delete karna hai, toh <strong>Village Name</strong> select karein.</li>
@@ -521,16 +540,16 @@
                         </div>
                         <div class="order-1 md:order-2">
                             <img src="/assets/Delete_Demand.png" alt="Delete Demand"
-                                class="rounded-lg shadow-md border dark:border-gray-700">
+                                class="rounded-lg shadow-md border dark:border-navy-700">
                         </div>
                     </div>
                     <!-- ===== NEW AUTOMATIONS ADDED v3.0.5 ===== -->
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">28. Mate/Mistri MR Generation</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the Panchayat name.</li>
                                 <li>Select the 'From' and 'To' dates.</li>
                                 <li>Paste the list of Work Codes you want to process.</li>
@@ -540,14 +559,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Mate_MR_Gen.png" alt="Mate/Mistri MR"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">29. Physical Complete</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>In the browser, navigate to the Physical Complete page for the scheme.</li>
                                 <li>Enter the Panchayat name in the app.</li>
                                 <li>Paste the list of Work Codes to process.</li>
@@ -556,14 +575,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/Physical_Complete.png" alt="Physical Complete"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">30. Resend Rejected Wagelist</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>In the browser, log in and navigate to the Rejected Wagelist page.</li>
                                 <li>Enter the Agency (Panchayat) name.</li>
                                 <li>Click "Fetch List" to load all rejected wagelists.</li>
@@ -572,14 +591,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Resend_WG.png" alt="Resend Rejected Wagelist"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">31. Login Automation</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Go to the 'Login Automation' tab in the app.</li>
                                 <li>Enter your NREGA portal credentials (Username, Password, and PIN).</li>
                                 <li>Click "Save Credentials" to store them securely.</li>
@@ -587,14 +606,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/Login_Automation.png" alt="Login Automation"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">32. Macro Manager</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>The ultimate automation hub to queue multiple tasks in sequence.</li>
                                 <li>Add tasks like 'Bulk Demand via CSV', 'Work Allocation', 'MR Fill', and more.</li>
                                 <li>Configure each task with its required parameters.</li>
@@ -604,14 +623,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Macro_Manager.png" alt="Macro Manager"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">33. Material Entry</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter Work Keys (search keys) in the input field.</li>
                                 <li>Enter Bill Numbers for each work.</li>
                                 <li>Fill in Material details like item description and quantity.</li>
@@ -620,14 +639,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/Material_Entry.png" alt="Material Entry"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">34. Delete Applicant</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Prepare a CSV file containing job card numbers of applicants to delete.</li>
                                 <li>In the app, click "Load CSV" and select your prepared file.</li>
                                 <li>The bot will automatically detect the village from job card numbers and select the correct panchayat.</li>
@@ -635,14 +654,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/Delete_Applicant.png" alt="Delete Applicant"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">35. MIS Reports</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Select the Report Type (e.g., Work Progress, Expenditure, etc.).</li>
                                 <li>Select State, District, Block, and Panchayat as needed.</li>
                                 <li>Choose the Financial Year and Time Period.</li>
@@ -651,14 +670,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/MIS_Reports.png" alt="MIS Reports"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">36. eKYC Report</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Select State, District, Block, and Panchayat.</li>
                                 <li>(Optional) Enter a specific Village name to filter results.</li>
                                 <li>Click "Start Automation" to fetch eKYC verification status for all job card holders.</li>
@@ -667,14 +686,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/eKYC_Report.png" alt="eKYC Report"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">37. Social Audit Report</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Log in to the PO (Block) account in the browser.</li>
                                 <li>Navigate to D23 > Social Audit View page.</li>
                                 <li>Select the Financial Year and Panchayat.</li>
@@ -684,14 +703,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/SA_Report.png" alt="Social Audit Report"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">38. NMMS Daily Attendance</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Enter the District, Block, and select the date for attendance.</li>
                                 <li>Click "Start Automation" to scrape NMMS daily attendance data.</li>
                                 <li>The bot will navigate the NMMS portal and fetch attendance for all schools.</li>
@@ -700,14 +719,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/NMMS_Attendance.png" alt="NMMS Attendance"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">39. Sarkar Aapke Dwar (AYASAD)</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Select the Camp/Event details and Scheme name.</li>
                                 <li>Prepare a CSV file with applicant details as per the camp format.</li>
                                 <li>Load the CSV file in the app.</li>
@@ -716,14 +735,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/SAD.png" alt="Sarkar Aapke Dwar"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-1">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">40. SAD Update Status</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Select the Camp details and date.</li>
                                 <li>Paste or load the list of application reference numbers.</li>
                                 <li>Click "Start Automation".</li>
@@ -732,14 +751,14 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-2"><img src="/assets/SAD_Update.png" alt="SAD Update Status"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
                     <div
-                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-gray-800 p-8 rounded-lg border dark:border-gray-700">
+                        class="instruction-card grid md:grid-cols-2 gap-8 lg:gap-12 items-center bg-white dark:bg-navy-800 p-8 rounded-lg border dark:border-navy-700">
                         <div class="order-2 md:order-2">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white">41. File Manager</h3>
-                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-300">
+                            <ol class="list-decimal list-inside mt-4 space-y-2 text-gray-700 dark:text-gray-200">
                                 <li>Open the File Manager tab in the app.</li>
                                 <li>Browse your local files and folders directly within the app interface.</li>
                                 <li>Organize downloaded reports, PDFs, and CSV files into folders.</li>
@@ -748,7 +767,7 @@
                             </ol>
                         </div>
                         <div class="order-1 md:order-1"><img src="/assets/File_Manager.png" alt="File Manager"
-                                class="rounded-lg shadow-md border dark:border-gray-700"></div>
+                                class="rounded-lg shadow-md border dark:border-navy-700"></div>
                     </div>
 
         </section>
@@ -758,8 +777,8 @@
         </section>
     </main>
 
-    <footer class="bg-white border-t dark:bg-gray-900 dark:border-gray-800">
-        <div class="container mx-auto px-6 py-10 text-center text-sm text-gray-600 dark:text-gray-400">
+    <footer class="bg-navy-900 dark:bg-navy-950 text-gray-300 border-t border-gray-800">
+        <div class="container mx-auto px-6 py-10 text-center text-sm">
             <p>&copy; 2025 NREGA Bot by Rajat Poddar. All rights reserved.</p>
         </div>
     </footer>

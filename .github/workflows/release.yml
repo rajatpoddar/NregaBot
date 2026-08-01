@@ -121,6 +121,40 @@ jobs:
               Write-Host "  $rel ($([math]::Round($_.Length/1KB,2)) KB)" -ForegroundColor Green
             }
 
+  # --- 2b. Build Windows BETA Portable (no auto-update, folder+zip) ---
+  build-beta-windows:
+    name: Build Windows Beta Portable
+    needs: get-release-info
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create .env file
+        run: echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" > .env
+        shell: bash
+
+      - name: Run Beta Portable build
+        shell: cmd
+        run: |
+          scripts\build_beta_portable.bat onefile ${{ needs.get-release-info.outputs.version }}-beta
+
+      - name: Upload Beta Portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-beta-portable
+          path: dist/NREGA_Bot_Beta_v*_portable.exe
+          if-no-files-found: error
+          retention-days: 1
+
   # --- 3. Build for Linux (Portable Loader) ---
   build-linux:
     name: Build Linux Loader
@@ -152,8 +186,8 @@ jobs:
           --add-data="web:web" \
           --collect-all customtkinter \
           --collect-data fpdf \
-          --hidden-import=selenium \
-          --hidden-import=webdriver_manager \
+          --collect-all selenium \
+          --collect-all webdriver_manager \
           --hidden-import=pandas \
           --hidden-import=PIL \
           --hidden-import=requests \
@@ -182,7 +216,7 @@ jobs:
   # --- 4. Publish Release ---
   publish-release:
     name: Publish GitHub Release
-    needs: [get-release-info, build-windows, build-linux]
+    needs: [get-release-info, build-windows, build-beta-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -214,6 +248,7 @@ jobs:
           files: |
             artifacts/windows-builds/**/*.exe
             artifacts/windows-builds/**/*.zip
+            artifacts/windows-beta-portable/**/*.exe
             artifacts/linux-build/**/*
 
       - name: Debug - List downloaded artifacts

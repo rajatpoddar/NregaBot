@@ -54,8 +54,8 @@ pyinstaller --noconfirm --windowed --onefile ^
 %ENV_ARG% ^
 --collect-all customtkinter ^
 --collect-data fpdf ^
---hidden-import=selenium ^
---hidden-import=webdriver_manager ^
+--collect-all selenium ^
+--collect-all webdriver_manager ^
 --hidden-import=pandas ^
 --hidden-import=PIL ^
 --hidden-import=requests ^
@@ -91,8 +91,8 @@ pyinstaller --noconfirm --windowed --onedir ^
 %ENV_ARG% ^
 --collect-all customtkinter ^
 --collect-data fpdf ^
---hidden-import=selenium ^
---hidden-import=webdriver_manager ^
+--collect-all selenium ^
+--collect-all webdriver_manager ^
 --hidden-import=pandas ^
 --hidden-import=PIL ^
 --hidden-import=requests ^

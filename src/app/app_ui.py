@@ -11,6 +11,7 @@ import customtkinter as ctk
 import tkinter
 from tkinter import messagebox
 import os
+import webbrowser
 from typing import Any, Dict, List, Optional, Tuple
 from PIL import Image
 
@@ -319,7 +320,7 @@ class UIMixin:
         create_icon_btn(dock_frame, "history", lambda: self.show_activity_log_tab(), "View Activity Log (Settings → Activity Log)")
         create_icon_btn(dock_frame, "emoji_file_manager", self.open_web_file_manager, "Open Cloud Files")
         create_icon_btn(dock_frame, "whatsapp", lambda: webbrowser.open("https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn"), "Join Community")
-        create_icon_btn(dock_frame, "feedback", lambda: self.show_frame("Feedback"), "Contact Support")
+        create_icon_btn(dock_frame, "settings", lambda: self.show_frame("Settings"), "Open Settings")
 
         ctk.CTkFrame(dock_frame, width=2, height=20, corner_radius=0, fg_color=("gray80", "gray40")).pack(side="left", padx=10)
 

@@ -57,12 +57,8 @@ pyinstaller --noconfirm --clean --windowed --name "${APP_NAME}" \
 --add-data=".env:." \
 --collect-all customtkinter \
 --collect-data fpdf \
---hidden-import=selenium \
---hidden-import=webdriver_manager \
---hidden-import=webdriver_manager.chrome \
---hidden-import=webdriver_manager.firefox \
---hidden-import=webdriver_manager.microsoft \
---collect-submodules=webdriver_manager \
+--collect-all selenium \
+--collect-all webdriver_manager \
 --hidden-import=pandas \
 --hidden-import=PIL \
 --hidden-import=requests \
@@ -86,6 +82,8 @@ pyinstaller --noconfirm --clean --windowed --name "${LITE_APP_NAME}" \
 --add-data="src:src" \
 --add-data=".env:." \
 --collect-all customtkinter \
+--collect-all selenium \
+--collect-all webdriver_manager \
 --hidden-import=getmac \
 --hidden-import=packaging \
 --hidden-import=requests \
