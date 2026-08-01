@@ -12,6 +12,40 @@ APP_AUTHOR_EMAIL: str = "Rajatpoddar@outlook.com"
 APP_VERSION: str = "3.0.7"
 import os
 LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://license.nregabot.com')
+
+# --- Beta build support ---
+# scripts/build_beta_portable.bat bundles a config/beta.json marker into the
+# portable EXE. When present, the app runs as a "beta" build:
+#   * APP_VERSION is overridden to the beta version (e.g. 3.0.8-beta)
+#   * All update checks from version.json are disabled
+# Normal (installer) builds never contain this marker -> BETA_BUILD = False
+BETA_BUILD: bool = False
+
+
+def _detect_beta_build() -> bool:
+    """Detect the bundled config/beta.json marker and apply beta overrides."""
+    global APP_VERSION
+    try:
+        import json as _json
+        from src.utils import resource_path
+        marker = resource_path(os.path.join("config", "beta.json"))
+        if os.path.exists(marker):
+            with open(marker, "r", encoding="utf-8") as f:
+                _data = _json.load(f)
+            _ver = _data.get("version")
+            if _ver:
+                APP_VERSION = str(_ver)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+BETA_BUILD = _detect_beta_build()
+# Clean numeric version sent to the license server on the wire. The server
+# may not understand pre-release suffixes like "-beta" (client-side
+# parse_version strips them, but the server is out of our control).
+APP_VERSION_WIRE: str = APP_VERSION.split('-')[0]
 MAIN_WEBSITE_URL: str = "https://nregabot.com"
 SUPPORT_EMAIL: str = "nregabot@gmail.com"
 

@@ -354,7 +354,7 @@ class LicenseMixin:
                     payload = {
                         "key": key_val,
                         "machine_id": self.app_state.machine_id,
-                        "app_version": config.APP_VERSION
+                        "app_version": config.APP_VERSION_WIRE
                     }
                     resp = self.app_state.http_session.post(
                         f"{config.LICENSE_SERVER_URL}/api/validate",
@@ -574,7 +574,7 @@ class LicenseMixin:
                             "email": email_val,
                             "machine_id": self.app_state.machine_id,
                             "otp": otp_val,
-                            "app_version": config.APP_VERSION
+                            "app_version": config.APP_VERSION_WIRE
                         },
                         timeout=15
                     )
@@ -1050,7 +1050,7 @@ class LicenseMixin:
                     return
 
                 data["machine_id"] = self.app_state.machine_id
-                data["app_version"] = config.APP_VERSION
+                data["app_version"] = config.APP_VERSION_WIRE
                 submit_btn.configure(state="disabled", text="⏳ Creating your trial...")
                 progress_bar.pack(fill="x", pady=(0, 6), before=status_label)
                 progress_bar.start()
@@ -1351,7 +1351,14 @@ class LicenseMixin:
         if about_tab:
             about_tab.update_subscription_details(self.app_state.license_info)
             info = self.app_state.update_info
-            if info.get('status') == 'available':
+            if config.BETA_BUILD:
+                # Beta builds: show beta state, disable update button
+                about_tab.latest_version_label.configure(text="Latest Version: Updates disabled (Beta build)")
+                try:
+                    about_tab.update_button.configure(state="disabled", text="Beta Build — No Updates")
+                except Exception:
+                    pass
+            elif info.get('status') == 'available':
                 about_tab.latest_version_label.configure(text=f"Latest Version: {info['version']}")
             elif info.get('status') == 'updated':
                 about_tab.latest_version_label.configure(text="Latest Version: Up to date")

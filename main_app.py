@@ -546,11 +546,16 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
         self.services.check_for_updates_background()
 
     def show_update_prompt(self, version):
+        if config.BETA_BUILD:
+            return  # Beta builds never prompt for updates
         self.play_sound("update")
         if messagebox.askyesno("Update", f"Version {version} available. View?"):
             self.show_frame("About"); self.app_state.tab_instances.get("About").tab_view.set("Updates")
 
     def download_and_install_update(self, url: str, version: str) -> None:
+        if config.BETA_BUILD:
+            self.show_toast("Updates are disabled in this Beta build.", kind="info")
+            return
         self.services.download_and_install_update(url, version)
 
     def _apply_smart_update(self, zip_path):

@@ -52,7 +52,7 @@ class ServiceManager:
             payload: Dict[str, str] = {
                 "key": key, 
                 "machine_id": self.machine_id,
-                "app_version": config.APP_VERSION 
+                "app_version": config.APP_VERSION_WIRE 
             }
             # Timeout check
             resp = requests.post(f"{config.LICENSE_SERVER_URL}/api/validate", json=payload, timeout=10)
@@ -98,6 +98,12 @@ class ServiceManager:
 
     # --- UPDATE LOGIC ---
     def check_for_updates_background(self) -> None:
+        if config.BETA_BUILD:
+            # Beta builds never auto-update from version.json
+            self.app.update_info = {"status": "beta", "version": config.APP_VERSION}
+            self.app.after(0, self.app._update_about_tab_info)
+            return
+
         def _check() -> None:
             try:
                 resp = requests.get(f"{config.MAIN_WEBSITE_URL}/version.json", timeout=15)

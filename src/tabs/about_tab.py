@@ -280,6 +280,11 @@ class AboutTab(ctk.CTkFrame):
         self.update_button = ctk.CTkButton(update_wrapper_frame, text="Check for Updates", command=self.check_for_updates)
         self.update_button.grid(row=3, column=0, pady=(20, 10), ipady=4, ipadx=10)
 
+        # Beta builds: updates are disabled from version.json
+        if config.BETA_BUILD:
+            self.update_button.configure(state="disabled", text="Beta Build — No Updates")
+            self.latest_version_label.configure(text="Latest Version: Updates disabled (Beta build)")
+
         self.update_progress = ctk.CTkProgressBar(update_wrapper_frame)
         self.update_progress.set(0) # Initially hidden
 
@@ -800,7 +805,9 @@ class AboutTab(ctk.CTkFrame):
         messagebox.showinfo("Copied", "Machine ID copied to clipboard.")
 
     def check_for_updates(self):
-        # (Keep this method as is)
+        if config.BETA_BUILD:
+            self.latest_version_label.configure(text="Updates are disabled in this Beta build.")
+            return
         self.update_button.configure(state="disabled", text="Checking...")
         self.app.check_for_updates_background()
 
