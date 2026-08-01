@@ -55,7 +55,7 @@ class BrowserManager:
         if target_urls:
             urls_to_open: List[str] = target_urls
         else:
-            urls_to_open = [config.MAIN_WEBSITE_URL, "https://bookmark.nregabot.com/"]
+            urls_to_open = list(config.DEFAULT_LAUNCH_URLS)
             
         try:
             cmd: List[str] = [
@@ -111,8 +111,7 @@ class BrowserManager:
                 "--disable-backgrounding-occluded-windows",
                 "--disable-renderer-backgrounding",
                 "--disable-background-timer-throttling",
-                config.MAIN_WEBSITE_URL, 
-                "https://bookmark.nregabot.com/"
+                *config.DEFAULT_LAUNCH_URLS
             ]
 
             flags: int = 0x00000008 if config.OS_SYSTEM == "Windows" else 0
@@ -158,8 +157,9 @@ class BrowserManager:
             self.active_browser = "firefox"
             self.app.play_sound("success")
             
-            self.driver.get(config.MAIN_WEBSITE_URL)
-            self.driver.execute_script("window.open(arguments[0], '_blank');", "https://bookmark.nregabot.com/")
+            self.driver.get(config.DEFAULT_LAUNCH_URLS[0])
+            for url in config.DEFAULT_LAUNCH_URLS[1:]:
+                self.driver.execute_script("window.open(arguments[0], '_blank');", url)
             self.driver.switch_to.window(self.driver.window_handles[0])
             
             # Sync with main app

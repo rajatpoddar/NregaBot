@@ -47,6 +47,14 @@ BETA_BUILD = _detect_beta_build()
 # parse_version strips them, but the server is out of our control).
 APP_VERSION_WIRE: str = APP_VERSION.split('-')[0]
 MAIN_WEBSITE_URL: str = "https://nregabot.com"
+# Websites opened by default when the user launches a managed browser
+# (Chrome / Edge / Firefox) from the app. First entry opens in the main
+# tab, the rest open as additional tabs.
+DEFAULT_LAUNCH_URLS: List[str] = [
+    MAIN_WEBSITE_URL,
+    "https://bookmark.nregabot.com/",
+    "https://vbgramg.nregabot.com/",
+]
 SUPPORT_EMAIL: str = "nregabot@gmail.com"
 
 # --- Evolution API Configuration (for WhatsApp messaging) ---
