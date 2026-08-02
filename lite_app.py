@@ -1477,6 +1477,15 @@ del "%~f0" & exit
                 new_fg = ("#FEF2F2", "#450A0A")
             btn.configure(text=new_text, fg_color=new_fg)
 
+        # Home page cards ko bhi naye feature flags ke saath sync karo —
+        # blocked/premium tabs wahan se bhi access na ho payen.
+        try:
+            home_tab = self.tab_instances.get("Home")
+            if home_tab is not None and hasattr(home_tab, 'refresh_feature_states'):
+                home_tab.refresh_feature_states()
+        except Exception:
+            pass
+
     def open_folder(self, path):
         try:
             if os.path.exists(path):

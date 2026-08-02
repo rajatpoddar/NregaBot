@@ -40,6 +40,10 @@ dmg/
 updates/
 user_uploads/
 
+# nrega-server is its OWN separate git repo (deployed independently).
+# Do NOT track it inside the NregaBot app repository.
+nrega-server/
+
 # Old backup files (not needed in release)
 backups/
 

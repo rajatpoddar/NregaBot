@@ -183,7 +183,6 @@ jobs:
           --add-data="config:config" \
           --add-data="docs/changelog.json:docs/" \
           --add-data="src:src" \
-          --add-data="web:web" \
           --collect-all customtkinter \
           --collect-data fpdf \
           --collect-all selenium \

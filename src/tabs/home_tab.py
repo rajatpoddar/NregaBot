@@ -49,6 +49,9 @@ class HomeTab(ctk.CTkFrame):
             for name, data in tabs.items():
                 self._all_tabs[name] = {**data, "category": cat}
 
+        # Blocked/premium cards ko re-style karne ke liye (feature flags update par)
+        self._feature_cards: Dict[str, List[Any]] = {}
+
         # --- Main scrollable container ---
         self.scroll_container = ctk.CTkScrollableFrame(
             self, fg_color="transparent", corner_radius=0,
@@ -249,6 +252,12 @@ class HomeTab(ctk.CTkFrame):
                 card.destroy()
             except Exception:
                 pass
+            # Stale callback references prune karo (memory-leak fix)
+            if name in getattr(self, '_feature_cards', {}) and card in self._feature_cards[name]:
+                try:
+                    self._feature_cards[name].remove(card)
+                except ValueError:
+                    pass
         self._most_used_cards.clear()
         if self._most_used_placeholder:
             try:
@@ -404,28 +413,77 @@ class HomeTab(ctk.CTkFrame):
         # Store automation name as an attribute for search filtering
         card._automation_name = name
 
+        # ── Feature state: blocked (admin) / premium (trial-locked) ──
+        state = self._get_feature_state(name)
+
         # --- Hover effects ---
         hover_bg = self._lighten(bg_color[0], -15) if ctk.get_appearance_mode() == "Light" else self._lighten(bg_color[1], 20)
         original_text_color = (config.COLORS["tv_header_bg_dark"], config.COLORS["text_white"])
         hover_text_color = (config.COLORS["tv_header_fg_dark"], config.COLORS["text_white"])  # White in light mode, unchanged in dark
 
-        def on_enter(e, c=card, nl=name_label, hb=hover_bg, htc=hover_text_color):
-            c.configure(
-                fg_color=hb,
-                border_width=2,
-                border_color=border_color,
-            )
-            nl.configure(text_color=htc)
-
-        def on_leave(e, c=card, nl=name_label, bg=bg_color, bc=border_color, otc=original_text_color):
-            c.configure(
-                fg_color=bg,
+        # Blocked cards: greyed + red accent; premium: indigo accent
+        if state == "blocked":
+            card.configure(
+                fg_color=("#FEF2F2", "#450A0A"),
+                border_color=("#DC2626", "#F87171"),
                 border_width=1,
-                border_color=bc,
             )
-            nl.configure(text_color=otc)
+            name_label.configure(text=f"⚠️ {name}", text_color=("#DC2626", "#F87171"))
+        elif state == "premium":
+            card.configure(
+                fg_color=("#EEF2FF", "#312E81"),
+                border_color=("#6366F1", "#818CF8"),
+                border_width=1,
+            )
+            name_label.configure(text=f"🔒 {name}", text_color=("#4F46E5", "#A5B4FC"))
+
+        # Refresh helper — feature flags update hone par card ko re-style karta hai
+        def _apply_card_state():
+            s = self._get_feature_state(name)
+            if s == "blocked":
+                card.configure(fg_color=("#FEF2F2", "#450A0A"), border_color=("#DC2626", "#F87171"), border_width=1)
+                name_label.configure(text=f"⚠️ {name}", text_color=("#DC2626", "#F87171"))
+            elif s == "premium":
+                card.configure(fg_color=("#EEF2FF", "#312E81"), border_color=("#6366F1", "#818CF8"), border_width=1)
+                name_label.configure(text=f"🔒 {name}", text_color=("#4F46E5", "#A5B4FC"))
+            else:
+                card.configure(fg_color=bg_color, border_color=border_color, border_width=1)
+                name_label.configure(text=name, text_color=original_text_color)
+
+        # Live widget reference store — destroyed cards hata diye jate hain (no leak)
+        card._apply_state_fn = _apply_card_state
+        self._feature_cards.setdefault(name, []).append(card)
+
+        def on_enter(e, c=card, nl=name_label, hb=hover_bg, htc=hover_text_color):
+            # Dynamically re-check — stale card state par hover galat na lage
+            if self._get_feature_state(name) is None:
+                c.configure(fg_color=hb, border_width=2, border_color=border_color)
+                nl.configure(text_color=htc)
+
+        def on_leave(e, c=card):
+            # Live feature-state ke hisaab se restore karo (blocked/premium styling bachti hai)
+            _apply_card_state()
 
         def on_click(e=None):
+            st = self._get_feature_state(name)
+            if st == "blocked":
+                alert = getattr(self.app, 'show_feature_maintenance_alert', None)
+                if alert:
+                    alert(name)  # internally error sound play karta hai
+                else:  # Lite app fallback
+                    self.app.play_sound("error")
+                    tk.messagebox.showwarning("Under Maintenance",
+                                              f"'{name}' is currently under maintenance.\n\nPlease try again later.")
+                return
+            if st == "premium":
+                alert = getattr(self.app, 'show_trial_lock_alert', None)
+                if alert:
+                    alert(name)  # internally error sound play karta hai
+                else:  # Lite app fallback
+                    self.app.play_sound("error")
+                    tk.messagebox.showinfo("Premium Feature",
+                                           f"'{name}' is a premium feature available in paid plans.")
+                return
             self.app.play_sound("click")
             self.app.show_frame(name)
 
@@ -495,7 +553,47 @@ class HomeTab(ctk.CTkFrame):
             self._filtered_state[cat] = has_match
 
     # ──────────────────────────────────────────────
-    # 7. HELPERS
+    # 7. FEATURE STATE (blocked / premium)
+    # ──────────────────────────────────────────────
+    def _get_feature_state(self, name: str) -> Optional[str]:
+        """
+        Return 'blocked' | 'premium' | None for a tab name.
+
+        Mirrors nav-button logic in _apply_feature_flags:
+          - global_disabled_features → blocked (admin kill-switch / maintenance)
+          - trial_restricted_features → premium (trial users ke liye locked)
+        Home page cards ko bhi yahi guard apply hota hai.
+        """
+        disabled = getattr(self.app, 'global_disabled_features', None) or []
+        restricted = getattr(self.app, 'trial_restricted_features', None) or []
+
+        # Admin block (list OR legacy dict format)
+        if isinstance(disabled, (list, tuple)):
+            if name in disabled:
+                return "blocked"
+        elif isinstance(disabled, dict):
+            if name in disabled:
+                return "blocked"
+
+        # Premium lock for trial users
+        if isinstance(restricted, (list, tuple)) and name in restricted:
+            return "premium"
+
+        return None
+
+    def refresh_feature_states(self):
+        """Feature flags update hone par saare LIVE home cards ko re-style karta hai.
+        Called from _apply_feature_flags (main_app + lite_app)."""
+        for cards in list(getattr(self, '_feature_cards', {}).values()):
+            for card in cards:
+                try:
+                    if card.winfo_exists() and hasattr(card, '_apply_state_fn'):
+                        card._apply_state_fn()
+                except Exception:
+                    pass
+
+    # ──────────────────────────────────────────────
+    # 8. HELPERS
     # ──────────────────────────────────────────────
     def _lighten(self, hex_color, amount):
         """Lighten or darken a hex color by amount (±)."""

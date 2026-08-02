@@ -1651,6 +1651,15 @@ class LicenseMixin:
             if btn.cget("text") != new_text or btn.cget("fg_color") != new_fg:
                 btn.configure(state=new_state, fg_color=new_fg, text=new_text, command=new_cmd)
 
+        # Home page cards ko bhi naye feature flags ke saath sync karo —
+        # blocked/premium tabs wahan se bhi access na ho payen.
+        try:
+            home_tab = self.app_state.tab_instances.get("Home")
+            if home_tab is not None and hasattr(home_tab, 'refresh_feature_states'):
+                home_tab.refresh_feature_states()
+        except Exception:
+            pass
+
     def _start_validation_thread(self):
         if not self.app_state.is_validating_license:
             threading.Thread(target=self._validate_in_background, daemon=True).start()

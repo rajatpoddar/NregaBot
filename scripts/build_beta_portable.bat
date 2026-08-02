@@ -6,15 +6,15 @@ REM  version.json (loader skipped, in-app update check gated
 REM  by the bundled config/beta.json marker).
 REM
 REM  Usage:
-REM    scripts\build_beta_portable.bat              (onefile, v3.0.8-beta)
+REM    scripts\build_beta_portable.bat              (onefile, v3.1.0-beta)
 REM    scripts\build_beta_portable.bat folder       (folder+zip mode)
-REM    scripts\build_beta_portable.bat onefile 3.0.8-beta
+REM    scripts\build_beta_portable.bat onefile 3.1.0-beta
 REM =======================================================
 
 SET MODE=%1
 IF "%MODE%"=="" SET MODE=onefile
 SET BETA_VERSION=%2
-IF "%BETA_VERSION%"=="" SET BETA_VERSION=3.0.8-beta
+IF "%BETA_VERSION%"=="" SET BETA_VERSION=3.1.0-beta
 
 SET APP_NAME="NREGA Bot Beta"
 SET MARKER=config\beta.json

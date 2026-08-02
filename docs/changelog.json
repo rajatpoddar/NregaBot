@@ -1,4 +1,19 @@
 {
+  "3.1.0": [
+      "🚀 **New Settings Panel:** Completely redesigned Settings tab with cloud backup & restore, one-time announcement popups, and a Location Fix wizard that validates your State/District against server records.",
+      "🚀 **New Automation (Pending Bills):** Added the Pending Bills automation tab to track and process pending bills efficiently.",
+      "💬 **WhatsApp Integration:** Send files and messages directly to WhatsApp (Evolution API) with a dedicated WhatsApp chat tab.",
+      "📍 **Auto-Fetch Locations:** State/District/Block now auto-fetch from the server with a filtered location hierarchy — no more manual spelling errors.",
+      "☁️ **Cloud Sync:** User data & settings now sync to your account — activate on any PC or restore after factory reset in one click.",
+      "🔐 **Security Fix:** License key is no longer exposed in URLs.",
+      "🏠 **Home Page Fix:** Blocked/premium tabs can no longer be opened from the Home page shortcuts.",
+      "🌐 **Browser Launch:** Default launch URLs are now centralized in config — added vbgramg.nregabot.com at startup.",
+      "🖥️ **UI Overhaul:** Improved layouts across all automation tabs; dashboard & issued-report fixes; standardized logs and status output.",
+      "📊 **Report Fixes:** MIS reports fixed and Excel result output standardized.",
+      "⚡ **All Villages Option:** Added 'All Villages' support in multiple automation tabs for faster bulk processing.",
+      "🔄 **Beta Builds:** Added beta portable build support with auto-update bypass for testing.",
+      "🐞 **Bug Fixes:** Overhaul of the whole app — dozens of stability and reliability fixes."
+    ],
   "3.0.7": [
       "🧹 **Repository Cleanup:** Removed unnecessary backup files and screenshots from the repository to reduce release size.",
       "📦 **Optimized Release:** Fixed release pipeline to exclude old backups and screenshots from the build artifacts."
