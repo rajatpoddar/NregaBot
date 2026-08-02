@@ -4,7 +4,17 @@ from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import os, json, time, base64, sys, subprocess, requests, threading
 from datetime import datetime
-from pypdf import PdfWriter, PdfReader
+# pypdf may be missing on installs that predate v3.0.0 (smart code-only
+# updates cannot add new Python deps). Fall back to PyPDF2, and if neither
+# is available the merge/PDF features will show a clear message instead of
+# crashing the whole tab.
+try:
+    from pypdf import PdfWriter, PdfReader
+except ImportError:
+    try:
+        from PyPDF2 import PdfWriter, PdfReader
+    except ImportError:
+        PdfWriter = PdfReader = None
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -933,6 +943,10 @@ class MusterrollGenTab(BaseAutomationTab):
 
     def _run_merge_logic(self, file_list, output_path):
         """The actual PDF merging logic that runs in a thread."""
+        if PdfWriter is None:
+            self.log_error("PDF library (pypdf/PyPDF2) not installed. Please reinstall the latest version from nregabot.com.")
+            messagebox.showerror("PDF Library Missing", "PDF merge requires the 'pypdf' library.\n\nSmart updates cannot add new Python libraries — please download the latest full version from nregabot.com.", parent=self)
+            return
         self.app.after(0, self.set_ui_state, True)
         self.log_info(f"Merging {len(file_list)} files...")
         self.app.after(0, self.app.set_status, "Merging PDFs...")

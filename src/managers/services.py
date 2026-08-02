@@ -117,7 +117,15 @@ class ServiceManager:
                     download_url = data.get("download_url_windows")
                     
                     if core_upd and not core_upd.get("force_full_reinstall", False):
-                        download_url = core_upd.get("url")
+                        # Use the platform-specific core zip (build_update.py names
+                        # them core_mac_*.zip / core_win_*.zip). Fall back to the
+                        # generic URL if the platform key is missing.
+                        if sys.platform == "win32":
+                            download_url = core_upd.get("url_windows") or core_upd.get("url")
+                        elif sys.platform == "darwin":
+                            download_url = core_upd.get("url_macos") or core_upd.get("url")
+                        else:
+                            download_url = core_upd.get("url")
                         is_smart = True
 
                     self.app.update_info = {

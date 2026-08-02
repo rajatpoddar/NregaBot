@@ -8,7 +8,7 @@
     "url": "https://nregabot.com/updates/core_v3.1.0.zip",
     "url_windows": "https://nregabot.com/updates/core_win_v3.1.0.zip",
     "url_macos": "https://nregabot.com/updates/core_mac_v3.1.0.zip",
-    "force_full_reinstall": false
+    "force_full_reinstall": true
   },
   "changelog": {
     "3.1.0": [

@@ -42,6 +42,7 @@ pyinstaller --noconfirm --windowed --onedir ^
 --hidden-import=getmac ^
 --hidden-import=packaging ^
 --hidden-import=main_app ^
+--hidden-import=pypdf ^
 --collect-submodules=src.tabs ^
 loader.py
 
@@ -74,6 +75,7 @@ pyinstaller --noconfirm --windowed --onedir ^
 --hidden-import=packaging ^
 --hidden-import=requests ^
 --hidden-import=PIL ^
+--hidden-import=pypdf ^
 --collect-submodules=src.managers ^
 --collect-submodules=src.tabs ^
 lite_loader.py

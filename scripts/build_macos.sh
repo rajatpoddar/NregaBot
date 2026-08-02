@@ -1,5 +1,22 @@
 #!/bin/bash
 
+# --- 0. Resolve project root (this script lives in scripts/) ---
+# Makes the script location-independent: run it from anywhere (repo root,
+# scripts/, etc.) and it always operates on the real project root.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT" || { echo "ERROR: cannot cd to project root ($PROJECT_ROOT)"; exit 1; }
+
+# Build tools (pyinstaller, python3) live in the user-level venv — sudo resets
+# PATH and won't find them. Fail fast with a clear message instead.
+if [ "$(id -u)" = "0" ]; then
+    echo "⚠️  Do NOT run this script with sudo."
+    echo "    pyinstaller/python3 are installed in your venv and sudo cannot see them."
+    echo "    Run it directly instead, e.g.:  ./build_macos.sh   (from scripts/)"
+    echo "                                or:  ./scripts/build_macos.sh   (from repo root)"
+    exit 1
+fi
+
 # --- 1. Clean previous builds ---
 echo "Cleaning up previous builds..."
 rm -rf build
@@ -21,7 +38,13 @@ if [ ! -f "src/config.py" ]; then
     echo "!!!!!! ERROR: config.py not found in src/ !!!!!!"
     exit 1
 fi
-APP_VERSION=$(grep "APP_VERSION =" src/config.py | sed 's/.*"\(.*\)".*/\1/')
+# Match ONLY the declaration line (APP_VERSION: str = "x.y.z"), NOT the beta
+# override inside _detect_beta_build() (APP_VERSION = str(_ver)).
+APP_VERSION=$(sed -n 's/^APP_VERSION: str = "\([^"]*\)".*/\1/p' src/config.py | head -1)
+if [ -z "$APP_VERSION" ]; then
+    echo "!!!!!! ERROR: Could not extract APP_VERSION from src/config.py !!!!!!"
+    exit 1
+fi
 echo "Found version: $APP_VERSION"
 
 OUTPUT_DMG_NAME="dist/${APP_NAME}-v${APP_VERSION}-macOS.dmg"
@@ -44,10 +67,22 @@ for file in src/tabs/*.py; do
     fi
 done
 
+# --- 5.5 Resolve PyInstaller (robust: python3 -m works even if venv is
+# not activated on PATH) ---
+PYINSTALLER_CMD="pyinstaller"
+if ! command -v pyinstaller >/dev/null 2>&1; then
+    if python3 -m PyInstaller --version >/dev/null 2>&1; then
+        PYINSTALLER_CMD="python3 -m PyInstaller"
+    elif [ -x "venv/bin/pyinstaller" ]; then
+        PYINSTALLER_CMD="venv/bin/pyinstaller"
+    fi
+fi
+echo "Using: $PYINSTALLER_CMD"
+
 # --- 6a. Build MAIN Loader with PyInstaller ---
 echo "Building MAIN Application..."
 
-pyinstaller --noconfirm --clean --windowed --name "${APP_NAME}" \
+$PYINSTALLER_CMD --noconfirm --clean --windowed --name "${APP_NAME}" \
 --icon="$ICON_FILE" \
 --add-data="assets:assets" \
 --add-data="config:config" \
@@ -67,6 +102,7 @@ pyinstaller --noconfirm --clean --windowed --name "${APP_NAME}" \
 --hidden-import=getmac \
 --hidden-import=packaging \
 --hidden-import=main_app \
+--hidden-import=pypdf \
 --collect-submodules=src.tabs \
 $HIDDEN_IMPORTS \
 loader.py
@@ -74,7 +110,7 @@ loader.py
 # --- 6b. Build LITE App with PyInstaller ---
 echo "Building LITE Application..."
 
-pyinstaller --noconfirm --clean --windowed --name "${LITE_APP_NAME}" \
+$PYINSTALLER_CMD --noconfirm --clean --windowed --name "${LITE_APP_NAME}" \
 --icon="$ICON_FILE" \
 --add-data="assets:assets" \
 --add-data="config:config" \
@@ -87,6 +123,7 @@ pyinstaller --noconfirm --clean --windowed --name "${LITE_APP_NAME}" \
 --hidden-import=packaging \
 --hidden-import=requests \
 --hidden-import=PIL \
+--hidden-import=pypdf \
 --collect-submodules=src.managers \
 --collect-submodules=src.tabs \
 lite_loader.py

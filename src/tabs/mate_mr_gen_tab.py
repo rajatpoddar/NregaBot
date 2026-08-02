@@ -8,7 +8,13 @@ from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import os, json, time, base64, sys, subprocess, threading
 from datetime import datetime
-from pypdf import PdfWriter
+try:
+    from pypdf import PdfWriter
+except ImportError:
+    try:
+        from PyPDF2 import PdfWriter
+    except ImportError:
+        PdfWriter = None
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -966,6 +972,10 @@ class MateMrGenTab(BaseAutomationTab):
             "pdf_merger_mate_mr", self._run_merge_logic, args=(pdf_files, output_path))
 
     def _run_merge_logic(self, file_list, output_path):
+        if PdfWriter is None:
+            self.log_error("PDF library (pypdf/PyPDF2) not installed. Please reinstall the latest version from nregabot.com.")
+            messagebox.showerror("PDF Library Missing", "PDF merge requires the 'pypdf' library.\n\nSmart updates cannot add new Python libraries — please download the latest full version from nregabot.com.")
+            return
         self.app.after(0, self.set_ui_state, True)
         self.log_info(f"Merging {len(file_list)} files...")
         self.app.after(0, self.app.set_status, "Merging PDFs...")

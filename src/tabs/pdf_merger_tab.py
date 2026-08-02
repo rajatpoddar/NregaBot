@@ -3,8 +3,14 @@ import tkinter
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import os
-from pypdf import PdfWriter, PdfReader
-from datetime import datetime  
+from datetime import datetime
+try:
+    from pypdf import PdfWriter, PdfReader
+except ImportError:
+    try:
+        from PyPDF2 import PdfWriter, PdfReader
+    except ImportError:
+        PdfWriter = PdfReader = None
 
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -230,6 +236,10 @@ class PDFMergerTab(BaseAutomationTab):
         )
         
     def run_automation_logic(self, file_list, output_path):
+        if PdfWriter is None:
+            self.log_error("PDF library (pypdf/PyPDF2) not installed. Please reinstall the latest version from nregabot.com.")
+            messagebox.showerror("PDF Library Missing", "PDF merge requires the 'pypdf' library.\n\nSmart updates cannot add new Python libraries — please download the latest full version from nregabot.com.", parent=self)
+            return
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         self.log_info(f"Starting merge of {len(file_list)} files...")
