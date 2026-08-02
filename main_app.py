@@ -545,11 +545,15 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
     def check_for_updates_background(self) -> None:
         self.services.check_for_updates_background()
 
-    def show_update_prompt(self, version):
+    def show_update_prompt(self, version, is_hotfix=False):
         if config.BETA_BUILD:
             return  # Beta builds never prompt for updates
         self.play_sound("update")
-        if messagebox.askyesno("Update", f"Version {version} available. View?"):
+        if is_hotfix:
+            msg = f"A bug-fix update for v{version} is available. View?"
+        else:
+            msg = f"Version {version} available. View?"
+        if messagebox.askyesno("Update", msg):
             self.show_frame("About"); self.app_state.tab_instances.get("About").tab_view.set("Updates")
 
     def download_and_install_update(self, url: str, version: str) -> None:
@@ -578,8 +582,9 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
 
                 try:
                     new_ver = self.app_state.update_info.get('version', '0.0.0')
+                    new_hash = self.app_state.update_info.get('hash', '') or ''
                     with open(version_file, 'w') as f:
-                        json.dump({"version": new_ver}, f)
+                        json.dump({"version": new_ver, "hash": new_hash}, f)
                 except Exception:
                     logger.warning("Failed to write version file: %s", version_file)
 
@@ -596,7 +601,7 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
                 messagebox.showerror("Update Error", f"Failed to apply update:\n{e}")
                 return
 
-        extract_dir = os.path.join(self.get_data_path(), "update_temp")
+        extract_dir = self.get_data_path("update_temp")
         if os.path.exists(extract_dir):
             shutil.rmtree(extract_dir)
         os.makedirs(extract_dir)
@@ -615,7 +620,7 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
             self.play_sound("update")
             messagebox.showinfo("Update Ready", "Application will restart to apply changes.")
 
-            batch_script_path = os.path.join(self.get_data_path(), "updater.bat")
+            batch_script_path = self.get_data_path("updater.bat")
             script_content = f"""
 @echo off
 title Updating NREGA Bot...
@@ -638,6 +643,17 @@ del "%~f0" & exit
             with open(batch_script_path, "w") as bat:
                 bat.write(script_content)
             os.startfile(batch_script_path)
+
+            # Record the applied version + zip hash so the loader does not
+            # re-download the same content on the next launch.
+            try:
+                new_ver = self.app_state.update_info.get('version', '0.0.0')
+                new_hash = self.app_state.update_info.get('hash', '') or ''
+                vf = self.get_data_path("core_version.json")
+                with open(vf, 'w') as f:
+                    json.dump({"version": new_ver, "hash": new_hash}, f)
+            except Exception as e:
+                logger.debug("Failed to write version file after smart update: %s", e)
 
             self.on_closing(force=True)
             sys.exit(0)

@@ -104,15 +104,40 @@ class ServiceManager:
             self.app.after(0, self.app._update_about_tab_info)
             return
 
+        def _get_local_applied_hash() -> str:
+            """Hash of the core zip the loader last applied (core_version.json)."""
+            try:
+                vf = get_data_path('core_version.json')
+                if os.path.exists(vf):
+                    with open(vf, 'r', encoding='utf-8') as f:
+                        return json.load(f).get('hash', '') or ''
+            except Exception:
+                pass
+            return ''
+
         def _check() -> None:
             try:
                 resp = requests.get(f"{config.MAIN_WEBSITE_URL}/version.json", timeout=15)
                 data = resp.json()
                 lat = data.get("latest_version")
-                
-                if lat and parse_version(lat) > parse_version(config.APP_VERSION):
+                core_upd = data.get("core_update", {}) or {}
+                # Platform-specific hash (Windows/macOS core zips differ). Each
+                # platform verifies against ITS OWN hash only — never fall back to
+                # the generic hash here (it describes the generic zip, not this
+                # platform's zip, and a mismatch would block updates).
+                if sys.platform == "win32":
+                    server_hash = core_upd.get("hash_windows", "") or ""
+                elif sys.platform == "darwin":
+                    server_hash = core_upd.get("hash_macos", "") or ""
+                else:
+                    server_hash = core_upd.get("hash", "") or ""
+
+                # Same-version hotfix: version equal but core zip content changed.
+                is_newer = bool(lat) and parse_version(lat) > parse_version(config.APP_VERSION)
+                is_hotfix = bool(server_hash) and server_hash != _get_local_applied_hash()
+
+                if is_newer or is_hotfix:
                     # Smart Update Check
-                    core_upd = data.get("core_update", {})
                     is_smart = False
                     download_url = data.get("download_url_windows")
                     
@@ -133,9 +158,10 @@ class ServiceManager:
                         "version": lat, 
                         "url": download_url, 
                         "is_smart_update": is_smart,
+                        "hash": server_hash,
                         "changelog": data.get("changelog", {}).get(lat, [])
                     }
-                    self.app.after(0, self.app.show_update_prompt, lat)
+                    self.app.after(0, self.app.show_update_prompt, lat, is_hotfix)
                 else:
                     self.app.update_info = {"status": "updated", "version": lat}
             except Exception as e: 

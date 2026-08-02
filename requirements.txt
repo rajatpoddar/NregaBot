@@ -3,6 +3,7 @@ selenium
 webdriver-manager
 pyperclip
 appdirs
+beautifulsoup4
 getmac
 fpdf2
 pyinstaller

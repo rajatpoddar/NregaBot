@@ -102,6 +102,23 @@ jobs:
             shutil.rmtree(temp_dir)
             print(f'Success: Created {zip_name}')
 
+            # Compute the SHA-256 so config/version.json's core_update.hash_windows
+            # can be filled in before uploading this zip (enables same-version
+            # hotfixes). IMPORTANT: copy this hash into config/version.json ->
+            # core_update.hash_windows when deploying this release (build_update.py
+            # does this automatically for local builds; CI only prints it).
+            import hashlib
+            h = hashlib.sha256()
+            with open(zip_name, 'rb') as fh:
+                for chunk in iter(lambda: fh.read(8192), b''):
+                    h.update(chunk)
+            digest = h.hexdigest()
+            hash_file = f'dist/core_win_v{version}.sha256'
+            with open(hash_file, 'w') as fh:
+                fh.write(digest)
+            print(f'SHA-256 of {zip_name}: {digest}')
+            print(f'Wrote {hash_file}')
+
         - name: Upload Windows Artifacts
           uses: actions/upload-artifact@v4
           with:
@@ -109,6 +126,7 @@ jobs:
             path: |
               dist/installer/*.exe
               dist/core_win_*.zip
+              dist/core_win_*.sha256
               dist/NREGA_Bot_Lite_v*_portable.zip
             retention-days: 1
 
@@ -247,6 +265,7 @@ jobs:
           files: |
             artifacts/windows-builds/**/*.exe
             artifacts/windows-builds/**/*.zip
+            artifacts/windows-builds/**/*.sha256
             artifacts/windows-beta-portable/**/*.exe
             artifacts/linux-build/**/*
 

@@ -14,6 +14,7 @@ import sys
 import os
 import json
 import time
+import hashlib
 import threading
 import shutil
 import zipfile
@@ -43,6 +44,18 @@ def parse_version(v: str) -> tuple:
         return tuple(int(x) for x in v.replace("-LITE", "").replace("-lite", "").split("."))
     except Exception:
         return (0, 0, 0)
+
+
+def sha256_file(path: str) -> str:
+    """Return lowercase hex SHA-256 of a file (streaming — safe for big zips)."""
+    h = hashlib.sha256()
+    try:
+        with open(path, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                h.update(chunk)
+    except Exception:
+        return ""
+    return h.hexdigest()
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -222,24 +235,27 @@ class LiteLoaderSplash(ctk.CTk):
                 self._launch_lite_app()
                 return
 
-            # Read current version from persistent location
+            # Read current version + applied zip hash from persistent location
             current_ver = "0.0.0"
+            current_hash = ""
             ver_path = os.path.join(install_dir, VERSION_FILE)
             if os.path.exists(ver_path):
                 try:
                     with open(ver_path) as f:
-                        current_ver = json.load(f).get("version", "0.0.0")
+                        _vdata = json.load(f)
+                        current_ver = _vdata.get("version", "0.0.0")
+                        current_hash = _vdata.get("hash", "") or ""
                 except Exception:
                     pass
 
-            if parse_version(lat) <= parse_version(current_ver):
-                self._set_status("App is up to date")
-                time.sleep(0.4)
-                self._launch_lite_app()
-                return
-
             # ── Update available — find download URL ──
             core_data = data.get("core_update", {})
+            # Lite always downloads the generic core_vX.zip, so it uses the
+            # generic hash field (not the platform-specific ones). Note: the
+            # generic hash is normally empty (build_update.py only writes it on
+            # Linux), so Lite hotfix detection is usually version-only — that's
+            # expected, not a bug.
+            server_hash = core_data.get("hash", "") or ""
             dl_url = (core_data.get("url")
                       or data.get("download_url_windows")
                       or data.get("download_url"))
@@ -247,6 +263,15 @@ class LiteLoaderSplash(ctk.CTk):
             if not dl_url:
                 self._set_status("Update info missing")
                 time.sleep(0.5)
+                self._launch_lite_app()
+                return
+
+            # Update if version is newer OR the core zip content changed
+            # (same-version hotfix: same version number, new hash → re-download).
+            hash_changed = bool(server_hash) and server_hash != current_hash
+            if parse_version(lat) <= parse_version(current_ver) and not hash_changed:
+                self._set_status("App is up to date")
+                time.sleep(0.4)
                 self._launch_lite_app()
                 return
 
@@ -268,6 +293,18 @@ class LiteLoaderSplash(ctk.CTk):
                 self._cleanup_file(zip_path)
                 self._launch_lite_app()
                 return
+
+            # Integrity check: verify hash before extracting (same-version hotfix
+            # + corrupt-download protection).
+            if server_hash:
+                actual_hash = sha256_file(zip_path)
+                if not actual_hash or actual_hash != server_hash:
+                    print(f"Hash mismatch: expected {server_hash}, got {actual_hash}. Keeping old version.")
+                    self._set_status("Download corrupt — will retry next launch")
+                    time.sleep(1)
+                    self._cleanup_file(zip_path)
+                    self._launch_lite_app()
+                    return
 
             # ── Extract into content_dir (sys._MEIPASS = _internal/) ──
             # The ZIP contains files at project root (src/, config/, assets/,
@@ -294,9 +331,9 @@ class LiteLoaderSplash(ctk.CTk):
                             os.remove(dst)
                     shutil.move(src, dst)
 
-                # Save updated version in persistent location
+                # Save updated version + zip hash in persistent location
                 with open(ver_path, "w") as f:
-                    json.dump({"version": lat}, f)
+                    json.dump({"version": lat, "hash": server_hash}, f)
 
                 self._set_status("Update applied! ✓")
                 time.sleep(0.5)

@@ -1189,7 +1189,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         """Check for updates in a background thread."""
         self.services.check_for_updates_background()
 
-    def show_update_prompt(self, version: str) -> None:
+    def show_update_prompt(self, version: str, is_hotfix: bool = False) -> None:
         """Auto-download and install update — exactly like the main app's loader.
         Shows a progress dialog, downloads in background, then applies the update
         and restarts. No user interaction required beyond the initial notification.
@@ -1314,8 +1314,9 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
                 try:
                     new_ver = self.update_info.get('version', '0.0.0')
+                    new_hash = self.update_info.get('hash', '') or ''
                     with open(version_file, 'w') as f:
-                        json.dump({"version": new_ver}, f)
+                        json.dump({"version": new_ver, "hash": new_hash}, f)
                 except Exception:
                     pass
 
@@ -1335,7 +1336,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                 return
 
         # Windows path — extract zip, create updater.bat, restart
-        extract_dir = os.path.join(self.get_data_path(), "update_temp")
+        extract_dir = self.get_data_path("update_temp")
         if os.path.exists(extract_dir):
             shutil.rmtree(extract_dir)
         os.makedirs(extract_dir)
@@ -1354,7 +1355,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
             messagebox.showinfo("Update Ready", "Application will restart to apply changes.")
 
-            batch_script_path = os.path.join(self.get_data_path(), "updater.bat")
+            batch_script_path = self.get_data_path("updater.bat")
             script_content = f"""
 @echo off
 title Updating NREGA Bot Lite...
@@ -1377,6 +1378,17 @@ del "%~f0" & exit
             with open(batch_script_path, "w") as bat:
                 bat.write(script_content)
             os.startfile(batch_script_path)
+
+            # Record the applied version + zip hash so the loader does not
+            # re-download the same content on the next launch.
+            try:
+                new_ver = self.update_info.get('version', '0.0.0')
+                new_hash = self.update_info.get('hash', '') or ''
+                vf = self.get_data_path("core_version.json")
+                with open(vf, 'w') as f:
+                    json.dump({"version": new_ver, "hash": new_hash}, f)
+            except Exception:
+                pass
 
             self.on_closing(force=True)
             sys.exit(0)

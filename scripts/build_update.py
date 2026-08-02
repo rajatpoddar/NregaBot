@@ -7,6 +7,8 @@ deliberately EXCLUDED so they can never leak through the update channel.
 import zipfile
 import os
 import sys
+import json
+import hashlib
 import platform
 
 # Make sure the project root is on sys.path so `from src.config import
@@ -112,6 +114,54 @@ def create_source_zip():
 
     print(f"\n✅ Success! Update file ready: {OUTPUT_PATH} ({count} files)")
     print(f"👉 Upload this file to your server for v{APP_VERSION} ({PLAT_TAG}) update.")
+
+    # Compute + record the zip's SHA-256 so the same-version hash update
+    # mechanism (loader.py / lite_loader.py) can detect content changes.
+    digest = sha256_file(OUTPUT_PATH)
+    print(f"🔑 SHA-256: {digest}")
+    _update_version_json_hash(digest)
+
+
+def sha256_file(path: str) -> str:
+    """Streaming SHA-256 of a file — safe for large zips."""
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _update_version_json_hash(digest: str) -> None:
+    """Write the fresh hash into config/version.json → core_update.<platform>.
+
+    Windows and macOS core zips are DIFFERENT files (CI compiles .pyc for
+    Windows; this script zips source for the local platform), so they have
+    different SHA-256 hashes. The hash is stored per-platform:
+      * hash_windows  ← core_win_vX.zip (built by CI on Windows)
+      * hash_macos    ← core_mac_vX.zip (built locally on macOS)
+      * hash          ← generic core_vX.zip fallback
+    """
+    vj_path = os.path.join(PROJECT_ROOT, "config", "version.json")
+    try:
+        with open(vj_path, encoding="utf-8") as f:
+            vj = json.load(f)
+        if "core_update" not in vj:
+            print("⚠️ config/version.json has no core_update block — hash not written.")
+            return
+        if PLAT_TAG == "mac":
+            vj["core_update"]["hash_macos"] = digest
+            field = "hash_macos"
+        elif PLAT_TAG == "win":
+            vj["core_update"]["hash_windows"] = digest
+            field = "hash_windows"
+        else:
+            vj["core_update"]["hash"] = digest
+            field = "hash"
+        with open(vj_path, "w", encoding="utf-8") as f:
+            json.dump(vj, f, indent=2, ensure_ascii=False)
+        print(f"✅ Updated config/version.json → core_update.{field}")
+    except Exception as e:
+        print(f"⚠️ Could not update config/version.json: {e}")
 
 
 if __name__ == "__main__":

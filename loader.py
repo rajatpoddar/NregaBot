@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import hashlib
 import requests
 import zipfile
 import json
@@ -39,6 +40,18 @@ def log_error(msg):
             f.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
     except Exception as e:
         print(f"log_error failed: {e}")
+
+def sha256_file(path: str) -> str:
+    """Return lowercase hex SHA-256 of a file (streaming — safe for big zips)."""
+    h = hashlib.sha256()
+    try:
+        with open(path, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                h.update(chunk)
+    except Exception as e:
+        log_error(f"sha256_file failed for {path}: {e}")
+        return ""
+    return h.hexdigest()
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -256,10 +269,13 @@ class ModernSplashScreen(ctk.CTk):
             self.update_status("Checking for updates...", -1)
 
             current_ver = "0.0.0"
+            current_hash = ""
             if os.path.exists(VERSION_FILE):
                 try:
                     with open(VERSION_FILE, 'r') as f:
-                        current_ver = json.load(f).get('version', "0.0.0")
+                        _vdata = json.load(f)
+                        current_ver = _vdata.get('version', "0.0.0")
+                        current_hash = _vdata.get('hash', "") or ""
                 except:
                     pass
 
@@ -273,6 +289,16 @@ class ModernSplashScreen(ctk.CTk):
 
             core_data = data.get('core_update', {})
             server_ver = core_data.get('version')
+            # Platform-specific hash: Windows and macOS core zips differ, so each
+            # platform verifies against ITS OWN hash only. Never fall back to the
+            # generic hash here — a generic hash describes the generic zip, not
+            # this platform's zip, and a mismatch would block updates.
+            if sys.platform == "win32":
+                server_hash = core_data.get('hash_windows', '') or ''
+            elif sys.platform == "darwin":
+                server_hash = core_data.get('hash_macos', '') or ''
+            else:
+                server_hash = core_data.get('hash', '') or ''
 
             download_url = None
             if sys.platform == "win32":
@@ -286,8 +312,12 @@ class ModernSplashScreen(ctk.CTk):
             if not server_ver or not download_url:
                 return False
 
-            if server_ver != current_ver:
-                self.update_status(f"New version found: v{server_ver}", 0)
+            # Update if the version changed OR the core zip content changed
+            # (same-version hotfix: same version number, new hash → re-download).
+            needs_update = (server_ver != current_ver) or (server_hash and server_hash != current_hash)
+
+            if needs_update:
+                self.update_status(f"New update found: v{server_ver}", 0)
                 time.sleep(0.5)
                 self.update_status("Downloading update...", 0)
 
@@ -304,8 +334,23 @@ class ModernSplashScreen(ctk.CTk):
                                 percent = downloaded / total_size
                                 self.update_status(f"Downloading... {int(percent*100)}%", percent)
 
+                # Integrity check: if the server declared a hash, verify it before
+                # applying. A mismatch means a corrupt/partial download — keep the
+                # old version and retry on the next launch.
+                if server_hash:
+                    actual_hash = sha256_file(CORE_ZIP_PATH)
+                    if not actual_hash or actual_hash != server_hash:
+                        log_error(f"Hash mismatch: expected {server_hash}, got {actual_hash}. Keeping old version.")
+                        self.update_status("Download corrupt — will retry next launch.", 0)
+                        try:
+                            os.remove(CORE_ZIP_PATH)
+                        except Exception:
+                            pass
+                        time.sleep(1)
+                        return False
+
                 with open(VERSION_FILE, 'w') as f:
-                    json.dump({"version": server_ver}, f)
+                    json.dump({"version": server_ver, "hash": server_hash}, f)
 
                 return True
             else:

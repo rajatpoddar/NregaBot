@@ -1,4 +1,7 @@
 {
+  "3.1.1": [
+      "🐞 **Fix (Pending Bills):** Resolved missing 'beautifulsoup4' library — the Pending Bills scraper was failing because bs4 was not bundled with the app. Dependency added to requirements.txt. Full reinstall required (smart updates cannot add new Python libraries)."
+    ],
   "3.1.0": [
       "🚀 **New Settings Panel:** Completely redesigned Settings tab with cloud backup & restore, one-time announcement popups, and a Location Fix wizard that validates your State/District against server records.",
       "🚀 **New Automation (Pending Bills):** Added the Pending Bills automation tab to track and process pending bills efficiently.",
