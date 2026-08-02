@@ -50,7 +50,6 @@ pyinstaller --noconfirm --windowed --onefile ^
 --add-data="config:config" ^
 --add-data="docs/changelog.json:docs/" ^
 --add-data="src:src" ^
---add-data="web:web" ^
 %ENV_ARG% ^
 --collect-all customtkinter ^
 --collect-data fpdf ^
@@ -87,7 +86,6 @@ pyinstaller --noconfirm --windowed --onedir ^
 --add-data="config:config" ^
 --add-data="docs/changelog.json:docs/" ^
 --add-data="src:src" ^
---add-data="web:web" ^
 %ENV_ARG% ^
 --collect-all customtkinter ^
 --collect-data fpdf ^

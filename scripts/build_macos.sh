@@ -53,7 +53,6 @@ pyinstaller --noconfirm --clean --windowed --name "${APP_NAME}" \
 --add-data="config:config" \
 --add-data="docs/changelog.json:docs/" \
 --add-data="src:src" \
---add-data="web:web" \
 --add-data=".env:." \
 --collect-all customtkinter \
 --collect-data fpdf \
