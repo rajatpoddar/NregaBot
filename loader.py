@@ -154,9 +154,11 @@ class ModernSplashScreen(ctk.CTk):
         self.status_label.pack(pady=(2, 0))
 
         # ---------- 8. VERSION FOOTER ----------
+        # Dynamic version from config — matches the app's actual build version
+        # (lite_loader.py uses the same pattern).
         ctk.CTkLabel(
             container,
-            text="v3.0.6 \u00b7 NregaBot.com",
+            text=f"v{config.APP_VERSION} \u00b7 NregaBot.com",
             font=ctk.CTkFont(family="Helvetica Neue", size=10),
             text_color=(config.COLORS["text_border"], config.COLORS["text_border_dark"])
         ).pack(side="bottom", pady=(0, 5))

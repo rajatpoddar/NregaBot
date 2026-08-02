@@ -15,7 +15,8 @@
   },
   "changelog": {
     "3.1.1": [
-      "🐞 **Fix (Pending Bills):** Resolved missing 'beautifulsoup4' library — the Pending Bills scraper was failing because bs4 was not bundled with the app. Dependency added to requirements.txt. Full reinstall required (smart updates cannot add new Python libraries)."
+      "🐞 **Fix (Pending Bills):** Resolved missing 'beautifulsoup4' library — the Pending Bills scraper was failing because bs4 was not bundled with the app. Dependency added to requirements.txt. Full reinstall required (smart updates cannot add new Python libraries).",
+      "⚡ **Smart Hash Updates:** Small code fixes can now be delivered instantly in the same version — updates are SHA-256 verified, and corrupt downloads are detected and retried automatically."
     ],
     "3.1.0": [
       "🚀 **New Settings Panel:** Completely redesigned Settings tab with cloud backup & restore, one-time announcement popups, and a Location Fix wizard that validates your State/District against server records.",
