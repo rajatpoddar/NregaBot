@@ -21,6 +21,7 @@ from src import config
 from src.utils import get_data_path, get_logger, get_config, save_config
 from src.ui_components import AfterTracker
 from src.location_hierarchy import get_hierarchy, HIERARCHY_TYPES, TYPE_TO_PREFIX
+from src.location_data import STATE_DISTRICT_MAP
 from src.tabs.activity_log_tab import ActivityLogTab
 
 # Selenium imports (used in _scrape_from_website)
@@ -53,12 +54,14 @@ class SettingsTab(ctk.CTkFrame):
         self.tab_mapping   = self.tab_view.add("  👥  Staff Mapping  ")
         self.tab_defaults  = self.tab_view.add("  ⚙️  Default Values  ")
         self.tab_activity  = self.tab_view.add("  📋 Activity Log  ")
+        self.tab_cloud     = self.tab_view.add("  ☁️  Cloud Backup  ")
         self.tab_factory   = self.tab_view.add("  🏭  Factory Reset  ")
 
         self._build_location_tab()
         self._build_mapping_tab()
         self._build_defaults_tab()
         self._build_activity_log_tab()
+        self._build_cloud_backup_tab()
         self._build_factory_reset_tab()
 
     # ────────────────────────────────────────────────────────────────
@@ -168,6 +171,16 @@ class SettingsTab(ctk.CTkFrame):
             command=self._sync_from_server,
         )
         self._srv_sync_btn.pack(side="left")
+
+        # ── Fix Location button (location mismatch detection) ──
+        self._fix_loc_btn = ctk.CTkButton(
+            srv_btn_row, text="🔧 Fix Location", width=110, height=26,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color=("#F97316", "#EA580C"), text_color="white",
+            hover_color=("#EA580C", "#C2410C"),
+            command=self._fix_location_now,
+        )
+        self._fix_loc_btn.pack(side="left", padx=(8, 0))
 
         self._srv_sync_status = ctk.CTkLabel(srv_btn_row, text="",
                                                font=ctk.CTkFont(size=10),
@@ -409,6 +422,165 @@ class SettingsTab(ctk.CTkFrame):
                 text_color=("#DC2626", "#F87171")
             )
             self.after(5000, lambda: self._srv_sync_status.configure(text=""))
+
+    def _fix_location_now(self) -> None:
+        """
+        User ke state/district ko app ke valid location data (STATE_DISTRICT_MAP)
+        se compare karta hai. Mismatch ho to dropdown-based popup dikhata hai jahan
+        user apna sahi location select kar ke save kar sakta hai (local + server).
+        """
+        lic = self.app.license_info if hasattr(self.app, 'license_info') else {}
+        cur_state = (lic.get('user_state') or '').strip().upper()
+        cur_dist = (lic.get('user_district') or '').strip().upper()
+
+        valid_states = sorted(STATE_DISTRICT_MAP.keys())
+        state_ok = cur_state in [s.upper() for s in valid_states]
+        dist_ok = True
+        if cur_state and state_ok:
+            valid_dists = [d.upper() for d in STATE_DISTRICT_MAP.get(
+                next((s for s in valid_states if s.upper() == cur_state), cur_state), [])]
+            dist_ok = cur_dist in valid_dists
+
+        if state_ok and dist_ok and cur_state and cur_dist:
+            self._srv_sync_status.configure(
+                text=f"✅ Location sahi hai: {cur_state} / {cur_dist}",
+                text_color=("#16A34A", "#4ADE80"))
+            self.after(5000, lambda: self._srv_sync_status.configure(text=""))
+            return
+
+        # ── Mismatch → show fix popup ──
+        win = ctk.CTkToplevel(self)
+        win.title(f"{config.APP_SHORT_NAME} - Fix Location")
+        win.update_idletasks()
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        w, h = min(440, sw - 40), min(460, sh - 40)
+        win.geometry(f'{w}x{h}+{(sw//2)-(w//2)}+{(sh//2)-(h//2)}')
+        win.resizable(False, False)
+        win.transient(self.winfo_toplevel())
+        win.grab_set()
+
+        outer = ctk.CTkFrame(win, fg_color="transparent")
+        outer.pack(expand=True, fill="both", padx=20, pady=16)
+
+        ctk.CTkLabel(outer, text="🔧 Location Mismatch Detected",
+                     font=ctk.CTkFont(size=16, weight="bold"),
+                     text_color=("#F97316", "#FB923C")).pack(anchor="w")
+
+        reason_lines = []
+        if not cur_state or not state_ok:
+            reason_lines.append(f"• State '{cur_state or '(empty)'}' app ke valid states se match nahi karta.")
+        if cur_state and state_ok and not dist_ok:
+            reason_lines.append(f"• District '{cur_dist or '(empty)'}' {cur_state} ke valid districts se match nahi karta.")
+        if not cur_state and not cur_dist:
+            reason_lines.append("• Aapne abhi state/district set nahi ki hai — server sync karein ya neeche select karein.")
+        reason_text = "\n".join(reason_lines) if reason_lines else "• Location data thoda sahi nahi hai."
+
+        ctk.CTkLabel(outer,
+            text=f"Aapka registered location sahi nahi hai:\n\n{reason_text}\n\n"
+                 "Neeche se sahi state aur district select karein — ye aapke app aur server dono mein update ho jayega.",
+            font=ctk.CTkFont(size=12), text_color=("gray40", "gray80"),
+            justify="left", wraplength=w - 50).pack(anchor="w", pady=(4, 12))
+
+        # State dropdown
+        state_row = ctk.CTkFrame(outer, fg_color="transparent")
+        state_row.pack(fill="x", pady=4)
+        ctk.CTkLabel(state_row, text="State:", width=80,
+                     font=ctk.CTkFont(size=13, weight="bold"), anchor="w").pack(side="left")
+        state_var = ctk.StringVar(value=cur_state if state_ok else "Select a State")
+        state_menu = ctk.CTkOptionMenu(state_row, values=["Select a State"] + valid_states,
+                                       variable=state_var, width=230, font=ctk.CTkFont(size=12))
+        state_menu.pack(side="left", expand=True, fill="x")
+
+        # District dropdown
+        dist_row = ctk.CTkFrame(outer, fg_color="transparent")
+        dist_row.pack(fill="x", pady=4)
+        ctk.CTkLabel(dist_row, text="District:", width=80,
+                     font=ctk.CTkFont(size=13, weight="bold"), anchor="w").pack(side="left")
+        dist_var = ctk.StringVar(value="Select District")
+        dist_menu = ctk.CTkOptionMenu(dist_row, values=["Select District"],
+                                      variable=dist_var, width=230, state="disabled",
+                                      font=ctk.CTkFont(size=12))
+        dist_menu.pack(side="left", expand=True, fill="x")
+
+        def _on_state(s):
+            dists = STATE_DISTRICT_MAP.get(s, [])
+            if dists:
+                dist_menu.configure(values=dists, state="normal")
+                if dist_var.get() not in dists:
+                    dist_var.set("Select District")
+            else:
+                dist_menu.configure(state="disabled")
+
+        if state_ok and cur_state:
+            # Pre-fill districts for the current state so the user can fix district
+            state_var.set(next((s for s in valid_states if s.upper() == cur_state), cur_state))
+            _on_state(state_var.get())
+            if cur_dist:
+                dist_var.set(next((d for d in STATE_DISTRICT_MAP.get(state_var.get(), []) if d.upper() == cur_dist), "Select District"))
+        state_var.trace_add("write", lambda *args: _on_state(state_var.get()))
+
+        status_line = ctk.CTkLabel(outer, text="", font=ctk.CTkFont(size=11),
+                                   text_color=("gray50", "gray60"), justify="left", wraplength=w - 50)
+        status_line.pack(fill="x", pady=(10, 4))
+
+        def _save():
+            state = state_var.get().strip()
+            dist = dist_var.get().strip()
+            if state == "Select a State" or not state:
+                status_line.configure(text="⚠️  Please select a state.", text_color=("#DC2626", "#EF4444"))
+                return
+            if dist == "Select District" or not dist:
+                status_line.configure(text="⚠️  Please select a district.", text_color=("#DC2626", "#EF4444"))
+                return
+
+            # Save locally to history manager (automation dropdowns)
+            hm = self.app.history_manager
+            for k in ["location_state", "mr_track_state", "issued_mr_state", "mis_state", "dashboard_state"]:
+                hm.save_entry(k, state.upper())
+            for k in ["location_district", "mr_track_district", "issued_mr_district", "mis_district", "dashboard_district"]:
+                hm.save_entry(k, dist.upper())
+
+            status_line.configure(text="⏳  Saving to server...", text_color=("#2563EB", "#60A5FA"))
+
+            def _worker():
+                ok = False
+                try:
+                    ok = self.app.fix_location_on_server(state, dist)
+                except Exception as e:
+                    logger.error("Fix location worker error: %s", e)
+
+                def _done():
+                    try:
+                        if ok:
+                            status_line.configure(
+                                text=f"✅ Location updated: {state.upper()} / {dist.upper()}",
+                                text_color=("#16A34A", "#4ADE80"))
+                            self._refresh_server_data_card()
+                            self._refresh_loc_list()
+                            win.after(900, win.destroy)
+                        else:
+                            status_line.configure(
+                                text="⚠️  Locally saved, but server update failed (check internet).",
+                                text_color=("#DC2626", "#EF4444"))
+                    except Exception:
+                        pass
+                self.after(0, _done)
+
+            import threading
+            threading.Thread(target=_worker, daemon=True).start()
+
+        btn_row = ctk.CTkFrame(outer, fg_color="transparent")
+        btn_row.pack(fill="x", pady=(8, 0))
+        btn_row.grid_columnconfigure(0, weight=1)
+        ctk.CTkButton(btn_row, text="💾 Save Location", command=_save,
+                      fg_color=("#16A34A", "#16A34A"), text_color="white",
+                      hover_color=("#15803D", "#15803D"), height=38,
+                      font=ctk.CTkFont(size=13, weight="bold")
+                      ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ctk.CTkButton(btn_row, text="Cancel", command=win.destroy,
+                      fg_color="gray", width=100, height=38,
+                      font=ctk.CTkFont(size=12)
+                      ).grid(row=0, column=1, padx=(6, 0))
 
     def _scrape_from_website(self) -> None:
         """
@@ -918,6 +1090,8 @@ class SettingsTab(ctk.CTkFrame):
             self._refresh_map_panel()
         elif "Activity Log" in current:
             self._refresh_activity_log()
+        elif "Cloud Backup" in current:
+            self._refresh_cloud_backup_status()
         elif "Factory Reset" in current:
             self._refresh_fr_stats()
 
@@ -945,6 +1119,261 @@ class SettingsTab(ctk.CTkFrame):
         """Refresh the activity log when its tab is shown."""
         if hasattr(self, '_activity_log_widget') and self._activity_log_widget.winfo_exists():
             self._activity_log_widget._refresh_log()
+
+    # ════════════════════════════════════════════════════════════════
+    # TAB: CLOUD BACKUP — server sync of settings data + suggestions
+    # ════════════════════════════════════════════════════════════════
+    def _build_cloud_backup_tab(self) -> None:
+        c = self.tab_cloud
+        c.grid_rowconfigure(0, weight=1)
+        c.grid_columnconfigure(0, weight=1)
+
+        bg = ctk.ThemeManager.theme["CTkFrame"]["fg_color"]
+        scroll = ctk.CTkScrollableFrame(c, fg_color=bg)
+        scroll.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        scroll.grid_columnconfigure(1, weight=1)
+
+        # ── Header ──
+        ctk.CTkLabel(scroll, text="☁️ Cloud Backup",
+                     font=ctk.CTkFont(size=18, weight="bold"),
+                     ).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 5))
+        ctk.CTkLabel(scroll,
+            text="Aapka saved data (location, staff mappings, default values, autocomplete suggestions) "
+                 "server par backup hota hai. Naye PC par activate karne ya factory reset ke baad "
+                 "'Restore from Server' se wapas la sakte hain. Web account page par bhi server data clear kar sakte hain.\n\n"
+                 "💡 Activity log aur usage stats backup mein shamil NAHI hote.",
+            font=ctk.CTkFont(size=12), text_color=("gray50", "gray60"),
+            wraplength=650, justify="left",
+                     ).grid(row=1, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 15))
+
+        # ── Status card ──
+        status_card = ctk.CTkFrame(scroll, fg_color=("#F0FDF4", "#0F2A1D"), corner_radius=10,
+                                   border_width=1, border_color=("#BBF7D0", "#166534"))
+        status_card.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 15))
+        status_card.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(status_card, text="📦  Server Backup Status:",
+                     font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color=("#166534", "#4ADE80"),
+                     ).grid(row=0, column=0, sticky="w", padx=12, pady=(10, 2))
+        self._cb_status_label = ctk.CTkLabel(status_card, text="Checking...",
+                                             font=ctk.CTkFont(size=12),
+                                             text_color=("gray50", "gray60"))
+        self._cb_status_label.grid(row=0, column=1, sticky="w", padx=12, pady=(10, 2))
+
+        local_stats = self._cb_local_stats_text()
+        ctk.CTkLabel(status_card, text=local_stats,
+                     font=ctk.CTkFont(size=11),
+                     text_color=("#166534", "#86EFAC"),
+                     justify="left", anchor="w",
+                     ).grid(row=1, column=0, columnspan=2, sticky="w", padx=12, pady=(2, 8))
+
+        # ── Action buttons ──
+        btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        btn_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=10, pady=(5, 10))
+        btn_frame.grid_columnconfigure(0, weight=1)
+
+        self._cb_status_line = ctk.CTkLabel(btn_frame, text="", font=ctk.CTkFont(size=12),
+                                            text_color=("gray50", "gray60"), justify="left", wraplength=650)
+        self._cb_status_line.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
+
+        self._cb_backup_btn = ctk.CTkButton(btn_frame, text="⬆️  Backup to Server", height=40,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color=("#16A34A", "#16A34A"), text_color="white",
+            hover_color=("#15803D", "#15803D"),
+            command=self._cb_backup_now)
+        self._cb_backup_btn.grid(row=1, column=0, sticky="ew", padx=(0, 6))
+
+        self._cb_restore_btn = ctk.CTkButton(btn_frame, text="⬇️  Restore from Server", height=40,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color=("#2563EB", "#3B82F6"), text_color="white",
+            hover_color=("#1D4ED8", "#2563EB"),
+            command=self._cb_restore_now)
+        self._cb_restore_btn.grid(row=1, column=1, sticky="ew", padx=6)
+
+        self._cb_clear_btn = ctk.CTkButton(btn_frame, text="🗑️  Clear Server Data", height=40,
+            font=ctk.CTkFont(size=13),
+            fg_color=("#FEE2E2", "#450A0A"), text_color=("#DC2626", "#F87171"),
+            hover_color=("#FECACA", "#7F1D1D"),
+            command=self._cb_clear_server)
+        self._cb_clear_btn.grid(row=1, column=2, sticky="ew", padx=(6, 0))
+
+        # ── Notes ──
+        ctk.CTkLabel(scroll,
+            text="• Backup: local data ka snapshot server par save karta hai (naya PC par restore ke liye).\n"
+                 "• Restore: server backup ko local data mein merge karta hai (duplicates nahi bante).\n"
+                 "• Clear: server wala snapshot delete karta hai — local data par koi asar nahi.\n"
+                 "• Factory reset ke baad isi tab se 'Restore from Server' dabayein.",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray50", "gray60"),
+            wraplength=630, justify="left",
+            ).grid(row=4, column=0, columnspan=2, sticky="w", padx=10, pady=(5, 0))
+
+        self.after(300, self._refresh_cloud_backup_status)
+
+    def _cb_local_stats_text(self) -> str:
+        """Local data summary shown in the status card."""
+        try:
+            hm = self.app.history_manager
+            sugg = hm.get_total_suggestions_count()
+            inputs = hm.get_tab_inputs_count()
+            return f"📊 Local data: {sugg} suggestions, {inputs} saved inputs, staff mappings, default values, config"
+        except Exception:
+            return "📊 Local data: (unavailable)"
+
+    def _refresh_cloud_backup_status(self) -> None:
+        """Query the server and show whether a backup exists."""
+        def _worker():
+            exists = False
+            updated = None
+            try:
+                key = self.app.license_info.get('key')
+                if not key:
+                    raise ValueError("No license key")
+                headers = {'Authorization': f'Bearer {key}'}
+                resp = self.app.http_session.get(
+                    f"{config.LICENSE_SERVER_URL}/api/user-data/backup",
+                    headers=headers, timeout=10)
+                res = resp.json() if resp.status_code == 200 else {}
+                exists = bool(res.get('data'))
+                updated = res.get('updated_at')
+            except Exception:
+                pass
+
+            def _update():
+                try:
+                    if not self._cb_status_label.winfo_exists():
+                        return
+                    if exists:
+                        ts = ""
+                        if updated:
+                            try:
+                                ts = " (" + str(updated)[:16].replace('T', ' ') + ")"
+                            except Exception:
+                                ts = ""
+                        self._cb_status_label.configure(
+                            text=f"✅ Backup exists on server{ts}",
+                            text_color=("#16A34A", "#4ADE80"))
+                    else:
+                        self._cb_status_label.configure(
+                            text="💡 No backup on server yet",
+                            text_color=("gray50", "gray60"))
+                except Exception:
+                    pass
+            self.after(0, _update)
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _cb_set_line(self, msg: str, color: str = "gray") -> None:
+        colors = {"green": ("#16A34A", "#4ADE80"), "red": ("#DC2626", "#F87171"),
+                  "blue": ("#2563EB", "#60A5FA"), "gray": ("gray50", "gray60")}
+        try:
+            self._cb_status_line.configure(text=msg, text_color=colors.get(color, colors["gray"]))
+        except Exception:
+            pass
+        try:
+            self.after(10000, lambda: self._cb_status_line.configure(text=""))
+        except Exception:
+            pass
+
+    def _cb_backup_now(self) -> None:
+        """Push local data to the server."""
+        if not messagebox.askyesno("Backup to Server",
+            "Local saved data ka snapshot server par upload karein?\n\n"
+            "Isse aapka data naye PC ya factory reset ke baad restore karne ke liye save ho jayega.",
+            parent=self.winfo_toplevel()):
+            return
+        self._cb_backup_btn.configure(state="disabled", text="⏳ Uploading...")
+        self._cb_set_line("⬆️ Uploading backup to server...", "blue")
+
+        def _worker():
+            ok = False
+            try:
+                ok = self.app.push_user_data_backup()
+            except Exception as e:
+                logger.error("Backup worker error: %s", e)
+
+            def _done():
+                try:
+                    self._cb_backup_btn.configure(state="normal", text="⬆️  Backup to Server")
+                    if ok:
+                        self._cb_set_line("✅ Backup uploaded successfully!", "green")
+                        self._refresh_cloud_backup_status()
+                    else:
+                        self._cb_set_line("❌ Backup failed. Server connection check karein.", "red")
+                except Exception:
+                    pass
+            self.after(0, _done)
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _cb_restore_now(self) -> None:
+        """Pull server backup and merge into local data."""
+        if not messagebox.askyesno("Restore from Server",
+            "Server backup se local data restore karein?\n\n"
+            "Naye entries merge ho jayengi — existing local data delete NAHI hoga.",
+            parent=self.winfo_toplevel()):
+            return
+        self._cb_restore_btn.configure(state="disabled", text="⏳ Downloading...")
+        self._cb_set_line("⬇️ Downloading backup from server...", "blue")
+
+        def _worker():
+            ok = False
+            try:
+                ok = self.app.pull_user_data_backup()
+            except Exception as e:
+                logger.error("Restore worker error: %s", e)
+
+            def _done():
+                try:
+                    self._cb_restore_btn.configure(state="normal", text="⬇️  Restore from Server")
+                    if ok:
+                        self._cb_set_line("✅ Restore complete! Location data, mappings aur suggestions wapas aa gaye.", "green")
+                        self._refresh_loc_list()
+                        self._refresh_server_data_card()
+                    else:
+                        self._cb_set_line("💡 No backup on server (ya restore failed).", "gray")
+                except Exception:
+                    pass
+            self.after(0, _done)
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _cb_clear_server(self) -> None:
+        """Delete the server-side backup snapshot."""
+        if not messagebox.askyesno("Clear Server Data",
+            "Server par saved backup DELETE kar dein?\n\n"
+            "Aapka local data kuch nahi hoga — sirf cloud backup delete hoga.\n"
+            "Web account page par bhi ye option available hai.",
+            icon="warning", parent=self.winfo_toplevel()):
+            return
+        self._cb_clear_btn.configure(state="disabled", text="⏳ Clearing...")
+        self._cb_set_line("🗑️ Clearing server backup...", "blue")
+
+        def _worker():
+            ok = False
+            try:
+                ok = self.app.clear_server_user_data()
+            except Exception as e:
+                logger.error("Clear server worker error: %s", e)
+
+            def _done():
+                try:
+                    self._cb_clear_btn.configure(state="normal", text="🗑️  Clear Server Data")
+                    if ok:
+                        self._cb_set_line("✅ Server backup cleared.", "green")
+                        self._refresh_cloud_backup_status()
+                    else:
+                        self._cb_set_line("❌ Clear failed. Try again.", "red")
+                except Exception:
+                    pass
+            self.after(0, _done)
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
 
     # ════════════════════════════════════════════════════════════════
     # TAB 5: FACTORY RESET — Restore app to fresh-install state

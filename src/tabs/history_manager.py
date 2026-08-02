@@ -507,31 +507,6 @@ class HistoryManager:
             except:
                 return 0
 
-    def clear_all_suggestions(self) -> bool:
-        """Delete all autocomplete suggestion entries + per-tab saved inputs."""
-        with self.lock:
-            try:
-                conn = self._get_connection()
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM suggestions")
-                conn.commit()
-                # Clear tab inputs from DB (caller holds lock, use _clear_tab_inputs)
-                self._clear_tab_inputs()
-                # Delete legacy JSON files so they don't re-import on restart
-                for filename in self._TAB_INPUT_JSON_FILES.values():
-                    try:
-                        fp = self.data_path_func(filename)
-                        if os.path.exists(fp):
-                            os.remove(fp)
-                    except Exception:
-                        pass
-                # Delete old JSON to prevent re-population on restart
-                self._delete_file_if_exists(self.old_json_file)
-                return True
-            except Exception as e:
-                logger.debug("clear_all_suggestions failed: %s", e)
-                return False
-
     def _delete_file_if_exists(self, filepath: str):
         try:
             if os.path.exists(filepath):
@@ -593,6 +568,130 @@ class HistoryManager:
 
     def get_db_file_path(self) -> str:
         return self.db_file
+
+    # ────────────────────────────────────────────────────────────────
+    # CLOUD BACKUP — export / import suggestions (user data sync)
+    # ────────────────────────────────────────────────────────────────
+    def export_all_suggestions(self) -> Dict[str, list]:
+        """Return ALL suggestions grouped by field_key: {field_key: [values]}.
+
+        Used by the cloud backup feature — this covers location data
+        (state/district/block/panchayat/village) + autocomplete suggestions
+        for every field. Usage stats / activity log are intentionally
+        excluded (server sync already handles activity log separately).
+        """
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT field_key, value FROM suggestions ORDER BY field_key, value")
+                rows = cursor.fetchall()
+                result: Dict[str, list] = {}
+                for field_key, value in rows:
+                    result.setdefault(field_key, []).append(value)
+                return result
+            except Exception as e:
+                logger.error("export_all_suggestions failed: %s", e)
+                return {}
+
+    def import_all_suggestions(self, suggestions: Dict[str, list]) -> int:
+        """Merge suggestions from a cloud backup into the local DB.
+
+        Existing values are kept (INSERT OR IGNORE) so a restore never wipes
+        newer local data. Returns the number of entries added.
+        """
+        if not suggestions or not isinstance(suggestions, dict):
+            return 0
+        added = 0
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                for field_key, values in suggestions.items():
+                    if not isinstance(values, list):
+                        continue
+                    for value in values:
+                        if not value:
+                            continue
+                        # Reuse save_entry logic (uppercase for location keys)
+                        try:
+                            cursor.execute("INSERT OR IGNORE INTO suggestions VALUES (?, ?)", (field_key, str(value)))
+                            added += cursor.rowcount
+                        except Exception:
+                            continue
+                conn.commit()
+                return added
+            except Exception as e:
+                logger.error("import_all_suggestions failed: %s", e)
+                return 0
+
+    def export_tab_inputs(self) -> Dict[str, Dict[str, str]]:
+        """Return all per-tab saved form inputs: {tab_key: {field_key: value}}."""
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT tab_key, field_key, value FROM tab_inputs ORDER BY tab_key, field_key")
+                rows = cursor.fetchall()
+                result: Dict[str, Dict[str, str]] = {}
+                for tab_key, field_key, value in rows:
+                    result.setdefault(tab_key, {})[field_key] = value
+                return result
+            except Exception as e:
+                logger.error("export_tab_inputs failed: %s", e)
+                return {}
+
+    def import_tab_inputs(self, tab_inputs: Dict[str, Dict[str, str]]) -> int:
+        """Merge per-tab form inputs from a cloud backup."""
+        if not tab_inputs or not isinstance(tab_inputs, dict):
+            return 0
+        added = 0
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                for tab_key, fields in tab_inputs.items():
+                    if not isinstance(fields, dict):
+                        continue
+                    for field_key, value in fields.items():
+                        try:
+                            cursor.execute(
+                                "INSERT OR REPLACE INTO tab_inputs (tab_key, field_key, value) VALUES (?, ?, ?)",
+                                (tab_key, field_key, str(value) if value else "")
+                            )
+                            added += 1
+                        except Exception:
+                            continue
+                conn.commit()
+                return added
+            except Exception as e:
+                logger.error("import_tab_inputs failed: %s", e)
+                return 0
+
+    def clear_all_suggestions(self) -> bool:
+        """Delete all autocomplete suggestion entries + per-tab saved inputs."""
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM suggestions")
+                conn.commit()
+                # Clear tab inputs from DB (caller holds lock, use _clear_tab_inputs)
+                self._clear_tab_inputs()
+                # Delete legacy JSON files so they don't re-import on restart
+                for filename in self._TAB_INPUT_JSON_FILES.values():
+                    try:
+                        fp = self.data_path_func(filename)
+                        if os.path.exists(fp):
+                            os.remove(fp)
+                    except Exception:
+                        pass
+                # Delete old JSON to prevent re-population on restart
+                self._delete_file_if_exists(self.old_json_file)
+                return True
+            except Exception as e:
+                logger.debug("clear_all_suggestions failed: %s", e)
+                return False
 
     def factory_reset(self) -> bool:
         """

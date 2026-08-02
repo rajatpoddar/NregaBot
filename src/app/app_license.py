@@ -1164,7 +1164,25 @@ class LicenseMixin:
 
     def show_purchase_window(self, context: str = 'upgrade') -> None:
         if not self.app_state.license_info.get('key'): self.play_sound("error"); messagebox.showerror("Error", "License key missing"); return
-        webbrowser.open_new_tab(f"{config.LICENSE_SERVER_URL}/buy?existing_key={self.app_state.license_info['key']}")
+
+        # SECURITY: license key kabhi browser URL mein nahi aata. Server se
+        # signed opaque buy-link lete hain (key sirf Authorization header mein
+        # jata hai, TLS ke andar). Server verify karke user ko prefill karta hai.
+        try:
+            headers = {'Authorization': f"Bearer {self.app_state.license_info['key']}"}
+            resp = self.app_state.http_session.post(
+                f"{config.LICENSE_SERVER_URL}/api/get-buy-link",
+                headers=headers, timeout=10)
+            data = resp.json()
+            if resp.status_code == 200 and data.get('status') == 'success' and data.get('url'):
+                webbrowser.open_new_tab(data['url'])
+                return
+        except Exception:
+            logger.warning("get-buy-link failed — falling back to plain /buy page", exc_info=True)
+
+        # Fallback: bina key ke buy page kholo — user wahan email dal ke
+        # register/renew kar sakta hai (raw key URL mein expose nahi hoti).
+        webbrowser.open_new_tab(f"{config.LICENSE_SERVER_URL}/buy")
 
     def check_expiry_and_notify(self) -> bool:
         exp = self.app_state.license_info.get('expires_at')
@@ -1264,6 +1282,15 @@ class LicenseMixin:
                             except Exception:
                                 _shutdown = True
                                 break
+
+                            # One-time popup announcement (admin → user)
+                            popup = data.get("announcement_popup") or None
+                            if popup and isinstance(popup, dict) and popup.get("active"):
+                                try:
+                                    self.after(0, lambda p=popup: self._maybe_show_announcement_popup(p))
+                                except Exception:
+                                    _shutdown = True
+                                    break
                     except Exception as e:
                         logger.error("Config Fetch Error: %s", e)
                     ping_counter = 0
@@ -1284,6 +1311,308 @@ class LicenseMixin:
 
     def _fetch_app_config(self):
         pass  # Deprecated: merged into _ping_server_in_background
+
+    # ------------------------------------------------------------------
+    # ONE-TIME ANNOUNCEMENT POPUP (admin → user, with go-to-tab button)
+    # ------------------------------------------------------------------
+
+    def _maybe_show_announcement_popup(self, popup: Dict[str, Any]) -> None:
+        """Show the admin's one-time popup announcement (once per popup id).
+
+        - Each announcement has a unique `id` from the server.
+        - The user can tick "Don't show again" — the id is then saved to
+          config.json and the popup never reappears for that id.
+        - If the popup has a `target_tab`, a button is shown that navigates
+          the user straight to that tab (e.g. a newly added automation).
+        """
+        try:
+            popup_id = str(popup.get('id') or '').strip()
+            message = (popup.get('message') or '').strip()
+            if not message:
+                return
+
+            # Without an id there is no way to remember dismissal — treat the
+            # message itself as the id so it still only shows once per session.
+            if not popup_id:
+                popup_id = "msg:" + message[:64]
+
+            # Respect the user's "don't show again" choice
+            dismissed = get_config('dismissed_announcements') or []
+            if popup_id and popup_id in dismissed:
+                return
+
+            # Only show once per app session even without a persisted choice
+            if getattr(self, '_shown_popup_ids', None) is None:
+                self._shown_popup_ids = set()
+            if popup_id and popup_id in self._shown_popup_ids:
+                return
+            if popup_id:
+                self._shown_popup_ids.add(popup_id)
+
+            button_text = (popup.get('button_text') or 'OK').strip() or 'OK'
+            target_tab = (popup.get('target_tab') or '').strip()
+
+            win = ctk.CTkToplevel(self)
+            win.title(f"{config.APP_SHORT_NAME} - Announcement")
+            win.update_idletasks()
+            sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+            w, h = min(460, sw - 40), min(420, sh - 40)
+            win.geometry(f'{w}x{h}+{(sw//2)-(w//2)}+{(sh//2)-(h//2)}')
+            win.resizable(False, False)
+            win.transient(self)
+            win.grab_set()
+
+            outer = ctk.CTkFrame(win, fg_color="transparent")
+            outer.pack(expand=True, fill="both", padx=20, pady=18)
+
+            # Header
+            head = ctk.CTkFrame(outer, fg_color="transparent")
+            head.pack(fill="x", pady=(0, 10))
+            try:
+                icon = ctk.CTkImage(Image.open(resource_path("assets/logo.png")), size=(34, 34))
+                ctk.CTkLabel(head, image=icon, text="").pack(side="left", padx=(0, 10))
+            except Exception:
+                ctk.CTkLabel(head, text="📢", font=ctk.CTkFont(size=24)).pack(side="left", padx=(0, 10))
+            ctk.CTkLabel(head, text="Announcement",
+                         font=ctk.CTkFont(size=16, weight="bold"), anchor="w").pack(fill="x")
+
+            # Message
+            msg_frame = ctk.CTkFrame(outer, fg_color=("gray95", "gray25"), corner_radius=10)
+            msg_frame.pack(fill="both", expand=True, pady=(0, 12))
+            msg_lbl = ctk.CTkLabel(
+                msg_frame, text=message, justify="left", anchor="w",
+                font=ctk.CTkFont(size=13), wraplength=w - 70,
+                text_color=("gray20", "gray90"),
+            )
+            msg_lbl.pack(fill="both", expand=True, padx=16, pady=14)
+
+            # Don't-show-again checkbox
+            dont_show_var = tkinter.BooleanVar(value=False)
+            cb = ctk.CTkCheckBox(outer, text="Don't show this again",
+                                 variable=dont_show_var, font=ctk.CTkFont(size=12))
+            cb.pack(anchor="w", pady=(0, 10))
+
+            def _mark_dismissed():
+                if popup_id and dont_show_var.get():
+                    dismissed = list(get_config('dismissed_announcements') or [])
+                    if popup_id not in dismissed:
+                        dismissed.append(popup_id)
+                        save_config('dismissed_announcements', dismissed)
+
+            def _open_tab():
+                _mark_dismissed()
+                win.destroy()
+                try:
+                    self.show_frame(target_tab)
+                except Exception:
+                    logger.warning("Announcement target tab not found: %s", target_tab, exc_info=True)
+
+            def _close():
+                _mark_dismissed()
+                win.destroy()
+
+            btn_row = ctk.CTkFrame(outer, fg_color="transparent")
+            btn_row.pack(fill="x", pady=(2, 0))
+            btn_row.grid_columnconfigure(0, weight=1)
+
+            if target_tab:
+                go_btn = ctk.CTkButton(btn_row, text=button_text,
+                                       command=_open_tab,
+                                       fg_color=("#2563EB", "#3B82F6"),
+                                       hover_color=("#1D4ED8", "#2563EB"),
+                                       height=38, corner_radius=8,
+                                       font=ctk.CTkFont(size=13, weight="bold"))
+                go_btn.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+                close_btn = ctk.CTkButton(btn_row, text="Close", command=_close,
+                                          fg_color="gray", width=100, height=38,
+                                          font=ctk.CTkFont(size=12))
+                close_btn.grid(row=0, column=1, padx=(6, 0))
+            else:
+                ok_btn = ctk.CTkButton(btn_row, text=button_text, command=_close,
+                                       fg_color=("#2563EB", "#3B82F6"),
+                                       hover_color=("#1D4ED8", "#2563EB"),
+                                       height=38, corner_radius=8,
+                                       font=ctk.CTkFont(size=13, weight="bold"))
+                ok_btn.grid(row=0, column=0, columnspan=2, sticky="ew")
+
+            self.play_sound("notification")
+        except Exception as e:
+            logger.error("Failed to show announcement popup: %s", e, exc_info=True)
+
+    # ------------------------------------------------------------------
+    # USER DATA CLOUD BACKUP (Settings → Cloud Backup)
+    # ------------------------------------------------------------------
+
+    def _collect_user_data(self) -> Dict[str, Any]:
+        """Gather all syncable user data for the cloud backup.
+
+        Includes: autocomplete suggestions (covers location data),
+        per-tab saved inputs, staff/mate mappings, and app config
+        (theme, browser, toggles). Activity log / usage stats are NOT
+        included (they sync separately / are not needed on a new PC).
+        """
+        hm = self.history_manager
+        data: Dict[str, Any] = {}
+
+        suggestions = hm.export_all_suggestions()
+        if suggestions:
+            data['suggestions'] = suggestions
+
+        tab_inputs = hm.export_tab_inputs()
+        if tab_inputs:
+            data['tab_inputs'] = tab_inputs
+
+        # Staff / mate mappings (JSON files)
+        maps: Dict[str, Any] = {}
+        for fname in ("mr_panchayat_staff_map.json", "mb_panchayat_mate_map.json"):
+            fp = get_data_path(fname)
+            if os.path.exists(fp):
+                try:
+                    with open(fp, "r") as f:
+                        maps[fname] = json.load(f)
+                except Exception:
+                    maps[fname] = {}
+        if maps:
+            data['staff_maps'] = maps
+
+        # App config (theme / browser / toggles) — whitelist only
+        cfg_keys = ["theme", "last_used_browser", "sound_enabled",
+                    "minimize_on_start", "whatsapp_automation_notify",
+                    "whatsapp_excel_send"]
+        cfg = {}
+        for k in cfg_keys:
+            try:
+                v = get_config(k)
+                if v is not None:
+                    cfg[k] = v
+            except Exception:
+                continue
+        if cfg:
+            data['config'] = cfg
+
+        return data
+
+    def push_user_data_backup(self) -> bool:
+        """Upload the current local user data snapshot to the server."""
+        key = self.app_state.license_info.get('key')
+        if not key:
+            return False
+        data = self._collect_user_data()
+        if not data:
+            return False
+        try:
+            headers = {'Authorization': f'Bearer {key}'}
+            resp = self.app_state.http_session.post(
+                f"{config.LICENSE_SERVER_URL}/api/user-data/backup",
+                json={'data': data}, headers=headers, timeout=15)
+            return resp.status_code == 200
+        except Exception as e:
+            logger.error("User data backup upload failed: %s", e)
+            return False
+
+    def pull_user_data_backup(self) -> bool:
+        """Fetch the server backup and merge it into the local DB.
+
+        Returns True if a backup existed and was applied. Used on a new PC
+        (first activation) and after a factory reset (re-sync).
+        """
+        key = self.app_state.license_info.get('key')
+        if not key:
+            return False
+        try:
+            headers = {'Authorization': f'Bearer {key}'}
+            resp = self.app_state.http_session.get(
+                f"{config.LICENSE_SERVER_URL}/api/user-data/backup",
+                headers=headers, timeout=15)
+            if resp.status_code != 200:
+                return False
+            res = resp.json()
+            data = res.get('data') or {}
+            if not data:
+                return False
+
+            hm = self.history_manager
+            added = 0
+            if data.get('suggestions'):
+                added += hm.import_all_suggestions(data['suggestions'])
+            if data.get('tab_inputs'):
+                added += hm.import_tab_inputs(data['tab_inputs'])
+
+            # Staff / mate mappings
+            for fname, payload in (data.get('staff_maps') or {}).items():
+                if not isinstance(payload, dict):
+                    continue
+                fp = get_data_path(fname)
+                try:
+                    with open(fp, "w") as f:
+                        json.dump(payload, f, indent=4)
+                except Exception:
+                    continue
+
+            # App config
+            for k, v in (data.get('config') or {}).items():
+                try:
+                    save_config(k, v)
+                except Exception:
+                    continue
+
+            logger.info("User data restored from cloud backup (%s suggestions/inputs).", added)
+            return True
+        except Exception as e:
+            logger.error("User data backup restore failed: %s", e)
+            return False
+
+    def clear_server_user_data(self) -> bool:
+        """Delete the server-side backup (web account page also does this)."""
+        key = self.app_state.license_info.get('key')
+        if not key:
+            return False
+        try:
+            headers = {'Authorization': f'Bearer {key}'}
+            resp = self.app_state.http_session.delete(
+                f"{config.LICENSE_SERVER_URL}/api/user-data/backup",
+                headers=headers, timeout=15)
+            return resp.status_code == 200
+        except Exception as e:
+            logger.error("User data backup clear failed: %s", e)
+            return False
+
+    # ------------------------------------------------------------------
+    # LOCATION FIX (Settings → Fix Location)
+    # ------------------------------------------------------------------
+
+    def fix_location_on_server(self, state: str, district: str, block: str = "") -> bool:
+        """Push corrected state/district/block to the server license record."""
+        key = self.app_state.license_info.get('key')
+        if not key:
+            return False
+        try:
+            headers = {'Authorization': f'Bearer {key}'}
+            payload = {}
+            if state:
+                payload['state'] = state
+            if district:
+                payload['district'] = district
+            if block:
+                payload['block'] = block
+            if not payload:
+                return False
+            resp = self.app_state.http_session.post(
+                f"{config.LICENSE_SERVER_URL}/api/update-location",
+                json=payload, headers=headers, timeout=15)
+            ok = resp.status_code == 200
+            if ok:
+                # Refresh local license_info so future syncs use the fixed values
+                if state:
+                    self.app_state.license_info['user_state'] = state.upper()
+                if district:
+                    self.app_state.license_info['user_district'] = district.upper()
+                if block:
+                    self.app_state.license_info['user_block'] = block.upper()
+            return ok
+        except Exception as e:
+            logger.error("Fix location on server failed: %s", e)
+            return False
 
     def _apply_feature_flags(self) -> None:
         current_ver = parse_version(config.APP_VERSION)
