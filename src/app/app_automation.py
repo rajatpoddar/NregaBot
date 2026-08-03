@@ -161,6 +161,7 @@ class AutomationMixin:
             )
 
         def wrapper():
+            error_msg = ''  # set if target() raises — used to log status="failed"
             # Fresh run: forget any browser choice left over from a previous
             # run so this automation gets to pick (if multiple browsers).
             try:
@@ -170,6 +171,9 @@ class AutomationMixin:
             try:
                 target(*args)
             except Exception as e:
+                # Include the exception type — much more useful for the admin
+                # error logs when debugging what went wrong.
+                error_msg = f"{type(e).__name__}: {str(e)}"[:600]
                 # Safety net: never let an uncaught automation exception crash
                 # the app (e.g. the user closed the browser tab mid-run).
                 try:
@@ -218,7 +222,8 @@ class AutomationMixin:
                     except Exception:
                         pass
                     tab_instance.driver = None
-                self.after(0, lambda k=key, dur=duration, inst=tab_instance: self.on_automation_finished(k, dur, inst))
+                self.after(0, lambda k=key, dur=duration, inst=tab_instance, err=error_msg:
+                           self.on_automation_finished(k, dur, inst, err))
 
         t = threading.Thread(target=wrapper, daemon=True)
         self.app_state.automation_threads[key] = t
@@ -265,7 +270,7 @@ class AutomationMixin:
 
         threading.Thread(target=_marker_keeper, args=(t,), daemon=True).start()
 
-    def on_automation_finished(self, key, duration=0.0, tab_instance=None):
+    def on_automation_finished(self, key, duration=0.0, tab_instance=None, error_msg=''):
         if key in self.app_state.active_automations:
             self.app_state.active_automations.remove(key)
         self._update_running_automation_indicator()
@@ -288,17 +293,29 @@ class AutomationMixin:
                 village = getattr(tab_instance, 'activity_village', '')
                 details = getattr(tab_instance, 'activity_details', '')
                 
-                # Determine status from stop_event
+                # Determine status: uncaught error → failed, stop requested →
+                # stopped, otherwise success.
                 stop_event = self.app_state.stop_events.get(key)
-                status = "stopped" if (stop_event and stop_event.is_set()) else "success"
-                
+                if error_msg:
+                    status = "failed"
+                elif stop_event and stop_event.is_set():
+                    status = "stopped"
+                else:
+                    status = "success"
+
+                # Prepend the error so the admin panel's Error Logs tab can
+                # show exactly what went wrong.
+                log_details = details
+                if error_msg:
+                    log_details = f"ERROR: {error_msg}" + (f" | {details}" if details else "")
+
                 self.history_manager.log_automation_finish(
                     automation_key=key,
                     panchayat=panchayat,
                     village=village,
                     status=status,
                     duration_seconds=duration,
-                    details=details
+                    details=log_details
                 )
             except Exception as e:
                 logger.error(f"Failed to log automation finish for {key}: {e}")

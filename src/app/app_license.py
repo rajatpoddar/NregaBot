@@ -1253,6 +1253,21 @@ class LicenseMixin:
                         _shutdown = True
                         break
 
+                # 1b. Heartbeat — update licenses.last_seen on the server so the
+                # admin panel can show which users are currently online.
+                try:
+                    lic = getattr(self.app_state, 'license_info', {}) or {}
+                    hb_key = (lic.get('key') or '').strip()
+                    if hb_key:
+                        self.app_state.http_session.post(
+                            f"{config.LICENSE_SERVER_URL}/api/heartbeat",
+                            json={'key': hb_key, 'app_version': config.APP_VERSION},
+                            timeout=5,
+                        )
+                        _cookie_req_count += 1
+                except Exception:
+                    pass  # Heartbeat failure is non-fatal — try again next cycle
+
                 # 2. Fetch App Config (Every 120s -> 6 loops of 20s)
                 if ping_counter % 6 == 0:
                     try:
@@ -1730,14 +1745,17 @@ class LicenseMixin:
     # ------------------------------------------------------------------
 
     def _custom_showinfo(self, title, message, **options):
-        active_tab = getattr(self.app_state, 'current_active_tab', 'System')
+        # Tab context goes into the structured automation_key column (admin
+        # panel 'Task' column), so the plain message is logged — no redundant
+        # '[tab]' prefix.
+        active_tab = getattr(self.app_state, 'current_active_tab', '') or 'app'
         extra_info = self._get_active_tab_context()
 
-        log_msg = f"[{active_tab}] {message}"
+        log_msg = message
         if extra_info:
             log_msg += f" ({extra_info})"
 
-        self.history_manager.log_activity("SUCCESS", log_msg)
+        self.history_manager.log_activity("SUCCESS", log_msg, automation_key=active_tab)
 
         if len(message) < 60 or "success" in message.lower() or "complete" in message.lower() or "finished" in message.lower():
             self.show_toast(message, kind="success")
@@ -1747,14 +1765,14 @@ class LicenseMixin:
             return self.app_state._original_showinfo(title, message, **options)
 
     def _custom_showwarning(self, title, message, **options):
-        active_tab = getattr(self.app_state, 'current_active_tab', 'System')
+        active_tab = getattr(self.app_state, 'current_active_tab', '') or 'app'
         extra_info = self._get_active_tab_context()
 
-        log_msg = f"[{active_tab}] {message}"
+        log_msg = message
         if extra_info:
             log_msg += f" ({extra_info})"
 
-        self.history_manager.log_activity("WARNING", log_msg)
+        self.history_manager.log_activity("WARNING", log_msg, automation_key=active_tab)
 
         if len(message) < 50:
             self.show_toast(message, kind="warning")
@@ -1764,14 +1782,14 @@ class LicenseMixin:
         return self.app_state._original_showwarning(title, message, **options)
 
     def _custom_showerror(self, title, message, **options):
-        active_tab = getattr(self.app_state, 'current_active_tab', 'System')
+        active_tab = getattr(self.app_state, 'current_active_tab', '') or 'app'
         extra_info = self._get_active_tab_context()
 
-        log_msg = f"[{active_tab}] Error: {message}"
+        log_msg = f"Error: {message}"
         if extra_info:
             log_msg += f" ({extra_info})"
 
-        self.history_manager.log_activity("ERROR", log_msg)
+        self.history_manager.log_activity("ERROR", log_msg, automation_key=active_tab)
 
         self.play_sound("error")
         return self.app_state._original_showerror(title, message, **options)

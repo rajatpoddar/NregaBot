@@ -734,23 +734,24 @@ class HistoryManager:
                 return False
 
     # --- NEW: Logging Functions ---
-    def log_activity(self, activity_type: str, description: str):
-        """Current time ke saath activity save karta hai (backward compatible)."""
-        with self.lock:
-            try:
-                conn = self._get_connection()
-                cursor = conn.cursor()
-                
-                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                cursor.execute("INSERT INTO activity_log (timestamp, activity_type, description) VALUES (?, ?, ?)", 
-                               (now, activity_type, description))
-                
-                # Auto-Cleanup: Sirf last 1000 records rakho taaki DB heavy na ho
-                cursor.execute("DELETE FROM activity_log WHERE id NOT IN (SELECT id FROM activity_log ORDER BY id DESC LIMIT 1000)")
-                
-                conn.commit()
-            except Exception as e:
-                print(f"Log Error: {e}")
+    def log_activity(self, activity_type: str, description: str, automation_key: str = "app",
+                     panchayat: str = "", village: str = "", details: str = ""):
+        """Backward-compatible activity logger — routes through the structured
+        logger so the admin panel / Activity Log never shows blank columns.
+
+        The status is derived from the type (SUCCESS→success, WARNING→warning,
+        ERROR→error) and the description is mirrored into the details column
+        when no explicit details are given.
+        """
+        self.log_activity_structured(
+            activity_type=activity_type,
+            description=description,
+            automation_key=automation_key or "app",
+            panchayat=panchayat,
+            village=village,
+            status=activity_type.lower(),
+            details=details or description,
+        )
 
     def log_activity_structured(self, activity_type: str, description: str,
                                  automation_key: str = "", panchayat: str = "",
@@ -793,9 +794,10 @@ class HistoryManager:
     def log_automation_start(self, automation_key: str, panchayat: str = "",
                               village: str = "", details: str = ""):
         """Log when an automation starts."""
+        loc = " | ".join(x for x in (panchayat, village) if x)
         self.log_activity_structured(
             activity_type="START",
-            description=f"Started {automation_key} for {panchayat or 'N/A'}",
+            description=f"Started {automation_key}{(' for ' + loc) if loc else ''}",
             automation_key=automation_key,
             panchayat=panchayat,
             village=village,
@@ -808,9 +810,11 @@ class HistoryManager:
                                village: str = "", status: str = "success",
                                duration_seconds: float = 0, details: str = ""):
         """Log when an automation finishes."""
+        loc = " | ".join(x for x in (panchayat, village) if x)
+        dur = f" ({duration_seconds:.0f}s)" if duration_seconds > 0 else ""
         self.log_activity_structured(
             activity_type="FINISH",
-            description=f"{status.upper()}: {automation_key} for {panchayat or 'N/A'} ({duration_seconds:.0f}s)",
+            description=f"{status.upper()}: {automation_key}{(' for ' + loc) if loc else ''}{dur}",
             automation_key=automation_key,
             panchayat=panchayat,
             village=village,
@@ -917,12 +921,14 @@ class HistoryManager:
                         "timestamp": row[1],
                         "activity_type": row[2],
                         "description": row[3],
-                        "automation_key": row[4] or "",
+                        # Backfill fallbacks so legacy rows (written before the
+                        # structured columns existed) never sync as blank.
+                        "automation_key": row[4] or "app",
                         "panchayat": row[5] or "",
                         "village": row[6] or "",
-                        "status": row[7] or "",
+                        "status": row[7] or (row[2] or "").lower(),
                         "duration_seconds": float(row[8] or 0),
-                        "details": row[9] or "",
+                        "details": row[9] or row[3] or "",
                     })
                 return result
             except Exception as e:
@@ -985,6 +991,7 @@ class HistoryManager:
 
                 payload = {
                     "license_key": license_key,
+                    "app_version": config.APP_VERSION,
                     "entries": entries,
                 }
 
