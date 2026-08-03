@@ -1,19 +1,24 @@
 {
-  "latest_version": "3.1.1",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.1.1-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.1.1-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.1.1-Linux.tar.gz",
+  "latest_version": "3.1.2",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.1.2-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.1.2-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.1.2-Linux.tar.gz",
   "core_update": {
-    "version": "3.1.1",
-    "url": "https://nregabot.com/updates/core_v3.1.1.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.1.1.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.1.1.zip",
-    "force_full_reinstall": true,
+    "version": "3.1.2",
+    "url": "https://nregabot.com/updates/core_v3.1.2.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.1.2.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.1.2.zip",
+    "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "544ffd733d04dc217a9719839b7616fc5dd2dcc9e7861c0ef890eb0d0ee2b0ad",
-    "hash_macos": "21c35188ba3b2790b9311318dd90e9a1601ab60fef950bd7cc46a9054e513f3a"
+    "hash_windows": "",
+    "hash_macos": ""
   },
   "changelog": {
+    "3.1.2": [
+      "🐞 **Fix (About tab crash):** Resolved the 'humanize module missing' error — About tab and File Manager no longer crash if the humanize package isn't bundled; a built-in fallback is used and the package is now included in all builds.",
+      "▶️ **Running Automation Indicator:** The footer now shows exactly which automation is currently running (e.g. '▶ Running: MR Tracking') next to the status, so you always know what's happening.",
+      "🖥️ **Footer Layout:** Status text moved to the right of the running-automation name for a cleaner '© 2025 NREGA Bot | ▶ Running: X | Status: ...' read."
+    ],
     "3.1.1": [
       "🐞 **Fix (Pending Bills):** Resolved missing 'beautifulsoup4' library — the Pending Bills scraper was failing because bs4 was not bundled with the app. Dependency added to requirements.txt. Full reinstall required (smart updates cannot add new Python libraries).",
       "⚡ **Smart Hash Updates:** Small code fixes can now be delivered instantly in the same version — updates are SHA-256 verified, and corrupt downloads are detected and retried automatically."

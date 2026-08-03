@@ -1,4 +1,9 @@
 {
+  "3.1.2": [
+      "🐞 **Fix (About tab crash):** Resolved the 'humanize module missing' error — About tab and File Manager no longer crash if the humanize package isn't bundled; a built-in fallback is used and the package is now included in all builds.",
+      "▶️ **Running Automation Indicator:** The footer now shows exactly which automation is currently running (e.g. '▶ Running: MR Tracking') next to the status, so you always know what's happening.",
+      "🖥️ **Footer Layout:** Status text moved to the right of the running-automation name for a cleaner '© 2025 NREGA Bot | ▶ Running: X | Status: ...' read."
+    ],
   "3.1.1": [
       "🐞 **Fix (Pending Bills):** Resolved missing 'beautifulsoup4' library — the Pending Bills scraper was failing because bs4 was not bundled with the app. Dependency added to requirements.txt. Full reinstall required (smart updates cannot add new Python libraries)."
     ],

@@ -58,6 +58,10 @@ from src.utils import (
     setup_logging, get_logger, _suppress_overscroll
 )
 
+# --- Shared automation display names for the footer's "▶ Running: ..."
+# indicator — single source of truth lives in src/app/app_automation.py.
+from src.app.app_automation import AUTOMATION_DISPLAY_NAMES, _automation_display_name
+
 # --- Replace AutocompleteEntry with LiteDropdown for the lite app ---
 # Every tab that imports AutocompleteEntry from autocomplete_widget will get
 # LiteDropdown instead — a read-only dropdown with NO typing/autocomplete.
@@ -563,22 +567,34 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         footer = ctk.CTkFrame(self, height=34, corner_radius=0, fg_color=("#FFFFFF", "#2B2B2B"))
         footer.grid(row=2, column=0, sticky="ew", padx=15, pady=(0, 10))
         footer.grid_propagate(False)
-        footer.grid_columnconfigure(0, weight=1)
+        footer.grid_columnconfigure(0, weight=0)
+        footer.grid_columnconfigure(1, weight=1)
+        footer.grid_columnconfigure(2, weight=0)
 
-        # Left: status
-        self.status_label = ctk.CTkLabel(footer, text="Ready", text_color="gray60", font=ctk.CTkFont(size=11))
-        self.status_label.grid(row=0, column=0, sticky="w", padx=10)
+        # Left: "© 2025 NREGA Bot | ▶ Running: X | Status: ..." (one sequence)
+        left_frame = ctk.CTkFrame(footer, fg_color="transparent")
+        left_frame.grid(row=0, column=0, sticky="w", padx=10)
 
-        # Center: Copyright
         ctk.CTkLabel(
-            footer, text="© 2025 NREGA Bot",
-            font=ctk.CTkFont(size=10),
+            left_frame, text="© 2025 NREGA Bot",
+            font=ctk.CTkFont(size=10, weight="bold"),
             text_color=("gray50", "gray50")
-        ).grid(row=0, column=0, sticky="")
+        ).pack(side="left", padx=(0, 10))
+
+        self.running_automation_label = ctk.CTkLabel(
+            left_frame, text="", font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=("#2563EB", "#60A5FA")
+        )
+        self.running_automation_label.pack(side="left", padx=(0, 5))
+
+        ctk.CTkFrame(left_frame, width=1, height=14, fg_color=("gray80", "gray40")).pack(side="left", padx=(8, 0))
+
+        self.status_label = ctk.CTkLabel(left_frame, text="Ready", text_color="gray60", font=ctk.CTkFont(size=11))
+        self.status_label.pack(side="left", padx=(8, 0))
 
         # Right: right-side widgets container (avoids grid overlap)
         right_frame = ctk.CTkFrame(footer, fg_color="transparent")
-        right_frame.grid(row=0, column=0, sticky="e", padx=10)
+        right_frame.grid(row=0, column=2, sticky="e", padx=10)
 
         # Server status dot
         self.server_status_indicator = ctk.CTkFrame(right_frame, width=8, height=8, corner_radius=4, fg_color="gray")
@@ -817,6 +833,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.active_automations.add(key)
         self.stop_events[key] = threading.Event()
         self._update_emergency_stop_btn()
+        self._update_running_automation_indicator()
 
         tab_instance = getattr(target, '__self__', None)
         if tab_instance is not None:
@@ -842,6 +859,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
     def _on_automation_finished(self, key: str) -> None:
         self.active_automations.discard(key)
+        self._update_running_automation_indicator()
         self.set_status("Ready")
         if not self.active_automations:
             self._update_emergency_stop_btn()
@@ -865,9 +883,29 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             pass
         count = len(self.active_automations)
         self.active_automations.clear()
+        self._update_running_automation_indicator()
         self.set_status(f"Stopped {count} automation(s)")
         self.show_toast(f"🛑 Stopped {count} automation(s)", "warning", duration=5000)
         self._update_emergency_stop_btn()
+
+    def _update_running_automation_indicator(self) -> None:
+        """Update the footer's '▶ Running: ...' label with the currently
+        active automation display names. Safe to call before the footer is
+        built (label may not exist yet)."""
+        label = getattr(self, 'running_automation_label', None)
+        if label is None:
+            return
+        try:
+            if not label.winfo_exists():
+                return
+            active = list(self.active_automations)
+            if not active:
+                label.configure(text="")
+            else:
+                names = [_automation_display_name(k) for k in sorted(active)]
+                label.configure(text="▶ Running: " + ", ".join(names))
+        except Exception:
+            pass
 
     def _update_emergency_stop_btn(self) -> None:
         """Toggle emergency stop indicator + label. Red when active, dim when idle."""

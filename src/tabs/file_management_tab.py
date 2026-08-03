@@ -6,12 +6,12 @@ import requests
 import os
 import threading
 from datetime import datetime
-import humanize
 from pathlib import Path
 from requests_toolbelt.multipart.encoder import MultipartEncoder, MultipartEncoderMonitor
 import webbrowser
 
 from src import config
+from src.utils import format_bytes
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class FileManagementTab(ctk.CTkFrame):
@@ -297,7 +297,7 @@ class FileManagementTab(ctk.CTkFrame):
 
             icon = "📁" if item['is_folder'] else "📄"
             name = f"{icon} {item['filename']}"
-            size = humanize.naturalsize(item['filesize']) if not item['is_folder'] else "—"
+            size = format_bytes(item['filesize']) if not item['is_folder'] else "—"
 
             self.files_tree.insert("", "end", iid=item['id'], values=(name, size, formatted_date))
 
@@ -306,8 +306,8 @@ class FileManagementTab(ctk.CTkFrame):
             numeric_usage = int(total_usage)
             numeric_limit = int(storage_limit) if storage_limit else 1
 
-            # Use humanize for both values for consistent formatting
-            self.storage_label.configure(text=f"Storage: {humanize.naturalsize(numeric_usage)} / {humanize.naturalsize(numeric_limit)}")
+            # Use format_bytes for both values for consistent formatting
+            self.storage_label.configure(text=f"Storage: {format_bytes(numeric_usage)} / {format_bytes(numeric_limit)}")
 
             usage_percent = numeric_usage / numeric_limit if numeric_limit > 0 else 0
             self.storage_progress.set(usage_percent)

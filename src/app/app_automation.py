@@ -23,6 +23,59 @@ from src.utils import get_logger, get_config
 
 logger = get_logger()
 
+# Friendly display names for automation keys shown in the footer's
+# "▶ Running: ..." indicator. Keys are the automation_key values that
+# tabs register via start_automation_thread().
+AUTOMATION_DISPLAY_NAMES = {
+    "pending_bills": "Pending Bills",
+    "mr_tracking": "MR Tracking",
+    "issued_mr_report": "Issued MR",
+    "fto_gen": "FTO Generation",
+    "fto_gen_del": "FTO Delete",
+    "nmms_attendance": "NMMS Attendance",
+    "work_allocation": "Work Allocation",
+    "gen": "Wagelist",
+    "mr_fill": "MR Fill",
+    "emb_verify": "eMB Verify",
+    "material_entry": "Material Entry",
+    "mis_reports": "MIS",
+    "physical_complete": "Physical Complete",
+    "sad_update_status": "SAD Update",
+    "add_activity": "Add Activity",
+    "del_demand": "Delete Demand",
+    "sad_auto": "Sarkar Aapke Dwar",
+    "mb_entry": "MB Entry",
+    "zero_mr": "Zero MR",
+    "delete_applicant": "Delete Applicant",
+    "demand": "Demand",
+    "resend_wg": "Resend Rejected Wagelist",
+    "update_estimate": "Update Estimate",
+    "wc_gen": "Work Code Generation",
+    "send": "Wagelist Send",
+    "duplicate_mr": "Duplicate MR",
+    "social_audit_respond": "Social Audit",
+    "muster": "Muster Roll",
+    "mate_mr": "Mate MR",
+    "pdf_merger": "PDF Merger",
+    "msr": "MR Payment",
+    "dashboard_report": "Dashboard Report",
+    "abps_verify": "ABPS Verify",
+    "if_edit": "IF Edit",
+    "jc_verify": "Jobcard Verify",
+    "jobcard_verify": "Jobcard Verify",
+    "verify_abps": "Verify ABPS",
+    "del_work_alloc": "Delete Work Allocation",
+    "macro": "Macro",
+    "scheme_closing": "Scheme Closing",
+    "ekyc_report": "eKYC Report",
+}
+
+
+def _automation_display_name(key: str) -> str:
+    """Return a friendly name for an automation key, falling back to a
+    prettified version of the raw key."""
+    return AUTOMATION_DISPLAY_NAMES.get(key, key.replace("_", " ").title())
+
 
 class AutomationMixin:
     """Mixin class containing browser and automation dispatch methods.
@@ -71,6 +124,7 @@ class AutomationMixin:
         self.app_state.active_automations.add(key)
         self.app_state.stop_events[key] = threading.Event()
         self._update_emergency_stop_btn()
+        self._update_running_automation_indicator()
 
         if self.app_state.minimize_var.get() and self.app_state.driver:
             try:
@@ -154,6 +208,7 @@ class AutomationMixin:
     def on_automation_finished(self, key, duration=0.0, tab_instance=None):
         if key in self.app_state.active_automations:
             self.app_state.active_automations.remove(key)
+        self._update_running_automation_indicator()
         self.set_status("Finished")
         self.after(5000, lambda: self.set_status("Ready"))
         if not self.app_state.active_automations:
@@ -430,6 +485,26 @@ class AutomationMixin:
         self.set_status(f"⚠ Emergency Stopped {count} automation(s)")
         self.show_toast(f"🛑 Emergency stopped {count} automation(s)", "warning", duration=5000)
         self.after(0, self._update_emergency_stop_btn)
+        self.after(0, self._update_running_automation_indicator)
+
+    def _update_running_automation_indicator(self) -> None:
+        """Update the footer's '▶ Running: ...' label with the currently
+        active automation display names. Safe to call before the footer is
+        built (label may not exist yet)."""
+        label = getattr(self, 'running_automation_label', None)
+        if label is None:
+            return
+        try:
+            if not label.winfo_exists():
+                return
+            active = list(self.app_state.active_automations)
+            if not active:
+                label.configure(text="")
+            else:
+                names = [f"{_automation_display_name(k)}" for k in sorted(active)]
+                label.configure(text="▶ Running: " + ", ".join(names))
+        except Exception:
+            logger.debug("Failed to update running automation indicator", exc_info=True)
 
     def _update_emergency_stop_btn(self) -> None:
         """Toggle emergency stop indicator + label state.

@@ -214,6 +214,7 @@ jobs:
           --hidden-import=getmac \
           --hidden-import=packaging \
           --hidden-import=main_app \
+          --hidden-import=humanize \
           --collect-submodules=src.tabs \
           loader.py
 

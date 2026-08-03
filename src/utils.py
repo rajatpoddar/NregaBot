@@ -193,6 +193,44 @@ def current_financial_year() -> str:
     return f"{start}-{start + 1}"
 
 
+def format_bytes(amount: Any, binary: bool = False) -> str:
+    """
+    Human-readable byte size formatter.
+
+    Uses the `humanize` package when it is installed; otherwise falls back to
+    a built-in formatter so the app NEVER crashes on screens that display
+    file sizes (About tab, File Manager) even if `humanize` is missing from
+    the PyInstaller bundle.
+
+    Examples:
+        format_bytes(0)          -> "0 Bytes"
+        format_bytes(1536)       -> "1.5 kB"
+        format_bytes(1536, True) -> "1.5 KiB"
+    """
+    if amount is None:
+        amount = 0
+    try:
+        import humanize
+        return humanize.naturalsize(amount, binary=binary)
+    except Exception:
+        pass
+    # --- Fallback (no humanize installed) ---
+    try:
+        size = float(amount)
+    except (TypeError, ValueError):
+        return "0 Bytes"
+    base = 1024.0 if binary else 1000.0
+    units = (["Bytes", "KiB", "MiB", "GiB", "TiB"] if binary
+             else ["Bytes", "kB", "MB", "GB", "TB"])
+    if size < base:
+        return f"{int(size)} Bytes"
+    unit_idx = 0
+    while size >= base and unit_idx < len(units) - 1:
+        size /= base
+        unit_idx += 1
+    return f"{size:.1f} {units[unit_idx]}"
+
+
 def get_report_path(category: str = "", fin_year: str = "") -> str:
     """
     Standard report directory: ~/Downloads/NregaBot/Report {fin_year}/{category}/

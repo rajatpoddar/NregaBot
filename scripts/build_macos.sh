@@ -103,6 +103,7 @@ $PYINSTALLER_CMD --noconfirm --clean --windowed --name "${APP_NAME}" \
 --hidden-import=packaging \
 --hidden-import=main_app \
 --hidden-import=pypdf \
+--hidden-import=humanize \
 --collect-submodules=src.tabs \
 $HIDDEN_IMPORTS \
 loader.py
@@ -124,6 +125,8 @@ $PYINSTALLER_CMD --noconfirm --clean --windowed --name "${LITE_APP_NAME}" \
 --hidden-import=requests \
 --hidden-import=PIL \
 --hidden-import=pypdf \
+--hidden-import=humanize \
+--hidden-import=src.app.app_automation \
 --collect-submodules=src.managers \
 --collect-submodules=src.tabs \
 lite_loader.py

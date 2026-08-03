@@ -43,6 +43,7 @@ pyinstaller --noconfirm --windowed --onedir ^
 --hidden-import=packaging ^
 --hidden-import=main_app ^
 --hidden-import=pypdf ^
+--hidden-import=humanize ^
 --collect-submodules=src.tabs ^
 loader.py
 
@@ -76,6 +77,8 @@ pyinstaller --noconfirm --windowed --onedir ^
 --hidden-import=requests ^
 --hidden-import=PIL ^
 --hidden-import=pypdf ^
+--hidden-import=humanize ^
+--hidden-import=src.app.app_automation ^
 --collect-submodules=src.managers ^
 --collect-submodules=src.tabs ^
 lite_loader.py

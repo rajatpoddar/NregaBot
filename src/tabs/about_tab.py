@@ -9,14 +9,13 @@ from src import config
 import os
 import sys
 import json
-import humanize
 from PIL import Image
 from datetime import datetime
 from urllib.parse import urlencode
 
 # --- MODIFIED IMPORT ---
 # Assuming utils.py has resource_path, get_data_path, get_config, save_config
-from src.utils import resource_path, get_data_path, get_config, save_config, get_logger
+from src.utils import resource_path, get_data_path, get_config, save_config, get_logger, format_bytes
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
@@ -603,11 +602,11 @@ class AboutTab(ctk.CTkFrame):
 
     def update_storage_display(self, usage, limit):
         if usage is not None and limit is not None and limit > 0:
-            usage_str = humanize.naturalsize(usage)
-            limit_str = humanize.naturalsize(limit)
+            usage_str = format_bytes(usage)
+            limit_str = format_bytes(limit)
             self.storage_label.configure(text=f"{usage_str} of {limit_str}")
         else:
-            usage_str = humanize.naturalsize(usage if usage is not None else 0)
+            usage_str = format_bytes(usage if usage is not None else 0)
             self.storage_label.configure(text=f"{usage_str} Used (Limit N/A)")
 
     # --- NEW/MODIFIED: Popup for renaming device ---

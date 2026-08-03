@@ -254,11 +254,29 @@ class UIMixin:
         self.loading_animation_label = ctk.CTkLabel(status_frame, text="", width=20, font=ctk.CTkFont(size=14))
         self.loading_animation_label.pack(side="left")
 
+        # ── Running Automation Indicator ──
+        # Shows WHICH automation(s) are currently running (e.g. "▶ Running: MR Tracking").
+        # Updated by AutomationMixin._update_running_automation_indicator().
+        self.running_automation_label = ctk.CTkLabel(
+            status_frame, text="", font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=("#2563EB", "#60A5FA")
+        )
+        self.running_automation_label.pack(side="left", padx=(0, 5))
+
+        # Separator between running automation name and status
+        ctk.CTkFrame(status_frame, width=2, height=14, corner_radius=0,
+                     fg_color=("gray80", "gray40")).pack(side="left", padx=(10, 0))
+
+        # ── Status Label ──
+        # Footer reads: "© 2025 NREGA Bot | ▶ Running: X | Status: ..."
         self.status_label = ctk.CTkLabel(status_frame, text="Ready", text_color="gray60", font=ctk.CTkFont(size=12))
-        self.status_label.pack(side="left", padx=(5, 0))
+        self.status_label.pack(side="left", padx=(8, 0))
 
         dock_frame = ctk.CTkFrame(footer, fg_color="transparent")
         dock_frame.pack(side="right", padx=15, pady=5)
+
+        # Separator before the emergency-stop group
+        ctk.CTkFrame(dock_frame, width=2, height=14, corner_radius=0, fg_color=("gray80", "gray40")).pack(side="left", padx=(0, 10))
 
         # ── Emergency Stop — clickable dot + label ──
         _stop_cmd = lambda e: self._emergency_stop_all()

@@ -5,7 +5,7 @@
 # <div align="center">NREGA Bot</div>
 
 <p align="center">
-  <b>v3.1.1 | Powerful NREGA Automation — Windows, macOS & Lite</b><br />
+  <b>v3.1.2 | Powerful NREGA Automation — Windows, macOS & Lite</b><br />
   <a href="https://nregabot.com/#downloads"><strong>Download Now »</strong></a><br /><br />
   <a href="https://nregabot.com/how-to-use.html">View Instructions</a> ·
   <a href="https://nregabot.com/contact.html">Report Bug</a> ·
@@ -21,6 +21,12 @@
 The application works by securely controlling a web browser on your computer, allowing you to focus on what matters most.
 
 ---
+
+## 🆕 What's New in v3.1.2
+
+- 🐞 **Fix (About tab crash):** Resolved the 'humanize module missing' error — About tab and File Manager no longer crash if the humanize package isn't bundled.
+- ▶️ **Running Automation Indicator:** The footer now shows exactly which automation is currently running (e.g. `▶ Running: MR Tracking`) next to the status.
+- 🖥️ **Footer Layout:** Cleaner `© 2025 NREGA Bot | ▶ Running: X | Status: ...` footer ordering.
 
 ## 🆕 What's New in v3.1.1
 
@@ -135,9 +141,9 @@ You only need to have a supported web browser installed on your system:
 Download the latest version from the official website:
 
 - Website: [nregabot.com/#downloads](https://nregabot.com/#downloads)
-- **For Windows**: `NREGABot-v3.1.1-Setup.exe`
-- **For macOS**: `NREGABot-v3.1.1-macOS.dmg`
-- **Lite (Low-end PCs)**: `NREGABot-Lite-v3.1.1-Setup.exe` or portable ZIP
+- **For Windows**: `NREGABot-v3.1.2-Setup.exe`
+- **For macOS**: `NREGABot-v3.1.2-macOS.dmg`
+- **Lite (Low-end PCs)**: `NREGABot-Lite-v3.1.2-Setup.exe` or portable ZIP
 
 ### 2️⃣ First-Time Launch & Trial
 
@@ -172,6 +178,12 @@ Download the app and get your 30-day free trial by registering on our website. A
 ---
 
 ## 📜 Changelog
+
+### v3.1.2
+- 🐞 Fixed 'humanize module missing' crash in the About tab (built-in fallback + bundled in all builds)
+- ▶️ Footer now shows which automation is running (e.g. `▶ Running: MR Tracking`)
+- 🖥️ Footer reordered: `© 2025 NREGA Bot | ▶ Running: X | Status: ...`
+- 📘 Added `CODEBASE.md` developer guide documenting the app architecture
 
 ### v3.1.1
 - 🐞 Fixed missing `beautifulsoup4` library in the Pending Bills scraper
