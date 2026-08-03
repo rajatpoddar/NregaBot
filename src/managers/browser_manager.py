@@ -17,6 +17,34 @@ logger = get_logger()
 # the run instead of re-showing the dialog on every call.
 _CANCELLED_CHOICE = "__cancelled__"
 
+# JS injected into the automation browser tab when automation starts: prefixes
+# the tab title and swaps the favicon to a red dot, so the user can see at a
+# glance which tab is running the automation (and won't close it accidentally).
+# It self-heals: a setInterval re-applies the marker every second, because some
+# pages rewrite document.title after load. Combined with the CDP
+# Page.addScriptToEvaluateOnNewDocument injection, the marker survives every
+# page navigation and stays visible for the whole run.
+AUTOMATION_MARKER_JS: str = (
+    "(function(){"
+    "var apply=function(){"
+    "try{"
+    "var t=document.title||'';"
+    "if(t.indexOf('NREGA-BOT')===-1){document.title='🤖 NREGA-BOT ⚙ Running'+(t?' — '+t:'');}"
+    "var head=document.head||document.getElementsByTagName('head')[0];"
+    "if(head&&!document.getElementById('nregabot-icon')){"
+    "var ic=document.createElement('link');"
+    "ic.rel='icon';ic.id='nregabot-icon';ic.type='image/svg+xml';"
+    "ic.href='data:image/svg+xml,'+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\"><circle cx=\"8\" cy=\"8\" r=\"7\" fill=\"#e74c3c\" stroke=\"#fff\" stroke-width=\"1.5\"/></svg>');"
+    "head.appendChild(ic);"
+    "}"
+    "}catch(e){}"
+    "};"
+    "apply();"
+    "if(!window.__nregabotMarker){window.__nregabotMarker=1;setInterval(apply,1000);}"
+    "})()"
+)
+
+
 # Selenium Imports (Lazy loading handled inside methods where possible to speed up start)
 
 
@@ -32,6 +60,11 @@ class BrowserManager:
         self._thread_browser_choice: Dict[int, str] = {}
         # Session-wide preferred browser (set via "Remember my choice").
         self.preferred_browser: Optional[str] = None
+        # Handle of the ONE tab automation always runs in — pinned on the first
+        # run and reused across every later run/session so automation never
+        # jumps between tabs (window_handles[0] is NOT stable across CDP
+        # sessions, which caused runs to land on random tabs).
+        self._automation_tab_handle: Optional[str] = None
         
         # Suppress verbose WDM (WebDriver Manager) INFO logs from terminal
         os.environ['WDM_LOG'] = '0'
@@ -208,6 +241,152 @@ class BrowserManager:
         except Exception as e:
             return False, f"Failed to launch Old Firefox: {e}"
 
+    def _connect_external(self, browser: str, port: int) -> Any:
+        """Open a raw WebDriver session to an externally-launched Chrome/Edge
+        instance (debug port). No dialogs — used by get_driver() and the
+        background tab-marker keeper. Returns None on failure."""
+        from selenium import webdriver
+        try:
+            if browser == "chrome":
+                from selenium.webdriver.chrome.options import Options as ChromeOptions
+                opts = ChromeOptions()
+                opts.page_load_strategy = "eager"
+                opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{port}")
+                service = self._create_driver_service("chrome")
+                if service:
+                    return webdriver.Chrome(options=opts, service=service)
+                return webdriver.Chrome(options=opts)
+            elif browser == "edge":
+                from selenium.webdriver.edge.options import Options as EdgeOptions
+                opts = EdgeOptions()
+                opts.page_load_strategy = "eager"
+                opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{port}")
+                service = self._create_driver_service("edge")
+                if service:
+                    return webdriver.Edge(options=opts, service=service)
+                return webdriver.Edge(options=opts)
+        except Exception as e:
+            logger.debug("Failed to connect external %s: %s", browser, e)
+        return None
+
+    def apply_automation_marker(self, driver: Any) -> None:
+        """Prefix the tab title + set a red-dot favicon so the user can see
+        which browser tab the automation is running in. Never raises."""
+        try:
+            driver.execute_script(AUTOMATION_MARKER_JS)
+        except Exception:
+            pass
+
+    def _inject_persistent_marker(self, driver: Any) -> None:
+        """Register the marker JS so Chrome/Edge re-apply it automatically on
+        EVERY page load via CDP (Page.addScriptToEvaluateOnNewDocument).
+
+        This is what makes the 'Running' title + red dot truly constant — a
+        one-shot paint is wiped by the very next navigation, but a script
+        registered through this CDP API re-runs on every new document (and
+        every popup the automation opens). Firefox has no execute_cdp_cmd, so
+        it relies on the marker keeper re-painting periodically instead.
+        """
+        try:
+            driver.execute_cdp_cmd(
+                "Page.addScriptToEvaluateOnNewDocument",
+                {"source": AUTOMATION_MARKER_JS},
+            )
+        except Exception:
+            pass
+
+    def resolve_automation_tab(self, driver: Any) -> Optional[str]:
+        """Return the handle of the ONE tab automation should always run in.
+
+        Priority: (1) the pinned handle from an earlier run if it is still
+        open — this keeps every run on the SAME tab; (2) the tab currently on
+        the main NregaBot website; (3) the first open tab. Returns None when
+        the browser has no open tabs.
+        """
+        try:
+            handles = driver.window_handles
+            if not handles:
+                return None
+            # (1) Pinned handle from an earlier run — still open?
+            if self._automation_tab_handle and self._automation_tab_handle in handles:
+                return self._automation_tab_handle
+            # Pinned handle is stale (user closed the automation tab) — forget it
+            # so a fresh one is pinned below instead of the dead reference.
+            self._automation_tab_handle = None
+            # (2) Tab on the main website (fast JS read — no blocking waits)
+            try:
+                main_url = config.MAIN_WEBSITE_URL
+            except AttributeError:
+                main_url = ""
+            for h in handles:
+                try:
+                    driver.switch_to.window(h)
+                    if main_url and driver.execute_script("return location.href").startswith(main_url):
+                        self._automation_tab_handle = h
+                        return h
+                except Exception:
+                    continue
+            # (3) Fallback: first open tab
+            self._automation_tab_handle = handles[0]
+            return handles[0]
+        except Exception:
+            return None
+
+    def _prepare_driver_tab(self, driver: Any) -> bool:
+        """Switch to the automation tab (always the SAME one — pinned on the
+        first run) and mark it as the automation tab.
+
+        Also injects the persistent CDP marker so the 'Running' title and
+        red-dot favicon survive every page navigation. Returns False (after
+        showing a friendly message) if the browser has no open tabs — this is
+        exactly what happens when the user closed the automation tab mid-run,
+        and it prevents the app from crashing on the next Selenium call.
+        """
+        try:
+            target = self.resolve_automation_tab(driver)
+            if not target:
+                raise Exception("No open tabs in browser")
+            driver.switch_to.window(target)
+            self._inject_persistent_marker(driver)
+            self.apply_automation_marker(driver)
+            return True
+        except Exception:
+            try:
+                self.app.after(0, lambda: messagebox.showwarning(
+                    "Browser Tab Closed",
+                    "The browser tab used for automation is closed.\n\n"
+                    "Please relaunch the browser and run again."
+                ))
+            except Exception:
+                pass
+            try:
+                driver.quit()
+            except Exception:
+                pass
+            # If this was our shared in-app driver (Firefox), forget it so the
+            # next get_driver() doesn't retry a dead session (which would just
+            # re-show the dialog instead of relaunching cleanly).
+            if driver is self.driver:
+                self.driver = None
+            return False
+
+    def connect_driver_no_dialog(self) -> Tuple[Any, bool]:
+        """Connect a raw session to the currently active external browser
+        WITHOUT showing any dialogs (used by the background tab-marker keeper).
+
+        Returns (driver, owns_session). `owns_session` is False for the
+        in-app Firefox driver (shared — must not be quit by the keeper).
+        """
+        browser = self.active_browser
+        if browser == "chrome":
+            return self._connect_external("chrome", 9222), True
+        if browser == "edge":
+            return self._connect_external("edge", 9223), True
+        if browser == "firefox":
+            if self.driver is not None:
+                return self.driver, False
+        return None, False
+
     def _create_driver_service(self, browser_type: str) -> Any:
         """Returns a Service object for the given browser type, or None.
         Uses webdriver_manager to download the driver if needed, with
@@ -309,49 +488,35 @@ class BrowserManager:
                 return None
             self.active_browser = "firefox"
             self.app.active_browser = "firefox"
+            if not self._prepare_driver_tab(self.driver):
+                return None
             return self.driver
             
         elif selected_browser == "chrome":
-            from selenium import webdriver
-            from selenium.webdriver.chrome.options import Options as ChromeOptions
-            try:
-                opts = ChromeOptions()
-                opts.page_load_strategy = "eager"
-                opts.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
-                service = self._create_driver_service("chrome")
-                if service:
-                    driver = webdriver.Chrome(options=opts, service=service)
-                else:
-                    # Fallback: let Selenium Manager handle driver
-                    driver = webdriver.Chrome(options=opts)
-                self.active_browser = 'chrome'
-                self.app.active_browser = 'chrome'
-                return driver
-            except Exception as e:
+            driver = self._connect_external("chrome", 9222)
+            if driver is None:
                 self.app.play_sound("error")
-                messagebox.showerror("Connection Failed", f"Could not connect to Chrome.\nError: {e}")
+                messagebox.showerror("Connection Failed", "Could not connect to Chrome.")
                 return None
+            self.active_browser = 'chrome'
+            self.app.active_browser = 'chrome'
+            # Always run automation on the FIRST tab + guard against a closed tab
+            if not self._prepare_driver_tab(driver):
+                return None
+            return driver
                 
         elif selected_browser == "edge":
-            from selenium import webdriver
-            from selenium.webdriver.edge.options import Options as EdgeOptions
-            try:
-                opts = EdgeOptions()
-                opts.page_load_strategy = "eager"
-                opts.add_experimental_option("debuggerAddress", "127.0.0.1:9223")
-                service = self._create_driver_service("edge")
-                if service:
-                    driver = webdriver.Edge(options=opts, service=service)
-                else:
-                    # Fallback: let Selenium Manager handle driver
-                    driver = webdriver.Edge(options=opts)
-                self.active_browser = 'edge'
-                self.app.active_browser = 'edge'
-                return driver
-            except Exception as e:
+            driver = self._connect_external("edge", 9223)
+            if driver is None:
                 self.app.play_sound("error")
-                messagebox.showerror("Connection Failed", f"Could not connect to Edge.\nError: {e}")
+                messagebox.showerror("Connection Failed", "Could not connect to Edge.")
                 return None
+            self.active_browser = 'edge'
+            self.app.active_browser = 'edge'
+            # Always run automation on the FIRST tab + guard against a closed tab
+            if not self._prepare_driver_tab(driver):
+                return None
+            return driver
         return None
 
     # Friendly display names + subtitle for each browser in the picker dialog

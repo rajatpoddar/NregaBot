@@ -325,17 +325,32 @@ class BaseAutomationTab(ctk.CTkFrame):
         DatePickerPopup(self, callback)
 
     def handle_error(self, e: Exception) -> None:
-        """Centralized error handler."""
+        """Centralized error handler.
+
+        Dialogs are scheduled via app.after() so they always run on the Tk
+        main thread — handle_error may be called from automation threads, and
+        showing a Tk dialog directly from a worker thread can crash the app
+        (e.g. when the user closed the browser tab mid-run).
+        """
         error_msg = str(e).lower()
         if "no such window" in error_msg or "target window already closed" in error_msg or "web view not found" in error_msg:
             self.log_error("Automation Stopped: Browser tab/window was closed.")
-            messagebox.showwarning("Browser Closed", "Automation stopped because the browser window was closed.")
+            try:
+                self.app.after(0, lambda: messagebox.showwarning("Browser Closed", "Automation stopped because the browser window was closed."))
+            except Exception:
+                pass
         elif "invalid session id" in error_msg:
             self.log_error("Error: Browser session lost.")
-            messagebox.showwarning("Connection Lost", "Browser session was lost. Please restart the browser.")
+            try:
+                self.app.after(0, lambda: messagebox.showwarning("Connection Lost", "Browser session was lost. Please restart the browser."))
+            except Exception:
+                pass
         else:
             self.log_error(f"Error: {e}")
-            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
+            try:
+                self.app.after(0, lambda: messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}"))
+            except Exception:
+                pass
 
     def _get_wkhtml_path(self) -> str:
         os_type = platform.system()

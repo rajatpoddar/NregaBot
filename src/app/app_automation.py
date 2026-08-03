@@ -169,6 +169,25 @@ class AutomationMixin:
                 pass
             try:
                 target(*args)
+            except Exception as e:
+                # Safety net: never let an uncaught automation exception crash
+                # the app (e.g. the user closed the browser tab mid-run).
+                try:
+                    em = str(e).lower()
+                    if ("no such window" in em or "target window already closed" in em
+                            or "web view not found" in em or "invalid session id" in em):
+                        self.after(0, lambda: (
+                            self.show_toast("🛑 Browser tab was closed — automation stopped.", "warning", duration=5000),
+                            messagebox.showwarning(
+                                "Browser Closed",
+                                "Automation stopped because the browser tab was closed.\n\n"
+                                "Relaunch the browser and run again."
+                            )
+                        ))
+                    else:
+                        logger.error("Unhandled automation error in %s: %s", key, e, exc_info=True)
+                except Exception:
+                    logger.error("Failed to report automation error for %s: %s", key, e)
             finally:
                 # Run finished: clear the per-run browser choice so the NEXT
                 # automation asks the user again instead of silently reusing it.
@@ -204,6 +223,47 @@ class AutomationMixin:
         t = threading.Thread(target=wrapper, daemon=True)
         self.app_state.automation_threads[key] = t
         t.start()
+
+        # ── Tab marker keeper ────────────────────────────────────────────────
+        # Re-applies the "🤖 NREGA-BOT Running" title + red-dot favicon on the
+        # first browser tab while the automation runs (page navigations wipe
+        # the marker, so it is re-applied periodically). Lets the user see at a
+        # glance which tab is in use and avoids accidentally closing it.
+        def _marker_keeper(worker_thread: threading.Thread) -> None:
+            marker_session = None
+            owns_session = False
+            try:
+                while (worker_thread.is_alive()
+                       and key in self.app_state.active_automations):
+                    if marker_session is None:
+                        marker_session, owns_session = self.browser_manager.connect_driver_no_dialog()
+                    if marker_session is not None:
+                        try:
+                            if marker_session.window_handles:
+                                if owns_session:
+                                    # Separate keeper session (chrome/edge): safe
+                                    # to switch to the resolved automation tab.
+                                    target = self.browser_manager.resolve_automation_tab(marker_session)
+                                    if target:
+                                        marker_session.switch_to.window(target)
+                                # Shared in-app Firefox driver: do NOT switch
+                                # windows — the automation may be working in a
+                                # popup, and yanking the active window here
+                                # would break it. Just paint the marker on the
+                                # window the automation is currently using.
+                                self.browser_manager.apply_automation_marker(marker_session)
+                        except Exception:
+                            marker_session = None
+                            owns_session = False
+                    time.sleep(2)
+            finally:
+                if owns_session and marker_session is not None:
+                    try:
+                        marker_session.quit()
+                    except Exception:
+                        pass
+
+        threading.Thread(target=_marker_keeper, args=(t,), daemon=True).start()
 
     def on_automation_finished(self, key, duration=0.0, tab_instance=None):
         if key in self.app_state.active_automations:
