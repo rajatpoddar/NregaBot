@@ -10,8 +10,8 @@
     "url_macos": "https://nregabot.com/updates/core_mac_v3.1.1.zip",
     "force_full_reinstall": true,
     "hash": "",
-    "hash_windows": "",
-    "hash_macos": ""
+    "hash_windows": "544ffd733d04dc217a9719839b7616fc5dd2dcc9e7861c0ef890eb0d0ee2b0ad",
+    "hash_macos": "21c35188ba3b2790b9311318dd90e9a1601ab60fef950bd7cc46a9054e513f3a"
   },
   "changelog": {
     "3.1.1": [
