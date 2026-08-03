@@ -226,7 +226,12 @@ class MbEntryTab(BaseAutomationTab):
     def _load_mapping_data(self):
         if os.path.exists(self.mapping_file):
             try:
-                with open(self.mapping_file, 'r') as f: self.mapping_data = json.load(f)
+                with open(self.mapping_file, 'r') as f: raw = json.load(f)
+                # Normalize keys to lowercase for case-insensitive lookup — same as
+                # Muster Roll Gen. The Settings tab saves panchayat names as-typed
+                # (usually UPPERCASE), so without normalization the lookup in
+                # _on_panchayat_change() would never match and mate auto-fill breaks.
+                self.mapping_data = {str(k).strip().lower(): v for k, v in raw.items()}
             except Exception: self.mapping_data = {}
 
     def _save_mapping_pair(self, panchayat, mate_names):
@@ -248,6 +253,10 @@ class MbEntryTab(BaseAutomationTab):
             if current_panchayat in self.mapping_data:
                 saved_mate = self.mapping_data[current_panchayat]
                 if self.config_vars["mate_name"].get().strip() != saved_mate:
+                    # Make sure the mapped mate is visible in the dropdown options
+                    if saved_mate not in mate_vals:
+                        mate_vals = [v for v in mate_vals if v != "" and v != saved_mate] + [saved_mate]
+                        self.mate_name_entry.configure(values=mate_vals)
                     self.config_vars["mate_name"].set(saved_mate)
 
     def set_ui_state(self, running: bool):

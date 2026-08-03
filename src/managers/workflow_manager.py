@@ -92,6 +92,60 @@ class WorkflowManager:
         return list(set(codes))
 
     # --- HELPER: GENERIC RUNNER ---
+    def _set_target_on_tab(self, tab, target, entry_attr="panchayat_entry", sync=False):
+        """
+        Set the panchayat/agency name on a tab.
+
+        Some tabs use a CTkEntry named *_entry (e.g. `panchayat_entry`), others
+        use a CTkOptionMenu + StringVar (e.g. `panchayat_var`/`panchayat_menu`
+        in Muster Roll Gen, MR Tracking, Wagelist Gen, Job Card Verify, ABPS
+        Verify). This helper tries the entry widget first, then falls back to the
+        matching StringVar / option menu so macros work on every tab.
+
+        `sync=True` is for callers already running on the main thread (e.g. inside
+        an `after(0, ...)` callback) that must read the value immediately after —
+        otherwise the update is scheduled via `after(...)`.
+        """
+        entry_widget = getattr(tab, entry_attr, None)
+        if not entry_widget and hasattr(tab, "agency_entry"):
+            entry_widget = tab.agency_entry
+
+        if entry_widget is not None:
+            if sync:
+                entry_widget.delete(0, "end")
+                entry_widget.insert(0, target)
+            else:
+                self.app.after(0, lambda: entry_widget.delete(0, "end"))
+                self.app.after(100, lambda: entry_widget.insert(0, target))
+            return
+
+        # Fall back to a matching StringVar / option menu (case-insensitive match
+        # on existing dropdown options so the stored panchayat casing is kept).
+        setter_var = None
+        var_attr = entry_attr.replace("_entry", "_var")
+        menu_attr = entry_attr.replace("_entry", "_menu")
+        for attr_name in (var_attr, menu_attr, "panchayat_var", "agency_var"):
+            candidate = getattr(tab, attr_name, None)
+            if candidate is not None and hasattr(candidate, "set"):
+                setter_var = candidate
+                break
+
+        if setter_var is not None:
+            def _set_target():
+                try:
+                    if hasattr(setter_var, "cget"):
+                        for v in list(setter_var.cget("values")):
+                            if str(v).strip().lower() == str(target).strip().lower():
+                                setter_var.set(v)
+                                return
+                    setter_var.set(target)
+                except Exception as e:
+                    logger.debug("WorkflowManager: failed to set target %s on %s: %s", target, type(tab).__name__, e)
+            if sync:
+                _set_target()
+            else:
+                self.app.after(0, _set_target)
+
     def _run_generic_task(self, tab_name, target, automation_key, entry_attr="panchayat_entry", macro_tab=None):
         self.app.after(0, self.app.set_status, f"Macro: Starting {tab_name} for {target}...")
         self._log(macro_tab, f"Switching to {tab_name} tab...")
@@ -104,19 +158,14 @@ class WorkflowManager:
 
         self._ensure_automation_stopped(automation_key)
         
-        entry_widget = getattr(tab, entry_attr, None)
-        if not entry_widget and hasattr(tab, "agency_entry"): entry_widget = tab.agency_entry
-        
-        if entry_widget:
-            # 1. Update Panchayat Name
-            self.app.after(0, lambda: entry_widget.delete(0, "end"))
-            self.app.after(100, lambda: entry_widget.insert(0, target))
+        # Set the panchayat/agency (supports both entry widgets and option menus)
+        self._set_target_on_tab(tab, target, entry_attr)
 
-            # 2. Trigger Staff Auto-fill (Fix for Muster Roll Gen)
-            # ERROR FIXED HERE: Changed 'mr_gen' to 'muster'
-            if automation_key == "muster" and hasattr(tab, '_auto_fill_staff'):
-                self._log(macro_tab, f"Updating Technical Staff for {target}...")
-                self.app.after(500, lambda: tab._auto_fill_staff())
+        # 2. Trigger Staff Auto-fill (Fix for Muster Roll Gen)
+        # ERROR FIXED HERE: Changed 'mr_gen' to 'muster'
+        if automation_key == "muster" and hasattr(tab, '_auto_fill_staff'):
+            self._log(macro_tab, f"Updating Technical Staff for {target}...")
+            self.app.after(500, lambda: tab._auto_fill_staff())
         
         self._log(macro_tab, f"Starting automation '{automation_key}' for {target}...")
         
@@ -195,8 +244,11 @@ class WorkflowManager:
                             
                             if hasattr(track_tab, '_on_filter_check_changed'): track_tab._on_filter_check_changed()
                             p_name = target if target else item.get('panchayat', '')
-                            track_tab.panchayat_entry.delete(0, "end")
-                            track_tab.panchayat_entry.insert(0, p_name)
+                            # MR Tracking uses panchayat_var/panchayat_menu (not a
+                            # panchayat_entry widget) — use the shared setter.
+                            # sync=True because this callback runs on the main
+                            # thread and start_automation() reads the value next.
+                            self._set_target_on_tab(track_tab, p_name, "panchayat_entry", sync=True)
                             track_tab.start_automation()
 
                         self.app.after(0, _configure_tracking)

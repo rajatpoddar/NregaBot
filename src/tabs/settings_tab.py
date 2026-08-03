@@ -955,6 +955,19 @@ class SettingsTab(ctk.CTkFrame):
         for p, s in sorted(data.items()):
             self.map_tree.insert("", "end", values=(p, s))
 
+    @staticmethod
+    def _normalize_map_key(name: str) -> str:
+        """Canonical mapping key — lowercase, stripped, like the automation tabs use."""
+        return str(name).strip().lower()
+
+    def _find_map_key(self, data: Dict[str, str], panch: str) -> Optional[str]:
+        """Case-insensitive key lookup in the mapping dict (returns the stored key)."""
+        target = self._normalize_map_key(panch)
+        for k in data:
+            if self._normalize_map_key(k) == target:
+                return k
+        return None
+
     def _on_map_tree_select(self, event) -> None:
         sel = self.map_tree.selection()
         if not sel:
@@ -963,7 +976,11 @@ class SettingsTab(ctk.CTkFrame):
         if vals and len(vals) >= 2:
             self.map_staff_entry.delete(0, "end")
             self.map_staff_entry.insert(0, vals[1])
-            # Set panchayat via insert for compatibility
+            # Ensure the panchayat value exists in the dropdown options so it can
+            # be re-selected after clicking another row.
+            current_vals = list(self.map_panchayat_dropdown.cget("values"))
+            if vals[0] not in current_vals:
+                self.map_panchayat_dropdown.configure(values=current_vals + [vals[0]])
             self.map_panchayat_var.set(vals[0])
 
     def _get_current_map_panchayat(self) -> str:
@@ -977,7 +994,13 @@ class SettingsTab(ctk.CTkFrame):
                                    parent=self.winfo_toplevel())
             return
         data = self._load_map_data()
-        data[panch] = staff
+        # Normalize the key (lowercase) — matches how Muster Roll Gen & eMB Entry
+        # save mappings, so auto-fill works regardless of where it was set.
+        key = self._normalize_map_key(panch)
+        old_key = self._find_map_key(data, panch)
+        if old_key is not None and old_key != key:
+            del data[old_key]
+        data[key] = staff
         if self._save_map_data(data):
             self._refresh_map_tree()
             self.map_status_label.configure(text=f"✅ Saved: {panch} → {staff}",
@@ -992,7 +1015,8 @@ class SettingsTab(ctk.CTkFrame):
                                 parent=self.winfo_toplevel())
             return
         data = self._load_map_data()
-        if panch not in data:
+        key = self._find_map_key(data, panch)
+        if key is None:
             messagebox.showinfo("Not Found", f"'{panch}' ke liye koi mapping nahi mili.",
                                 parent=self.winfo_toplevel())
             return
@@ -1000,7 +1024,7 @@ class SettingsTab(ctk.CTkFrame):
             f"Kya aap '{panch}' ki mapping delete karna chahte hain?",
             parent=self.winfo_toplevel()):
             return
-        del data[panch]
+        del data[key]
         if self._save_map_data(data):
             self._refresh_map_tree()
             self.map_panchayat_var.set("")
@@ -1011,17 +1035,18 @@ class SettingsTab(ctk.CTkFrame):
             self.map_status_label.configure(text="❌ Delete failed", text_color=("#DC2626", "#F87171"))
 
     def _load_map_entry(self) -> None:
-        """Load the current mapping for the selected panchayat."""
+        """Load the current mapping for the selected panchayat (case-insensitive)."""
         panch = self._get_current_map_panchayat()
         if not panch:
             messagebox.showinfo("No Selection", "Pehle ek panchayat select karein.",
                                 parent=self.winfo_toplevel())
             return
         data = self._load_map_data()
-        if panch in data:
+        key = self._find_map_key(data, panch)
+        if key is not None:
             self.map_staff_entry.delete(0, "end")
-            self.map_staff_entry.insert(0, data[panch])
-            self.map_status_label.configure(text=f"📂 Loaded: {panch} → {data[panch]}",
+            self.map_staff_entry.insert(0, data[key])
+            self.map_status_label.configure(text=f"📂 Loaded: {panch} → {data[key]}",
                                             text_color=("#2563EB", "#60A5FA"))
         else:
             self.map_staff_entry.delete(0, "end")

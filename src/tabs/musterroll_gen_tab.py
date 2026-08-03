@@ -251,6 +251,12 @@ class MusterrollGenTab(BaseAutomationTab):
         if current_panchayat in self.mapping_data:
             saved_staff = self.mapping_data[current_panchayat]
             if self.staff_var.get().strip() != saved_staff:
+                # Ensure the mapped staff name appears in the dropdown options,
+                # otherwise the value can't be re-selected by the user.
+                vals = list(self.staff_menu.cget("values"))
+                if saved_staff not in vals:
+                    vals = [v for v in vals if v != ""] + [saved_staff]
+                    self.staff_menu.configure(values=vals)
                 self.staff_var.set(saved_staff)
     def _validate_date_not_too_old(self, date_str: str) -> bool:
         """Check if the start date is not more than 2 days before current date.
