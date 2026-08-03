@@ -951,12 +951,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
     def show_toast(self, message: str, kind: str = "success", duration: int = 3000) -> None:
         """Simple toast notification."""
         try:
-            if self.current_toast:
-                try:
-                    if self.current_toast.winfo_exists():
-                        self.current_toast.destroy()
-                except Exception:
-                    pass
+            # Multiple toasts stack gracefully (max 3) — no forced destroy here.
             self.current_toast = ToastNotification(self, message, kind, duration=duration)
         except Exception:
             pass

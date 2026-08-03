@@ -482,19 +482,32 @@ class MarqueeLabel(ctk.CTkFrame):
 # --- 5. PROFESSIONAL TOAST NOTIFICATION ---
 # A sleek, modern notification system that slides in from the bottom-right
 # of the parent window. Features:
-#   - Slide-in animation from right edge
-#   - Auto-dismiss with visible progress bar
+#   - Smooth eased slide + fade-in/out animations (16ms frames)
+#   - Auto-dismiss with a silky progress bar (50ms updates)
 #   - Title + message + details support
-#   - Close button (click to dismiss instantly)
-#   - Click-to-dismiss anywhere
-#   - Color-coded by type (success/error/info/warning)
-#   - Duration display
+#   - Close button (click to dismiss instantly) + click-anywhere-to-dismiss
+#   - Color-coded themes: success(green) / error(red) / warning(amber)
+#     / info(blue) / automation(indigo) / running(cyan)
+#   - Always-on-top watchdog that periodically re-asserts topmost + lift so
+#     the toast never slips behind the app or other windows
+#   - Stacking queue (max 3) with smooth reflow when a toast is dismissed
 
 class ToastNotification(ctk.CTkToplevel):
-    """Professional toast notification with slide-in, progress bar, and close button."""
+    """Professional toast notification with smooth slide-in, progress bar, and close button.
 
-    _active_toasts: List['ToastNotification'] = []  # Class-level queue
+    Kept as a standalone Toplevel (no parent passed to super().__init__()) so
+    -topmost can raise it above ALL windows including the main app, browser, etc.
+    A child Toplevel may stack behind other windows in some window managers
+    despite -topmost.
+    """
+
+    _active_toasts: List['ToastNotification'] = []  # Class-level queue (newest first)
     _MAX_VISIBLE = 3  # Max toasts shown simultaneously
+    _WIDTH = 380       # Fixed professional width
+    _EDGE_MARGIN = 16  # Horizontal gap from the parent window edge
+    _BOTTOM_OFFSET = 48  # Clear the app footer / OS taskbar
+    _STACK_GAP = 10    # Vertical gap between stacked toasts
+    _KEEP_TOP_MS = 350  # Watchdog interval for re-asserting topmost
 
     def __init__(self, parent: Any, message: str, kind: str = "success",
                  duration: int = 4000, title: str = "", details: str = "") -> None:
@@ -504,50 +517,71 @@ class ToastNotification(ctk.CTkToplevel):
         # behind other windows in some window managers despite -topmost.
         super().__init__()
         self.parent = parent
-        self._duration = duration
+        self._kind = kind
+        self._duration = max(int(duration), 1500)
         self._start_time: Optional[float] = None
         self._progress_after_id: Optional[str] = None
+        self._keep_top_after_id: Optional[str] = None
         self._fade_out_started = False
+        self._destroyed = False
+        self._animating_in = False
+        self._reflow_epoch = 0  # Invalidates stale reflow animation loops
 
         # ── Theme-aware colors ──
-        mode = ctk.get_appearance_mode()
-        is_dark = mode == "Dark"
-
         self._configs = {
             "success": {
                 "icon": "✅", "bg": ("#065F46", "#065F46"),
                 "border": ("#34D399", "#34D399"),
                 "progress": ("#34D399", "#6EE7B7"),
+                "accent": ("#6EE7B7", "#6EE7B7"),
                 "title_color": ("#FFFFFF", "#FFFFFF"),
                 "msg_color": ("#D1FAE5", "#D1FAE5"),
+                "hover": ("#047857", "#047857"),
             },
             "error": {
                 "icon": "❌", "bg": ("#7F1D1D", "#7F1D1D"),
                 "border": ("#F87171", "#FCA5A5"),
                 "progress": ("#F87171", "#FCA5A5"),
+                "accent": ("#FCA5A5", "#FCA5A5"),
                 "title_color": ("#FFFFFF", "#FFFFFF"),
                 "msg_color": ("#FEE2E2", "#FEE2E2"),
+                "hover": ("#B91C1C", "#B91C1C"),
             },
             "info": {
                 "icon": "ℹ️", "bg": ("#1E3A5F", "#1E3A5F"),
                 "border": ("#60A5FA", "#93C5FD"),
                 "progress": ("#60A5FA", "#93C5FD"),
+                "accent": ("#93C5FD", "#93C5FD"),
                 "title_color": ("#FFFFFF", "#FFFFFF"),
                 "msg_color": ("#DBEAFE", "#DBEAFE"),
+                "hover": ("#1E40AF", "#1E40AF"),
             },
             "warning": {
                 "icon": "⚠️", "bg": ("#78350F", "#78350F"),
                 "border": ("#FBBF24", "#FCD34D"),
                 "progress": ("#FBBF24", "#FCD34D"),
+                "accent": ("#FCD34D", "#FCD34D"),
                 "title_color": ("#FFFFFF", "#FFFFFF"),
                 "msg_color": ("#FEF3C7", "#FEF3C7"),
+                "hover": ("#B45309", "#B45309"),
             },
             "automation": {
                 "icon": "🤖", "bg": ("#312E81", "#312E81"),
                 "border": ("#818CF8", "#A5B4FC"),
                 "progress": ("#818CF8", "#A5B4FC"),
+                "accent": ("#A5B4FC", "#A5B4FC"),
                 "title_color": ("#FFFFFF", "#FFFFFF"),
                 "msg_color": ("#E0E7FF", "#E0E7FF"),
+                "hover": ("#3730A3", "#3730A3"),
+            },
+            "running": {
+                "icon": "⚙️", "bg": ("#164E63", "#164E63"),
+                "border": ("#38BDF8", "#7DD3FC"),
+                "progress": ("#38BDF8", "#7DD3FC"),
+                "accent": ("#7DD3FC", "#7DD3FC"),
+                "title_color": ("#FFFFFF", "#FFFFFF"),
+                "msg_color": ("#CFFAFE", "#CFFAFE"),
+                "hover": ("#0C4A6E", "#0C4A6E"),
             },
         }
 
@@ -557,15 +591,21 @@ class ToastNotification(ctk.CTkToplevel):
         self.overrideredirect(True)
         self.attributes("-topmost", True)
         self.configure(fg_color=cfg["bg"])
+        self.resizable(False, False)
 
         # ── Main frame ──
-        self.frame = ctk.CTkFrame(self, fg_color=cfg["bg"], corner_radius=10,
+        self.frame = ctk.CTkFrame(self, fg_color=cfg["bg"], corner_radius=12,
                                    border_width=1, border_color=cfg["border"])
         self.frame.pack(fill="both", expand=True)
 
+        # ── Left accent bar (subtle color stripe for a premium look) ──
+        accent_bar = ctk.CTkFrame(self.frame, width=3, corner_radius=1,
+                                   fg_color=cfg["accent"])
+        accent_bar.place(relx=0.02, rely=0.5, relheight=0.82, anchor="w")
+
         # ── Content area ──
         self.content = ctk.CTkFrame(self.frame, fg_color="transparent")
-        self.content.pack(fill="x", padx=16, pady=(12, 4))
+        self.content.pack(fill="x", padx=(20, 16), pady=(12, 6))
         self.content.grid_columnconfigure(2, weight=1)
 
         # Icon
@@ -585,7 +625,7 @@ class ToastNotification(ctk.CTkToplevel):
         self._msg_label = ctk.CTkLabel(self.content, text=message,
                                         font=("Segoe UI", 12),
                                         text_color=cfg["msg_color"],
-                                        wraplength=320, justify="left",
+                                        wraplength=self._WIDTH - 110, justify="left",
                                         anchor="w")
         self._msg_label.grid(row=1, column=1, sticky="ew")
 
@@ -594,7 +634,7 @@ class ToastNotification(ctk.CTkToplevel):
             self._details_label = ctk.CTkLabel(self.content, text=details,
                                                font=("Segoe UI", 10),
                                                text_color=cfg["msg_color"],
-                                               wraplength=320, justify="left",
+                                               wraplength=self._WIDTH - 110, justify="left",
                                                anchor="w")
             self._details_label.grid(row=2, column=1, sticky="ew", pady=(2, 0))
 
@@ -603,7 +643,7 @@ class ToastNotification(ctk.CTkToplevel):
             self.content, text="✕", width=24, height=24, corner_radius=12,
             font=("Segoe UI", 12, "bold"),
             fg_color="transparent",
-            hover_color=("#E5E7EB", "#374151"),
+            hover_color=cfg["hover"],
             text_color=cfg["title_color"],
             command=self._animate_out,
         )
@@ -622,17 +662,18 @@ class ToastNotification(ctk.CTkToplevel):
         # ── Position & animate ──
         self.update_idletasks()
 
-        # Register in queue (dismiss oldest if > MAX_VISIBLE)
-        ToastNotification._active_toasts.append(self)
+        # Register in queue (newest first → appears at the bottom of the stack)
+        ToastNotification._active_toasts.insert(0, self)
         while len(ToastNotification._active_toasts) > ToastNotification._MAX_VISIBLE:
-            oldest = ToastNotification._active_toasts.pop(0)
+            oldest = ToastNotification._active_toasts.pop()  # oldest sits on top
             try:
-                if oldest.winfo_exists():
-                    oldest.destroy()
+                if oldest.winfo_exists() and not oldest._fade_out_started:
+                    oldest._animate_out()
             except Exception:
                 pass
 
-        self._position_window()
+        self._position_window(initial=True)
+        ToastNotification._reflow()  # shift existing toasts up to make room
         self._animate_in()
 
         # Start progress bar
@@ -640,113 +681,170 @@ class ToastNotification(ctk.CTkToplevel):
         self._update_progress()
 
         # Auto-dismiss after duration
-        self.after(duration, self._on_auto_dismiss)
+        self.after(self._duration, self._on_auto_dismiss)
+
+        # Keep-on-top watchdog — periodically re-assert topmost + lift so the
+        # toast never slips behind the app, browser, or any other window.
+        self.after(120, self._keep_on_top)
 
         # ── Bindings ──
-        for widget in [self, self.frame, self.content, icon_lbl, self._title_label, self._msg_label]:
+        _bind_widgets = [self, self.frame, self.content, icon_lbl,
+                         self._title_label, self._msg_label]
+        if details:
+            _bind_widgets.append(self._details_label)
+        for widget in _bind_widgets:
             try:
                 widget.bind("<Button-1>", lambda e: self._animate_out())
             except Exception:
                 pass
 
-    def _position_window(self) -> None:
-        """Position at bottom-right of parent window, stacking if multiple toasts visible."""
+    # ── Positioning ──────────────────────────────────────────────────────────
+    def _parent_bounds(self) -> Tuple[int, int, int, int]:
+        """Return (root_x, root_y, width, height) of the reference window.
+        Falls back to the whole screen when the parent is minimized/hidden."""
         try:
-            parent_x = self.parent.winfo_rootx()
-            parent_y = self.parent.winfo_rooty()
-            parent_w = self.parent.winfo_width()
-            parent_h = self.parent.winfo_height()
+            if self.parent is not None and self.parent.winfo_exists():
+                w = self.parent.winfo_width()
+                h = self.parent.winfo_height()
+                if w > 100 and h > 100 and self.parent.winfo_viewable():
+                    return (self.parent.winfo_rootx(), self.parent.winfo_rooty(), w, h)
+        except Exception:
+            pass
+        return (0, 0, self.winfo_screenwidth(), self.winfo_screenheight())
 
-            my_w = max(self.winfo_reqwidth(), 380)
-            my_h = self.winfo_reqheight()
+    def _compute_target(self) -> Tuple[int, int]:
+        """Final (x, y) for this toast based on its index in the stack.
+        Index 0 (newest) sits at the bottom; older toasts stack upward."""
+        px, py, pw, ph = self._parent_bounds()
+        my_w = self._WIDTH
+        my_h = self.winfo_reqheight()
 
-            # Find position among active toasts
-            my_idx = 0
-            for i, t in enumerate(ToastNotification._active_toasts):
-                if t is self:
-                    my_idx = i
-                    break
+        my_idx = 0
+        for i, t in enumerate(ToastNotification._active_toasts):
+            if t is self:
+                my_idx = i
+                break
 
-            # Stack from bottom-right: each toast goes up by (my_h + 10) pixels
-            base_x = parent_x + parent_w - my_w - 20
-            base_y = parent_y + parent_h - my_h - 60 - (my_idx * (my_h + 10))
+        base_x = px + pw - my_w - self._EDGE_MARGIN
+        base_y = py + ph - my_h - self._BOTTOM_OFFSET - (my_idx * (my_h + self._STACK_GAP))
+        return int(base_x), int(base_y)
 
-            # Start off-screen to the right (for slide-in effect)
-            self._target_x = int(base_x)
-            self._target_y = int(base_y)
-            self._start_x = int(parent_x + parent_w + 20)  # Off-screen right
-
-            # Set initial position off-screen
-            self.geometry(f"{my_w}x{my_h}+{self._start_x}+{self._target_y}")
+    def _position_window(self, initial: bool = False) -> None:
+        """Place the toast at its target. When `initial`, start off-screen to
+        the right so `_animate_in()` can slide it in.
+        (Reflow movement is handled by `_animate_to_target()` instead.)"""
+        try:
+            tx, ty = self._compute_target()
+            self._target_x, self._target_y = tx, ty
+            if not initial:
+                return
+            px, py, pw, ph = self._parent_bounds()
+            self._start_x = int(px + pw + 20)  # Off-screen right
+            self.geometry(f"{self._WIDTH}x{self.winfo_reqheight()}+{self._start_x}+{ty}")
         except Exception as e:
             logger.debug("ToastNotification._position_window failed: %s", e)
 
-    def _animate_in(self, step: int = 0) -> None:
-        """Slide in from right with fade."""
-        if step > 12:
+    @classmethod
+    def _reflow(cls) -> None:
+        """Re-position remaining toasts (smooth slide) after add/remove."""
+        for t in list(cls._active_toasts):
+            try:
+                if t.winfo_exists() and not t._fade_out_started and not t._destroyed:
+                    t._animate_to_target()
+            except Exception:
+                pass
+
+    def _animate_to_target(self, steps: int = 8, step: int = 0,
+                           start_y: Optional[int] = None,
+                           epoch: Optional[int] = None) -> None:
+        """Smoothly move this toast to its computed stack position.
+        Uses an epoch counter so a newer reflow invalidates older animation
+        loops that may still be running (prevents overlapping y-jitter)."""
+        if self._fade_out_started or self._destroyed:
             return
         try:
             if not self.winfo_exists():
                 return
-            # Slide: interpolate x from _start_x to _target_x
-            progress = step / 12
-            current_x = int(self._start_x + (self._target_x - self._start_x) * progress)
-            alpha = progress
-            self.attributes("-alpha", alpha)
-            self.geometry(f"+{current_x}+{self._target_y}")
-            self.after(20, lambda: self._animate_in(step + 1))
+            _, ty = self._compute_target()
+            self._target_y = ty
+            if self._animating_in:
+                return  # slide-in will land on the updated target anyway
+            if epoch is None:
+                # Fresh reflow — bump the epoch so any older loop bows out.
+                self._reflow_epoch += 1
+                epoch = self._reflow_epoch
+                start_y = self.winfo_y()
+                if abs(start_y - ty) < 2:
+                    return
+            elif epoch != self._reflow_epoch:
+                return  # A newer reflow superseded this loop.
+            t = (step + 1) / steps
+            eased = 1 - (1 - t) ** 3  # ease-out cubic
+            y = int(start_y + (ty - start_y) * eased)
+            self.geometry(f"+{self.winfo_x()}+{y}")
+            if step < steps - 1:
+                self.after(14, lambda: self._animate_to_target(steps, step + 1, start_y, epoch))
         except Exception:
             pass
 
-    def _update_progress(self) -> None:
-        """Update the progress bar to show remaining time."""
-        if self._fade_out_started or not self.winfo_exists():
-            return
+    # ── Animations ───────────────────────────────────────────────────────────
+    def _animate_in(self, steps: int = 14, step: int = 0) -> None:
+        """Slide in from the right with a smooth ease-out + fade-in."""
+        if self._destroyed or self._fade_out_started:
+            return  # bail if a fade-out was already started (e.g. X clicked mid-slide)
         try:
-            if self._start_time is None:
+            if not self.winfo_exists():
                 return
-            elapsed = (time.time() - self._start_time) * 1000
-            remaining = max(0, 1.0 - (elapsed / self._duration))
-            pw = int(remaining * 380)
-            self._progress_fill.configure(width=pw)
-            self._progress_bg.update_idletasks()
-            if remaining > 0:
-                self._progress_after_id = self.after(100, self._update_progress)
+            if step >= steps:
+                self._animating_in = False
+                self.attributes("-alpha", 1.0)
+                self.geometry(f"+{self._target_x}+{self._target_y}")
+                return
+            self._animating_in = True
+            t = (step + 1) / steps
+            eased = 1 - (1 - t) ** 3  # ease-out cubic
+            current_x = int(self._start_x + (self._target_x - self._start_x) * eased)
+            self.attributes("-alpha", min(1.0, 0.15 + 0.85 * eased))
+            self.geometry(f"+{current_x}+{self._target_y}")
+            self.after(16, lambda: self._animate_in(steps, step + 1))
         except Exception:
             pass
 
-    def _on_auto_dismiss(self) -> None:
-        """Called when duration expires — fade out."""
-        self._animate_out()
-
-    def _animate_out(self, step: int = 12) -> None:
-        """Slide out to the right with fade."""
-        if self._fade_out_started:
+    def _animate_out(self, steps: int = 14) -> None:
+        """Slide out to the right with an ease-in + fade-out."""
+        if self._fade_out_started or self._destroyed:
             return
         self._fade_out_started = True
 
-        def _animate(step: int = 12):
-            if step < 0:
-                # Remove from queue and destroy
-                try:
-                    if self in ToastNotification._active_toasts:
-                        ToastNotification._active_toasts.remove(self)
-                except Exception:
-                    pass
-                try:
-                    self.destroy()
-                except Exception:
-                    pass
+        # Stop the keep-on-top watchdog & progress bar
+        if self._keep_top_after_id:
+            try:
+                self.after_cancel(self._keep_top_after_id)
+            except Exception:
+                pass
+            self._keep_top_after_id = None
+
+        try:
+            start_x = self.winfo_x()
+            start_y = self.winfo_y()
+        except Exception:
+            start_x, start_y = self._target_x, self._target_y
+
+        def _animate(step: int = 0):
+            if self._destroyed:
                 return
             try:
                 if not self.winfo_exists():
                     return
-                progress = step / 12
-                current_x = int(self._target_x + (self._start_x - self._target_x) * (1 - progress))
-                alpha = progress
-                self.attributes("-alpha", alpha)
-                self.geometry(f"+{current_x}+{self._target_y}")
-                self.after(20, lambda: _animate(step - 1))
+                if step >= steps:
+                    self.destroy()
+                    return
+                t = (step + 1) / steps
+                eased = t * t  # ease-in quad
+                x = int(start_x + (self._start_x - start_x) * eased)
+                self.attributes("-alpha", max(0.0, 1.0 - eased))
+                self.geometry(f"+{x}+{start_y}")
+                self.after(16, lambda: _animate(step + 1))
             except Exception:
                 try:
                     self.destroy()
@@ -755,19 +853,70 @@ class ToastNotification(ctk.CTkToplevel):
 
         _animate()
 
+    # ── Progress bar & watchdog ─────────────────────────────────────────────
+    def _update_progress(self) -> None:
+        """Smoothly shrink the progress bar to show remaining time."""
+        if self._fade_out_started or self._destroyed or not self.winfo_exists():
+            return
+        try:
+            if self._start_time is None:
+                return
+            elapsed = (time.time() - self._start_time) * 1000
+            remaining = max(0.0, 1.0 - (elapsed / self._duration))
+            bar_w = self._progress_bg.winfo_width() or self._WIDTH
+            self._progress_fill.configure(width=int(remaining * bar_w))
+            self._progress_bg.update_idletasks()
+            if remaining > 0:
+                self._progress_after_id = self.after(50, self._update_progress)
+            else:
+                self._progress_after_id = None
+        except Exception:
+            pass
+
+    def _keep_on_top(self) -> None:
+        """Watchdog: periodically re-assert topmost + lift so the toast stays
+        above the app and any other window on screen."""
+        if self._destroyed or self._fade_out_started:
+            return
+        try:
+            if not self.winfo_exists():
+                return
+            self.attributes("-topmost", True)
+            self.lift()
+            self._keep_top_after_id = self.after(self._KEEP_TOP_MS, self._keep_on_top)
+        except Exception:
+            pass
+
+    def _on_auto_dismiss(self) -> None:
+        """Called when duration expires — fade out."""
+        self._animate_out()
+
+    # ── Cleanup ──────────────────────────────────────────────────────────────
     def destroy(self) -> None:
-        """Clean up progress bar timer on destroy."""
+        """Cancel timers, remove from the queue, and reflow remaining toasts."""
+        self._destroyed = True
         if self._progress_after_id:
             try:
                 self.after_cancel(self._progress_after_id)
             except Exception:
                 pass
+            self._progress_after_id = None
+        if self._keep_top_after_id:
+            try:
+                self.after_cancel(self._keep_top_after_id)
+            except Exception:
+                pass
+            self._keep_top_after_id = None
         try:
             if self in ToastNotification._active_toasts:
                 ToastNotification._active_toasts.remove(self)
         except Exception:
             pass
-        super().destroy()
+        try:
+            super().destroy()
+        except Exception:
+            pass
+        ToastNotification._reflow()
 
 # --- 6. ONBOARDING GUIDE ---
 class OnboardingGuide(ctk.CTkToplevel):

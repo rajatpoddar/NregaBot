@@ -746,11 +746,8 @@ del "%~f0" & exit
             if not self.winfo_exists():
                 return
 
-            if self.app_state.current_toast:
-                try:
-                    if self.app_state.current_toast.winfo_exists():
-                        self.app_state.current_toast.destroy()
-                except Exception as e: logger.debug("Failed to dismiss old toast: %s", e)
+            # Multiple toasts stack gracefully (max 3) — the previous toast is
+            # NOT force-destroyed here; ToastNotification manages the queue.
 
             auto_kind = kind
             if not title:
@@ -759,6 +756,7 @@ del "%~f0" & exit
                 elif kind == "info": title = "Info"
                 elif kind == "warning": title = "Warning"
                 elif kind == "automation": title = "Automation"
+                elif kind == "running": title = "Running"
 
             # Play appropriate sound
             sound_map = {
@@ -766,6 +764,7 @@ del "%~f0" & exit
                 "error": "error",
                 "warning": "error",
                 "automation": "complete",
+                "running": "click",
             }
             self.play_sound(sound_map.get(kind, "click"))
 

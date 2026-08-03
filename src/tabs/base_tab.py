@@ -240,16 +240,17 @@ class BaseAutomationTab(ctk.CTkFrame):
             panchayat = self.activity_panchayat
             village = self.activity_village
             
-            # Choose title based on status
+            # Colour-coded by outcome: passed → green, failed → red,
+            # stopped → amber.
             if status == "success":
                 title = "✅ Automation Complete"
-                kind = "automation"
+                kind = "success"  # GREEN = passed
             elif status == "stopped":
                 title = "⏹ Automation Stopped"
-                kind = "warning"
+                kind = "warning"  # AMBER = stopped
             else:
                 title = "⚠️ Automation Failed"
-                kind = "error"
+                kind = "error"    # RED = failed
             
             # Build location string
             location_parts = []
