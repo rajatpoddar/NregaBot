@@ -41,9 +41,12 @@ class JobcardVerifyTab(BaseAutomationTab):
         
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=10)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
-        self.panchayat_var = ctk.StringVar()
-        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var,
+                                                values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=10)
+        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' to verify jobcards in every panchayat of the block.",
+                     text_color="gray50", font=ctk.CTkFont(size=11)).grid(row=4, column=0, columnspan=2, sticky='w', padx=15, pady=(0, 10))
         
         ctk.CTkLabel(controls_frame, text="Village Name:").grid(row=1, column=0, sticky='w', padx=15, pady=10)
         v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
@@ -168,20 +171,28 @@ class JobcardVerifyTab(BaseAutomationTab):
         process_all = self.process_all_villages_var.get()
         verify_account_only = self.verify_account_only_var.get()
 
+        all_panchayats = panchayat == config.ALL_PANCHAYATS_LABEL
+
         if not panchayat:
             messagebox.showwarning("Input Required", "Panchayat name is required.")
             return
-        if not process_all and not village:
+        if not all_panchayats and not process_all and not village:
             messagebox.showwarning("Input Required", "Please enter a Village name or check 'Process all villages'.")
             return
+        if all_panchayats:
+            # Each panchayat's villages are processed automatically
+            process_all = True
+            village = ""
             
         inputs = {
             'panchayat': panchayat, 
             'village': village, 
             'process_all': process_all,
-            'verify_account_only': verify_account_only
+            'verify_account_only': verify_account_only,
+            'all_panchayats': all_panchayats
         }
-        self._save_preferences(panchayat, village)
+        if not all_panchayats:
+            self._save_preferences(panchayat, village)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def _get_photo_for_jobcard(self, jobcard_no):
@@ -214,56 +225,47 @@ class JobcardVerifyTab(BaseAutomationTab):
             url = config.JOBCARD_VERIFY_CONFIG["url"]
             driver.get(url)
             
-            villages_to_process = []
-            self.log_info(f"Selecting Panchayat: {inputs['panchayat']}")
-            html_element = driver.find_element(By.TAG_NAME, "html")
-            self.select_dropdown(html_element, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch", inputs['panchayat'])
-            wait.until(EC.staleness_of(html_element))
-
-            if inputs['process_all']:
-                self.log_info("Finding all villages in Panchayat...")
-                village_dropdown = Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlVillage"))))
-                villages_to_process = [opt.text for opt in village_dropdown.options if "--Select" not in opt.text]
-                self.log_info(f"Found {len(villages_to_process)} villages.")
+            all_mode = inputs.get('all_panchayats', False) or inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL
+            panchayats_to_process = []
+            if all_mode:
+                panch_dd = Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch"))))
+                panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if "--Select" not in t]
+                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
             else:
-                villages_to_process.append(inputs['village'])
+                panchayats_to_process = [inputs['panchayat']]
 
-            self.app.update_history("location_panchayat", inputs['panchayat'])
-
-            for location_village in villages_to_process:
+            total_p = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process):
                 if self.is_stopped():
-                    self.log_warning("🛑 Stop signal received."); break
-                
-                self.log_info(f"\n--- Processing Village: {location_village} ---")
-                self.app.after(0, self.update_status, f"Processing Village: {location_village}")
-                self.app.update_history("location_village", location_village)
-                
-                html_element = driver.find_element(By.TAG_NAME, "html")
-                self.select_dropdown(html_element, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlVillage", location_village)
-                wait.until(EC.staleness_of(html_element))
-                
-                try:
-                    driver.implicitly_wait(1)
-                    msg_element = driver.find_elements(By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
-                    if msg_element and msg_element[0].is_displayed() and "no record found" in msg_element[0].text.lower():
-                        self.log_info(f"   - Village has no records. Skipping.")
-                        continue
-                finally:
-                    driver.implicitly_wait(20)
+                    self.log_warning("🛑 Stop signal received.")
+                    break
+                self.log_info(f"\n===== Panchayat {p_idx+1}/{total_p}: {p_name} =====")
+                self.app.after(0, self.update_status, f"{p_name}: selecting...", p_idx / max(total_p, 1))
+                inputs['panchayat'] = p_name
 
-                # --- PAGINATION LOOP ---
-                page_count = 1
-                while not self.is_stopped():
-                    self.log_info(f"   > Processing Page {page_count}")                    
-                    self._process_jobcards_for_current_page(driver, wait, inputs['verify_account_only'])
-                    
-                    # Pass the current page number so we know what to look for (Next = page_count + 1)
-                    if not self._handle_pagination(driver, wait, page_count):
-                        self.log_info("   - End of pages for this village.")
-                        break 
-                    
-                    page_count += 1
-                    time.sleep(2)
+                html_element = driver.find_element(By.TAG_NAME, "html")
+                selected = self.select_dropdown(html_element, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch", p_name)
+                if selected is None:
+                    self.log_warning(f"   Panchayat '{p_name}' not found on the website. Skipping.")
+                    continue
+                wait.until(EC.staleness_of(html_element))
+
+                villages_to_process = []
+                if inputs['process_all']:
+                    self.log_info("Finding all villages in Panchayat...")
+                    village_dropdown = Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlVillage"))))
+                    villages_to_process = [opt.text for opt in village_dropdown.options if "--Select" not in opt.text]
+                    self.log_info(f"Found {len(villages_to_process)} villages.")
+                else:
+                    villages_to_process.append(inputs['village'])
+
+                self.app.update_history("location_panchayat", p_name)
+
+                for location_village in villages_to_process:
+                    if self.is_stopped():
+                        self.log_warning("🛑 Stop signal received.")
+                        break
+                    self._process_single_village(driver, wait, inputs, location_village)
 
             if not self.is_stopped():
                 self.log_info(f"{'='*50}")
@@ -279,6 +281,39 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
     
+    def _process_single_village(self, driver, wait, inputs, location_village):
+        """Processes one village (photo upload + jobcard verification, with pagination)."""
+        self.log_info(f"\n--- Processing Village: {location_village} ---")
+        self.app.after(0, self.update_status, f"Processing Village: {location_village}")
+        self.app.update_history("location_village", location_village)
+
+        html_element = driver.find_element(By.TAG_NAME, "html")
+        self.select_dropdown(html_element, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlVillage", location_village)
+        wait.until(EC.staleness_of(html_element))
+
+        try:
+            driver.implicitly_wait(1)
+            msg_element = driver.find_elements(By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
+            if msg_element and msg_element[0].is_displayed() and "no record found" in msg_element[0].text.lower():
+                self.log_info(f"   - Village has no records. Skipping.")
+                return
+        finally:
+            driver.implicitly_wait(20)
+
+        # --- PAGINATION LOOP ---
+        page_count = 1
+        while not self.is_stopped():
+            self.log_info(f"   > Processing Page {page_count}")
+            self._process_jobcards_for_current_page(driver, wait, inputs['verify_account_only'])
+
+            # Pass the current page number so we know what to look for (Next = page_count + 1)
+            if not self._handle_pagination(driver, wait, page_count):
+                self.log_info("   - End of pages for this village.")
+                break
+
+            page_count += 1
+            time.sleep(2)
+
     def _process_jobcards_for_current_page(self, driver, wait, verify_account_only):
         row_index = 2 
         while not self.is_stopped():

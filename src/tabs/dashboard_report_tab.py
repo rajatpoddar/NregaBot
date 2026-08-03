@@ -30,7 +30,7 @@ class DashboardReportTab(BaseAutomationTab):
         
         # Columns to scrape (Strictly 4 columns)
         self.report_headers = [
-            "S No.", "Project Name with code", "E-MR No.", "DateFrom-DateTo"
+            "S No.", "Panchayat", "Project Name with code", "E-MR No.", "DateFrom-DateTo"
         ]
         
         self._create_widgets()
@@ -70,8 +70,8 @@ class DashboardReportTab(BaseAutomationTab):
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
-        self.panchayat_var = ctk.StringVar()
-        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=3, column=1, sticky='ew', padx=15, pady=5)
 
         # --- Wire up location hierarchy callbacks now (all widgets exist) ---
@@ -88,9 +88,9 @@ class DashboardReportTab(BaseAutomationTab):
         self.district_var.trace_add("write", _on_district_change)
         
         def _on_block_change(*_):
-            self.panchayat_var.set("")
+            self.panchayat_var.set(config.ALL_PANCHAYATS_LABEL)
             vals = self.app.history_manager.get_filtered_suggestions("location_panchayat", "location_block", self.block_var.get()) or [""]
-            self.panchayat_menu.configure(values=vals)
+            self.panchayat_menu.configure(values=self._all_panchayat_values(vals))
         self.block_var.trace_add("write", _on_block_change)
 
         ctk.CTkLabel(controls_frame, text="Delay Column:").grid(row=4, column=0, sticky='w', padx=15, pady=5)
@@ -146,6 +146,7 @@ class DashboardReportTab(BaseAutomationTab):
             self.results_tree.heading(col, text=col)
             
         self.results_tree.column("S No.", width=50, anchor='center')
+        self.results_tree.column("Panchayat", width=130)
         self.results_tree.column("Project Name with code", width=450)
         self.results_tree.column("E-MR No.", width=120, anchor='center')
         self.results_tree.column("DateFrom-DateTo", width=180, anchor='center')
@@ -183,12 +184,16 @@ class DashboardReportTab(BaseAutomationTab):
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['panchayat'], inputs['delay_column']]):
             messagebox.showwarning("Input Error", "All fields are required."); return
+        if inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL:
+            if not messagebox.askyesno("Confirm", "This will process ALL panchayats in the block. Continue?"):
+                return
         
         self.save_inputs(inputs)
         self.app.update_history("location_state", inputs['state'])
         self.app.update_history("location_district", inputs['district'])
         self.app.update_history("location_block", inputs['block'])
-        self.app.update_history("location_panchayat", inputs['panchayat'])
+        if inputs['panchayat'] != config.ALL_PANCHAYATS_LABEL:
+            self.app.update_history("location_panchayat", inputs['panchayat'])
         
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
@@ -375,7 +380,7 @@ class DashboardReportTab(BaseAutomationTab):
             except Exception:
                 pass
 
-            self.update_status("Finding Panchayat...", 0.35)
+            self.update_status("Finding Panchayats...", 0.35)
             # Find the panchayat summary table — 3 strategies:
             # 1. old portal: <b> inside <td>
             # 2. new portal Bootstrap: <th> elements
@@ -390,22 +395,80 @@ class DashboardReportTab(BaseAutomationTab):
                 main_table_xpath = "//table[contains(., 'Panchayat') and contains(., 'S No')]"
             wait.until(EC.presence_of_element_located((By.XPATH, main_table_xpath)))
 
-            # Iterate through rows to find panchayat (case-insensitive) with retry
+            def _reopen_dashboard():
+                """Re-navigate to the dashboard page and land on the panchayat summary table."""
+                driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+                self._solve_captcha(driver, wait)
+                state_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddl_States")))
+                driver.execute_script("""
+                    arguments[0].scrollIntoView({block: 'center'});
+                    var select = arguments[0];
+                    var target = arguments[1].toLowerCase().trim();
+                    for (var i = 0; i < select.options.length; i++) {
+                        if (select.options[i].text.toLowerCase().trim() === target) {
+                            select.selectedIndex = i;
+                            select.dispatchEvent(new Event('change', {bubbles: true}));
+                            break;
+                        }
+                    }
+                """, state_select, inputs['state'])
+                time.sleep(4)
+                wait.until(EC.presence_of_element_located((By.ID, "accordionMain")))
+                driver.execute_script("""
+                    document.querySelectorAll('.accordion-collapse').forEach(function(el) {
+                        el.classList.add('show');
+                    });
+                """)
+                time.sleep(0.5)
+                report_link = driver.find_element(By.XPATH, "//a[contains(normalize-space(.), 'Dashboard for Delay Monitoring System')]")
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", report_link)
+                time.sleep(5)
+                try:
+                    WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, main_table_xpath_gen)))
+                    self.log_info("Panchayat table already loaded, skipping drilldown.")
+                except TimeoutException:
+                    self.log_info("Table not found directly, trying drilldown...")
+                    self._handle_report_drilldown(driver, wait, inputs)
+                # Expand radios to load full data
+                try:
+                    all_districts_rb = driver.find_element(By.ID, "ContentPlaceHolder1_rdbuttondistrict_0")
+                    if not all_districts_rb.is_selected():
+                        driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", all_districts_rb)
+                        self.log_info("Selected 'All Districts' radio button")
+                        time.sleep(3)
+                except Exception:
+                    pass
+                try:
+                    consolidate_rb = driver.find_element(By.ID, "ContentPlaceHolder1_RadioButtonList1_0")
+                    if not consolidate_rb.is_selected():
+                        driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", consolidate_rb)
+                        self.log_info("Selected 'Consolidate for the Financial Year' radio button")
+                        time.sleep(3)
+                except Exception:
+                    pass
+                wait.until(EC.presence_of_element_located((By.XPATH, main_table_xpath)))
+
             target_panchayat = inputs['panchayat'].strip()
-            panchayat_row = None
-            for attempt in range(5):
-                rows = driver.find_elements(By.XPATH, f"{main_table_xpath}//tr[td]")
-                for row in rows:
-                    cells = row.find_elements(By.TAG_NAME, "td")
-                    if len(cells) >= 6:
-                        p_name = cells[1].text.strip()
-                        if p_name.lower() == target_panchayat.lower():
-                            panchayat_row = row
-                            break
-                if panchayat_row is not None:
-                    break
-                time.sleep(1)
-            if panchayat_row is None:
+            all_mode = target_panchayat == config.ALL_PANCHAYATS_LABEL
+
+            # Collect target panchayat name(s) from the summary table
+            panchayat_names = []
+            rows_all = driver.find_elements(By.XPATH, f"{main_table_xpath}//tr[td]")
+            for row in rows_all:
+                cells = row.find_elements(By.TAG_NAME, "td")
+                if len(cells) >= 6:
+                    p_name = cells[1].text.strip()
+                    if all_mode:
+                        if p_name and not self._is_aggregate_panchayat_name(p_name):
+                            panchayat_names.append(p_name)
+                    elif p_name.lower() == target_panchayat.lower():
+                        panchayat_names.append(p_name)
+                        break
+            if not panchayat_names:
+                if all_mode:
+                    self.log_warning("No panchayats found in the summary table.")
+                    self.success_message = None
+                    return
                 raise ValueError(f"Panchayat '{target_panchayat}' not found in table.")
 
             self.update_status("Finding Column...", 0.4)
@@ -422,59 +485,138 @@ class DashboardReportTab(BaseAutomationTab):
 
             if target_col_index == -1: raise ValueError(f"Column '{inputs['delay_column']}' not found.")
 
-            row_cells = panchayat_row.find_elements(By.TAG_NAME, "td")
-            target_cell = row_cells[target_col_index]
-
-            try:
-                target_link = target_cell.find_element(By.TAG_NAME, "a")
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", target_link)
-            except NoSuchElementException:
-                 if target_cell.text.strip() == '0':
-                    self.log_info(f"No records found (value=0) for {inputs['delay_column']} in {inputs['panchayat']}.")
-                    self.success_message = None; return
-                 else: raise ValueError("Target cell is not a clickable link.")
-
-            self.update_status("Loading Final Report...", 0.5)
-            # Dual-strategy: table with <th> containing 'E-MR' (new portal) OR old green-bordered table
-            FINAL_TABLE_XPATH = (
-                "//table[.//th[contains(text(), 'E-MR')]]"
-                " | //table[@bordercolor='green' and .//b[contains(text(), 'E-MR No.')]]"
-            )
-            table = wait.until(EC.presence_of_element_located((By.XPATH, FINAL_TABLE_XPATH)))
-            rows = table.find_elements(By.XPATH, ".//tr[position()>1]") 
-
-            if not rows:
-                self.log_warning("Table is empty.")
-                return
-
             workcode_list = []
             pending_mr_count = 0
-
-            for i, row in enumerate(rows):
+            total_p = len(panchayat_names)
+            need_back = False
+            for p_idx, p_name in enumerate(panchayat_names):
                 if self.is_stopped(): break
-                self.update_status(f"Processing row {i+1}/{len(rows)}", 0.5 + ((i+1)/len(rows))*0.45)
+                self.log_info(f"===== Panchayat {p_idx+1}/{total_p}: {p_name} =====")
+                self.update_status(f"Processing {p_name}...", 0.4 + (p_idx / max(total_p, 1)) * 0.1)
 
-                cells = row.find_elements(By.TAG_NAME, "td")
-                # Original Table Indices: 0:SNo, 1:Dist, 2:Blk, 3:GP, 4:Agency, 5:Project, 6:EMR, 7:Date
-                if len(cells) < 8: continue
+                # Navigate to the summary table: fast path = 1 step back (only if
+                # the previous panchayat actually opened a report page);
+                # fallback = full dashboard reload
+                panchayat_row = None
+                for nav_attempt in range(2):
+                    if nav_attempt == 0:
+                        if need_back:
+                            try:
+                                driver.back()
+                                time.sleep(0.5)
+                                WebDriverWait(driver, 5).until(
+                                    EC.presence_of_element_located((By.XPATH, main_table_xpath))
+                                )
+                            except Exception:
+                                self.log_info("Back navigation failed, re-opening dashboard...")
+                                _reopen_dashboard()
+                    else:
+                        self.log_info("Reloading dashboard to find the panchayat...")
+                        _reopen_dashboard()
 
-                # --- EXTRACT DATA FOR NEW COLUMNS ---
-                s_no = cells[0].text.strip()
-                project_name = cells[5].text.strip()
-                emr_no = cells[6].text.strip()
-                dates = cells[7].text.strip()
-                
-                # Extract workcode
-                wc_match = re.search(r'\(([^)]+)\)$', project_name)
-                if wc_match: workcode_list.append(wc_match.group(1).strip())
+                    # Re-locate the panchayat row (case-insensitive, with retry)
+                    panchayat_row = None
+                    for attempt in range(3):
+                        rows = driver.find_elements(By.XPATH, f"{main_table_xpath}//tr[td]")
+                        for row in rows:
+                            cells = row.find_elements(By.TAG_NAME, "td")
+                            if len(cells) >= 6:
+                                p_name_in = cells[1].text.strip()
+                                if p_name_in.lower() == p_name.lower():
+                                    panchayat_row = row
+                                    break
+                        if panchayat_row is not None:
+                            break
+                        time.sleep(1)
+                    if panchayat_row is not None:
+                        break
+                if panchayat_row is None:
+                    self.log_warning(f"Panchayat '{p_name}' not found in table. Skipping.")
+                    need_back = False
+                    continue
 
-                pending_mr_count += 1
-                row_data = (s_no, project_name, emr_no, dates)
-                self.app.after(0, lambda data=row_data: self.results_tree.insert("", "end", values=data))
+                row_cells = panchayat_row.find_elements(By.TAG_NAME, "td")
+                target_cell = row_cells[target_col_index]
+
+                try:
+                    target_link = target_cell.find_element(By.TAG_NAME, "a")
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();", target_link)
+                    need_back = True
+                except NoSuchElementException:
+                    need_back = False
+                    if target_cell.text.strip() == '0':
+                        self.log_info(f"No records found (value=0) for {inputs['delay_column']} in {p_name}.")
+                        continue
+                    else:
+                        self.log_warning(f"Target cell is not a clickable link for {p_name}. Skipping.")
+                        continue
+
+                self.update_status("Loading Final Report...", 0.55)
+                # Dual-strategy: table with <th> containing 'E-MR' (new portal) OR old green-bordered table
+                FINAL_TABLE_XPATH = (
+                    "//table[.//th[contains(text(), 'E-MR')]]"
+                    " | //table[@bordercolor='green' and .//b[contains(text(), 'E-MR No.')]]"
+                )
+                try:
+                    table = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, FINAL_TABLE_XPATH)))
+                except TimeoutException:
+                    # Report page didn't load — assume no navigation happened
+                    need_back = False
+                    self.log_warning(f"Final report table not found for {p_name}. Skipping.")
+                    continue
+                # ⚡ FAST READ: fetch the entire table's cell text in ONE round trip
+                try:
+                    all_rows_data = driver.execute_script(
+                        "var rows = arguments[0].querySelectorAll('tr'); var out = []; "
+                        "for (var r = 1; r < rows.length; r++) { var c = rows[r].querySelectorAll('td'); var arr = []; "
+                        "for (var i = 0; i < c.length; i++) { arr.push((c[i].innerText || '').trim()); } out.push(arr); } return out;",
+                        table
+                    ) or []
+                except Exception as e:
+                    self.log_warning(f"Could not read final table for {p_name}: {str(e)[:120]} Skipping.")
+                    continue
+
+                if not all_rows_data:
+                    self.log_warning(f"Table is empty for {p_name}.")
+                    continue
+
+                insert_buffer = []
+                for i, row_data in enumerate(all_rows_data):
+                    if self.is_stopped(): break
+
+                    # Original Table Indices: 0:SNo, 1:Dist, 2:Blk, 3:GP, 4:Agency, 5:Project, 6:EMR, 7:Date
+                    if not row_data or len(row_data) < 8: continue
+
+                    project_name = row_data[5]
+                    emr_no = row_data[6]
+                    dates = row_data[7]
+
+                    wc_match = re.search(r'\(([^)]+)\)$', project_name)
+                    if wc_match: workcode_list.append(wc_match.group(1).strip())
+
+                    # Continuous S.No. across all panchayats + explicit Panchayat column
+                    pending_mr_count += 1
+                    insert_buffer.append((pending_mr_count, p_name, project_name, emr_no, dates))
+
+                    # Batched tree inserts (keeps the UI snappy)
+                    if len(insert_buffer) >= 50:
+                        batch = list(insert_buffer)
+                        insert_buffer.clear()
+                        self.app.after(0, lambda b=batch: self._insert_rows_batch(b))
+
+                    # Throttled progress — keyed on the row index
+                    if i % 50 == 0 or i == len(all_rows_data) - 1:
+                        self.app.after(0, self.update_status, f"Processing {p_name} row {i+1}/{len(all_rows_data)}", 0.55 + ((i+1)/len(all_rows_data))*0.3)
+
+                if insert_buffer:
+                    batch = list(insert_buffer)
+                    insert_buffer.clear()
+                    self.app.after(0, lambda b=batch: self._insert_rows_batch(b))
 
             if self.is_stopped(): return
-            self.app.after(0, self._update_workcode_textbox, "\n".join(workcode_list)) 
+            self.app.after(0, self._update_workcode_textbox, "\n".join(workcode_list))
             self.success_message = f"Done.\n{pending_mr_count} Pending items found."
+
 
         except Exception as e:
             if "Session Expired" in str(e) and retries > 0:
@@ -651,4 +793,4 @@ class DashboardReportTab(BaseAutomationTab):
             self.state_var.set(data.get('state', ''))
             self.district_var.set(data.get('district', ''))
             self.block_var.set(data.get('block', ''))
-            self.panchayat_var.set(data.get('panchayat', ''))
+            self.panchayat_var.set(data.get('panchayat') or config.ALL_PANCHAYATS_LABEL)

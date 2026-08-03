@@ -48,8 +48,9 @@ class DelDemandTab(BaseAutomationTab):
         # 1. Panchayat Name Input
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=12)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
-        self.panchayat_var = ctk.StringVar()
-        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var,
+                                                values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=5, pady=12)
 
         # 2. Village Name Input (Optional)
@@ -72,7 +73,7 @@ class DelDemandTab(BaseAutomationTab):
         self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # 3. Explanatory Note
-        note_text = "💡 Select '🌐 All Villages' to process ALL villages in the selected Panchayat."
+        note_text = "💡 Select '🌐 All Panchayats' for all panchayats, and '🌐 All Villages' for all villages of a panchayat."
         note_label = ctk.CTkLabel(controls_frame, text=note_text, font=ctk.CTkFont(size=11, slant="italic"), text_color="gray60")
         note_label.grid(row=1, column=0, columnspan=4, sticky="w", padx=15, pady=(0, 12))
 
@@ -132,10 +133,14 @@ class DelDemandTab(BaseAutomationTab):
         if not panchayat:
             messagebox.showwarning("Input Error", "Panchayat Name is required.")
             return
+        if panchayat == config.ALL_PANCHAYATS_LABEL:
+            if not messagebox.askyesno("Confirm", "This will process ALL panchayats in the block. Continue?"):
+                return
 
         self.safe_tree_clear()
 
-        self.app.update_history("location_panchayat", panchayat)
+        if panchayat != config.ALL_PANCHAYATS_LABEL:
+            self.app.update_history("location_panchayat", panchayat)
         if village:
             self.app.update_history("location_village", village)
         
@@ -160,115 +165,146 @@ class DelDemandTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 15)
             url = config.DEL_DEMAND_CONFIG.get("url", "https://nregade4.dord.gov.in/Netnrega/deletedemand.aspx")
             
-            self.log_info("Navigating to Delete Demand page...")
-            driver.get(url)
-
-            # 1. Select Panchayat (If Dropdown Exists - Handles PO vs GP login)
-            try:
-                panchayat_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")
-                panchayat_dropdown = Select(panchayat_dd_elem)
-                
-                found_p = None
-                target_p_lower = target_panchayat.lower()
-                for opt in panchayat_dropdown.options:
-                    if target_p_lower in opt.text.lower():
-                        found_p = opt.text
-                        break
-                        
-                if found_p:
-                    self.log_info(f"Selecting Panchayat: '{found_p}'...")
-                    panchayat_dropdown.select_by_visible_text(found_p)
-
-                    # Wait for village dropdown to populate after panchayat postback
-                    fast_wait = WebDriverWait(driver, 20, poll_frequency=0.3)
-                    try:
-                        fast_wait.until(lambda d: len(Select(
-                            d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
-                        ).options) > 1)
-                    except TimeoutException:
-                        pass
-                else:
-                    raise ValueError(f"Panchayat '{target_panchayat}' not found in dropdown.")
-            except NoSuchElementException:
-                self.log_info("Panchayat dropdown not found. Assuming GP Login.")
-            # 2. Get list of Villages
-            wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
-            village_dropdown = Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"))
-            
-            villages_to_process = []
-            if target_village:
-                for opt in village_dropdown.options:
-                    if target_village.lower() in opt.text.lower() and "Select" not in opt.text:
-                        villages_to_process.append(opt.text)
-                        break
-                if not villages_to_process:
-                    raise ValueError(f"Village '{target_village}' not found.")
+            # Determine which panchayats to process
+            all_mode = target_panchayat == config.ALL_PANCHAYATS_LABEL
+            panchayats_to_process = []
+            if all_mode:
+                self.log_info("Fetching all panchayats from the website...")
+                driver.get(url)
+                try:
+                    panchayat_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")
+                    panchayat_dropdown = Select(panchayat_dd_elem)
+                    panchayats_to_process = [t for t in self._get_select_option_texts(panchayat_dropdown) if t]
+                except NoSuchElementException:
+                    self.log_error("🌐 All Panchayats mode requires PO login (Panchayat dropdown not found).")
+                    return
+                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
             else:
-                villages_to_process = [opt.text for opt in village_dropdown.options if "Select" not in opt.text]
+                panchayats_to_process = [target_panchayat]
 
-            self.log_info(f"Found {len(villages_to_process)} village(s) to process.")
-            # 3. Iterate through Villages
-            total_v = len(villages_to_process)
-            for i, v_name in enumerate(villages_to_process):
+            total_p = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process):
                 if self.is_stopped():
                     self.log_warning("⏹️ Automation stopped by user.")
                     break
+                target_panchayat = p_name
+                self.log_info(f"===== Panchayat {p_idx+1}/{total_p}: {target_panchayat} =====")
+                self.app.after(0, self.update_status, f"{target_panchayat}...", p_idx / max(total_p, 1))
+                self.log_info("Navigating to Delete Demand page...")
+                driver.get(url)
 
-                pct = (i + 1) / total_v * 100
-                self.log_info(f"  🔄 [{i+1}/{total_v}] Village: {v_name} ({pct:.0f}%)")
-                self.app.after(0, self.update_status, f"Processing {i+1}/{total_v}: {v_name}", (i+1)/total_v)
-                
-                # After first village, re-navigate and RESET page state completely
-                if i > 0:
-                    self.log_info(f"Re-navigating to page for next village...")                    
-                    # ⬇️ FIX: Navigate to blank page FIRST to clear ASP.NET session/viewstate
-                    try:
-                        driver.get("about:blank")
-                        WebDriverWait(driver, 10).until(
-                            lambda d: d.execute_script("return document.readyState") == "complete"
-                        )
-                    except Exception:
-                        pass
-                    time.sleep(0.5)
-                    
-                    driver.get(url)
-                    try:
-                        WebDriverWait(driver, 20).until(
-                            lambda d: d.execute_script("return document.readyState") == "complete"
-                        )
-                    except Exception:
-                        pass
-                    time.sleep(1.5)  # Brief wait for postback to begin
-                    
-                    try:
-                        wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")))
-                    except TimeoutException:
-                        self.log_warning(f"   ⚠️ Panchayat dropdown not found after re-navigation!")
-                        continue  # Skip this village instead of crashing
-                    
-                    try:
-                        panchayat_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")
-                        panchayat_dropdown = Select(panchayat_dd_elem)
-                        found_p = None
-                        target_p_lower = target_panchayat.lower()
-                        for opt in panchayat_dropdown.options:
-                            if target_p_lower in opt.text.lower():
-                                found_p = opt.text
-                                break
-                        if found_p:
-                            panchayat_dropdown.select_by_visible_text(found_p)
-                            time.sleep(0.5)  # Wait for postback to begin
-                            fast_wait = WebDriverWait(driver, 20, poll_frequency=0.3)
-                            try:
-                                fast_wait.until(lambda d: len(Select(
-                                    d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
-                                ).options) > 1)
-                            except TimeoutException:
-                                self.log_warning(f"   ⚠️ Village dropdown didn't populate after panchayat re-select.")
-                    except NoSuchElementException:
+                # 1. Select Panchayat (If Dropdown Exists - Handles PO vs GP login)
+                try:
+                    panchayat_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")
+                    panchayat_dropdown = Select(panchayat_dd_elem)
+
+                    found_p = None
+                    target_p_lower = target_panchayat.lower()
+                    for opt in panchayat_dropdown.options:
+                        if target_p_lower in opt.text.lower():
+                            found_p = opt.text
+                            break
+
+                    if found_p:
+                        self.log_info(f"Selecting Panchayat: '{found_p}'...")
+                        panchayat_dropdown.select_by_visible_text(found_p)
+
+                        # Wait for village dropdown to populate after panchayat postback
+                        fast_wait = WebDriverWait(driver, 20, poll_frequency=0.3)
+                        try:
+                            fast_wait.until(lambda d: len(Select(
+                                d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
+                            ).options) > 1)
+                        except TimeoutException:
+                            pass
+                    else:
+                        self.log_warning(f"Panchayat '{target_panchayat}' not found in dropdown. Skipping.")
+                        continue
+                except NoSuchElementException:
+                    self.log_info("Panchayat dropdown not found. Assuming GP Login.")
+                    if all_mode:
+                        self.log_warning("All Panchayats mode not possible with GP login. Stopping.")
+                        break
+
+                # 2. Get list of Villages
+                wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
+                village_dropdown = Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"))
+
+                villages_to_process = []
+                if target_village:
+                    for opt in village_dropdown.options:
+                        if target_village.lower() in opt.text.lower() and "Select" not in opt.text:
+                            villages_to_process.append(opt.text)
+                            break
+                    if not villages_to_process:
+                        self.log_warning(f"Village '{target_village}' not found in {target_panchayat}. Skipping.")
+                        continue
+                else:
+                    villages_to_process = [opt.text for opt in village_dropdown.options if "Select" not in opt.text]
+
+                self.log_info(f"Found {len(villages_to_process)} village(s) to process.")
+                # 3. Iterate through Villages
+                total_v = len(villages_to_process)
+                for i, v_name in enumerate(villages_to_process):
+                    if self.is_stopped():
+                        self.log_warning("⏹️ Automation stopped by user.")
+                        break
+
+                    pct = (i + 1) / max(total_v, 1) * 100
+                    self.log_info(f"  🔄 [{i+1}/{total_v}] Village: {v_name} ({pct:.0f}%)")
+                    self.app.after(0, self.update_status, f"{target_panchayat}: {i+1}/{total_v}", (p_idx + (i + 1) / max(total_v, 1)) / max(total_p, 1))
+
+                    # After first village, re-navigate and RESET page state completely
+                    if i > 0:
+                        self.log_info(f"Re-navigating to page for next village...")
+                        # ⬇️ FIX: Navigate to blank page FIRST to clear ASP.NET session/viewstate
+                        try:
+                            driver.get("about:blank")
+                            WebDriverWait(driver, 10).until(
+                                lambda d: d.execute_script("return document.readyState") == "complete"
+                            )
+                        except Exception:
+                            pass
+                        time.sleep(0.5)
+
+                        driver.get(url)
+                        try:
+                            WebDriverWait(driver, 20).until(
+                                lambda d: d.execute_script("return document.readyState") == "complete"
+                            )
+                        except Exception:
+                            pass
+                        time.sleep(1.5)  # Brief wait for postback to begin
+
+                        try:
+                            wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")))
+                        except TimeoutException:
+                            self.log_warning(f"   ⚠️ Panchayat dropdown not found after re-navigation!")
+                            continue  # Skip this village instead of crashing
+
+                        try:
+                            panchayat_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")
+                            panchayat_dropdown = Select(panchayat_dd_elem)
+                            found_p = None
+                            target_p_lower = target_panchayat.lower()
+                            for opt in panchayat_dropdown.options:
+                                if target_p_lower in opt.text.lower():
+                                    found_p = opt.text
+                                    break
+                            if found_p:
+                                panchayat_dropdown.select_by_visible_text(found_p)
+                                time.sleep(0.5)  # Wait for postback to begin
+                                fast_wait = WebDriverWait(driver, 20, poll_frequency=0.3)
+                                try:
+                                    fast_wait.until(lambda d: len(Select(
+                                        d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
+                                    ).options) > 1)
+                                except TimeoutException:
+                                    self.log_warning(f"   ⚠️ Village dropdown didn't populate after panchayat re-select.")
+                        except NoSuchElementException:
                             self.log_info(f"   ⚠️ Panchayat dropdown not found (GP Login?).")
 
-                self._process_village(driver, wait, target_panchayat, v_name)
+                    self._process_village(driver, wait, target_panchayat, v_name)
             # Count results from tree
             success_count = 0
             fail_count = 0
@@ -287,7 +323,7 @@ class DelDemandTab(BaseAutomationTab):
             final_msg = "Finished" if not self.is_stopped() else "Stopped"
             self.app.after(0, self.update_status, final_msg, 1.0)
             self.log_info(f"{'='*50}")
-            self.log_info(f"📊 Delete Demand: ✅ {success_count} deleted, ❌ {fail_count} failed, ⏭️ {skip_count} skipped (of {total_v} villages)")
+            self.log_info(f"📊 Delete Demand: ✅ {success_count} deleted, ❌ {fail_count} failed, ⏭️ {skip_count} skipped (of {total_p} panchayats)")
             self.log_info(f"{'='*50}")
         except Exception as e:
             self.handle_error(e)

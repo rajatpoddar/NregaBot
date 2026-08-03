@@ -60,8 +60,9 @@ class DelWorkAllocTab(BaseAutomationTab):
         # 1. Panchayat Name Input (with Autocomplete)
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=12)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
-        self.panchayat_var = ctk.StringVar()
-        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var,
+                                                values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=5, pady=12)
 
         # 2. Date Filter Input (Multiple Dates Support)
@@ -86,7 +87,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         self.cal_btn.pack(side="left", padx=2)
 
         # 3. Explanatory Note
-        note_text = "💡 Optional: type multiple dates separated by commas to delete specific allocations. Leave empty to delete ALL."
+        note_text = "💡 Select '🌐 All Panchayats' to process every panchayat. Optional: type multiple dates (comma-separated) to delete only specific allocations; leave empty to delete ALL."
         note_label = ctk.CTkLabel(
             controls_frame, 
             text=note_text, 
@@ -180,6 +181,9 @@ class DelWorkAllocTab(BaseAutomationTab):
         if not panchayat:
             messagebox.showwarning("Input Error", "Panchayat Name is required.")
             return
+        if panchayat == config.ALL_PANCHAYATS_LABEL:
+            if not messagebox.askyesno("Confirm", "This will process ALL panchayats in the block. Continue?"):
+                return
 
         # Clear previous results
         self.safe_tree_clear()
@@ -189,7 +193,8 @@ class DelWorkAllocTab(BaseAutomationTab):
         # Parse multiple dates
         target_dates = [d.strip() for d in from_dates_raw.split(',') if d.strip()]
         
-        self.app.update_history("location_panchayat", panchayat)
+        if panchayat != config.ALL_PANCHAYATS_LABEL:
+            self.app.update_history("location_panchayat", panchayat)
         
         # Start Thread
         self.app.start_automation_thread(
@@ -256,89 +261,108 @@ class DelWorkAllocTab(BaseAutomationTab):
                 return
 
             auto_mode = not bool(jobcard_list)
-            items_to_process = []
-
-            # 1. Navigate Safely
             url = config.DEL_WORK_ALLOC_CONFIG["url"]
-            if not self._safe_load_page(driver, url):
-                raise Exception("Failed to load page after multiple attempts.")
-
-            # 2. Select Panchayat (With Fuzzy Match)
             wait = WebDriverWait(driver, 20)
-            
-            try:
-                # Ensure the dropdown is actually visible and interactive
-                panchayat_dropdown_elem = wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
-                panchayat_dropdown = Select(panchayat_dropdown_elem)
-                
-                # --- Fuzzy Matching Logic ---
-                target_p = panchayat.strip().lower()
-                found_option_text = None
-                
-                for opt in panchayat_dropdown.options:
-                    if opt.text.strip().lower() == target_p:
-                        found_option_text = opt.text
-                        break
-                
-                if found_option_text:
-                    self.log_info(f"Selecting Panchayat: '{found_option_text}'...")
-                    
-                    # Store current body element to check for staleness (Postback detection)
-                    body_elem = driver.find_element(By.TAG_NAME, "body")
-                    
-                    panchayat_dropdown.select_by_visible_text(found_option_text)
-                    
-                    # --- CRITICAL: Wait for Postback ---
-                    # Selection triggers __doPostBack. We MUST wait for the page to reload.
-                    self.log_info("Waiting for page reload (Postback)...")
-                    try:
-                        wait.until(EC.staleness_of(body_elem))
-                    except TimeoutException:
-                        self.log_warning("Page did not seem to reload. Continuing...")
-                    
-                    # Wait for Registration dropdown to come back
-                    wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
-                    self.log_success("Panchayat selected successfully.")
-                    
-                else:
-                    available = [o.text for o in panchayat_dropdown.options[:10]]
-                    raise ValueError(f"Panchayat '{panchayat}' not found. Did you mean: {available}?")
 
-            except Exception as e:
-                self.log_error(f"Error selecting Panchayat: {e}")
-                return
-
-            # 3. Determine Items to Process
-            if auto_mode:
-                self.log_info("Auto Mode: Fetching all Registration IDs.")
-                # Locate dropdown again after refresh
-                reg_id_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration"))))
-                items_to_process = [opt.get_attribute("value") for opt in reg_id_dropdown.options if opt.get_attribute("value") and "Select" not in opt.text]
-                
-                if not items_to_process:
-                    self.log_warning("No Registration IDs found for this Panchayat.")
+            # Determine which panchayats to process
+            all_mode = panchayat == config.ALL_PANCHAYATS_LABEL
+            panchayats_to_process = []
+            if all_mode:
+                if not self._safe_load_page(driver, url):
+                    raise Exception("Failed to load page after multiple attempts.")
+                panchayat_dropdown = Select(wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code"))))
+                panchayats_to_process = [t for t in self._get_select_option_texts(panchayat_dropdown) if t]
+                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
             else:
-                self.log_info(f"Manual Mode: Processing {len(jobcard_list)} provided IDs.")
-                items_to_process = jobcard_list
+                panchayats_to_process = [panchayat]
 
-            # 4. Process Loop
-            total_items = len(items_to_process)
-            for i, item_id in enumerate(items_to_process):
+            total_p = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process):
                 if self.is_stopped():
                     self.log_warning("⏹️ Automation stopped by user.")
                     break
-                
-                pct = (i + 1) / total_items * 100
-                self.log_info(f"  🔄 [{i+1}/{total_items}] Processing: {item_id} ({pct:.0f}%)")
-                self.app.after(0, self.update_status, f"Processing {i+1}/{total_items}: {item_id}", (i+1) / total_items)
-                
-                # Execute the scraping/action logic
-                self._process_single_id(driver, wait, panchayat, item_id, auto_mode, target_dates)
+                self.log_info(f"===== Panchayat {p_idx+1}/{total_p}: {p_name} =====")
+                self.app.after(0, self.update_status, f"{p_name}: selecting...", p_idx / max(total_p, 1))
+                if not self._safe_load_page(driver, url):
+                    self.log_error(f"Failed to load page for {p_name}. Skipping.")
+                    continue
+
+                # 2. Select Panchayat (With Fuzzy Match)
+                try:
+                    # Ensure the dropdown is actually visible and interactive
+                    panchayat_dropdown_elem = wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
+                    panchayat_dropdown = Select(panchayat_dropdown_elem)
+
+                    # --- Fuzzy Matching Logic ---
+                    target_p = p_name.strip().lower()
+                    found_option_text = None
+
+                    for opt in panchayat_dropdown.options:
+                        if opt.text.strip().lower() == target_p:
+                            found_option_text = opt.text
+                            break
+
+                    if found_option_text:
+                        self.log_info(f"Selecting Panchayat: '{found_option_text}'...")
+
+                        # Store current body element to check for staleness (Postback detection)
+                        body_elem = driver.find_element(By.TAG_NAME, "body")
+
+                        panchayat_dropdown.select_by_visible_text(found_option_text)
+
+                        # --- CRITICAL: Wait for Postback ---
+                        # Selection triggers __doPostBack. We MUST wait for the page to reload.
+                        self.log_info("Waiting for page reload (Postback)...")
+                        try:
+                            wait.until(EC.staleness_of(body_elem))
+                        except TimeoutException:
+                            self.log_warning("Page did not seem to reload. Continuing...")
+
+                        # Wait for Registration dropdown to come back
+                        wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
+                        self.log_success("Panchayat selected successfully.")
+
+                    else:
+                        available = [o.text for o in panchayat_dropdown.options[:10]]
+                        self.log_warning(f"Panchayat '{p_name}' not found. Did you mean: {available}? Skipping.")
+                        continue
+
+                except Exception as e:
+                    self.log_error(f"Error selecting Panchayat {p_name}: {e}")
+                    continue
+
+                # 3. Determine Items to Process
+                items_to_process = []
+                if auto_mode:
+                    self.log_info("Auto Mode: Fetching all Registration IDs.")
+                    # Locate dropdown again after refresh
+                    reg_id_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration"))))
+                    items_to_process = [opt.get_attribute("value") for opt in reg_id_dropdown.options if opt.get_attribute("value") and "Select" not in opt.text]
+
+                    if not items_to_process:
+                        self.log_warning(f"No Registration IDs found for {p_name}.")
+                else:
+                    self.log_info(f"Manual Mode: Processing {len(jobcard_list)} provided IDs.")
+                    items_to_process = jobcard_list
+
+                # 4. Process Loop
+                total_items = len(items_to_process)
+                for i, item_id in enumerate(items_to_process):
+                    if self.is_stopped():
+                        self.log_warning("⏹️ Automation stopped by user.")
+                        break
+
+                    pct = (i + 1) / max(total_items, 1) * 100
+                    self.log_info(f"  🔄 [{i+1}/{total_items}] Processing: {item_id} ({pct:.0f}%)")
+                    self.app.after(0, self.update_status, f"{p_name}: {i+1}/{total_items}", (p_idx + (i + 1) / max(total_items, 1)) / max(total_p, 1))
+
+                    # Execute the scraping/action logic
+                    self._process_single_id(driver, wait, p_name, item_id, auto_mode, target_dates)
 
             # 5. Completion
             final_msg = "Automation finished." if not self.is_stopped() else "Stopped."
             self.app.after(0, self.update_status, final_msg, 1.0)
-            
+
             # Count results from tree
             success_count = 0
             fail_count = 0
@@ -351,7 +375,7 @@ class DelWorkAllocTab(BaseAutomationTab):
                     elif 'fail' in st or 'error' in st:
                         fail_count += 1
             self.log_info(f"\n{'='*50}")
-            self.log_info(f"📊 Delete Work Allocation: ✅ {success_count} deleted, ❌ {fail_count} failed (of {total_items} total)")
+            self.log_info(f"📊 Delete Work Allocation: ✅ {success_count} deleted, ❌ {fail_count} failed (of {total_p} panchayats)")
             self.log_info(f"{'='*50}")
 
         except Exception as e:

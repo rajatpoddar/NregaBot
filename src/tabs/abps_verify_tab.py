@@ -41,8 +41,9 @@ class AbpsVerifyTab(BaseAutomationTab):
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=0, sticky="w", padx=15, pady=(15, 5))
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
-        self.panchayat_var = ctk.StringVar()
-        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var,
+                                                values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=0, column=1, sticky="ew", padx=(0, 15), pady=(15, 5))
 
         ctk.CTkLabel(controls_frame, text="Village:").grid(row=0, column=2, sticky="w", padx=15, pady=(15, 5))
@@ -64,7 +65,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # --- Note for auto-mode ---
-        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Villages' to process all villages automatically.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky="w", padx=15, pady=(0, 15))
+        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' to process all panchayats, and '🌐 All Villages' for all villages of a panchayat.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky="w", padx=15, pady=(0, 15))
 
         # --- Action Buttons (OUTSIDE the card) ---
         action_frame = self._create_action_buttons(parent_frame=self)
@@ -165,145 +166,70 @@ class AbpsVerifyTab(BaseAutomationTab):
                 self.log_error("Error: Redirected to Login page.")
                 return
 
-            # --- 1. Select Panchayat (Background Safe) ---
-            self.log_info(f"Selecting Panchayat: {panchayat}")
-            try:
-                # Use Presence Check
-                panchayat_select = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']")))
-                self._select_by_text_case_insensitive(Select(panchayat_select), panchayat)
-                self.app.update_history("location_panchayat", panchayat)
-                time.sleep(1)
-            except Exception:
-                 try:
-                    # Fallback locator
-                    panchayat_select = driver.find_element(By.NAME, "ctl00$ContentPlaceHolder1$DDL_panchayat")
-                    self._select_by_text_case_insensitive(Select(panchayat_select), panchayat)
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, 'DDL_Village'))
-                        )
-                    except (TimeoutException, NoSuchElementException):
-                        pass
-                 except:
-                     raise Exception("Could not find Panchayat dropdown.")
+            # Determine which panchayats to process
+            all_mode = panchayat == config.ALL_PANCHAYATS_LABEL
+            panchayats_to_process = []
+            if all_mode:
+                panch_dd = Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']"))))
+                panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if t]
+                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+            else:
+                panchayats_to_process = [panchayat]
 
-            # --- 2. Handle Village Dropdown ---
             village_css = "select[id*='DDL_Village']"
-            wait.until(lambda d: len(Select(d.find_element(By.CSS_SELECTOR, village_css)).options) > 1)
-            
-            village_select_elem = driver.find_element(By.CSS_SELECTOR, village_css)
-            all_villages = [opt.text for opt in Select(village_select_elem).options if opt.get_attribute("value") != "00"]
-            
-            villages_to_process = [village] if village else all_villages
-            if village and village not in all_villages:
-                raise ValueError(f"Village '{village}' not found.")
+            total_p = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process):
+                if self.is_stopped():
+                    break
+                self.log_info(f"===== Panchayat {p_idx+1}/{total_p}: {p_name} =====")
+                self.app.after(0, self.update_status, f"{p_name}: selecting...", p_idx / max(total_p, 1))
+                driver.get(config.ABPS_VERIFY_CONFIG["url"])
 
-            # --- VILLAGE LOOP ---
-            for i, current_village in enumerate(villages_to_process):
-                if self.is_stopped(): break
-                self.log_info(f"--- Processing Village {i+1}/{len(villages_to_process)}: {current_village} ---")
+                # --- 1. Select Panchayat ---
+                self.log_info(f"Selecting Panchayat: {p_name}")
                 try:
-                    self._select_by_text_case_insensitive(Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, village_css)))), current_village)
-                    self.app.update_history("location_village", current_village)
-                    
-                    table_xpath = "//table[contains(@id, 'gvData')]"
+                    panchayat_select = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']")))
+                    selected_ok = self._select_by_text_case_insensitive(Select(panchayat_select), p_name)
+                except Exception:
+                    selected_ok = False
+                if not selected_ok:
                     try:
-                        short_wait.until(EC.presence_of_element_located((By.XPATH, table_xpath)))
-                    except TimeoutException:
-                        self.log_warning(f"No records found for {current_village}. Skipping.")
-                        continue
-
-                    page_number = 1
-                    while True:
-                        if self.is_stopped(): break
-                        self.log_info(f"Scanning page {page_number}...")                        
-                        page_processed_count = 0
-                        while True:
-                            if self.is_stopped(): break
-
-                            unprocessed_rows_xpath = f"//table[contains(@id, 'gvData')]/tbody/tr[position()>1 and .//input[contains(@id, 'btn_showuid')]]"
-                            potential_rows = driver.find_elements(By.XPATH, unprocessed_rows_xpath)
-                            
-                            row_to_process = None
-                            job_card, app_name = "N/A", "N/A"
-                            unique_key = None
-                            
-                            # Row finding (No interaction here, so standard logic is fine)
-                            for row in potential_rows:
-                                try:
-                                    # Use innerText for background reading
-                                    jc_num = row.find_element(By.XPATH, ".//td[2]").get_attribute("innerText")
-                                    ap_name = row.find_element(By.XPATH, ".//td[4]").get_attribute("innerText")
-                                    key = (jc_num, ap_name) 
-
-                                    if key not in session_processed_jobcards:
-                                        row_to_process = row
-                                        job_card = jc_num
-                                        app_name = ap_name
-                                        unique_key = key
-                                        break
-                                except StaleElementReferenceException: continue
-                            
-                            if row_to_process is None:
-                                self.log_info("No new unprocessed records found on this page view.")
-                                break
-
-                            try:
-                                self.app.after(0, self.update_status, f"Processing: {app_name}", 0.5)
-
-                                # --- FIX: JS Click for Show UID ---
-                                show_btn = row_to_process.find_element(By.XPATH, ".//input[contains(@id, 'btn_showuid')]")
-                                driver.execute_script("arguments[0].click();", show_btn)
-                                
-                                wait.until(EC.staleness_of(row_to_process))
-
-                                # Wait for row refresh
-                                refreshed_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//tr[contains(., '{job_card}') and contains(., '{app_name}')]")))
-                                
-                                # --- FIX: JS Click for Verify UID ---
-                                check_npci_btn = refreshed_row.find_element(By.XPATH, ".//input[contains(@id, 'btn_verifyuid')]")
-                                driver.execute_script("arguments[0].click();", check_npci_btn)
-                                
-                                wait.until(EC.staleness_of(refreshed_row))
-
-                                # Read Status
-                                final_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//tr[contains(., '{job_card}') and contains(., '{app_name}')]")))
-                                status_msg = final_row.find_element(By.XPATH, ".//td[9]/span").get_attribute("innerText")
-                                self._log_result(job_card, app_name, status_msg or "Checked")
-                                
-                            except (TimeoutException, StaleElementReferenceException, NoSuchElementException) as e:
-                                self._log_result(job_card, app_name, f"Error: {type(e).__name__}")
-                            finally:
-                                if unique_key:
-                                    session_processed_jobcards.add(unique_key)
-                                    page_processed_count += 1
-                        
-                        if self.is_stopped(): break
-                        
-                        if page_processed_count > 0:
-                            self.log_info("Saving all verified records for this page...")                            
-                            # --- FIX: JS Click for Save ---
-                            table_element = driver.find_element(By.XPATH, table_xpath)
-                            save_btn = driver.find_element(By.CSS_SELECTOR, "input[id*='btnProceed2']")
-                            driver.execute_script("arguments[0].click();", save_btn)
-                            
-                            wait.until(EC.staleness_of(table_element))
-                            self.log_info("Page saved.")
-                        try:
-                            # --- FIX: JS Click for Next Page ---
-                            next_page_link = driver.find_element(By.LINK_TEXT, str(page_number + 1))
-                            table_element = driver.find_element(By.XPATH, table_xpath)
-                            driver.execute_script("arguments[0].click();", next_page_link)
-                            wait.until(EC.staleness_of(table_element))
-                            page_number += 1
-                        except NoSuchElementException:
-                            self.log_info(f"No more pages for {current_village}.")
-                            break
-
-                except Exception as village_error:
-                    self.log_error(f"Error in {current_village}: {village_error}. Skipping.")
+                        panchayat_select = driver.find_element(By.NAME, "ctl00$ContentPlaceHolder1$DDL_panchayat")
+                        selected_ok = self._select_by_text_case_insensitive(Select(panchayat_select), p_name)
+                    except Exception:
+                        selected_ok = False
+                if not selected_ok:
+                    self.log_warning(f"Could not find panchayat '{p_name}' on website. Skipping.")
                     continue
-            
+                self.app.update_history("location_panchayat", p_name)
+                try:
+                    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'DDL_Village')))
+                except (TimeoutException, NoSuchElementException):
+                    pass
+                time.sleep(1)
+
+                # --- 2. Handle Village Dropdown for this panchayat ---
+                try:
+                    wait.until(lambda d: len(Select(d.find_element(By.CSS_SELECTOR, village_css)).options) > 1)
+                except TimeoutException:
+                    self.log_warning(f"No villages found for {p_name}. Skipping.")
+                    continue
+
+                village_select_elem = driver.find_element(By.CSS_SELECTOR, village_css)
+                all_villages = [opt.text for opt in Select(village_select_elem).options if opt.get_attribute("value") != "00"]
+
+                villages_to_process = [village] if village else all_villages
+                if village and village not in all_villages:
+                    self.log_warning(f"Village '{village}' not found in {p_name}. Skipping.")
+                    continue
+
+                # --- VILLAGE LOOP ---
+                for i, current_village in enumerate(villages_to_process):
+                    if self.is_stopped():
+                        break
+                    self.log_info(f"--- Processing Village {i+1}/{len(villages_to_process)}: {current_village} ---")
+                    self._process_single_village(driver, wait, short_wait, village_css, session_processed_jobcards, p_name, current_village)
+
             self.app.after(200, lambda: self._show_abps_summary())
 
         except Exception as e:
@@ -312,6 +238,113 @@ class AbpsVerifyTab(BaseAutomationTab):
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
+
+    def _process_single_village(self, driver, wait, short_wait, village_css, session_processed_jobcards, p_name, current_village):
+        """ABPS verification for one village of one panchayat."""
+        try:
+            self._select_by_text_case_insensitive(Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, village_css)))), current_village)
+            self.app.update_history("location_village", current_village)
+
+            table_xpath = "//table[contains(@id, 'gvData')]"
+            try:
+                short_wait.until(EC.presence_of_element_located((By.XPATH, table_xpath)))
+            except TimeoutException:
+                self.log_warning(f"No records found for {current_village}. Skipping.")
+                return
+
+            page_number = 1
+            while True:
+                if self.is_stopped():
+                    break
+                self.log_info(f"Scanning page {page_number}...")
+                page_processed_count = 0
+                while True:
+                    if self.is_stopped():
+                        break
+
+                    unprocessed_rows_xpath = f"//table[contains(@id, 'gvData')]/tbody/tr[position()>1 and .//input[contains(@id, 'btn_showuid')]]"
+                    potential_rows = driver.find_elements(By.XPATH, unprocessed_rows_xpath)
+
+                    row_to_process = None
+                    job_card, app_name = "N/A", "N/A"
+                    unique_key = None
+
+                    # Row finding (No interaction here, so standard logic is fine)
+                    for row in potential_rows:
+                        try:
+                            # Use innerText for background reading
+                            jc_num = row.find_element(By.XPATH, ".//td[2]").get_attribute("innerText")
+                            ap_name = row.find_element(By.XPATH, ".//td[4]").get_attribute("innerText")
+                            key = (jc_num, ap_name)
+
+                            if key not in session_processed_jobcards:
+                                row_to_process = row
+                                job_card = jc_num
+                                app_name = ap_name
+                                unique_key = key
+                                break
+                        except StaleElementReferenceException:
+                            continue
+
+                    if row_to_process is None:
+                        self.log_info("No new unprocessed records found on this page view.")
+                        break
+
+                    try:
+                        self.app.after(0, self.update_status, f"Processing: {app_name}", 0.5)
+
+                        # --- FIX: JS Click for Show UID ---
+                        show_btn = row_to_process.find_element(By.XPATH, ".//input[contains(@id, 'btn_showuid')]")
+                        driver.execute_script("arguments[0].click();", show_btn)
+
+                        wait.until(EC.staleness_of(row_to_process))
+
+                        # Wait for row refresh
+                        refreshed_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//tr[contains(., '{job_card}') and contains(., '{app_name}')]")))
+
+                        # --- FIX: JS Click for Verify UID ---
+                        check_npci_btn = refreshed_row.find_element(By.XPATH, ".//input[contains(@id, 'btn_verifyuid')]")
+                        driver.execute_script("arguments[0].click();", check_npci_btn)
+
+                        wait.until(EC.staleness_of(refreshed_row))
+
+                        # Read Status
+                        final_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//tr[contains(., '{job_card}') and contains(., '{app_name}')]")))
+                        status_msg = final_row.find_element(By.XPATH, ".//td[9]/span").get_attribute("innerText")
+                        self._log_result(job_card, app_name, status_msg or "Checked")
+
+                    except (TimeoutException, StaleElementReferenceException, NoSuchElementException) as e:
+                        self._log_result(job_card, app_name, f"Error: {type(e).__name__}")
+                    finally:
+                        if unique_key:
+                            session_processed_jobcards.add(unique_key)
+                            page_processed_count += 1
+
+                if self.is_stopped():
+                    break
+
+                if page_processed_count > 0:
+                    self.log_info("Saving all verified records for this page...")
+                    # --- FIX: JS Click for Save ---
+                    table_element = driver.find_element(By.XPATH, table_xpath)
+                    save_btn = driver.find_element(By.CSS_SELECTOR, "input[id*='btnProceed2']")
+                    driver.execute_script("arguments[0].click();", save_btn)
+
+                    wait.until(EC.staleness_of(table_element))
+                    self.log_info("Page saved.")
+                try:
+                    # --- FIX: JS Click for Next Page ---
+                    next_page_link = driver.find_element(By.LINK_TEXT, str(page_number + 1))
+                    table_element = driver.find_element(By.XPATH, table_xpath)
+                    driver.execute_script("arguments[0].click();", next_page_link)
+                    wait.until(EC.staleness_of(table_element))
+                    page_number += 1
+                except NoSuchElementException:
+                    self.log_info(f"No more pages for {current_village}.")
+                    break
+
+        except Exception as village_error:
+            self.log_error(f"Error in {current_village}: {village_error}. Skipping.")
 
     def _log_result(self, job_card, app_name, status):
         timestamp = datetime.now().strftime("%H:%M:%S")

@@ -87,6 +87,8 @@ class MbEntryTab(BaseAutomationTab):
         
         # --- Form Fields ---
         self.panchayat_entry = self._create_option_field(config_frame, "location_panchayat", "Panchayat Name", 0, 0)
+        self._with_all_panchayats(self.panchayat_entry)
+        self.config_vars["location_panchayat"].set(config.ALL_PANCHAYATS_LABEL)
         self.config_vars["location_panchayat"].trace_add("write", self._on_panchayat_change_debounced)
         
         # --- MB No. with Auto Checkbox ---
@@ -363,7 +365,13 @@ class MbEntryTab(BaseAutomationTab):
         saved_data = self.app.history_manager.get_tab_inputs("mb_entry")
         for key, var in self.config_vars.items():
             default_value = config.MB_ENTRY_CONFIG["defaults"].get(key, "")
-            var.set(saved_data.get(key, default_value))
+            saved = saved_data.get(key)
+            if key == "location_panchayat":
+                # Default to All Panchayats when nothing useful was saved
+                default_value = config.ALL_PANCHAYATS_LABEL
+                if not saved or saved == config.ALL_PANCHAYATS_LABEL:
+                    saved = config.ALL_PANCHAYATS_LABEL
+            var.set(saved if saved is not None else default_value)
         self.after(100, self._on_panchayat_change)
 
     def run_automation_logic(self, cfg, work_codes_raw):
@@ -382,40 +390,60 @@ class MbEntryTab(BaseAutomationTab):
                 messagebox.showerror("Input Error", "Please provide at least one Mate Name.")
                 return
 
-            if not self.is_stopped():
-                self.app.update_history("location_panchayat", cfg['location_panchayat'])
-                mate_key = self._get_current_mate_key()
-                for mate in mate_names_list: self.app.update_history(mate_key, mate)
-            
-            # If no work codes entered by user, process all works from dropdown
-            if not work_codes_raw:
-                self._process_all_works_from_dropdown(driver, cfg, mate_names_list)
-                final_msg = "Automation finished." if not self.is_stopped() else "Stopped."
-                self.app.after(0, self.update_status, final_msg, 1.0)
-                if not self.is_stopped():
-                    self.log_info("📊 e-MB Entry process has finished.")
-                    return
+            # Determine which panchayats to process
+            panchayat_target = cfg['location_panchayat']
+            all_mode = panchayat_target == config.ALL_PANCHAYATS_LABEL
+            panchayats_to_process = []
+            if all_mode:
+                driver.get(config.MB_ENTRY_CONFIG["url"])
+                panch_dd = Select(WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch'))))
+                panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if t]
+                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+            else:
+                panchayats_to_process = [panchayat_target]
 
-            processed_codes = set()
-            total = len(work_codes_raw)
-            self.app.after(0, self.app.set_status, f"Starting eMB Entry for {total} workcodes...")
-
-            for i, work_code in enumerate(work_codes_raw):
+            total_p = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process):
                 if self.is_stopped():
-                    self.log_warning("Automation stopped."); break
-                
-                self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {work_code}", (i+1) / total)
-                
-                if work_code in processed_codes:
-                    self._log_result(cfg, work_code, "Skipped", "Duplicate entry.")
+                    self.log_warning("Automation stopped.")
+                    break
+                self.app.after(0, self.update_status, f"{p_name}: processing...", p_idx / max(total_p, 1))
+                cfg['location_panchayat'] = p_name
+                self.log_info(f"=== Panchayat {p_idx+1}/{total_p}: {p_name} ===")
+
+                if not self.is_stopped():
+                    self.app.update_history("location_panchayat", p_name)
+                    mate_key = self._get_current_mate_key()
+                    for mate in mate_names_list:
+                        self.app.update_history(mate_key, mate)
+
+                # If no work codes entered by user, process all works from dropdown
+                if not work_codes_raw:
+                    self._process_all_works_from_dropdown(driver, cfg, mate_names_list)
                     continue
-                
-                self._process_single_work_code(driver, work_code, cfg, mate_names_list)
-                processed_codes.add(work_code)
+
+                processed_codes = set()
+                total = len(work_codes_raw)
+                self.app.after(0, self.app.set_status, f"eMB Entry for {p_name}: {total} workcodes...")
+
+                for i, work_code in enumerate(work_codes_raw):
+                    if self.is_stopped():
+                        self.log_warning("Automation stopped.")
+                        break
+
+                    self.app.after(0, self.update_status, f"{p_name}: {i+1}/{total}", (p_idx + (i + 1) / max(total, 1)) / max(total_p, 1))
+
+                    if work_code in processed_codes:
+                        self._log_result(cfg, work_code, "Skipped", "Duplicate entry.")
+                        continue
+
+                    self._process_single_work_code(driver, work_code, cfg, mate_names_list)
+                    processed_codes.add(work_code)
 
             final_msg = "Automation finished." if not self.is_stopped() else "Stopped."
             self.app.after(0, self.update_status, final_msg, 1.0)
-            if not self.is_stopped(): 
+            if not self.is_stopped():
                 messagebox.showinfo("Complete", "e-MB Entry process has finished.")
         
         except Exception as e:

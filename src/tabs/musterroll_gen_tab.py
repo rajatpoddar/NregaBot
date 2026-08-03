@@ -76,10 +76,13 @@ class MusterrollGenTab(BaseAutomationTab):
         
         ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=(15,0))
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
-        self.panchayat_var = ctk.StringVar()
+        self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
         self.panchayat_var.trace_add("write", lambda *_: self._on_panchayat_selected())
-        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var,
+                                                values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=0, column=1, columnspan=3, sticky='ew', padx=15, pady=(15,0))
+        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' to generate Muster Rolls for every panchayat of the block.",
+                     text_color="gray50", font=ctk.CTkFont(size=11)).grid(row=1, column=1, columnspan=3, sticky='w', padx=15, pady=(2, 0))
         
         # --- Start Date ---
         ctk.CTkLabel(controls_frame, text="तारीख से:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
@@ -310,7 +313,8 @@ class MusterrollGenTab(BaseAutomationTab):
         if not all(inputs[k] for k in ['panchayat', 'start_date', 'end_date', 'designation', 'staff']):
             messagebox.showwarning("Input Error", "All fields are required (except Work Search Keys).")
             return
-        self._save_mapping_pair(inputs['panchayat'], inputs['staff'])
+        if inputs['panchayat'] != config.ALL_PANCHAYATS_LABEL:
+            self._save_mapping_pair(inputs['panchayat'], inputs['staff'])
         inputs['work_codes'] = [line.strip() for line in inputs['work_codes_raw'].split('\n') if line.strip()]
         inputs['auto_mode'] = not bool(inputs['work_codes'])
         self.save_inputs(inputs)
@@ -412,42 +416,63 @@ class MusterrollGenTab(BaseAutomationTab):
     def run_automation_logic(self, inputs):
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
-        self.log_info(f"Starting MR generation for: {inputs['panchayat']}")
+        panchayat_target = inputs.get('panchayat', '')
+        all_mode = panchayat_target == config.ALL_PANCHAYATS_LABEL
+        self.log_info(f"Starting MR generation for: {panchayat_target}")
         self.app.after(0, self.app.set_status, "Running MR Generation...")
         
-        self.output_dir = self._get_output_dir(inputs['panchayat'])
-        if not self.output_dir:
-            self.log_error("Failed to create output directory. Aborting.")
-            self.app.after(0, self.set_ui_state, False)
-            return
-            
         try:
             driver = self.app.get_driver()
             if not driver: 
                 self.app.after(0, self.set_ui_state, False)
                 return
             wait = WebDriverWait(driver, 20)
-            
-            self.log_info(f"Output will be in: {self.output_dir}")            
-            if not self._validate_panchayat(driver, wait, inputs['panchayat']):
-                self.app.after(0, self.set_ui_state, False)
-                return
-            
-            self.app.update_history("location_panchayat", inputs['panchayat'])
-            self.app.update_history("staff_name", inputs['staff'])
 
-            items_to_process = self._get_items_to_process(driver, wait, inputs)
-            session_skip_list = set()
-            total_items = len(items_to_process)
+            # Determine which panchayats to process
+            panchayats_to_process = []
+            if all_mode:
+                self.log_info("🌐 Fetching all panchayats from the website...")
+                driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
+                agency_select = Select(wait.until(EC.presence_of_element_located((By.ID, "exe_agency"))))
+                prefix = config.AGENCY_PREFIX
+                for t in self._get_select_option_texts(agency_select):
+                    if t.startswith(prefix):
+                        t = t[len(prefix):]
+                    panchayats_to_process.append(t.strip())
+                self.log_info(f"Found {len(panchayats_to_process)} panchayats to process.")
+            else:
+                panchayats_to_process = [panchayat_target]
 
-            for index, item in enumerate(items_to_process):
+            total_panchayats = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process):
                 if self.is_stopped(): 
                     self.log_warning("Stop signal received.")
                     break
-                self.log_info(f"--- Processing item ({index+1}/{total_items}): {item} ---")
-                self.app.after(0, self.update_status, f"Processing {item}", (index+1)/total_items)
-                
-                self._process_single_item(driver, wait, inputs, item, self.output_dir, session_skip_list)
+                self.log_info(f"=== Panchayat {p_idx+1}/{total_panchayats}: {p_name} ===")
+                self.app.after(0, self.update_status, f"{p_name}: fetching items...", p_idx / total_panchayats)
+                inputs['panchayat'] = p_name
+                self.output_dir = self._get_output_dir(p_name)
+                if not self.output_dir:
+                    self.log_warning(f"Skipping {p_name}: could not create output directory.")
+                    continue
+                if not self._validate_panchayat(driver, wait, p_name, silent=all_mode):
+                    continue
+
+                self.app.update_history("location_panchayat", p_name)
+                self.app.update_history("staff_name", inputs['staff'])
+
+                items_to_process = self._get_items_to_process(driver, wait, inputs)
+                session_skip_list = set()
+                total_items = len(items_to_process)
+
+                for index, item in enumerate(items_to_process):
+                    if self.is_stopped(): 
+                        self.log_warning("Stop signal received.")
+                        break
+                    self.log_info(f"--- Processing item ({index+1}/{total_items}): {item} ---")
+                    self.app.after(0, self.update_status, f"{p_name}: {item}", (p_idx + (index + 1) / max(total_items, 1)) / max(total_panchayats, 1))
+                    
+                    self._process_single_item(driver, wait, inputs, item, self.output_dir, session_skip_list)
 
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
@@ -471,14 +496,17 @@ class MusterrollGenTab(BaseAutomationTab):
                 self.app.open_folder(output_dir)
         else:
             self.log_info(f"📊 {summary}")
-    def _validate_panchayat(self, driver, wait, location_panchayat):
+    def _validate_panchayat(self, driver, wait, location_panchayat, silent=False):
+        """Validate that the panchayat exists on the website. In silent mode
+        (All Panchayats / Macro) failures are logged instead of blocking on a
+        messagebox."""
         try:
             self.log_info("Validating Panchayat name...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
             panchayat_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "exe_agency"))))
             if not self._select_by_text_case_insensitive(panchayat_dropdown, config.AGENCY_PREFIX + location_panchayat):
                 error_msg = f"Panchayat name '{location_panchayat}' not found on the website. Please check spelling."
-                if "macro" in self.app.active_automations:
+                if "macro" in self.app.active_automations or silent:
                     self.log_error(f"Skipping: {error_msg}")
                     return False
                 messagebox.showerror("Validation Error", error_msg)

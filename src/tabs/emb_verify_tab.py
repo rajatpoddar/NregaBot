@@ -42,9 +42,12 @@ class EmbVerifyTab(BaseAutomationTab):
         # Panchayat input field
         ctk.CTkLabel(config_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=15)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
-        self.panchayat_var = ctk.StringVar()
-        self.panchayat_menu = ctk.CTkOptionMenu(config_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
+        self.panchayat_menu = ctk.CTkOptionMenu(config_frame, variable=self.panchayat_var,
+                                                values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=15)
+        ctk.CTkLabel(config_frame, text="💡 Select '🌐 All Panchayats' to verify every panchayat of the block.",
+                     text_color="gray50", font=ctk.CTkFont(size=11)).grid(row=2, column=0, columnspan=2, sticky='w', padx=15, pady=(0, 8))
         
         # Verify Amount input field
         ctk.CTkLabel(config_frame, text="Verify Amount (₹):").grid(row=1, column=0, sticky='w', padx=15, pady=(0, 15))
@@ -144,7 +147,8 @@ class EmbVerifyTab(BaseAutomationTab):
 
         work_codes = [line.strip() for line in self.work_codes_text.get("1.0", "end-1c").splitlines() if line.strip()]
         
-        self.app.update_history("location_panchayat", panchayat)
+        if panchayat != config.ALL_PANCHAYATS_LABEL:
+            self.app.update_history("location_panchayat", panchayat)
         for wc in work_codes:
             self.app.update_history("work_code", wc)
 
@@ -184,51 +188,75 @@ class EmbVerifyTab(BaseAutomationTab):
         try:
             driver = self.app.get_driver()
             if not driver: return
+            wait = WebDriverWait(driver, 20)
 
-            driver.get(config.EMB_VERIFY_CONFIG["url"])
-            wait = WebDriverWait(driver, 20) 
-
-            self.log_info(f"Selecting Panchayat: {panchayat}")
-            panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
-            self._select_by_text_case_insensitive(panchayat_select, panchayat)
-            
-            self.log_info("Waiting for page to reload...")
-            wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
-            time.sleep(1.5)  # Brief wait for postback to begin
-            self.log_info("Page reloaded successfully.")
-            
-            work_codes_to_process = []
-            use_search = bool(work_codes_from_ui)
-
-            if use_search:
-                work_codes_to_process = work_codes_from_ui
-                self.log_info(f"Processing {len(work_codes_to_process)} work codes from input.")
+            # Determine which panchayats to process
+            all_mode = panchayat == config.ALL_PANCHAYATS_LABEL
+            panchayats_to_process = []
+            if all_mode:
+                driver.get(config.EMB_VERIFY_CONFIG["url"])
+                panch_dd = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
+                panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if t]
+                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
             else:
-                self.log_info("No work codes provided. Fetching all from dropdown...")
-                work_code_select_element = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work"))))
-                work_codes_to_process = [opt.text for opt in work_code_select_element.options if opt.get_attribute('value')]
-                if not work_codes_to_process:
-                    self.log_warning("No work codes found for this Panchayat.")
-                    self._log_result("N/A", "Skipped", "No work codes found.")
-            
-            total = len(work_codes_to_process)
-            for i, current_wc in enumerate(work_codes_to_process):
+                panchayats_to_process = [panchayat]
+
+            total_p = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process):
                 if self.is_stopped():
                     self.log_warning("⏹️ Automation stopped by user.")
                     break
-                
-                pct = (i + 1) / total * 100
-                self.log_info(f"  🔄 [{i+1}/{total}] Verifying: {truncate_workcode(current_wc)} ({pct:.0f}%)")
-                self.app.after(0, self.update_status, f"Processing {i+1}/{total}: {current_wc}", (i+1)/total)
-                self._process_single_work_code(driver, wait, current_wc, use_search, verify_amount)
+                self.log_info(f"=== Panchayat {p_idx+1}/{total_p}: {p_name} ===")
+                self.app.after(0, self.update_status, f"{p_name}: selecting...", p_idx / max(total_p, 1))
 
-                if use_search and i < total - 1:
-                    self.log_info("Navigating back for next work code...")
-                    driver.get(config.EMB_VERIFY_CONFIG["url"])
-                    panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
-                    self._select_by_text_case_insensitive(panchayat_select, panchayat)
-                    wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
-                    time.sleep(1.5)  # Brief wait for postback to begin
+                driver.get(config.EMB_VERIFY_CONFIG["url"])
+                self.log_info(f"Selecting Panchayat: {p_name}")
+                panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
+                if not self._select_by_text_case_insensitive(panchayat_select, p_name):
+                    self.log_warning(f"Panchayat '{p_name}' not found on the website. Skipping.")
+                    continue
+
+                self.log_info("Waiting for page to reload...")
+                wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
+                time.sleep(1.5)  # Brief wait for postback to begin
+                self.log_info("Page reloaded successfully.")
+
+                work_codes_to_process = []
+                use_search = bool(work_codes_from_ui)
+
+                if use_search:
+                    work_codes_to_process = work_codes_from_ui
+                    self.log_info(f"Processing {len(work_codes_to_process)} work codes from input.")
+                else:
+                    self.log_info("No work codes provided. Fetching all from dropdown...")
+                    work_code_select_element = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work"))))
+                    work_codes_to_process = [opt.text for opt in work_code_select_element.options if opt.get_attribute('value')]
+                    if not work_codes_to_process:
+                        self.log_warning("No work codes found for this Panchayat.")
+                        self._log_result("N/A", "Skipped", "No work codes found.")
+
+                total += len(work_codes_to_process)
+                for i, current_wc in enumerate(work_codes_to_process):
+                    if self.is_stopped():
+                        self.log_warning("⏹️ Automation stopped by user.")
+                        break
+
+                    pct = (i + 1) / max(len(work_codes_to_process), 1) * 100
+                    self.log_info(f"  🔄 [{i+1}/{len(work_codes_to_process)}] Verifying: {truncate_workcode(current_wc)} ({pct:.0f}%)")
+                    self.app.after(0, self.update_status, f"{p_name}: {i+1}/{len(work_codes_to_process)}",
+                                   (p_idx + (i + 1) / max(len(work_codes_to_process), 1)) / max(total_p, 1))
+                    self._process_single_work_code(driver, wait, current_wc, use_search, verify_amount)
+
+                    if use_search and i < len(work_codes_to_process) - 1:
+                        self.log_info("Navigating back for next work code...")
+                        driver.get(config.EMB_VERIFY_CONFIG["url"])
+                        panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
+                        self._select_by_text_case_insensitive(panchayat_select, p_name)
+                        wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
+                        time.sleep(1.5)  # Brief wait for postback to begin
+
+                if p_name != config.ALL_PANCHAYATS_LABEL:
+                    self.app.update_history("location_panchayat", p_name)
 
             # Queue summary on main thread after inserts are processed
             self.app.after(200, lambda: self._show_emb_summary(total))

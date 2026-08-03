@@ -1629,7 +1629,58 @@ class BaseAutomationTab(ctk.CTkFrame):
                 select_element.select_by_visible_text(option.text)
                 return True
         return False
-    
+
+    @staticmethod
+    def _get_select_option_texts(select_element: Any) -> List[str]:
+        """Return non-empty visible option texts from a Selenium Select.
+
+        Filters out common placeholder options (---Select---, --Select--, etc.)
+        so callers get only real panchayat/agency/village names. Individual tabs
+        may apply extra filters on top (e.g. skip 'Total' rows).
+        """
+        texts: List[str] = []
+        for opt in select_element.options:
+            t = (opt.text or "").strip()
+            low = t.lower()
+            if not t or low.startswith("--") or low.startswith("---"):
+                continue
+            if low in ("select", "select panchayat", "select one", "select all", "choose", "please select"):
+                continue
+            texts.append(t)
+        return texts
+
+    def _with_all_panchayats(self, menu_widget: Any) -> None:
+        """Prepend the '🌐 All Panchayats' option to an option menu's values."""
+        try:
+            vals = list(menu_widget.cget("values"))
+        except Exception:
+            return
+        clean = [v for v in vals if v and v != config.ALL_PANCHAYATS_LABEL]
+        if not clean:
+            clean = [""]
+        menu_widget.configure(values=[config.ALL_PANCHAYATS_LABEL] + clean)
+
+    def _all_panchayat_values(self, raw_vals: Optional[List[str]]) -> List[str]:
+        """Build option-menu values = [All Panchayats] + deduped non-empty values."""
+        vals = [v for v in (raw_vals or []) if v and v != config.ALL_PANCHAYATS_LABEL]
+        return [config.ALL_PANCHAYATS_LABEL] + vals
+
+    @staticmethod
+    def _is_aggregate_panchayat_name(name: str) -> bool:
+        """True for header/aggregate/numeric rows that are NOT real panchayats.
+
+        Summary tables often contain rows like 'Total', 'Panchayats' (header)
+        or serial numbers ('2', '2.') — these must be excluded when collecting
+        panchayat names in 'All Panchayats' mode.
+        """
+        low = name.strip().lower()
+        if low in ("total", "grand total", "panchayats", "panchayat",
+                   "panchayat name", "s no", "s no.", "sl no", "sl. no",
+                   "sr no", "sr no.", "sno", "sno.", "all"):
+            return True
+        cleaned = name.strip().replace(".", "").replace(" ", "")
+        return cleaned.isdigit()
+
     # ────────────────────────────────────────────────────────────────
     # LOCATION HIERARCHY HELPERS
     # ────────────────────────────────────────────────────────────────
@@ -1729,6 +1780,23 @@ class BaseAutomationTab(ctk.CTkFrame):
         if not hasattr(self, 'results_tree') or self.results_tree is None:
             return
         self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
+
+    def _insert_rows_batch(self, batch: List[tuple]) -> None:
+        """Insert a batch of rows into the results tree (main thread only).
+
+        Batching avoids flooding Tk with thousands of queued inserts when
+        scraping large reports (e.g. 1000+ rows). Schedule with:
+            self.app.after(0, lambda b=batch: self._insert_rows_batch(b))
+        """
+        if not self._is_alive():
+            return
+        if not hasattr(self, 'results_tree') or self.results_tree is None:
+            return
+        try:
+            for data in batch:
+                self.results_tree.insert("", "end", values=data)
+        except Exception:
+            pass
 
     def safe_tree_clear(self) -> None:
         """Thread-safe results_tree clear. Called from background threads.

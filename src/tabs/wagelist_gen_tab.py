@@ -55,12 +55,13 @@ class WagelistGenTab(BaseAutomationTab):
         # --- 1. Agency Entry ---
         ctk.CTkLabel(controls_frame, text=f"Agency Name ({config.AGENCY_PREFIX}...):").grid(row=0, column=0, sticky='w', padx=15, pady=(15,0))
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
-        self.agency_var = ctk.StringVar()
-        self.agency_menu = ctk.CTkOptionMenu(controls_frame, variable=self.agency_var, values=p_vals)
+        self.agency_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
+        self.agency_menu = ctk.CTkOptionMenu(controls_frame, variable=self.agency_var,
+                                             values=self._all_panchayat_values(p_vals))
         self.agency_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15,0))
         
         # Note for Macro usage
-        ctk.CTkLabel(controls_frame, text="💡 Use 'Macro Manager' tab for bulk processing multiple Panchayats.", text_color="gray60", font=ctk.CTkFont(size=11)).grid(row=1, column=1, sticky='w', padx=15, pady=(5,10))
+        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' to generate wagelists for every panchayat of the block.", text_color="gray60", font=ctk.CTkFont(size=11)).grid(row=1, column=1, sticky='w', padx=15, pady=(5,10))
         
         # --- 2. Settings Checkboxes ---
         self.save_pdf_var = ctk.StringVar(value="off")
@@ -146,7 +147,8 @@ class WagelistGenTab(BaseAutomationTab):
             messagebox.showwarning("Input Error", "Please enter an Agency/Panchayat name.")
             return
 
-        self.app.update_history("location_panchayat", agency)
+        if agency != config.ALL_PANCHAYATS_LABEL:
+            self.app.update_history("location_panchayat", agency)
         
         # We pass it as a list [agency] so the looping logic in run_automation_logic handles it correctly
         # This keeps it compatible with both manual run and macro run.
@@ -180,6 +182,22 @@ class WagelistGenTab(BaseAutomationTab):
             driver = self.app.get_driver()
             if not driver: return
             wait = WebDriverWait(driver, 30)
+            
+            # --- ALL PANCHAYATS MODE: fetch the panchayat list from the website ---
+            if len(agency_list) == 1 and agency_list[0] == config.ALL_PANCHAYATS_LABEL:
+                driver.get(config.WAGELIST_GEN_CONFIG["base_url"])
+                try:
+                    agency_select = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_exe_agency')))
+                    prefix = config.AGENCY_PREFIX
+                    agency_list = []
+                    for t in self._get_select_option_texts(Select(agency_select)):
+                        agency_list.append(t[len(prefix):].strip() if t.startswith(prefix) else t.strip())
+                    self.log_info(f"🌐 All Panchayats mode: found {len(agency_list)} panchayats to process.")
+                    total_panchayats = len(agency_list)
+                except Exception as e:
+                    self.log_error(f"Could not fetch panchayat list from website: {e}")
+                    self.app.after(0, self.set_ui_state, False)
+                    return
             
             # --- LOOP THROUGH EACH PANCHAYAT ---
             for p_index, agency_name_part in enumerate(agency_list):

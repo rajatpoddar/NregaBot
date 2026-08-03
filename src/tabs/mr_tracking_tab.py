@@ -86,8 +86,8 @@ class MrTrackingTab(BaseAutomationTab):
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=1, column=2, sticky='w', padx=(15, 5), pady=5)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
-        self.panchayat_var = ctk.StringVar()
-        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
+        self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
+        self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=1, column=3, sticky='ew', padx=(5, 15), pady=5)
 
         # --- Wire up location hierarchy callbacks now (all widgets exist) ---
@@ -104,9 +104,9 @@ class MrTrackingTab(BaseAutomationTab):
         self.district_var.trace_add("write", _on_district_change)
         
         def _on_block_change(*_):
-            self.panchayat_var.set("")
+            self.panchayat_var.set(config.ALL_PANCHAYATS_LABEL)
             vals = self.app.history_manager.get_filtered_suggestions("location_panchayat", "location_block", self.block_var.get()) or [""]
-            self.panchayat_menu.configure(values=vals)
+            self.panchayat_menu.configure(values=self._all_panchayat_values(vals))
         self.block_var.trace_add("write", _on_block_change)
 
         # --- Row 2: Filter Checkboxes (Compact Text) ---
@@ -298,12 +298,16 @@ class MrTrackingTab(BaseAutomationTab):
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['panchayat']]):
             messagebox.showwarning("Input Error", "State, District, Block, and Panchayat are required."); return
+        if inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL:
+            if not messagebox.askyesno("Confirm", "This will process ALL panchayats in the block. Continue?"):
+                return
         
         self.save_inputs(inputs)
         self.app.update_history("location_state", inputs['state'])
         self.app.update_history("location_district", inputs['district'])
         self.app.update_history("location_block", inputs['block'])
-        self.app.update_history("location_panchayat", inputs['panchayat'])
+        if inputs['panchayat'] != config.ALL_PANCHAYATS_LABEL:
+            self.app.update_history("location_panchayat", inputs['panchayat'])
         
         driver = self.app.get_driver()
         if not driver:
@@ -330,20 +334,15 @@ class MrTrackingTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
             
             url = config.MR_TRACKING_CONFIG["url"]
-            self.app.after(0, self.app.set_status, "Navigating to MR Tracking...")
-            self.app.after(0, self.update_status, "Navigating...", 0.1)
-            self.log_info(f"Navigating to MR Tracking page...")
-            driver.get(url)
-            
-            main_window_handle = driver.current_window_handle 
-            
+            main_window_handle = driver.current_window_handle
+
             # VB-G-RAM-G portal uses IDs WITHOUT the ctl00 prefix
             STATE_ID = "ContentPlaceHolder1_ddl_state"
             DIST_ID = "ContentPlaceHolder1_ddl_dist"
             BLOCK_ID = "ContentPlaceHolder1_ddl_blk"
             PANCH_ID = "ContentPlaceHolder1_ddl_pan"
             RADIO_PAYMENT_PENDING_ID = "ContentPlaceHolder1_Rbtn_pay_1"
-            RADIO_T8_T15_ID = "ContentPlaceHolder1_Rbtn_pay_2" 
+            RADIO_T8_T15_ID = "ContentPlaceHolder1_Rbtn_pay_2"
             SUBMIT_BTN_ID = "ContentPlaceHolder1_Button1"
             TABLE_XPATH = "//table[@bordercolor='#EBEBEB' and .//b[text()='SNo.']]"
 
@@ -368,128 +367,218 @@ class MrTrackingTab(BaseAutomationTab):
                     self.log_warning(f"'{step_name}' dropdown ({dropdown_id}) populate nahi hua (postback timeout).")
                     raise TimeoutException(f"Dropdown '{step_name}' ({dropdown_id}) did not populate after state selection.")
 
-            self.app.after(0, self.app.set_status, f"Selecting State: {inputs['state']}")
-            self.app.after(0, self.update_status, "Selecting State...", 0.15)
-            self.log_info(f"Selecting State: {inputs['state']}")
-            state_select = Select(wait.until(EC.element_to_be_clickable((By.ID, STATE_ID))))
-            self._select_by_text_case_insensitive(state_select, inputs['state'])
-            wait_for_dropdown(DIST_ID, "Districts", 0.2)
+            def select_location(progress_start):
+                """Navigate to MR Tracking and select state/district/block.
+                Returns the populated panchayat dropdown."""
+                self.app.after(0, self.app.set_status, "Navigating to MR Tracking...")
+                self.app.after(0, self.update_status, "Navigating...", progress_start)
+                self.log_info("Navigating to MR Tracking page...")
+                driver.get(url)
 
-            self.app.after(0, self.app.set_status, f"Selecting District: {inputs['district']}")
-            self.app.after(0, self.update_status, "Selecting District...", 0.25)
-            self.log_info(f"Selecting District: {inputs['district']}")
-            dist_select = Select(wait.until(EC.element_to_be_clickable((By.ID, DIST_ID))))
-            self._select_by_text_case_insensitive(dist_select, inputs['district'])
-            wait_for_dropdown(BLOCK_ID, "Blocks", 0.3)
+                self.app.after(0, self.app.set_status, f"Selecting State: {inputs['state']}")
+                self.app.after(0, self.update_status, "Selecting State...", progress_start + 0.05)
+                self.log_info(f"Selecting State: {inputs['state']}")
+                state_select = Select(wait.until(EC.element_to_be_clickable((By.ID, STATE_ID))))
+                self._select_by_text_case_insensitive(state_select, inputs['state'])
+                wait_for_dropdown(DIST_ID, "Districts", progress_start + 0.1)
 
-            self.app.after(0, self.app.set_status, f"Selecting Block: {inputs['block']}")
-            self.app.after(0, self.update_status, "Selecting Block...", 0.35)
-            self.log_info(f"Selecting Block: {inputs['block']}")
-            self.select_dropdown(driver, BLOCK_ID, inputs['block'])
-            
-            self.app.after(0, self.app.set_status, f"Selecting Panchayat: {inputs['panchayat']}")
-            self.app.after(0, self.update_status, "Selecting Panchayat...", 0.45)
-            self.log_info(f"Selecting Panchayat: {inputs['panchayat']}")
-            self.select_dropdown(driver, PANCH_ID, inputs['panchayat'])
-            
-            self.app.after(0, self.app.set_status, "Setting filter...")
-            self.app.after(0, self.update_status, "Setting filter...", 0.5)
-            
-            if inputs['zero_mr_filter']:
-                self.log_info("Selecting '...T+8 and T+15'")
-                wait.until(EC.element_to_be_clickable((By.ID, RADIO_T8_T15_ID))).click()
+                self.app.after(0, self.app.set_status, f"Selecting District: {inputs['district']}")
+                self.app.after(0, self.update_status, "Selecting District...", progress_start + 0.15)
+                self.log_info(f"Selecting District: {inputs['district']}")
+                dist_select = Select(wait.until(EC.element_to_be_clickable((By.ID, DIST_ID))))
+                self._select_by_text_case_insensitive(dist_select, inputs['district'])
+                wait_for_dropdown(BLOCK_ID, "Blocks", progress_start + 0.2)
+
+                self.app.after(0, self.app.set_status, f"Selecting Block: {inputs['block']}")
+                self.app.after(0, self.update_status, "Selecting Block...", progress_start + 0.25)
+                self.log_info(f"Selecting Block: {inputs['block']}")
+                self.select_dropdown(driver, BLOCK_ID, inputs['block'])
+
+                # Wait for the panchayat dropdown to populate after block postback
+                try:
+                    wait.until(EC.presence_of_element_located((By.XPATH, f"//select[@id='{PANCH_ID}']/option[position()>1]")))
+                except TimeoutException:
+                    self.log_warning("Panchayat dropdown did not populate after block selection.")
+                time.sleep(0.5)
+                return Select(wait.until(EC.element_to_be_clickable((By.ID, PANCH_ID))))
+
+            # --- Determine which panchayats to process ---
+            all_mode = inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL
+            panchayats_to_process = []
+            skip_first_nav = False
+            if all_mode:
+                # The portal already has a built-in 'ALL' option in the panchayat
+                # dropdown that returns every panchayat's records in one report.
+                self.log_info("🌐 All Panchayats mode: checking for the portal's built-in 'ALL' option...")
+                panchayat_dd = select_location(0.0)
+                all_option = None
+                for opt in panchayat_dd.options:
+                    t = opt.text.strip()
+                    if t.upper() in ("ALL", "ALL PANCHAYATS", "ALL PANCHAYAT", "ALL GPs", "ALL GP"):
+                        all_option = t
+                        break
+                if all_option:
+                    panchayats_to_process = [all_option]
+                    skip_first_nav = True
+                    self.log_info(f"🌐 Portal has a built-in '{all_option}' option — processing all panchayats in one run.")
+                else:
+                    panchayats_to_process = [t for t in self._get_select_option_texts(panchayat_dd)
+                                             if t and t.strip().upper() not in ("ALL", "ALL PANCHAYATS", "ALL PANCHAYAT", "ALL GPs", "ALL GP")]
+                    self.log_info(f"🌐 No built-in 'ALL' option found — looping over {len(panchayats_to_process)} panchayats.")
             else:
-                self.log_info("Selecting 'Where payment is pending'")
-                wait.until(EC.element_to_be_clickable((By.ID, RADIO_PAYMENT_PENDING_ID))).click()
-            
-            self.app.after(0, self.app.set_status, "Submitting form...")
-            self.app.after(0, self.update_status, "Submitting form...", 0.55)
-            self.log_info("Submitting form...")
-            wait.until(EC.element_to_be_clickable((By.ID, SUBMIT_BTN_ID))).click()
-            
-            self.app.after(0, self.app.set_status, "Waiting for report...")
-            self.app.after(0, self.update_status, "Waiting for report...", 0.6)
-            self.log_info("Waiting for report table...")
-            table = wait.until(EC.presence_of_element_located((By.XPATH, TABLE_XPATH)))
-            rows = table.find_elements(By.XPATH, ".//tr[position()>1]") 
-            
-            total_rows = len(rows)
-            if total_rows == 0:
-                self.log_warning("No records found for the selected criteria.")
-                messagebox.showinfo("No Data", "No records found for the selected criteria.")
-                self.success_message = None
-                return
+                panchayats_to_process = [inputs['panchayat']]
 
-            self.log_info(f"Found {total_rows} records. Processing...")            
+            total_p = len(panchayats_to_process)
             workcode_list = []
             displayed_rows = 0
             abps_pending_count = 0
             pending_filling_count = 0
-            abps_pending_mrs = [] 
-            
-            for i, row in enumerate(rows):
+            abps_pending_mrs = []
+
+            for p_idx, p_name in enumerate(panchayats_to_process):
                 if self.is_stopped():
                     self.log_warning("Stop signal received.")
                     break
-                
-                progress = 0.6 + ( (i + 1) / total_rows ) * 0.2
-                status_msg = f"Processing row {i+1}/{total_rows}"
-                self.app.after(0, self.app.set_status, status_msg)
-                self.app.after(0, self.update_status, status_msg, progress)
-                
-                cells = row.find_elements(By.TAG_NAME, "td")
-                if not cells or len(cells) < len(self.report_headers):
+
+                self.log_info(f"===== Panchayat {p_idx+1}/{total_p}: {p_name} =====")
+                if skip_first_nav and p_idx == 0:
+                    # Reuse the page already loaded during the pre-fetch above
+                    pass
+                else:
+                    panchayat_dd = select_location(0.0)
+
+                self.app.after(0, self.app.set_status, f"Selecting Panchayat: {p_name}")
+                self.app.after(0, self.update_status, f"Selecting Panchayat ({p_idx+1}/{total_p})...", 0.3)
+                self.log_info(f"Selecting Panchayat: {p_name}")
+                self._select_by_text_case_insensitive(panchayat_dd, p_name)
+                # Wait for the panchayat postback to settle
+                try:
+                    wait.until(lambda d: Select(d.find_element(By.ID, PANCH_ID)).first_selected_option.text.strip().lower() == p_name.lower())
+                except TimeoutException:
+                    pass
+                time.sleep(0.5)
+
+                self.app.after(0, self.app.set_status, "Setting filter...")
+                self.app.after(0, self.update_status, "Setting filter...", 0.35)
+                if inputs['zero_mr_filter']:
+                    self.log_info("Selecting '...T+8 and T+15'")
+                    wait.until(EC.element_to_be_clickable((By.ID, RADIO_T8_T15_ID))).click()
+                else:
+                    self.log_info("Selecting 'Where payment is pending'")
+                    wait.until(EC.element_to_be_clickable((By.ID, RADIO_PAYMENT_PENDING_ID))).click()
+
+                self.app.after(0, self.app.set_status, "Submitting form...")
+                self.app.after(0, self.update_status, "Submitting form...", 0.4)
+                self.log_info("Submitting form...")
+                wait.until(EC.element_to_be_clickable((By.ID, SUBMIT_BTN_ID))).click()
+
+                self.app.after(0, self.app.set_status, "Waiting for report...")
+                self.app.after(0, self.update_status, "Waiting for report...", 0.45)
+                self.log_info("Waiting for report table...")
+                try:
+                    table = wait.until(EC.presence_of_element_located((By.XPATH, TABLE_XPATH)))
+                except TimeoutException:
+                    self.log_warning(f"No report table found for {p_name}. Skipping.")
                     continue
-                    
-                row_data = [cell.text.strip() for cell in cells]
-                
-                panchayat_name = row_data[1] 
-                muster_roll_no = row_data[2] 
-                work_code = row_data[5]
-                muster_status = row_data[7]
-                wagelist_no = row_data[9]
-                fto_no = row_data[10]
-                fto_date = row_data[11]
-                first_sign_date = row_data[12]
 
-                is_abps_pending = "Pending for signature of 1st Signatory" in first_sign_date and not fto_no and not fto_date
-                is_pending_filling = "Pending for filling" in muster_status
+                # ⚡ FAST READ: fetch the ENTIRE table's cell text in ONE round trip
+                # (instead of ~15 Selenium round-trips per row, which made big
+                # reports take minutes instead of seconds).
+                try:
+                    all_rows_data = driver.execute_script(
+                        "var rows = arguments[0].querySelectorAll('tr'); var out = []; "
+                        "for (var r = 1; r < rows.length; r++) { var c = rows[r].querySelectorAll('td'); var arr = []; "
+                        "for (var i = 0; i < c.length; i++) { arr.push((c[i].innerText || '').trim()); } out.push(arr); } return out;",
+                        table
+                    ) or []
+                except Exception as e:
+                    self.log_warning(f"Could not read report table for {p_name}: {str(e)[:120]} Skipping.")
+                    continue
 
-                if inputs['abps_pending']:
-                    if not is_abps_pending:
-                        continue 
-                elif inputs['pending_only']:
-                    if not is_pending_filling:
-                        continue 
+                total_rows = len(all_rows_data)
+                if total_rows == 0:
+                    if not all_mode:
+                        self.log_warning("No records found for the selected criteria.")
+                        messagebox.showinfo("No Data", "No records found for the selected criteria.")
+                        self.success_message = None
+                        return
+                    self.log_warning(f"No records found for {p_name}.")
+                    continue
 
-                    if "since 0 days" in muster_status or "since 1 days" in muster_status or "since 1 Day" in muster_status:
-                        self.log_info(f"Skipping MR {muster_roll_no} (0/1 days pending).")
-                        continue 
-                    
-                    
-                elif inputs['zero_mr_filter']:
-                    self.zero_mr_data.append({
-                        "panchayat": panchayat_name,
-                        "work_code": work_code,
-                        "msr_no": muster_roll_no
-                    })
-                
-                self.app.after(0, lambda data=tuple(row_data): self.results_tree.insert("", "end", values=data))
-                displayed_rows += 1
-                
-                if work_code:
-                    workcode_list.append(work_code)
-                
-                if is_abps_pending:
-                    abps_pending_count += 1
-                    abps_pending_mrs.append({
-                        "panchayat": row_data[1],
-                        "mr_no": row_data[2],
-                        "work_code": work_code,
-                        "wagelist_no": wagelist_no
-                    })
-                if is_pending_filling:
-                    pending_filling_count += 1
+                self.log_info(f"Found {total_rows} records in {p_name}. Processing...")
+                insert_buffer = []
+                for i, row_data in enumerate(all_rows_data):
+                    if self.is_stopped():
+                        self.log_warning("Stop signal received.")
+                        break
+
+                    if not row_data or len(row_data) < len(self.report_headers):
+                        continue
+
+                    panchayat_name = row_data[1] if len(row_data) > 1 else ""
+                    muster_roll_no = row_data[2] if len(row_data) > 2 else ""
+                    work_code = row_data[5] if len(row_data) > 5 else ""
+                    muster_status = row_data[7] if len(row_data) > 7 else ""
+                    wagelist_no = row_data[9] if len(row_data) > 9 else ""
+                    fto_no = row_data[10] if len(row_data) > 10 else ""
+                    fto_date = row_data[11] if len(row_data) > 11 else ""
+                    first_sign_date = row_data[12] if len(row_data) > 12 else ""
+
+                    is_abps_pending = "Pending for signature of 1st Signatory" in first_sign_date and not fto_no and not fto_date
+                    is_pending_filling = "Pending for filling" in muster_status
+
+                    if inputs['abps_pending']:
+                        if not is_abps_pending:
+                            continue
+                    elif inputs['pending_only']:
+                        if not is_pending_filling:
+                            continue
+
+                        if "since 0 days" in muster_status or "since 1 days" in muster_status or "since 1 Day" in muster_status:
+                            self.log_info(f"Skipping MR {muster_roll_no} (0/1 days pending).")
+                            continue
+
+                    elif inputs['zero_mr_filter']:
+                        self.zero_mr_data.append({
+                            "panchayat": panchayat_name,
+                            "work_code": work_code,
+                            "msr_no": muster_roll_no
+                        })
+
+                    insert_buffer.append(tuple(row_data))
+                    displayed_rows += 1
+
+                    if work_code:
+                        workcode_list.append(work_code)
+
+                    if is_abps_pending:
+                        abps_pending_count += 1
+                        abps_pending_mrs.append({
+                            "panchayat": panchayat_name,
+                            "mr_no": muster_roll_no,
+                            "work_code": work_code,
+                            "wagelist_no": wagelist_no
+                        })
+                    if is_pending_filling:
+                        pending_filling_count += 1
+
+                    # Batched tree inserts (keeps the UI snappy)
+                    if len(insert_buffer) >= 50:
+                        batch = list(insert_buffer)
+                        insert_buffer.clear()
+                        self.app.after(0, lambda b=batch: self._insert_rows_batch(b))
+
+                    # Throttled progress — keyed on the row INDEX so filter-heavy
+                    # modes (where most rows are skipped) still show movement
+                    if i % 50 == 0 or i == total_rows - 1:
+                        self.app.after(0, self.update_status, f"Processing row {i+1}/{total_rows} ({p_name})", 0.4 + ((i + 1) / max(total_rows, 1)) * 0.3)
+
+                if insert_buffer:
+                    batch = list(insert_buffer)
+                    insert_buffer.clear()
+                    self.app.after(0, lambda b=batch: self._insert_rows_batch(b))
+
+
 
             if self.is_stopped():
                  self.log_warning("Automation stopped by user.")
@@ -1196,4 +1285,4 @@ class MrTrackingTab(BaseAutomationTab):
         self.state_var.set(data.get('state', ''))
         self.district_var.set(data.get('district', ''))
         self.block_var.set(data.get('block', ''))
-        self.panchayat_var.set(data.get('panchayat', ''))
+        self.panchayat_var.set(data.get('panchayat') or config.ALL_PANCHAYATS_LABEL)
