@@ -115,9 +115,11 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
         self.initial_height = 800
         self.minsize(1000, 700)
 
-        # Root-window background — matches the theme so no default tk bg
-        # flashes during maximize/restore transitions.
-        self.configure(bg=config.COLORS["bg_dark"])
+        # Root-window background — drive it through CTk's fg_color as a
+        # (light, dark) tuple so it follows the theme on every switch
+        # (a plain `bg=` is ignored by the macOS Aqua theme and a hardcoded
+        # colour never changes). Kept in sync by _sync_root_background().
+        self.configure(fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
 
         # A4: Centralized application state — all state lives in self.app_state dataclass
         self.app_state = AppState()
@@ -884,7 +886,11 @@ del "%~f0" & exit
     def update_history(self, key, val): self.history_manager.save_entry(key, val)
     def remove_history(self, key, val): self.history_manager.remove_entry(key, val)
 
-    def on_theme_change(self, new_theme: str): ctk.set_appearance_mode(new_theme); self.after(100, self.restyle_all_treeviews)
+    def on_theme_change(self, new_theme: str):
+        ctk.set_appearance_mode(new_theme)
+        if hasattr(self, '_sync_root_background'):
+            self._sync_root_background()
+        self.after(100, self.restyle_all_treeviews)
     def restyle_all_treeviews(self):
         # Only restyle treeviews that have actually been instantiated.
         # Lazy-loaded tabs that were never shown don't need style updates.

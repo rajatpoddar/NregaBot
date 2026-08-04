@@ -128,7 +128,10 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.initial_height = 680
         self.minsize(800, 550)
         
-        self.configure(bg=config.COLORS["bg_dark"])
+        # Root-window background — drive it through CTk's fg_color as a
+        # (light, dark) tuple so it follows the theme (plain `bg=` is ignored
+        # by macOS Aqua and a hardcoded colour never changes).
+        self.configure(fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
         
         # --- State ---
         self.http_session = requests.Session()

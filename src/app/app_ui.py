@@ -134,6 +134,11 @@ class UIMixin:
         settings_group.pack(side="left")
 
         self.app_state.current_theme_mode = get_config("theme_mode", "System")
+        # Apply the saved theme at startup (module-level default is "System",
+        # so without this the app would always launch in System mode even if
+        # the user explicitly picked Light/Dark last time).
+        ctk.set_appearance_mode(self.app_state.current_theme_mode)
+        self._sync_root_background()
         self.theme_btn = ctk.CTkButton(
             settings_group, text="", image=self.icon_images.get("theme_system"),
             width=30, height=30, corner_radius=15,
@@ -458,21 +463,60 @@ class UIMixin:
         state = "Enabled" if new_val else "Disabled"
         self.show_toast(f"Auto-Minimize {state}", "info")
 
+    def _sync_root_background(self) -> None:
+        """
+        Keep the root-window background in sync with the active theme.
+
+        CTk widgets use (light, dark) color tuples and repaint automatically on
+        theme change — but the root window is a plain Tk window whose background
+        must be driven through CTk's fg_color (a single `bg=` is ignored by the
+        macOS Aqua theme, and a hardcoded single color never changes). Setting
+        fg_color as a (light, dark) tuple makes CTk re-apply the right colour on
+        every appearance-mode change automatically.
+        """
+        try:
+            self.configure(fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"]))
+        except Exception:
+            logger.debug("Failed to sync root background", exc_info=True)
+
     def _cycle_theme(self) -> None:
-        """Cycle through System → Light → Dark with a smooth alpha fade transition."""
+        """Cycle System → Light → Dark, skipping any mode that would be a no-op.
+
+        'System' follows the OS, so when it already matches the current Light
+        or Dark appearance, clicking past it would be a 'dead' click (this is
+        why the old cycle needed 3-4 clicks for day↔night). Here we always jump
+        to the NEXT mode whose effective appearance actually differs — so one
+        click always flips day↔night, and System (auto) mode stays reachable.
+        """
         if self.app_state._is_theme_transitioning:
             return
         self.app_state._is_theme_transitioning = True
 
         try:
             modes = ["System", "Light", "Dark"]
-            try:
-                current_idx = modes.index(self.app_state.current_theme_mode)
-            except ValueError:
-                current_idx = 0
+            current = self.app_state.current_theme_mode
+            if current not in modes:
+                current = "System"
 
-            next_idx = (current_idx + 1) % len(modes)
-            self.app_state.current_theme_mode = modes[next_idx]
+            def _effective(mode: str) -> str:
+                """Resolve a mode to its actual appearance (Light/Dark)."""
+                if mode == "System":
+                    return ctk.get_appearance_mode()  # always 'Light' or 'Dark'
+                return mode
+
+            current_effective = _effective(current)
+            start_idx = modes.index(current)
+
+            # Walk the cycle until we find a mode whose appearance DIFFERS —
+            # this guarantees a single click always produces a visible change.
+            next_mode = current
+            for offset in range(1, len(modes) + 1):
+                candidate = modes[(start_idx + offset) % len(modes)]
+                if _effective(candidate) != current_effective:
+                    next_mode = candidate
+                    break
+
+            self.app_state.current_theme_mode = next_mode
 
             # Step 1: Make window invisible (instant — no flicker possible)
             self.attributes("-alpha", 0.0)
@@ -493,7 +537,8 @@ class UIMixin:
             if hasattr(self, 'icon_images'):
                 self.icon_images.clear_cache()
 
-            # Step 5: Update theme-dependent widgets
+            # Step 5: Update theme-dependent widgets + root-window background
+            self._sync_root_background()
             self._update_theme_icon()
             self.play_sound("click")
 
@@ -504,7 +549,7 @@ class UIMixin:
             self.restyle_all_treeviews()
             self.update_idletasks()
 
-            # Step 6: Smooth fade-in (8 steps x 25ms = 200ms total)
+            # Step 7: Smooth fade-in (6 steps x 20ms = 120ms — snappier)
             self._fade_in_after_theme(step=0)
         except Exception:
             # Safety: if anything goes wrong, ensure window is visible
@@ -513,13 +558,13 @@ class UIMixin:
             raise
 
     def _fade_in_after_theme(self, step=0):
-        """Recursively fades the window alpha from 0.0 -> 1.0 in 8 steps."""
-        if step <= 8:
+        """Recursively fades the window alpha from 0.0 -> 1.0 in 6 steps (~120ms)."""
+        if step <= 6:
             try:
                 if self.winfo_exists():
-                    alpha = step / 8
+                    alpha = step / 6
                     self.attributes("-alpha", alpha)
-                    self.after(25, lambda: self._fade_in_after_theme(step + 1))
+                    self.after(20, lambda: self._fade_in_after_theme(step + 1))
                 else:
                     self.app_state._is_theme_transitioning = False
             except Exception:

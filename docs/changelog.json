@@ -1,4 +1,13 @@
 {
+  "3.1.3": [
+      "🌗 **One-Click Theme Switch:** Theme button now switches day↔night in a single click — dead clicks (System mode already matching Light/Dark) are skipped automatically, and System/auto mode stays available.",
+      "🎨 **Complete Theme Coverage:** The window background now changes colour with the theme too — no more dark patches left around the edges in Light mode.",
+      "💬 **Toast Notifications Upgrade:** Notifications now stack neatly (up to 3), stay on top of every window, and are colour-coded — green for success, red for failed, amber for warnings.",
+      "📋 **No More Blank Activity Logs:** Activity entries now always record the task, status and details — previously some logs synced to the admin panel with empty fields.",
+      "❌ **Automation Failure Logging:** If an automation crashes, the app now logs it as 'Failed' with the error message instead of a misleading 'Success'.",
+      "📡 **Online Status:** The app now sends a heartbeat every 20 seconds so admins can see exactly which users are online right now.",
+      "⚡ **Reliable Auto-Updates:** The update check now waits up to 20s for the server (instead of 5s) — no more silently missed updates on slow networks."
+    ],
   "3.1.2": [
       "🐞 **Fix (About tab crash):** Resolved the 'humanize module missing' error — About tab and File Manager no longer crash if the humanize package isn't bundled; a built-in fallback is used and the package is now included in all builds.",
       "▶️ **Running Automation Indicator:** The footer now shows exactly which automation is currently running (e.g. '▶ Running: MR Tracking') next to the status, so you always know what's happening.",

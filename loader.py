@@ -283,7 +283,10 @@ class ModernSplashScreen(ctk.CTk):
 
             headers = {'User-Agent': 'NREGABot-Loader/1.0', 'Cache-Control': 'no-cache'}
             try:
-                resp = requests.get(UPDATE_URL, headers=headers, timeout=5)
+                # Timeout 20s — Cloudflare + Zero-Trust tunnel latency can push
+                # the version.json response past 5s; a too-tight timeout made the
+                # update check silently fail (looked like "no update available").
+                resp = requests.get(UPDATE_URL, headers=headers, timeout=20)
                 data = resp.json()
             except Exception as e:
                 print(f"Update check failed: {e}")

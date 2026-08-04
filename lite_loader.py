@@ -219,7 +219,10 @@ class LiteLoaderSplash(ctk.CTk):
             self._set_status("Checking for updates...")
 
             try:
-                resp = requests.get(UPDATE_URL, timeout=5)
+                # Timeout 20s — Cloudflare + Zero-Trust tunnel latency can push
+                # the version.json response past 5s; a too-tight timeout made the
+                # update check silently fail (looked like "no update available").
+                resp = requests.get(UPDATE_URL, timeout=20)
                 data = resp.json()
             except Exception as e:
                 print(f"Update check failed: {e}")
