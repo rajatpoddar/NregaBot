@@ -341,9 +341,9 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             raise Exception("Failed to read CSV.")
 
     def run_automation_logic(self, inputs):
-        self.app.after(0, self.set_ui_state, True)
+        self.app.after(0, self.set_ui_state, True)  # auto-switches to Logs tab
         self.app.clear_log(self.log_display)
-        self.tab_view.set("Results")
+        # (Results tab is auto-shown by set_common_ui_state(False) on finish.)
         
         try:
             driver = self.app.get_driver()

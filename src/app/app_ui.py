@@ -13,7 +13,7 @@ from tkinter import messagebox
 import os
 import webbrowser
 from typing import Any, Dict, List, Optional, Tuple
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from src import config
 from src.utils import resource_path, get_logger, get_config, save_config
@@ -158,7 +158,8 @@ class UIMixin:
         )
         self.sound_btn.pack(side="left", padx=2, pady=4)
         add_status_hover(self.sound_btn, "Toggle Sound Effects")
-        self._update_settings_btn_visuals(self.sound_btn, self.app_state.sound_switch_var.get())
+        # Improved ON/OFF visual (green pill = on, red + muted icon = off)
+        self._update_sound_btn_visual()
 
         self.minimize_btn = ctk.CTkButton(
             settings_group, text="", image=self.icon_images.get("minimize"),
@@ -451,7 +452,8 @@ class UIMixin:
         self.app_state.sound_switch_var.set(new_val)
         save_config('sound_enabled', new_val)
 
-        self._update_settings_btn_visuals(self.sound_btn, new_val)
+        # Improved ON/OFF visual feedback
+        self._update_sound_btn_visual()
         if new_val:
             self.play_sound("success")
 
@@ -604,6 +606,47 @@ class UIMixin:
             btn.configure(fg_color=("#C8E6C9", "#1B5E20"))
         else:
             btn.configure(fg_color="transparent")
+
+    def _update_sound_btn_visual(self) -> None:
+        """Clear ON/OFF visual for the sound button:
+        ON  -> green pill background + normal speaker icon
+        OFF -> muted background + 'muted' icon (speaker with red slash)
+        """
+        if not hasattr(self, 'sound_btn') or self.sound_btn is None:
+            return
+        enabled = self.app_state.sound_switch_var.get()
+        if enabled:
+            self.sound_btn.configure(
+                image=self.icon_images.get("sound_on"),
+                fg_color=("#C8E6C9", "#1B5E20"))
+        else:
+            self.sound_btn.configure(
+                image=self._make_muted_icon(),
+                fg_color=("#FEE2E2", "#450A0A"))
+
+    def _make_muted_icon(self) -> Any:
+        """Generate a 'muted' variant of the sound icon (red slash overlay).
+        IMPORTANT: sound.png is 512x512 — the CTkImage MUST be sized to the
+        same small size the icon manager uses (18x18) or the button blows up
+        to fill the window. Result is cached so toggles don't re-decode.
+        """
+        cached = getattr(self, "_muted_icon_cache", None)
+        if cached is not None:
+            return cached
+        try:
+            base = Image.open(resource_path("assets/icons/sound.png")).convert("RGBA")
+            overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
+            d = ImageDraw.Draw(overlay)
+            w, h = base.size
+            margin = max(2, w // 8)
+            d.line([(margin, h - margin), (w - margin, margin)],
+                   fill=(220, 38, 38, 235), width=max(2, w // 7))
+            base = Image.alpha_composite(base, overlay)
+            result = ctk.CTkImage(base, size=(18, 18))
+            self._muted_icon_cache = result
+            return result
+        except Exception:
+            return self.icon_images.get("sound_on")
 
     def _update_header_welcome_message(self):
         if not self.header_welcome_prefix_label:

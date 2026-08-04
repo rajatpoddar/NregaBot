@@ -180,6 +180,15 @@ class BrowserManager:
             opts.page_load_strategy = "eager"
             opts.add_argument("-profile")
             opts.add_argument(p_dir)
+            # Keep JS timers running near-normal speed when the Firefox window
+            # is minimized/occluded — Firefox throttles background tabs to 1s
+            # minimum timeout by default, which can break JS-driven controls
+            # (radio buttons, dropdown postbacks) mid-automation.
+            try:
+                opts.set_preference("dom.min_background_timeout_value", 10)
+                opts.set_preference("dom.timeout.background_throttling_max_budget", -1)
+            except Exception:
+                pass
             
             service = self._create_driver_service("firefox")
             if service:
@@ -277,6 +286,38 @@ class BrowserManager:
         except Exception:
             pass
 
+    def keep_tab_active(self, driver: Any) -> None:
+        """Force the automation tab to behave like the ACTIVE + FOCUSED tab even
+        while the user is working in another tab/window of the same browser.
+
+        Chrome/Edge silently degrade hidden tabs: timers get throttled,
+        requestAnimationFrame is paused, and the page loses focus. On the NREGA
+        portal that makes JS-driven controls (radio buttons, dropdown postbacks,
+        validation) silently fail — the click "lands" but nothing happens. These
+        CDP emulation overrides undo the degradation:
+          * Page.setWebLifecycleState("active")  — keep rendering/timers alive
+            (NOTE: resets on every navigation, so the marker keeper re-applies it
+            every 2s during a run).
+          * Emulation.setFocusEmulationEnabled(true) — document.hasFocus() stays
+            true; persists per session and does NOT affect the tab the user is
+            actually typing in.
+          * Emulation.setCPUThrottlingRate(1) — no CPU throttling.
+        Firefox has no execute_cdp_cmd, so this is a safe no-op there.
+        Never raises.
+        """
+        try:
+            driver.execute_cdp_cmd("Page.setWebLifecycleState", {"state": "active"})
+        except Exception:
+            pass
+        try:
+            driver.execute_cdp_cmd("Emulation.setFocusEmulationEnabled", {"enabled": True})
+        except Exception:
+            pass
+        try:
+            driver.execute_cdp_cmd("Emulation.setCPUThrottlingRate", {"rate": 1})
+        except Exception:
+            pass
+
     def _inject_persistent_marker(self, driver: Any) -> None:
         """Register the marker JS so Chrome/Edge re-apply it automatically on
         EVERY page load via CDP (Page.addScriptToEvaluateOnNewDocument).
@@ -347,6 +388,10 @@ class BrowserManager:
             if not target:
                 raise Exception("No open tabs in browser")
             driver.switch_to.window(target)
+            # Keep the tab ACTIVE + FOCUSED so JS-driven controls (radio
+            # buttons, dropdown postbacks) keep working while the user works
+            # in another tab. Critical for background automation runs.
+            self.keep_tab_active(driver)
             self._inject_persistent_marker(driver)
             self.apply_automation_marker(driver)
             return True

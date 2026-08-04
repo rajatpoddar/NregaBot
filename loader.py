@@ -542,6 +542,16 @@ if __name__ == "__main__":
             if m in sys.modules:
                 del sys.modules[m]
 
+        # CRITICAL: purge the ENTIRE src package (and every src.* submodule)
+        # that this loader imported at the top for its splash screen
+        # (from src import config). If left cached, main_app's own
+        # `from src import config` reuses the BUNDLED src — which still has
+        # the OLD APP_VERSION after a smart update — so the app reports the
+        # old version and keeps showing "update available" popups forever.
+        for _m in [m for m in list(sys.modules)
+                   if m == 'src' or m.startswith('src.')]:
+            del sys.modules[_m]
+
         try:
             import main_app
             main_app.run_application()
@@ -571,6 +581,11 @@ if __name__ == "__main__":
         sys.path.insert(0, launch_path)
         try:
             os.chdir(launch_path)
+            # Same src purge as the UI branch — otherwise main_app reuses the
+            # loader's cached (bundled) src and reports the old version.
+            for _m in [m for m in list(sys.modules)
+                       if m == 'src' or m.startswith('src.')]:
+                del sys.modules[_m]
             import main_app
             main_app.run_application()
         except ImportError as e:

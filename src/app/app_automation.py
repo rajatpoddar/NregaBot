@@ -127,19 +127,8 @@ class AutomationMixin:
         self._update_running_automation_indicator()
 
         if self.app_state.minimize_var.get() and self.app_state.driver:
-            try:
-                self.app_state.driver.minimize_window()
-                self.show_toast("Running in Background (Minimized)", "info")
-                if config.OS_SYSTEM == "Darwin" and self.app_state.active_browser == "chrome":
-                    try:
-                        subprocess.run([
-                            "osascript", "-e",
-                            'tell application "Google Chrome" to set minimized of windows to true'
-                        ])
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            self._minimize_active_browser()
+            self.show_toast("Running in Background (Minimized)", "info")
 
         # Mark the tab as having run an automation — show_frame won't destroy it
         tab_instance = getattr(target, '__self__', None)
@@ -237,29 +226,56 @@ class AutomationMixin:
         def _marker_keeper(worker_thread: threading.Thread) -> None:
             marker_session = None
             owns_session = False
+            anchored = False
             try:
                 while (worker_thread.is_alive()
                        and key in self.app_state.active_automations):
                     if marker_session is None:
                         marker_session, owns_session = self.browser_manager.connect_driver_no_dialog()
+                        anchored = False
                     if marker_session is not None:
                         try:
                             if marker_session.window_handles:
-                                if owns_session:
-                                    # Separate keeper session (chrome/edge): safe
-                                    # to switch to the resolved automation tab.
+                                if owns_session and not anchored:
+                                    # Separate keeper session (chrome/edge): switch
+                                    # to the automation tab ONCE to anchor the
+                                    # session there. IMPORTANT: never switch again
+                                    # — switch_to.window() brings the tab to the
+                                    # FRONT in the browser UI, so doing it every
+                                    # tick would yank the user off whatever tab
+                                    # they are working on. apply_automation_marker()
+                                    # uses execute_script() only, which does NOT
+                                    # steal focus — so we can keep re-painting the
+                                    # marker without disturbing the user's tab.
                                     target = self.browser_manager.resolve_automation_tab(marker_session)
                                     if target:
-                                        marker_session.switch_to.window(target)
+                                        # No-op anchor when the keeper session is
+                                        # already on the automation tab (the common
+                                        # case right at run start) — avoids even the
+                                        # single focus steal. Window handles are
+                                        # browser-level target IDs, stable across CDP
+                                        # sessions, so this comparison is reliable.
+                                        if marker_session.current_window_handle != target:
+                                            marker_session.switch_to.window(target)
+                                        anchored = True
                                 # Shared in-app Firefox driver: do NOT switch
                                 # windows — the automation may be working in a
                                 # popup, and yanking the active window here
                                 # would break it. Just paint the marker on the
                                 # window the automation is currently using.
                                 self.browser_manager.apply_automation_marker(marker_session)
+                                # Re-force the tab ACTIVE + FOCUSED every tick:
+                                # Chrome/Edge reset the web lifecycle state on
+                                # every navigation, and a hidden tab silently
+                                # breaks JS-driven controls (radio buttons,
+                                # dropdown postbacks) — this undoes that while
+                                # the user works on another tab. Safe no-op on
+                                # Firefox (no execute_cdp_cmd).
+                                self.browser_manager.keep_tab_active(marker_session)
                         except Exception:
                             marker_session = None
                             owns_session = False
+                            anchored = False
                     time.sleep(2)
             finally:
                 if owns_session and marker_session is not None:
@@ -269,6 +285,92 @@ class AutomationMixin:
                         pass
 
         threading.Thread(target=_marker_keeper, args=(t,), daemon=True).start()
+
+    def _minimize_active_browser(self) -> None:
+        """Minimize the active browser window on every platform.
+
+        Previously only the in-app Firefox driver was reliably minimized
+        (via Selenium). Detached Chrome/Edge sessions often ignore Selenium's
+        minimize, so we add an OS-level fallback per browser:
+          * macOS: osascript 'set minimized of windows to true' per app
+          * Windows: Win32 ShowWindow(SW_MINIMIZE) on the browser's windows
+        """
+        browser = self.app_state.active_browser
+
+        # 1) Selenium first (works for the in-app Firefox driver, and sometimes
+        #    for CDP-connected Chrome/Edge).
+        try:
+            if self.app_state.driver:
+                self.app_state.driver.minimize_window()
+        except Exception:
+            pass
+
+        # 2) OS-level fallbacks (belt & suspenders — idempotent, safe to repeat).
+        if config.OS_SYSTEM == "Darwin":
+            app_name = {"chrome": "Google Chrome",
+                        "edge": "Microsoft Edge"}.get(browser)
+            if app_name:
+                # Chrome/Edge expose a full scripting dictionary.
+                try:
+                    subprocess.run(
+                        ["osascript", "-e",
+                         f'tell application "{app_name}" to set minimized of windows to true'],
+                        check=True, capture_output=True, timeout=5)
+                except Exception:
+                    logger.debug("osascript minimize failed for %s", app_name, exc_info=True)
+            elif browser == "firefox":
+                # Firefox has a minimal AppleScript dictionary — use System
+                # Events accessibility (no-op if permission is missing).
+                try:
+                    subprocess.run(
+                        ["osascript", "-e",
+                         'tell application "System Events" to set value of attribute '
+                         '"AXMinimized" of every window of process "Firefox" to true'],
+                        check=True, capture_output=True, timeout=5)
+                except Exception:
+                    logger.debug("System Events minimize failed for Firefox", exc_info=True)
+        elif config.OS_SYSTEM == "Windows":
+            self._minimize_browser_windows_win32(browser)
+
+    @staticmethod
+    def _minimize_browser_windows_win32(browser: Optional[str]) -> None:
+        """Minimize all visible top-level windows of the given browser on Windows."""
+        if not browser:
+            return
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            SW_MINIMIZE = 6
+            # Chrome & Edge share the same Chromium window class.
+            class_map = {"chrome": "Chrome_WidgetWin_1",
+                         "edge": "Chrome_WidgetWin_1",
+                         "firefox": "MozillaWindowClass"}
+            target_class = class_map.get(browser)
+            if not target_class:
+                return
+
+            user32 = ctypes.windll.user32
+            windows: list = []
+
+            EnumWindowsProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+            @EnumWindowsProc
+            def _enum(hwnd, lparam):
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetClassNameW(hwnd, None, 0)
+                    if length:
+                        buf = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetClassNameW(hwnd, buf, length + 1)
+                        if buf.value == target_class:
+                            windows.append(hwnd)
+                return True
+
+            user32.EnumWindows(_enum, 0)
+            for hwnd in windows:
+                user32.ShowWindow(hwnd, SW_MINIMIZE)
+        except Exception:
+            logger.debug("Win32 browser minimize failed for %s", browser, exc_info=True)
 
     def on_automation_finished(self, key, duration=0.0, tab_instance=None, error_msg=''):
         if key in self.app_state.active_automations:

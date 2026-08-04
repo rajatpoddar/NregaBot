@@ -54,7 +54,7 @@ class EKycReportTab(BaseAutomationTab):
         settings_tab.grid_columnconfigure(0, weight=1)
         settings_tab.grid_rowconfigure(2, weight=1)
         results_tab.grid_columnconfigure(0, weight=1)
-        results_tab.grid_rowconfigure(0, weight=1)
+        results_tab.grid_rowconfigure(1, weight=1)
 
         # --- Settings: Input Section ---
         input_frame = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
@@ -112,12 +112,16 @@ class EKycReportTab(BaseAutomationTab):
         self.stats_text = ctk.CTkLabel(self.stats_frame, text="(No data yet)", font=("Arial", 10), justify="left", wraplength=900)
         self.stats_text.pack(anchor="w", padx=15, pady=(0, 5))
 
-        # --- Settings: Action Buttons + Export (outside any card) ---
+        # --- Settings: Action Buttons (outside any card) ---
         self._create_action_buttons(parent_frame=settings_tab).grid(row=3, column=0, pady=(8, 4))
-        
-        self.export_btn = ctk.CTkButton(settings_tab, text="📥 Export to Excel", command=self.export_professional_report, 
+
+        # --- Results Tab: Export button on top (so it's right next to the
+        #     data after the run finishes — no hunting in Settings) ---
+        export_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
+        export_frame.grid(row=0, column=0, columnspan=2, sticky="w", padx=5, pady=(5, 0))
+        self.export_btn = ctk.CTkButton(export_frame, text="📥 Export to Excel", command=self.export_professional_report, 
                                         state="disabled", fg_color=config.COLORS["green_export"])
-        self.export_btn.grid(row=4, column=0, pady=(0, 10))
+        self.export_btn.pack(side="left")
 
         # --- Results Table ---
         result_frame = results_tab
@@ -144,8 +148,8 @@ class EKycReportTab(BaseAutomationTab):
 
         sb = ttk.Scrollbar(result_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        sb.pack(side="right", fill="y")
+        self.tree.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        sb.grid(row=1, column=1, sticky="ns")
 
     def _safe_update_status(self, text, progress=None):
         """Safe version of update_status — only runs on main thread via after(0, ...)."""
@@ -241,7 +245,7 @@ class EKycReportTab(BaseAutomationTab):
             if village_target == ALL_VILLAGES_LABEL:
                 village_target = ""
 
-            self.app.after(0, self.tab_view.set, "Logs & Status")
+            # (Logs tab is auto-shown via set_common_ui_state(True) hook.)
             driver = self.app.browser_manager.get_driver()
             wait = WebDriverWait(driver, 20)
             

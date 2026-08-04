@@ -75,9 +75,14 @@ class SoundManager:
 
     def play(self, sound_name: str) -> None:
         """Play a WAV sound file. Optimized with caching and single-instance afplay."""
-        # Respect the sound toggle
-        if hasattr(self.app, 'sound_switch_var') and not self.app.sound_switch_var.get():
-            return
+        # Respect the sound toggle (defensive: never crash if the toggle var
+        # is missing or not yet initialized — treat missing as 'sound on').
+        try:
+            switch = getattr(self.app, 'sound_switch_var', None)
+            if switch is not None and hasattr(switch, 'get') and not switch.get():
+                return
+        except Exception:
+            pass
 
         sound_file = self._get_sound_path(sound_name)
         if not sound_file:

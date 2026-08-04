@@ -608,8 +608,21 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
 
                 messagebox.showinfo("Update Ready", "Update applied successfully.\nThe application will now restart.")
 
-                self.on_closing(force=True)
-                subprocess.Popen([sys.executable])
+                # IMPORTANT ORDER: on_closing(force=True) calls os._exit(0) which
+                # kills this process IMMEDIATELY — so the relaunch MUST be
+                # scheduled BEFORE it, or Popen below never runs and the app
+                # silently closes without restarting.
+                # Also, run_application() has a single-instance socket guard
+                # (port 60123): a freshly spawned instance sees the still-alive
+                # old process, sends 'focus', and exits. Delay the relaunch ~2s
+                # so the old process fully exits and frees the port first.
+                try:
+                    subprocess.Popen(
+                        ["sh", "-c", f'sleep 2; exec "{sys.executable}"'],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    subprocess.Popen([sys.executable])
+                self.on_closing(force=True)  # os._exit(0) — old process ends, port freed
                 sys.exit(0)
 
             except Exception as e:
@@ -746,7 +759,11 @@ del "%~f0" & exit
 
     def save_demo_csv(self, file_type: str):
         try:
-            src = resource_path(f"assets/demo_{file_type}.csv")
+            # Demo CSVs live in assets/demo/ (they were moved into that
+            # subfolder; the old flat path is kept as a fallback).
+            src = resource_path(f"assets/demo/demo_{file_type}.csv")
+            if not os.path.exists(src):
+                src = resource_path(f"assets/demo_{file_type}.csv")
             if not os.path.exists(src): self.play_sound("error"); messagebox.showerror("Error", "Demo file not found"); return
             demo_dir = self.get_nregabot_path("Demo")
             save_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialdir=demo_dir, initialfile=f"{file_type}_data.csv")
@@ -961,6 +978,17 @@ del "%~f0" & exit
     @machine_id.setter
     def machine_id(self, value: str) -> None:
         self.app_state.machine_id = value
+
+    @property
+    def sound_switch_var(self) -> Any:
+        """Forward to app_state so SoundManager.play() can read the live
+        toggle (it checks self.app.sound_switch_var). Without this property
+        the mute guard never ran and sound kept playing even when off."""
+        return self.app_state.sound_switch_var
+
+    @sound_switch_var.setter
+    def sound_switch_var(self, value: Any) -> None:
+        self.app_state.sound_switch_var = value
 
     @property
     def tab_instances(self) -> Dict[str, Any]:

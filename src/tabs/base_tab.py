@@ -665,6 +665,10 @@ class BaseAutomationTab(ctk.CTkFrame):
         return outer_wrapper
 
     def _create_log_and_status_area(self, parent_notebook):
+        # Remember the tab's main notebook so set_common_ui_state() can
+        # auto-switch between "Logs & Status" (while running) and "Results"
+        # (when the run finishes).
+        self.notebook = parent_notebook
         log_frame = parent_notebook.add("Logs & Status")
         log_frame.grid_columnconfigure(0, weight=1)
         log_frame.grid_rowconfigure(1, weight=1)
@@ -859,6 +863,40 @@ class BaseAutomationTab(ctk.CTkFrame):
                 self.retry_btn.configure(state="disabled" if running else "normal")
             except Exception:
                 pass
+
+        # Auto-switch the tab's inner notebook: show Logs while the automation
+        # runs, then show Results the moment it finishes — so the user never
+        # has to hunt for the results / export buttons after a run.
+        # (Helper is fully guarded internally — never raises.)
+        self._show_automation_tab("running" if running else "finished")
+
+    def _show_automation_tab(self, state: str) -> None:
+        """Auto-switch the tab's inner notebook based on automation state.
+
+        state="running"  → show 'Logs & Status' so the user watches progress.
+        state="finished" → show 'Results' so results (and their export/report
+                           buttons) are immediately visible.
+
+        Safe no-op when the tab has no notebook yet, or the desired tab name
+        doesn't exist (tabs use varied names: 'Logs', 'Results Table',
+        'MR Summary', ...). Falls back from self.notebook to self.tab_view
+        for tabs that build their notebook manually.
+        """
+        nb = getattr(self, "notebook", None) or getattr(self, "tab_view", None)
+        if nb is None:
+            return
+        try:
+            tabs = getattr(nb, "_tab_dict", None)
+            if not tabs:
+                return
+            candidates = ("Logs & Status", "Logs") if state == "running" \
+                else ("Results", "Results Table", "MR Summary")
+            for name in candidates:
+                if name in tabs:
+                    nb.set(name)
+                    return
+        except Exception:
+            pass
 
     def reset_ui(self) -> None:
         self.update_status("Ready", 0)

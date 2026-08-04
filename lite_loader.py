@@ -406,6 +406,14 @@ if __name__ == "__main__":
         if mod_name.startswith("lite_loader"):
             del sys.modules[mod_name]
 
+    # CRITICAL: purge the cached src package (imported at the top for the
+    # splash footer). If it stays cached, lite_app's `from src import config`
+    # gets the OLD bundled config even after a successful update — the app
+    # reports the old version and keeps prompting for updates forever.
+    for _m in [m for m in list(sys.modules)
+               if m == 'src' or m.startswith('src.')]:
+        del sys.modules[_m]
+
     # ── Import and run lite_app ──
     try:
         import lite_app
