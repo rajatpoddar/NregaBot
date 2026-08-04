@@ -1713,12 +1713,44 @@ class LicenseMixin:
                     pass
             elif info.get('status') == 'available':
                 about_tab.latest_version_label.configure(text=f"Latest Version: {info['version']}")
+                # When an update is available the button must become an
+                # install action — previously it stayed as "Check for Updates",
+                # so users could only check, never install, from the About tab.
+                # Only wire the download command if a URL is present (a missing
+                # URL would crash the downloader).
+                if info.get('url'):
+                    about_tab.update_button.configure(
+                        state="normal",
+                        text=f"Download & Install v{info['version']}",
+                        command=lambda: about_tab.download_and_install_update(
+                            info.get('url', ''), info.get('version', '')
+                        )
+                    )
+                else:
+                    about_tab.update_button.configure(
+                        state="normal", text="Check for Updates",
+                        command=about_tab.check_for_updates
+                    )
+                try:
+                    about_tab.show_new_version_changelog(info.get('changelog', []))
+                except Exception:
+                    pass
             elif info.get('status') == 'updated':
                 about_tab.latest_version_label.configure(text="Latest Version: Up to date")
-                about_tab.update_button.configure(state="normal", text="Check for Updates")
+                about_tab.update_button.configure(
+                    state="normal", text="Check for Updates",
+                    command=about_tab.check_for_updates
+                )
+                try:
+                    about_tab.hide_new_version_changelog()
+                except Exception:
+                    pass
             elif info.get('status') == 'error':
                 about_tab.latest_version_label.configure(text="Latest Version: Check failed")
-                about_tab.update_button.configure(state="normal", text="Retry Check")
+                about_tab.update_button.configure(
+                    state="normal", text="Retry Check",
+                    command=about_tab.check_for_updates
+                )
 
     # ------------------------------------------------------------------
     # LICENSED FEATURE ALERTS

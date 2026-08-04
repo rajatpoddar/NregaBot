@@ -6,7 +6,9 @@
       "📋 **No More Blank Activity Logs:** Activity entries now always record the task, status and details — previously some logs synced to the admin panel with empty fields.",
       "❌ **Automation Failure Logging:** If an automation crashes, the app now logs it as 'Failed' with the error message instead of a misleading 'Success'.",
       "📡 **Online Status:** The app now sends a heartbeat every 20 seconds so admins can see exactly which users are online right now.",
-      "⚡ **Reliable Auto-Updates:** The update check now waits up to 20s for the server (instead of 5s) — no more silently missed updates on slow networks."
+      "⚡ **Reliable Auto-Updates:** The update check now waits up to 20s for the server (instead of 5s) — no more silently missed updates on slow networks.",
+      "🛠️ **About Tab Install Button:** When an update is available, the About tab now shows a 'Download & Install' button (with the new changelog) — previously it only let you check for updates, never install them.",
+      "🔒 **Verified Downloads:** In-app downloads are now SHA-256 verified before applying — a corrupt download is discarded and automatically retried instead of breaking the install."
     ],
   "3.1.2": [
       "🐞 **Fix (About tab crash):** Resolved the 'humanize module missing' error — About tab and File Manager no longer crash if the humanize package isn't bundled; a built-in fallback is used and the package is now included in all builds.",

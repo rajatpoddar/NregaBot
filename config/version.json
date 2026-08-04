@@ -10,8 +10,8 @@
     "url_macos": "https://nregabot.com/updates/core_mac_v3.1.3.zip",
     "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "",
-    "hash_macos": "258c5a68f42b2944145610fe189ce0fd9cfbb0878c7a7f15f2886257b09e33b5"
+    "hash_windows": "0466420c21adaa8faf3b52623b32a2282e313036eae833f2f5f00a4b71c25e79",
+    "hash_macos": "83c2de1563b9ba81995c1e7c98ae1b06ce704b918ead9f7c20919f9c7508f25d"
   },
   "changelog": {
     "3.1.3": [
@@ -21,7 +21,9 @@
       "📋 **No More Blank Activity Logs:** Activity entries now always record the task, status and details — previously some logs synced to the admin panel with empty fields.",
       "❌ **Automation Failure Logging:** If an automation crashes, the app now logs it as 'Failed' with the error message instead of a misleading 'Success'.",
       "📡 **Online Status:** The app now sends a heartbeat every 20 seconds so admins can see exactly which users are online right now.",
-      "⚡ **Reliable Auto-Updates:** The update check now waits up to 20s for the server (instead of 5s) — no more silently missed updates on slow networks."
+      "⚡ **Reliable Auto-Updates:** The update check now waits up to 20s for the server (instead of 5s) — no more silently missed updates on slow networks.",
+      "🛠️ **About Tab Install Button:** When an update is available, the About tab now shows a 'Download & Install' button (with the new changelog) — previously it only let you check for updates, never install them.",
+      "🔒 **Verified Downloads:** In-app downloads are now SHA-256 verified before applying — a corrupt download is discarded and automatically retried instead of breaking the install."
     ],
     "3.1.2": [
       "🐞 **Fix (About tab crash):** Resolved the 'humanize module missing' error — About tab and File Manager no longer crash if the humanize package isn't bundled; a built-in fallback is used and the package is now included in all builds.",

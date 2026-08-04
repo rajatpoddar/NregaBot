@@ -167,6 +167,14 @@ class ModernSplashScreen(ctk.CTk):
         self._anim_after_id = None
         self._animate_dots()
 
+        # Pending update version/hash — recorded into core_version.json ONLY
+        # after a successful extraction (see extract_zip). The old loader wrote
+        # the version file BEFORE extracting; if extraction then failed, the app
+        # permanently believed it was already updated while actually running
+        # old code ("stuck state" — version matches server so no re-download).
+        self._pending_version = None
+        self._pending_hash = ""
+
         # ---------- BACKGROUND UPDATE THREAD ----------
         threading.Thread(target=self.run_update_process, daemon=True).start()
 
@@ -207,13 +215,104 @@ class ModernSplashScreen(ctk.CTk):
             pass
 
     # ------------------------------------------------------------------
-    #  BUSINESS LOGIC (unchanged from original)
+    #  BUSINESS LOGIC
     # ------------------------------------------------------------------
 
+    def _read_version_file(self):
+        """Read (version, hash) from core_version.json; default ('0.0.0', '')."""
+        try:
+            if os.path.exists(VERSION_FILE):
+                with open(VERSION_FILE, 'r') as f:
+                    data = json.load(f)
+                    return (data.get('version', '0.0.0'), data.get('hash', '') or '')
+        except Exception:
+            pass
+        return ('0.0.0', '')
+
+    def _write_version_file(self, version, hash_val):
+        try:
+            with open(VERSION_FILE, 'w') as f:
+                json.dump({"version": version, "hash": hash_val}, f)
+        except Exception as e:
+            log_error(f"Failed to write version file: {e}")
+
+    def _get_app_live_version(self) -> str:
+        """Actual version baked into the extracted code (app_live/src/config.py).
+
+        Returns '' if app_live isn't extracted yet. Used by the HEAL logic to
+        detect the stuck state where core_version.json claims a version the
+        extracted code doesn't actually have.
+        """
+        try:
+            cfg_path = os.path.join(EXTRACTED_DIR, "src", "config.py")
+            if not os.path.exists(cfg_path):
+                return ""
+            with open(cfg_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped.startswith("APP_VERSION:") or stripped.startswith("APP_VERSION ="):
+                        val = stripped.split("=", 1)[1].split("=")[-1].strip()
+                        return val.strip('"').strip("'").replace("-LITE", "").replace("-lite", "").strip()
+        except Exception:
+            pass
+        return ""
+
+    def _heal_install(self) -> None:
+        """Repair a stuck update state.
+
+        Old loader versions wrote core_version.json BEFORE extracting the zip.
+        If extraction then failed, the version file claimed the new version
+        while the app kept running old code — and because the recorded version
+        matched the server, the update was never attempted again.
+
+        Here we detect that mismatch (recorded version != actual code version
+        in app_live) and re-extract from the already-downloaded, hash-verified
+        core.zip. If core.zip is missing or corrupt, check_for_updates() will
+        re-download it because it compares against the LIVE code version too.
+        """
+        try:
+            recorded_ver, recorded_hash = self._read_version_file()
+            if recorded_ver == "0.0.0" or not recorded_hash:
+                return
+
+            live_ver = self._get_app_live_version()
+            if live_ver and live_ver == recorded_ver:
+                return  # code and record agree — nothing to heal
+
+            if not os.path.exists(CORE_ZIP_PATH):
+                return  # nothing to extract from; check_for_updates re-downloads
+
+            zip_hash = sha256_file(CORE_ZIP_PATH)
+            if not zip_hash or zip_hash != recorded_hash:
+                return  # zip doesn't match the recorded version — re-download instead
+
+            self.update_status("Repairing installation...", -1)
+            if self.extract_zip():
+                self._write_version_file(recorded_ver, recorded_hash)
+                log_error(f"Heal: re-extracted core.zip (v{recorded_ver}) after detecting version-file/code mismatch")
+        except Exception as e:
+            log_error(f"Heal install failed: {e}")
+
     def extract_zip(self):
-        """Safe extraction of core.zip to EXTRACTED_DIR"""
+        """Safe extraction of core.zip to EXTRACTED_DIR. Returns True on success.
+
+        The version file is written ONLY after a successful extraction — the old
+        behaviour recorded the new version before extracting, so a failed
+        extraction permanently stranded users on old code (version file matched
+        the server and the update was never attempted again).
+        """
         try:
             self.update_status("Extracting files...", -1)
+
+            # Validate the zip BEFORE touching the existing EXTRACTED_DIR — a
+            # corrupt download ("File is not a zip file") must never destroy
+            # the last working copy of the app; otherwise a failed extraction
+            # would leave the user with NO runnable app at all.
+            if not zipfile.is_zipfile(CORE_ZIP_PATH):
+                log_error("Extraction Failed: core.zip is not a valid zip file")
+                self.update_status("Extraction Error: corrupt update file", 0)
+                time.sleep(2)
+                return False
 
             if os.path.exists(EXTRACTED_DIR):
                 try:
@@ -228,6 +327,12 @@ class ModernSplashScreen(ctk.CTk):
             os.makedirs(EXTRACTED_DIR, exist_ok=True)
             with zipfile.ZipFile(CORE_ZIP_PATH, 'r') as zip_ref:
                 zip_ref.extractall(EXTRACTED_DIR)
+
+            # Only record the new version AFTER extraction succeeded.
+            if self._pending_version:
+                self._write_version_file(self._pending_version, self._pending_hash)
+                self._pending_version = None
+                self._pending_hash = ""
 
             return True
         except Exception as e:
@@ -251,6 +356,14 @@ class ModernSplashScreen(ctk.CTk):
             if os.path.exists(CORE_ZIP_PATH) and not os.path.exists(EXTRACTED_DIR):
                 self.extract_zip()
 
+            # HEAL: a previous run may have recorded a version in
+            # core_version.json WITHOUT successfully extracting it (old bug:
+            # the version file was written before extraction). If the recorded
+            # version doesn't match the actual code in app_live, re-extract
+            # from the already-downloaded core.zip so the app doesn't stay
+            # stuck on old code forever.
+            self._heal_install()
+
             update_found = self.check_for_updates()
 
             if update_found:
@@ -270,16 +383,21 @@ class ModernSplashScreen(ctk.CTk):
         try:
             self.update_status("Checking for updates...", -1)
 
-            current_ver = "0.0.0"
-            current_hash = ""
-            if os.path.exists(VERSION_FILE):
-                try:
-                    with open(VERSION_FILE, 'r') as f:
-                        _vdata = json.load(f)
-                        current_ver = _vdata.get('version', "0.0.0")
-                        current_hash = _vdata.get('hash', "") or ""
-                except:
-                    pass
+            current_ver, current_hash = self._read_version_file()
+            live_ver = self._get_app_live_version()
+            # Compare against the ACTUAL code version in app_live, not just the
+            # recorded version file. If a previous update recorded a newer
+            # version without successfully extracting it, the version file alone
+            # would say "up to date" while old code runs — so the live code
+            # version is authoritative for deciding whether an update is needed.
+            # When NO code version can be read at all (missing/partial app_live
+            # after a failed extraction), treat the install as empty — never let
+            # the recorded version make us think we're up to date (that is the
+            # permanent-stuck trap).
+            if live_ver:
+                effective_ver = live_ver
+            else:
+                effective_ver = "0.0.0"
 
             headers = {'User-Agent': 'NREGABot-Loader/1.0', 'Cache-Control': 'no-cache'}
             try:
@@ -319,7 +437,8 @@ class ModernSplashScreen(ctk.CTk):
 
             # Update if the version changed OR the core zip content changed
             # (same-version hotfix: same version number, new hash → re-download).
-            needs_update = (server_ver != current_ver) or (server_hash and server_hash != current_hash)
+            # Version is compared against the LIVE code (see effective_ver).
+            needs_update = (server_ver != effective_ver) or (server_hash and server_hash != current_hash)
 
             if needs_update:
                 self.update_status(f"New update found: v{server_ver}", 0)
@@ -354,8 +473,11 @@ class ModernSplashScreen(ctk.CTk):
                         time.sleep(1)
                         return False
 
-                with open(VERSION_FILE, 'w') as f:
-                    json.dump({"version": server_ver, "hash": server_hash}, f)
+                # Do NOT write the version file here — extract_zip() records it
+                # only AFTER a successful extraction. Writing it before
+                # extraction is the old bug that stranded users on old code.
+                self._pending_version = server_ver
+                self._pending_hash = server_hash
 
                 return True
             else:

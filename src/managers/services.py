@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import uuid
+import hashlib
 import requests
 import threading
 import subprocess
@@ -197,6 +198,30 @@ class ServiceManager:
                             dl += len(chunk)
                             if total > 0:
                                 self.app.after(0, about.update_progress.set, dl/total)
+
+                # Integrity check before applying — a corrupt download (e.g. a
+                # truncated transfer through the Cloudflare tunnel) would be
+                # copied into the loader's core.zip and fail extraction on the
+                # next launch, leaving the app stuck on the old version.
+                expected_hash = (self.app.update_info or {}).get("hash") or ""
+                if expected_hash:
+                    actual_hash = hashlib.sha256()
+                    with open(dl_path, 'rb') as f:
+                        for chunk in iter(lambda: f.read(8192), b""):
+                            actual_hash.update(chunk)
+                    if actual_hash.hexdigest() != expected_hash:
+                        try:
+                            os.remove(dl_path)
+                        except Exception:
+                            pass
+                        self.app.after(0, lambda: [
+                            messagebox.showerror(
+                                "Update Failed",
+                                "Download is corrupt — it will be retried automatically next time."
+                            ),
+                            about.update_button.configure(state="normal", text="Retry Update")
+                        ])
+                        return
 
                 self.app.after(0, lambda: self.app.set_status("Installing update..."))
 
