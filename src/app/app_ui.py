@@ -139,6 +139,7 @@ class UIMixin:
         # the user explicitly picked Light/Dark last time).
         ctk.set_appearance_mode(self.app_state.current_theme_mode)
         self._sync_root_background()
+        self._sync_macos_titlebar()
         self.theme_btn = ctk.CTkButton(
             settings_group, text="", image=self.icon_images.get("theme_system"),
             width=30, height=30, corner_radius=15,
@@ -479,6 +480,24 @@ class UIMixin:
         except Exception:
             logger.debug("Failed to sync root background", exc_info=True)
 
+    def _sync_macos_titlebar(self) -> None:
+        """
+        Sync the macOS window titlebar appearance with the current theme.
+
+        On macOS with Python 3.10+, CTk's built-in dark titlebar method is a
+        no-op (it only runs on Python < 3.10). We use the Tk unsupported
+        MacWindowStyle API directly to force the titlebar to match the app theme.
+        Options: 'aqua' (light), 'darkaqua' (dark), 'auto' (follows OS).
+        """
+        if config.OS_SYSTEM != "Darwin":
+            return
+        try:
+            mode = ctk.get_appearance_mode()  # "Light" or "Dark"
+            appearance = "darkaqua" if mode == "Dark" else "aqua"
+            self.tk.call("tk::unsupported::MacWindowStyle", "appearance", self._w, appearance)
+        except Exception:
+            logger.debug("Failed to sync macOS titlebar appearance", exc_info=True)
+
     def _cycle_theme(self) -> None:
         """Cycle System → Light → Dark, skipping any mode that would be a no-op.
 
@@ -539,6 +558,7 @@ class UIMixin:
 
             # Step 5: Update theme-dependent widgets + root-window background
             self._sync_root_background()
+            self._sync_macos_titlebar()
             self._update_theme_icon()
             self.play_sound("click")
 

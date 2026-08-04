@@ -275,6 +275,19 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
+        # BG FIX: Place a full-window background frame that covers the root
+        # window completely. On macOS, the root Tk window's `bg` property does
+        # not reliably update when the theme changes (Aqua ignores it). A
+        # CTkFrame with a theme-aware fg_color tuple placed behind all other
+        # widgets ensures the padding gaps (padx/pady around header/main/footer)
+        # always show the correct background color without any restart needed.
+        self._bg_frame = ctk.CTkFrame(
+            self, corner_radius=0,
+            fg_color=(config.COLORS["bg_light"], config.COLORS["bg_dark"])
+        )
+        self._bg_frame.place(x=0, y=0, relwidth=1, relheight=1)
+        self._bg_frame.lower()  # Keep it behind all other widgets
+
         # --- Stage 1: Header ---
         # P1: Removed intermediate update_idletasks() calls — splash screen is still
         # visible during these stages, so progressive rendering provides no visual benefit.
