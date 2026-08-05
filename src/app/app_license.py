@@ -1184,6 +1184,43 @@ class LicenseMixin:
         # register/renew kar sakta hai (raw key URL mein expose nahi hoti).
         webbrowser.open_new_tab(f"{config.LICENSE_SERVER_URL}/buy")
 
+    # Secure web-portal deep links (My Account / Files / Upgrade Storage).
+    # License key is password-equivalent — it must never appear in a browser
+    # URL. We fetch a short-lived signed token from the server (key travels
+    # only in the Authorization header over TLS) and open
+    # /authenticate-from-app/<token>?next=<dest>, which logs the user in and
+    # lands them on the requested page — no manual login needed.
+    _WEB_PORTAL_DESTS = {
+        'account': '/account',
+        'files': '/files',
+        'storage': '/upgrade-storage',
+    }
+
+    def open_web_page(self, dest: str = 'account') -> None:
+        """Open a web portal page logged in as the current user (no login needed)."""
+        if not self.app_state.license_info.get('key'):
+            self.play_sound("error")
+            messagebox.showerror("Error", "License key not found.")
+            return
+        try:
+            headers = {'Authorization': f"Bearer {self.app_state.license_info['key']}"}
+            resp = self.app_state.http_session.post(
+                f"{config.LICENSE_SERVER_URL}/api/get-auth-token",
+                headers=headers, timeout=10)
+            data = resp.json()
+            if resp.status_code == 200 and data.get('status') == 'success' and data.get('token'):
+                url = (f"{config.LICENSE_SERVER_URL}/authenticate-from-app/"
+                       f"{data['token']}?next={dest}")
+                webbrowser.open_new_tab(url)
+                return
+        except Exception:
+            logger.warning("get-auth-token failed — opening plain page instead", exc_info=True)
+
+        # Fallback: bina key ke destination page kholo — server login par
+        # redirect karega agar session nahi hai. Raw key kabhi URL nahi jati.
+        fallback = self._WEB_PORTAL_DESTS.get(dest, '/account')
+        webbrowser.open_new_tab(f"{config.LICENSE_SERVER_URL}{fallback}")
+
     def check_expiry_and_notify(self) -> bool:
         exp = self.app_state.license_info.get('expires_at')
         if not exp: return False

@@ -438,10 +438,9 @@ class AboutTab(ctk.CTkFrame):
         def create_manage_button(parent):
             # (Keep this helper function as is)
             def open_manage_url():
-                if self.license_info.get('key'):
-                    auth_url = f"{config.LICENSE_SERVER_URL}/authenticate-from-app/{self.license_info['key']}"
-                    webbrowser.open_new_tab(auth_url)
-                else: messagebox.showerror("Error", "License key not found.")
+                # Secure path: signed token fetch → browser (raw key kabhi
+                # URL mein nahi). User ka account page bina login khul jata hai.
+                self.app.open_web_page('account')
             return ctk.CTkButton(parent, text="Manage on Website", fg_color="transparent", border_width=1, text_color=(config.COLORS["gray10"], config.COLORS["text_bright"]), command=open_manage_url)
 
         # --- Trial Panel ---

@@ -7,11 +7,12 @@ Layout (top → bottom):
     Toolbar     : ⬅ ➡ | Upload ▾ (File(s)/Folder) | New Folder | Refresh
     Breadcrumb  : navigation + operation progress
     File tree   : multi-select, right-click menu, empty-state hint
-    Action bar  : Download | Send via WhatsApp | Share | Delete
+    Action bar  : Download | Send via WhatsApp | Delete
 
-WhatsApp fast-path: client ke PDFs select karo → "Send via WhatsApp" →
-mobile number do → server PDFs ko merge karke (footer/blank pages remove)
-Evolution API se client ko bhej deta hai. Koi manual WhatsApp Web attach nahi.
+WhatsApp fast-path: PDFs select karo → "Send via WhatsApp" → server PDFs ko
+merge karke (footer/blank pages remove) Evolution API se **aapke apne
+registered WhatsApp number par** bhej deta hai. Koi mobile input nahi —
+number hamesha license se aata hai. Koi manual WhatsApp Web attach nahi.
 """
 import tkinter
 from tkinter import ttk, messagebox, filedialog, simpledialog
@@ -22,7 +23,6 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from requests_toolbelt.multipart.encoder import MultipartEncoder, MultipartEncoderMonitor
-import webbrowser
 
 from src import config
 from src.utils import format_bytes
@@ -33,7 +33,7 @@ WHATSAPP_GREEN_HOVER = "#1EBE5D"
 
 
 class WhatsAppSendDialog(ctk.CTkToplevel):
-    """Small dialog: client mobile number + caption + blank-page cleanup option."""
+    """Small dialog: caption + blank-page cleanup option. Hamesha user ke apne number par."""
 
     def __init__(self, tab: "FileManagementTab", file_count: int) -> None:
         super().__init__(tab)
@@ -60,26 +60,37 @@ class WhatsAppSendDialog(ctk.CTkToplevel):
             text_color=WHATSAPP_GREEN
         ).grid(row=0, column=0, sticky="w", pady=(0, 10))
 
-        ctk.CTkLabel(frame, text="Client WhatsApp Number:").grid(row=1, column=0, sticky="w")
-        self.mobile_entry = ctk.CTkEntry(frame, placeholder_text="e.g., 9876543210", height=38)
-        self.mobile_entry.grid(row=2, column=0, sticky="ew", pady=(4, 10))
+        # Document aapke apne WhatsApp number par jayegi — koi number input nahi
+        self.user_mobile = self._get_user_mobile()
+        if self.user_mobile:
+            ctk.CTkLabel(
+                frame, text=f"📱 Aapke number par bheji jayegi: {self.user_mobile}",
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color=("#1D4ED8", "#60A5FA")
+            ).grid(row=1, column=0, sticky="w", pady=(0, 10))
+        else:
+            ctk.CTkLabel(
+                frame, text="⚠️ Aapka WhatsApp number account me registered nahi hai",
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color="orange"
+            ).grid(row=1, column=0, sticky="w", pady=(0, 10))
 
-        ctk.CTkLabel(frame, text="Caption (optional):").grid(row=3, column=0, sticky="w")
+        ctk.CTkLabel(frame, text="Caption (optional):").grid(row=2, column=0, sticky="w")
         self.caption_entry = ctk.CTkEntry(frame, placeholder_text="e.g., Muster Roll — Kasraydih", height=38)
-        self.caption_entry.grid(row=4, column=0, sticky="ew", pady=(4, 10))
+        self.caption_entry.grid(row=3, column=0, sticky="ew", pady=(4, 10))
 
         self.clean_var = tkinter.BooleanVar(value=True)
         ctk.CTkCheckBox(
             frame, text="Remove trailing blank/footer pages",
             variable=self.clean_var
-        ).grid(row=5, column=0, sticky="w")
+        ).grid(row=4, column=0, sticky="w")
         ctk.CTkLabel(
             frame, text="(Wahi filter jo PDF Merger use karta hai)",
             font=ctk.CTkFont(size=11), text_color="gray50"
-        ).grid(row=6, column=0, sticky="w", padx=(22, 0), pady=(0, 6))
+        ).grid(row=5, column=0, sticky="w", padx=(22, 0), pady=(0, 6))
 
         self.status_label = ctk.CTkLabel(frame, text="", text_color=WHATSAPP_GREEN, font=ctk.CTkFont(size=12))
-        self.status_label.grid(row=7, column=0, sticky="w", pady=(2, 0))
+        self.status_label.grid(row=6, column=0, sticky="w", pady=(2, 0))
 
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.grid(row=1, column=0, padx=18, pady=(0, 16), sticky="ew")
@@ -93,14 +104,28 @@ class WhatsAppSendDialog(ctk.CTkToplevel):
             text_color="white", command=self._submit
         )
         self.send_button.pack(side="right")
+        if not self.user_mobile:
+            self.send_button.configure(state="disabled")
 
-        self.after(120, self.mobile_entry.focus_set)
+        self.after(120, self.caption_entry.focus_set)
+
+    def _get_user_mobile(self) -> str:
+        """User ka registered mobile number (license_info se)."""
+        try:
+            lic = getattr(self.tab.app, 'license_info', {}) or {}
+            mobile = (lic or {}).get('user_mobile', '') or ''
+            digits = "".join(ch for ch in str(mobile) if ch.isdigit())
+            return digits if len(digits) >= 10 else ''
+        except Exception:
+            return ''
 
     def _submit(self):
-        mobile = self.mobile_entry.get().strip()
-        digits = "".join(ch for ch in mobile if ch.isdigit())
+        # Mobile number input nahi hai — hamesha user ke apne number par jata hai
+        digits = self._get_user_mobile()
         if len(digits) < 10:
-            self.status_label.configure(text="⚠️ Sahi mobile number likhein (kam se kam 10 digits)", text_color="orange")
+            self.status_label.configure(
+                text="⚠️ Aapka WhatsApp number account me registered nahi hai",
+                text_color="orange")
             return
 
         caption = self.caption_entry.get().strip()
@@ -253,7 +278,7 @@ class FileManagementTab(ctk.CTkFrame):
         # ── Action bar ──
         action_bar = ctk.CTkFrame(self, fg_color="transparent")
         action_bar.grid(row=4, column=0, padx=10, pady=10, sticky="ew")
-        action_bar.grid_columnconfigure(4, weight=1)
+        action_bar.grid_columnconfigure(3, weight=1)
 
         self.sel_label = ctk.CTkLabel(action_bar, text="", text_color="gray50", font=ctk.CTkFont(size=12))
         self.sel_label.grid(row=0, column=0, padx=(0, 10), sticky="w")
@@ -266,13 +291,11 @@ class FileManagementTab(ctk.CTkFrame):
             text_color="white"
         )
         self.whatsapp_button.grid(row=0, column=2, padx=5)
-        self.share_button = ctk.CTkButton(action_bar, text="Share", command=self.share_selected_item, state="disabled")
-        self.share_button.grid(row=0, column=3, padx=5)
         self.delete_button = ctk.CTkButton(
             action_bar, text="Delete", command=self.delete_selected_item, state="disabled",
             fg_color=config.COLORS["red_delete"], hover_color=config.COLORS["red_delete_hover"]
         )
-        self.delete_button.grid(row=0, column=4, padx=5, sticky="w")
+        self.delete_button.grid(row=0, column=3, padx=5, sticky="w")
 
     def style_treeview(self, treeview_widget=None):
         if hasattr(self.app, '_cached_style') and self.app._cached_style is not None:
@@ -326,12 +349,6 @@ class FileManagementTab(ctk.CTkFrame):
         self.delete_button.configure(state=state)
         self.whatsapp_button.configure(state="normal" if pdf_files else "disabled")
 
-        # Share: exactly 1 folder selected
-        if n == 1 and selected[0]['is_folder']:
-            self.share_button.configure(state="normal")
-        else:
-            self.share_button.configure(state="disabled")
-
         if n:
             if pdf_files and n > len(pdf_files):
                 self.sel_label.configure(text=f"{n} selected ({len(pdf_files)} PDF)")
@@ -366,8 +383,6 @@ class FileManagementTab(ctk.CTkFrame):
                          state="normal" if selected else "disabled")
         menu.add_command(label="🟢 Send via WhatsApp", command=self.send_whatsapp_selected,
                          state="normal" if pdf_files else "disabled")
-        if len(selected) == 1 and selected[0]['is_folder']:
-            menu.add_command(label="🔗 Share", command=self.share_selected_item)
         menu.add_separator()
         menu.add_command(label="🗑 Delete", command=self.delete_selected_item,
                          state="normal" if selected else "disabled")
@@ -784,50 +799,8 @@ class FileManagementTab(ctk.CTkFrame):
         threading.Thread(target=_download_worker, daemon=True).start()
 
     # ════════════════════════════════════════════════════════════
-    # SHARE + DELETE
+    # DELETE
     # ════════════════════════════════════════════════════════════
-    def share_selected_item(self):
-        selected = self._get_selected_items()
-        if len(selected) != 1 or not selected[0]['is_folder']:
-            messagebox.showwarning("Invalid Selection", "Please select a folder to share.")
-            return
-        item_data = selected[0]
-        headers = self.get_auth_headers()
-        if not headers:
-            return
-        self.share_button.configure(state="disabled", text="Sharing...")
-
-        def _share():
-            try:
-                response = self.app.http_session.post(
-                    f"{config.LICENSE_SERVER_URL}/files/api/share-folder/{item_data['id']}",
-                    headers=headers, timeout=15)
-                if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        share_link = data.get('share_link')
-                        self.app.clipboard_clear()
-                        self.app.clipboard_append(share_link)
-                        self.app.after(0, messagebox.showinfo, "Share Link Created",
-                                       f"The share link for '{item_data['filename']}' has been copied to your clipboard.")
-                    except ValueError:
-                        self.app.after(0, messagebox.showerror, "Share Failed",
-                                       "Received an invalid response from the server.")
-                else:
-                    try:
-                        reason = response.json().get('reason', f"Server returned status code {response.status_code}")
-                        self.app.after(0, messagebox.showerror, "Share Failed", reason)
-                    except ValueError:
-                        self.app.after(0, messagebox.showerror, "Share Failed",
-                                       "Received an invalid error response from the server.")
-            except requests.exceptions.RequestException as e:
-                self.app.after(0, messagebox.showerror, "Share Failed", str(e))
-            finally:
-                if self.share_button.winfo_exists():
-                    self.app.after(0, self.share_button.configure, {"state": "normal", "text": "Share"})
-
-        threading.Thread(target=_share, daemon=True).start()
-
     def delete_selected_item(self):
         items = self._get_selected_items()
         if not items:
@@ -915,11 +888,8 @@ class FileManagementTab(ctk.CTkFrame):
             except Exception:
                 pass
             messagebox.showinfo("WhatsApp Send", "PDF WhatsApp par bhej di gayi!\n\n"
-                                                 "Client ko document kuch seconds me mil jayega.")
+                                                 "Document aapke WhatsApp par kuch seconds me aa jayega.")
 
     def open_upgrade_page(self):
-        if not self.app.license_info.get('key'):
-            messagebox.showerror("Error", "No license key found to authenticate.")
-            return
-        auth_url = f"{config.LICENSE_SERVER_URL}/authenticate-from-app/{self.app.license_info['key']}"
-        webbrowser.open_new_tab(auth_url)
+        # Secure path: signed token fetch → browser (raw key kabhi URL mein nahi)
+        self.app.open_web_page('storage')

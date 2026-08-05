@@ -435,6 +435,11 @@ class AutomationMixin:
                 self._send_whatsapp_report_if_enabled(
                     key, panchayat, status, duration, details, tab_instance
                 )
+
+                # ── Cloud Reports: raw results (columns + rows) sync karo ──
+                self._sync_automation_results_to_cloud(
+                    key, panchayat, status, duration, details, tab_instance
+                )
                 
                 # ── Sync activity log to server (Phase 2) ──
                 lic = getattr(self.app_state, 'license_info', {}) or {}
@@ -459,6 +464,18 @@ class AutomationMixin:
         if not (get_config("whatsapp_automation_notify", False)
                 or get_config("whatsapp_excel_send", False)):
             return
+
+        # Success + koi result nahi → message bilkul na bhejo.
+        # e.g. Mr Tracking me koi record nahi mila — bina result ke
+        # "Completed Successfully" bhejne ka koi matlab nahi.
+        # Par agar results_tree me data hai (Excel ban sakti hai) to report
+        # chalti rahe — Excel hi result hai.
+        # (Failed status ab bhi notify hota hai — user ko pata hona chahiye.)
+        if status == "success" and (not details or not str(details).strip()):
+            tree = getattr(tab_instance, 'results_tree', None) if tab_instance else None
+            if tree is None or not tree.get_children():
+                logger.info("WhatsApp report skipped for %s — success with no result data", key)
+                return
 
         # Check if license_info has mobile number + key
         lic = getattr(self.app_state, 'license_info', {})
@@ -545,6 +562,69 @@ class AutomationMixin:
                         pass
 
         threading.Thread(target=_send, daemon=True).start()
+
+    # ════════════════════════════════════════════════════════════
+    # CLOUD REPORTS — raw results sync (30-day web portal storage)
+    # ════════════════════════════════════════════════════════════
+    def _sync_automation_results_to_cloud(self, key, panchayat, status, duration,
+                                          details, tab_instance=None):
+        """
+        Automation finish par results_tree ka raw data (columns + rows)
+        server ko POST karta hai — web portal Reports page ke liye.
+
+        - Sirf jab results data ho (rows empty ho to sync nahi)
+        - Background thread me, non-blocking
+        - Failed status bhi sync hota hai (details ke saath)
+        """
+        try:
+            # Stopped automations sync nahi karte (partial data galat report banayega)
+            if status not in ("success", "failed"):
+                return
+            if not tab_instance:
+                return
+            if not hasattr(tab_instance, '_extract_tree_columns_rows'):
+                return
+
+            columns, rows = tab_instance._extract_tree_columns_rows()
+            if not rows:
+                logger.debug("Cloud reports: no rows for %s — skip sync", key)
+                return
+
+            lic = getattr(self.app_state, 'license_info', {}) or {}
+            license_key = (lic or {}).get('key', '')
+            if not license_key:
+                return
+            server_url = config.LICENSE_SERVER_URL
+            if not server_url:
+                return
+
+            payload = {
+                "license_key": license_key,
+                "automation_key": key,
+                "run_timestamp": datetime.now().isoformat(),
+                "panchayat": panchayat,
+                "status": status,
+                "duration_seconds": duration,
+                "details": details,
+                "columns": columns,
+                "rows": rows,
+            }
+
+            def _send():
+                try:
+                    resp = requests.post(
+                        f"{server_url}/api/automation-results/sync",
+                        json=payload, timeout=20)
+                    if resp.status_code in (200, 201):
+                        logger.info("Cloud reports synced for %s (%d rows)", key, len(rows))
+                    else:
+                        logger.debug("Cloud reports sync failed for %s: %s", key, resp.text)
+                except Exception as e:
+                    logger.debug("Cloud reports sync error for %s: %s", key, e)
+
+            threading.Thread(target=_send, daemon=True).start()
+        except Exception as e:
+            logger.debug("Cloud reports pre-check error for %s: %s", key, e)
 
     def _emergency_stop_all(self) -> None:
         """Emergency stop ALL running automations immediately.

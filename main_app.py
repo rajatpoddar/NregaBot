@@ -9,7 +9,6 @@ import threading
 import time
 import subprocess
 import os
-import webbrowser
 import sys
 import json
 import logging
@@ -754,8 +753,8 @@ del "%~f0" & exit
             messagebox.showerror("Error", f"Could not open folder: {e}")
 
     def open_web_file_manager(self):
-        if self.app_state.license_info.get('key'): webbrowser.open_new_tab(f"{config.LICENSE_SERVER_URL}/authenticate-from-app/{self.app_state.license_info['key']}?next=files")
-        else: self.play_sound("error"); messagebox.showerror("Error", "License key not found.")
+        # Secure path: signed token fetch → browser (raw key kabhi URL mein nahi)
+        self.open_web_page('files')
 
     def save_demo_csv(self, file_type: str):
         try:

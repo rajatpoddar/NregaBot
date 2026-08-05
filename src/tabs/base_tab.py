@@ -215,6 +215,27 @@ class BaseAutomationTab(ctk.CTkFrame):
         except Exception:
             return self.activity_details
     
+    def _extract_tree_columns_rows(self) -> Tuple[List[str], List[List]]:
+        """
+        results_tree se raw columns + rows extract karta hai (cloud reports ke liye).
+
+        Returns:
+            (columns, rows) — rows list-of-lists, values stringified.
+            Agar tree khali/nahi hai to ([], []).
+        """
+        try:
+            tree = getattr(self, 'results_tree', None)
+            if tree is None:
+                return [], []
+            columns = list(tree["columns"])
+            rows: List[List] = []
+            for item_id in tree.get_children():
+                values = tree.item(item_id)['values']
+                rows.append(["" if v is None else str(v) for v in values])
+            return columns, rows
+        except Exception:
+            return [], []
+
     def _refresh_activity_data(self) -> None:
         """Call before/after automation to sync activity data from widgets."""
         self.activity_panchayat = self._extract_activity_panchayat()
