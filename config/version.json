@@ -1,19 +1,26 @@
 {
-  "latest_version": "3.1.5",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.1.5-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.1.5-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.1.5-Linux.tar.gz",
+  "latest_version": "3.1.6",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.1.6-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.1.6-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.1.6-Linux.tar.gz",
   "core_update": {
-    "version": "3.1.5",
-    "url": "https://nregabot.com/updates/core_v3.1.5.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.1.5.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.1.5.zip",
+    "version": "3.1.6",
+    "url": "https://nregabot.com/updates/core_v3.1.6.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.1.6.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.1.6.zip",
     "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "2d877ab840cffd74544b1936be8f838e558ecd585fdded393882d067cf57a737",
+    "hash_windows": "3ac701ebd4d4f456332a329928c9ddc9903b1245369fc20633d9feed670bcbef",
     "hash_macos": "d69f5cd597d2546596d096f25b6c1e0690dcd6f76dff93569d76276f48d5f1e5"
   },
   "changelog": {
+    "3.1.6": [
+      "🐞 **ABPS Verification Fix:** Village-wise ABPS verification no longer crashes with 'log_info() unexpected keyword level' — every village now verifies properly and results land in the table. The same log crash was also fixed in Update Estimate, Wagelist Gen, IF Edit and Resend Rejected Wagelist.",
+      "⚡ **ABPS Speed:** Fixed a 10-second stall per panchayat caused by a wrong village-dropdown wait selector.",
+      "💬 **WhatsApp Throttle Protection:** All WhatsApp sends now flow through a global queue with automatic pacing (2–6s between messages) — no more bursts, so your WhatsApp number stays safe from blocking even when many automations finish back-to-back.",
+      "📊 **WhatsApp Reports (Single Setting):** Summary message and results Excel are now controlled by ONE setting — when ON, the summary + Excel file arrive together in a single WhatsApp message.",
+      "📁 **Cloud File Manager:** Send your cloud PDFs directly to clients via WhatsApp with automatic blank-page cleanup."
+    ],
     "3.1.5": [
       "🔄 **Smart Update Fix (Loader):** After an update, the app now shows the correct new version — a stale cached config used to make it keep reporting the old version and re-showing 'update available' popups.",
       "🚀 **Auto-Restart Fix (macOS):** Updates now automatically restart the app — previously the relaunch silently never happened and you had to open it manually."

@@ -447,7 +447,13 @@ class IfEditTab(BaseAutomationTab):
         ts = datetime.now().strftime("%H:%M:%S")
         self.safe_tree_insert((ts, truncate_workcode(work_code), job_card, status, details))
         level = "success" if status.lower() == "success" else "error" if status.lower() == "failed" else "info"
-        self.log_info(f"  {'✅' if level == 'success' else '❌' if level == 'error' else '⏭️'} {truncate_workcode(work_code)} - {status}: {details}", level)        
+        msg = f"  {'✅' if level == 'success' else '❌' if level == 'error' else '⏭️'} {truncate_workcode(work_code)} - {status}: {details}"
+        if level == "success":
+            self.log_success(msg)
+        elif level == "error":
+            self.log_error(msg)
+        else:
+            self.log_info(msg)        
     def _scroll_to(self, driver, element):
         """Helper to scroll an element into view."""
         driver.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", element)
@@ -615,7 +621,7 @@ class IfEditTab(BaseAutomationTab):
                         self._scroll_to(driver, save_btn)
                         save_btn.click(); wait.until(EC.staleness_of(save_btn))
                         
-                        self.log_info(f"   - Successfully added activity '{actual_code}'.", "success"); existing_activity_codes.add(actual_code)
+                        self.log_success(f"   - Successfully added activity '{actual_code}'."); existing_activity_codes.add(actual_code)
                     except Exception as act_e:
                             self.log_error(f"   - ERROR adding activity '{actual_code}': {str(act_e).splitlines()[0]}")
             materials_raw = cfg.get("materials_list", "").strip()

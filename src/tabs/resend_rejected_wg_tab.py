@@ -239,7 +239,10 @@ class ResendRejectedWgTab(BaseAutomationTab):
             result_text = result_element.text.strip() if result_element.text else "No specific message returned."
             
             status = "Success" if "successfully" in result_text.lower() else "Info"
-            self.log_info(f"   - Result: {result_text}", "success" if status == "Success" else "info")
+            if status == "Success":
+                self.log_success(f"   - Result: {result_text}")
+            else:
+                self.log_info(f"   - Result: {result_text}")
             self._log_result(location_panchayat, status, result_text)
             
             time.sleep(1.5)  # Brief wait for postback to begin

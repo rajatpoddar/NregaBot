@@ -1,4 +1,11 @@
 {
+  "3.1.6": [
+      "🐞 **ABPS Verification Fix:** Village-wise ABPS verification no longer crashes with 'log_info() unexpected keyword level' — every village now verifies properly and results land in the table. The same log crash was also fixed in Update Estimate, Wagelist Gen, IF Edit and Resend Rejected Wagelist.",
+      "⚡ **ABPS Speed:** Fixed a 10-second stall per panchayat caused by a wrong village-dropdown wait selector.",
+      "💬 **WhatsApp Throttle Protection:** All WhatsApp sends now flow through a global queue with automatic pacing (2–6s between messages) — no more bursts, so your WhatsApp number stays safe from blocking even when many automations finish back-to-back.",
+      "📊 **WhatsApp Reports (Single Setting):** Summary message and results Excel are now controlled by ONE setting — when ON, the summary + Excel file arrive together in a single WhatsApp message.",
+      "📁 **Cloud File Manager:** Send your cloud PDFs directly to clients via WhatsApp with automatic blank-page cleanup."
+    ],
   "3.1.5": [
       "🔄 **Smart Update Fix (Loader):** After an update, the app now shows the correct new version — a stale cached config used to make it keep reporting the old version and re-showing 'update available' popups.",
       "🚀 **Auto-Restart Fix (macOS):** Updates now automatically restart the app — previously the relaunch silently never happened and you had to open it manually."

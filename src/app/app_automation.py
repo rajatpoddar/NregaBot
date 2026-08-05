@@ -431,13 +431,10 @@ class AutomationMixin:
 
             # ── Notification + Sync (safely wrapped) ──
             try:
-                # ── WhatsApp Notification (if enabled) ──
-                self._send_whatsapp_notification_if_enabled(
-                    key, panchayat, status, duration, details
+                # ── WhatsApp Report (single setting: summary + Excel sath) ──
+                self._send_whatsapp_report_if_enabled(
+                    key, panchayat, status, duration, details, tab_instance
                 )
-                
-                # ── WhatsApp Excel File send (if enabled) ──
-                self._send_excel_whatsapp_notification(key, status, tab_instance)
                 
                 # ── Sync activity log to server (Phase 2) ──
                 lic = getattr(self.app_state, 'license_info', {}) or {}
@@ -446,48 +443,82 @@ class AutomationMixin:
             except Exception as e:
                 logger.error(f"Failed to send notification/sync for {key}: {e}")
 
-    def _send_whatsapp_notification_if_enabled(self, key, panchayat, status, duration, details):
+    def _send_whatsapp_report_if_enabled(self, key, panchayat, status, duration, details, tab_instance=None):
         """
-        WhatsApp notification bhejega agar user ne settings mein enable kiya hai.
-        Notification sirf tab bheja jayega jab automation SUCCESS ya FAILED ho
-        (stopped/error par nahi bhejenge to avoid spam).
+        Ek hi setting (whatsapp_automation_notify) — ON hone par automation finish
+        par summary message + results Excel dono bheje jaate hain.
+
+        - Results data ho → EK hi WhatsApp message: Excel document jiska caption summary hai
+          (message count aadha → throttling risk bhi kam).
+        - Excel nahi bana (koi data nahi / >15MB / fail) → sirf summary text message.
         """
         if status not in ("success", "failed"):
             return
-        
-        # Check if WhatsApp notification is enabled in config
-        whatsapp_enabled = get_config("whatsapp_automation_notify", False)
-        if not whatsapp_enabled:
+
+        # Single merged setting (legacy whatsapp_excel_send bhi honor karta hai)
+        if not (get_config("whatsapp_automation_notify", False)
+                or get_config("whatsapp_excel_send", False)):
             return
-        
-        # Check if license_info has mobile number
+
+        # Check if license_info has mobile number + key
         lic = getattr(self.app_state, 'license_info', {})
-        if not lic or not lic.get('user_mobile'):
-            return
-        
-        user_mobile = lic.get('user_mobile', '')
-        license_key = lic.get('key', '')
+        user_mobile = (lic or {}).get('user_mobile', '')
+        license_key = (lic or {}).get('key', '')
         if not user_mobile or not license_key:
             return
-        
-        # Build summary message
+
+        # Build summary (Excel caption bhi yahi use hoga) — escaping-safe list + join
         duration_str = f"{duration:.0f}s" if duration < 60 else f"{duration/60:.1f}m"
         emoji = "✅" if status == "success" else "⚠️"
-        
-        summary = f"{emoji} Automation Complete\n"
-        summary += f"📋 Task: {key.replace('_', ' ').title()}\n"
+        status_word = "Completed Successfully" if status == "success" else "Completed with Issues"
+        task_name = _automation_display_name(key)
+        summary_lines = [f"{emoji} {task_name} — {status_word}"]
         if panchayat:
-            summary += f"📍 Panchayat: {panchayat}\n"
-        summary += f"⏱ Duration: {duration_str}\n"
+            summary_lines.append(f"📍 Panchayat: {panchayat}")
+        summary_lines.append(f"⏱ Duration: {duration_str}")
         if details:
-            summary += f"📊 Result: {details}\n"
-        
+            summary_lines.append(f"📊 Result: {details}")
+        summary = chr(10).join(summary_lines)
+
         # Send to server in background thread
         def _send():
+            file_path = None
             try:
                 server_url = config.LICENSE_SERVER_URL
                 if not server_url:
                     return
+
+                # ── Step 1: Try combined message — Excel with summary caption ──
+                results_tree = getattr(tab_instance, 'results_tree', None) if tab_instance else None
+                try:
+                    if (results_tree is not None and results_tree.get_children()
+                            and hasattr(tab_instance, 'export_treeview_to_excel_auto')):
+                        title_prefix = key.replace('_', ' ').title()
+                        filename = f"{key}_report.xlsx"
+                        file_path = tab_instance.export_treeview_to_excel_auto(
+                            results_tree, default_filename=filename, title_prefix=title_prefix
+                        )
+                        if file_path and os.path.exists(file_path):
+                            size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                            if size_mb <= 15:
+                                with open(file_path, "rb") as f:
+                                    file_b64 = base64.b64encode(f.read()).decode('utf-8')
+                                payload = {
+                                    "user_mobile": user_mobile,
+                                    "filename": filename,
+                                    "file_data": file_b64,
+                                    "caption": summary[:1000],  # Evolution caption limit ~1024
+                                    "license_key": license_key,
+                                }
+                                resp = requests.post(f"{server_url}/api/whatsapp-send-excel",
+                                                     json=payload, timeout=60)
+                                if resp.status_code in (200, 201):
+                                    logger.info("WhatsApp report (summary+Excel) sent for %s", key)
+                                    return
+                except Exception as e:
+                    logger.debug("WhatsApp Excel send failed for %s: %s", key, e)
+
+                # ── Step 2: Fallback — sirf summary text message ──
                 payload = {
                     "license_key": license_key,
                     "user_mobile": user_mobile,
@@ -498,123 +529,22 @@ class AutomationMixin:
                     "summary": summary,
                     "details": details,
                 }
-                resp = requests.post(
-                    f"{server_url}/api/whatsapp-notify-automation",
-                    json=payload,
-                    timeout=10
-                )
+                resp = requests.post(f"{server_url}/api/whatsapp-notify-automation",
+                                     json=payload, timeout=10)
                 if resp.status_code in (200, 201):
-                    logger.info("WhatsApp notification sent for %s", key)
+                    logger.info("WhatsApp summary sent for %s", key)
                 else:
-                    logger.debug("WhatsApp notification failed: %s", resp.text)
+                    logger.debug("WhatsApp summary failed: %s", resp.text)
             except Exception as e:
-                logger.debug("WhatsApp notification error: %s", e)
-        
-        threading.Thread(target=_send, daemon=True).start()
-
-    def _send_excel_whatsapp_notification(self, key, status, tab_instance=None):
-        """
-        Automation finish par Excel file ko nrega-server par upload karta hai,
-        aur server Evolution API ke through WhatsApp pe document bhejta hai.
-
-        Ye tab kaam karta hai jab:
-        - User ne setting mein "whatsapp_excel_send" enable kiya ho
-        - User ke paas mobile number ho
-        - Tab ke results_tree mein data ho
-        - Status "success" ya "failed" ho (stopped par nahi bhejenge)
-        """
-        # Only send on success or failure (not stopped)
-        if status not in ("success", "failed"):
-            return
-
-        # Check if Excel WhatsApp is enabled
-        excel_enabled = get_config("whatsapp_excel_send", False)
-        if not excel_enabled:
-            return
-
-        # Check if license_info has mobile number
-        lic = getattr(self.app_state, 'license_info', {})
-        if not lic or not lic.get('user_mobile'):
-            return
-        user_mobile = lic.get('user_mobile', '')
-        if not user_mobile:
-            return
-
-        # Check if tab has results_tree with data
-        if tab_instance is None:
-            return
-        results_tree = getattr(tab_instance, 'results_tree', None)
-        if results_tree is None:
-            return
-        all_items = results_tree.get_children()
-        if not all_items:
-            return
-
-        # Run in background thread
-        def _send_excel():
-            try:
-                # ── Step 1: Auto-save Excel to temp ──
-                if not hasattr(tab_instance, 'export_treeview_to_excel_auto'):
-                    return
-                title_prefix = key.replace('_', ' ').title()
-                filename = f"{key}_report.xlsx"
-                file_path = tab_instance.export_treeview_to_excel_auto(
-                    results_tree, default_filename=filename, title_prefix=title_prefix
-                )
-                if not file_path or not os.path.exists(file_path):
-                    logger.debug(f"Excel auto-save failed for {key}, skipping WhatsApp send")
-                    return
-
-                # ── Step 2: Check file size (limit ~15MB) ──
-                file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
-                if file_size_mb > 15:
-                    logger.debug(f"Excel file too large ({file_size_mb:.1f}MB), skipping WhatsApp send")
+                logger.debug("WhatsApp report error: %s", e)
+            finally:
+                if file_path and os.path.exists(file_path):
                     try:
                         os.remove(file_path)
                     except Exception:
                         pass
-                    return
 
-                # ── Step 3: Upload to nrega-server and send via Evolution API ──
-                server_url = config.LICENSE_SERVER_URL
-                if not server_url:
-                    logger.debug("No server URL configured, skipping WhatsApp send")
-                    return
-
-                # Read file as base64 for upload
-                with open(file_path, "rb") as f:
-                    file_data = f.read()
-                file_b64 = base64.b64encode(file_data).decode('utf-8')
-
-                caption = f"📊 {title_prefix} — NREGA Bot"
-                upload_payload = {
-                    "user_mobile": user_mobile,
-                    "filename": filename,
-                    "file_data": file_b64,
-                    "caption": caption,
-                    "license_key": lic.get('key', ''),
-                }
-
-                resp = requests.post(
-                    f"{server_url}/api/whatsapp-send-excel",
-                    json=upload_payload,
-                    timeout=60
-                )
-                if resp.status_code in (200, 201):
-                    logger.info(f"Excel WhatsApp sent for {key} to {user_mobile}")
-                else:
-                    logger.debug(f"Excel WhatsApp send failed: {resp.status_code} {resp.text}")
-
-                # ── Step 4: Clean up temp file ──
-                try:
-                    os.remove(file_path)
-                except Exception:
-                    pass
-
-            except Exception as e:
-                logger.debug(f"Excel WhatsApp send failed for {key}: {e}")
-
-        threading.Thread(target=_send_excel, daemon=True).start()
+        threading.Thread(target=_send, daemon=True).start()
 
     def _emergency_stop_all(self) -> None:
         """Emergency stop ALL running automations immediately.

@@ -257,9 +257,12 @@ class UpdateEstimateTab(BaseAutomationTab):
     def _log_result(self, work_code, outcome, status, details, is_error=False):
         """Logs the result to the UI."""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        log_level = "error" if is_error else "success"
         work_code = truncate_workcode(work_code)
-        self.log_info(f"'{work_code}' - {status.upper()}: {details}", level=log_level)
+        msg = f"'{work_code}' - {status.upper()}: {details}"
+        if is_error:
+            self.log_error(msg)
+        else:
+            self.log_success(msg)
         tags = ('failed',) if is_error else ()
         self.safe_tree_insert((work_code, outcome, status.upper(), details, timestamp), tags)
     

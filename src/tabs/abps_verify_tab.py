@@ -203,7 +203,10 @@ class AbpsVerifyTab(BaseAutomationTab):
                     continue
                 self.app.update_history("location_panchayat", p_name)
                 try:
-                    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'DDL_Village')))
+                    # Real ID is ctl00_ContentPlaceHolder1_DDL_Village — must use
+                    # the partial CSS selector, not By.ID 'DDL_Village' (would
+                    # silently time out 10s every panchayat).
+                    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, village_css)))
                 except (TimeoutException, NoSuchElementException):
                     pass
                 time.sleep(1)
@@ -360,8 +363,13 @@ class AbpsVerifyTab(BaseAutomationTab):
         elif "success" in status_lower or "checked" in status_lower or "verified" in status_lower:
             tags = ('success',)
         
-        log_level = 'success' if tags == ('success',) else 'error' if tags == ('failed',) else 'info'
-        self.log_info(f"📋 {job_card} ({app_name}): {status}", level=log_level)
+        msg = f"📋 {job_card} ({app_name}): {status}"
+        if tags == ('success',):
+            self.log_success(msg)
+        elif tags == ('failed',):
+            self.log_error(msg)
+        else:
+            self.log_info(msg)
         self.safe_tree_insert((job_card, app_name, status, timestamp), tags)
 
     def _show_abps_summary(self):

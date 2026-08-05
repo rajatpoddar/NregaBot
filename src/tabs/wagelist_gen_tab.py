@@ -351,7 +351,7 @@ class WagelistGenTab(BaseAutomationTab):
                 else:
                     self.log_info("📊 Wagelist Gen Complete: No wagelists were generated.")
         except Exception as e: 
-            self.log_info(f"Critical Error: {e}", level="error")
+            self.log_error(f"Critical Error: {e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Finished", 1.0)

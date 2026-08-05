@@ -146,8 +146,11 @@ echo "📄 version.json upload ho raha hai (last step)..."
 scp "${SSH_COMMON[@]}" "$LOCAL_VERSION_JSON" "$NAS_USER@$NAS_HOST:$NAS_BASE/config/version.json"
 
 # ── 9. docker-compose mount check — file mount ho to container refresh ─────
+#    NOTE: sirf ASLI mount line check hota hai (source:/target pattern), comments
+#    nahi — pehle generic grep comments me bhi 'config/version.json' dhundh leta
+#    tha aur naya directory-mount setup galat tarike se 'purana' dikhata tha.
 echo "🔍 docker-compose mount check..."
-MOUNT_LINE=$(ssh "${SSH_COMMON[@]}" "$NAS_USER@$NAS_HOST" "grep -n 'config/version.json' '$COMPOSE_DIR/docker-compose.yml' 2>/dev/null || true")
+MOUNT_LINE=$(ssh "${SSH_COMMON[@]}" "$NAS_USER@$NAS_HOST" "grep -nE 'version\\.json:/config/version\\.json|config/version\\.json:/config' '$COMPOSE_DIR/docker-compose.yml' 2>/dev/null || true")
 if [ -n "$MOUNT_LINE" ]; then
     echo "⚠️  Purana file-level mount mila — container refresh ho raha hai (ek baar)..."
     ssh -t "${SSH_COMMON[@]}" "$NAS_USER@$NAS_HOST" "cd '$COMPOSE_DIR' && sudo bash -lc 'docker-compose up -d nrega-server-new'"
