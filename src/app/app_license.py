@@ -459,14 +459,14 @@ class LicenseMixin:
         email_inner = ctk.CTkFrame(tab_email, fg_color="transparent")
         email_inner.pack(expand=True, fill="both", padx=16, pady=(16, 10))
 
-        ctk.CTkLabel(email_inner, text="Login with your registered email",
+        ctk.CTkLabel(email_inner, text="Login with your registered email / mobile",
                      font=ctk.CTkFont(size=14, weight="bold"),
                      anchor="w").pack(fill="x")
-        ctk.CTkLabel(email_inner, text="We'll send a one-time passcode to your email.",
+        ctk.CTkLabel(email_inner, text="OTP bheja jayega dono jagah — email aur WhatsApp par.",
                      font=ctk.CTkFont(size=11), text_color="gray60",
                      anchor="w").pack(fill="x", pady=(0, 12))
 
-        email_entry = ctk.CTkEntry(email_inner, placeholder_text="Enter your email address",
+        email_entry = ctk.CTkEntry(email_inner, placeholder_text="Enter your registered email or mobile number",
                                     font=ctk.CTkFont(size=13))
         email_entry.pack(fill="x", ipady=4)
         if get_config('last_used_email'):
@@ -476,7 +476,7 @@ class LicenseMixin:
         otp_row = ctk.CTkFrame(email_inner, fg_color="transparent")
         otp_row.pack(fill="x", pady=(10, 0))
 
-        otp_entry = ctk.CTkEntry(otp_row, placeholder_text="Enter OTP",
+        otp_entry = ctk.CTkEntry(otp_row, placeholder_text="Enter OTP (email / WhatsApp)",
                                   font=ctk.CTkFont(size=13))
         otp_entry.pack(side="left", fill="x", expand=True, padx=(0, 8), ipady=4)
 
@@ -497,19 +497,34 @@ class LicenseMixin:
             else:
                 send_otp_btn.configure(state="normal", text="Send OTP")
 
+        def _login_id_type(val: str) -> Optional[str]:
+            """Classify a login identifier as 'email', 'mobile' or None."""
+            v = val.strip()
+            if "@" in v:
+                return "email"
+            m = v[3:] if v.startswith("+91") else v
+            if len(m) == 10 and m.isdigit() and m[0] in "6789":
+                return "mobile"
+            return None
+
         def send_otp_login():
-            email_val = email_entry.get().strip()
-            if "@" not in email_val:
-                messagebox.showwarning("Invalid", "Enter a valid email to send OTP.",
-                                        parent=win)
+            id_val = email_entry.get().strip()
+            id_type = _login_id_type(id_val)
+            if not id_type:
+                messagebox.showwarning(
+                    "Invalid", "Enter a valid email or 10-digit mobile number to send OTP.",
+                    parent=win)
                 return
             send_otp_btn.configure(state="disabled", text="⏳ Sending...")
             email_status.configure(text="⏳  Sending OTP...",
                                    text_color=("#2563EB", "#60A5FA"))
+            payload = {"identifier": id_val}
+            if id_type == "mobile":
+                payload["mobile"] = id_val  # OTP WhatsApp par bhi jayega
             try:
                 resp = self.app_state.http_session.post(
                     f"{config.LICENSE_SERVER_URL}/api/send-otp",
-                    json={"identifier": email_val}, timeout=10)
+                    json=payload, timeout=10)
                 if resp.status_code == 200:
                     result = resp.json()
                     channel = result.get("channel", "email")
@@ -547,16 +562,17 @@ class LicenseMixin:
         email_status.pack(fill="x", pady=(8, 4))
 
         def on_email_activate():
-            email_val = email_entry.get().strip()
+            id_val = email_entry.get().strip()
+            id_type = _login_id_type(id_val)
             otp_val = otp_entry.get().strip()
-            if not email_val or "@" not in email_val:
+            if not id_type:
                 self.play_sound("error")
-                email_status.configure(text="⚠️  Please enter a valid email address.",
+                email_status.configure(text="⚠️  Please enter a valid email or mobile number.",
                                        text_color=("#DC2626", "#EF4444"))
                 return
             if not otp_val:
                 self.play_sound("error")
-                email_status.configure(text="⚠️  Please enter the OTP from your email.",
+                email_status.configure(text="⚠️  Please enter the OTP sent to your email / WhatsApp.",
                                        text_color=("#DC2626", "#EF4444"))
                 return
 
@@ -568,14 +584,19 @@ class LicenseMixin:
 
             def _email_activate_thread():
                 try:
+                    payload = {
+                        "identifier": id_val,
+                        "machine_id": self.app_state.machine_id,
+                        "otp": otp_val,
+                        "app_version": config.APP_VERSION_WIRE
+                    }
+                    if id_type == "email":
+                        payload["email"] = id_val
+                    else:
+                        payload["mobile"] = id_val
                     resp = self.app_state.http_session.post(
                         f"{config.LICENSE_SERVER_URL}/api/login-for-activation",
-                        json={
-                            "email": email_val,
-                            "machine_id": self.app_state.machine_id,
-                            "otp": otp_val,
-                            "app_version": config.APP_VERSION_WIRE
-                        },
+                        json=payload,
                         timeout=15
                     )
                     try:
@@ -590,7 +611,7 @@ class LicenseMixin:
                                 return
                             progress_bar.stop()
                             progress_bar.pack_forget()
-                            save_config('last_used_email', email_val)
+                            save_config('last_used_email', id_val)
                             self.app_state.license_info = data
                             with open(get_data_path('license.dat'), 'w') as f:
                                 json.dump(self.app_state.license_info, f)
