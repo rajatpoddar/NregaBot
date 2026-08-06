@@ -10,8 +10,8 @@
     "url_macos": "https://nregabot.com/updates/core_mac_v3.1.7.zip",
     "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "",
-    "hash_macos": ""
+    "hash_windows": "50b39d320fee402350e09a2c0cc4b5d72742cc16263caabe21c4896c1110c268",
+    "hash_macos": "3fd5f8e081573ceaa45ea9d38f34b45a614aa91ae928173c18e0083f90d0a55b"
   },
   "changelog": {
     "3.1.7": [

@@ -623,6 +623,11 @@ class AutomationMixin:
                 "details": details,
                 "columns": columns,
                 "rows": rows,
+                # 6 AM daily WhatsApp report ke liye — server ko batao ki
+                # user ne notification ON rakha hai ya nahi
+                "whatsapp_report_enabled": bool(
+                    get_config("whatsapp_automation_notify", False)
+                    or get_config("whatsapp_excel_send", False)),
             }
 
             def _send():
