@@ -20,7 +20,7 @@ from PIL import Image
 from src import config
 from src.utils import (
     resource_path, get_data_path, get_user_downloads_path,
-    get_config, save_config, get_logger, parse_version
+    get_config, save_config, get_logger, parse_version, format_bytes
 )
 from src.location_data import STATE_DISTRICT_MAP
 
@@ -612,6 +612,7 @@ class LicenseMixin:
                             progress_bar.stop()
                             progress_bar.pack_forget()
                             save_config('last_used_email', id_val)
+                            self._storage_alert_shown = False
                             self.app_state.license_info = data
                             with open(get_data_path('license.dat'), 'w') as f:
                                 json.dump(self.app_state.license_info, f)
@@ -1281,7 +1282,58 @@ class LicenseMixin:
                 if fm_tab:
                     self.after(0, lambda: fm_tab.update_storage_info(self.app_state.license_info.get('total_usage'), self.app_state.license_info.get('max_storage')))
                     self.after(0, lambda: fm_tab.refresh_files(fm_tab.current_folder_id, add_to_history=False))
+                self.after(3000, self._maybe_show_storage_full_alert)
         finally: self.app_state.is_validating_license = False
+
+    def _maybe_show_storage_full_alert(self) -> None:
+        """Show a one-time alert (per session) when cloud storage is full/nearly full.
+
+        The alert's button opens the upgrade-storage page, where the user can
+        either buy more space or clear old data (date-wise folders) to free
+        space — so they can act without hunting for the page.
+        """
+        if getattr(self, '_storage_alert_shown', False):
+            return
+        try:
+            lic = self.app_state.license_info or {}
+            try:
+                usage = int(lic.get('total_usage') or 0)
+                limit = int(lic.get('max_storage') or 0)
+            except (TypeError, ValueError):
+                return
+            if limit <= 0:
+                return
+            pct = (usage / limit) * 100
+            if pct < 90:
+                return
+
+            self._storage_alert_shown = True
+            self.play_sound("error")
+            if pct >= 100:
+                title, msg = (
+                    "⚠️ Cloud Storage Full",
+                    f"Aapka cloud storage {pct:.0f}% bhar chuka hai\n"
+                    f"({format_bytes(usage)} of {format_bytes(limit)}).\n\n"
+                    "Ab nayi files save nahi ho payengi. Aap ya to:\n"
+                    "  • Purana data clear karein (1 month se purana) — free space\n"
+                    "  • Ya storage upgrade karein\n\n"
+                    "Dono options ek hi page par hain — kholen?",
+                )
+            else:
+                title, msg = (
+                    "⚠️ Cloud Storage Almost Full",
+                    f"Aapka cloud storage {pct:.0f}% bhar chuka hai\n"
+                    f"({format_bytes(usage)} of {format_bytes(limit)}).\n\n"
+                    "Purana data clear karke ya upgrade karke space free kar sakte hain.\n\n"
+                    "Page kholen?",
+                )
+            if messagebox.askyesno(title, msg, parent=self):
+                try:
+                    self.open_web_page('storage')
+                except Exception:
+                    logger.warning("Could not open storage page", exc_info=True)
+        except Exception:
+            logger.warning("Storage alert check failed", exc_info=True)
 
     # ------------------------------------------------------------------
     # SERVER SYNC & FEATURE FLAGS
