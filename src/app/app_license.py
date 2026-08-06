@@ -27,6 +27,32 @@ from src.location_data import STATE_DISTRICT_MAP
 logger = get_logger()
 
 
+def _render_google_g_png(path: str, size: int = 128) -> None:
+    """Render a small four-color Google 'G' logo PNG with PIL."""
+    from PIL import Image as _PILImage, ImageDraw as _PILDraw
+    img = _PILImage.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = _PILDraw.Draw(img)
+    w = max(5, size // 7)
+    pad = size * 0.06
+    bbox = [pad, pad, size - pad, size - pad]
+    cx = cy = size / 2.0
+    blue, red, yellow, green = "#4285F4", "#EA4335", "#FBBC05", "#34A853"
+    # Ring segments (PIL angles: 0° = 3 o'clock, clockwise)
+    d.arc(bbox, start=300, end=405, fill=blue, width=w)    # top
+    d.arc(bbox, start=45, end=135, fill=red, width=w)      # right
+    d.arc(bbox, start=135, end=225, fill=yellow, width=w)  # bottom
+    d.arc(bbox, start=225, end=300, fill=green, width=w)   # left
+    # Blue crossbar through the middle-left
+    d.line([cx - size * 0.17, cy, cx + size * 0.10, cy], fill=blue, width=w)
+    # Red right connector (joins top and bottom arcs)
+    d.line([bbox[2] - w / 2.0, bbox[1] + w, bbox[2] - w / 2.0, bbox[3] - w], fill=red, width=w)
+    # Green tail curl at bottom-left
+    tbox = [bbox[0] + w * 0.7, bbox[3] - w * 2.2,
+            bbox[0] + w * 0.7 + size * 0.30, bbox[3] - w * 2.2 + size * 0.30]
+    d.arc(tbox, start=180, end=270, fill=green, width=w)
+    img.save(path)
+
+
 class LicenseMixin:
     """Mixin: license validation, activation, feature flags, alerts."""
 
@@ -143,6 +169,21 @@ class LicenseMixin:
                 logger.debug("No location data found on server to sync.")
         except Exception as e:
             logger.debug("Failed to sync location from server: %s", e)
+
+    # ------------------------------------------------------------------
+    # GOOGLE / PASSKEY QUICK LOGIN
+    # ------------------------------------------------------------------
+
+    def _get_google_g_icon(self, size: int = 22):
+        """Return a CTkImage of the Google 'G' logo (rendered once via PIL)."""
+        try:
+            path = get_data_path('google_g.png')
+            if not os.path.exists(path):
+                _render_google_g_png(path)
+            return ctk.CTkImage(Image.open(path), size=(size, size))
+        except Exception:
+            logger.debug("Could not render Google G icon", exc_info=True)
+            return None
 
     # ------------------------------------------------------------------
     # ACTIVATION WINDOW
@@ -698,6 +739,379 @@ class LicenseMixin:
             font=ctk.CTkFont(size=12, weight="bold"))
         trial_link.pack(pady=(4, 0))
         trial_link.bind("<Button-1>", lambda e: _start_trial())
+
+        # ==============================================================
+        # TAB 3: Quick Login (Google / Passkey)
+        # ==============================================================
+        tab_quick = tab_view.add("⚡  Quick Login")
+
+        quick_inner = ctk.CTkFrame(tab_quick, fg_color="transparent")
+        quick_inner.pack(expand=True, fill="both", padx=16, pady=(16, 10))
+
+        _oauth_state = {"request_id": None, "poll_job": None, "deadline": 0}
+        _quick_ui: Dict[str, Any] = {}
+
+        def _quick_status(text: str, color: Any = None) -> None:
+            st = _quick_ui.get("status")
+            try:
+                if st is not None and st.winfo_exists():
+                    st.configure(text=text, text_color=color or ("gray40", "gray60"))
+            except Exception:
+                pass
+
+        def _set_quick_buttons(state: str) -> None:
+            for key in ("google", "passkey"):
+                b = _quick_ui.get(key)
+                try:
+                    if b is not None and b.winfo_exists():
+                        b.configure(state=state)
+                except Exception:
+                    pass
+
+        def _build_quick_login_tab() -> None:
+            """(Re)build the Quick Login tab buttons (used after profile form)."""
+            for wgt in quick_inner.winfo_children():
+                wgt.destroy()
+            _quick_ui.clear()
+
+            ctk.CTkLabel(quick_inner, text="Login with Google or Passkey",
+                         font=ctk.CTkFont(size=14, weight="bold"),
+                         anchor="w").pack(fill="x")
+            ctk.CTkLabel(quick_inner,
+                         text="Browser khulega — Google ya passkey se login karein. Login ke baad app apne aap activate ho jayega.",
+                         font=ctk.CTkFont(size=11), text_color="gray60",
+                         anchor="w", wraplength=390, justify="left").pack(fill="x", pady=(2, 14))
+
+            g_icon = self._get_google_g_icon()
+            google = ctk.CTkButton(
+                quick_inner, text="  Continue with Google",
+                image=g_icon if g_icon else None,
+                compound="left",
+                fg_color=("#FFFFFF", "#3A3A3A"),
+                hover_color=("#F3F4F6", "#4A4A4A"),
+                text_color=("#1F2937", "#F3F4F6"),
+                border_width=1, border_color=("#D1D5DB", "#4B5563"),
+                height=42, corner_radius=8,
+                font=ctk.CTkFont(size=13, weight="bold"),
+                command=lambda: _start_oauth("google"),
+            )
+            google.pack(fill="x", ipady=2)
+            _quick_ui["google"] = google
+
+            passkey = ctk.CTkButton(
+                quick_inner, text="🔐  Sign in with Passkey",
+                fg_color=("#111827", "#E5E7EB"),
+                hover_color=("#1F2937", "#D1D5DB"),
+                text_color=("#FFFFFF", "#111827"),
+                height=42, corner_radius=8,
+                font=ctk.CTkFont(size=13, weight="bold"),
+                command=lambda: _start_oauth("passkey"),
+            )
+            passkey.pack(fill="x", pady=(10, 0), ipady=2)
+            _quick_ui["passkey"] = passkey
+
+            status = ctk.CTkLabel(quick_inner, text="", font=ctk.CTkFont(size=11),
+                                  anchor="w", wraplength=390, justify="left")
+            status.pack(fill="x", pady=(12, 6))
+            _quick_ui["status"] = status
+
+            cancel = ctk.CTkButton(quick_inner, text="Cancel", width=110, height=32,
+                                   fg_color="gray", state="disabled",
+                                   command=_cancel_oauth)
+            cancel.pack()
+            _quick_ui["cancel"] = cancel
+
+        def _cancel_oauth() -> None:
+            if _oauth_state["poll_job"]:
+                try:
+                    win.after_cancel(_oauth_state["poll_job"])
+                except Exception:
+                    pass
+            _oauth_state["request_id"] = None
+            _oauth_state["poll_job"] = None
+            _set_quick_buttons("normal")
+            cb = _quick_ui.get("cancel")
+            if cb is not None:
+                cb.configure(state="disabled")
+            _quick_status("Cancelled.", ("gray40", "gray60"))
+
+        def _activate_from_oauth(data: Dict[str, Any]) -> None:
+            """Save the license payload returned by the server and close the window."""
+            if not win.winfo_exists():
+                return
+            progress_bar.stop()
+            progress_bar.pack_forget()
+            try:
+                save_config('last_used_email', data.get('user_email') or '')
+                save_config('last_used_license_key', data.get('key') or '')
+                self._storage_alert_shown = False
+                self.app_state.license_info = data
+                with open(get_data_path('license.dat'), 'w') as f:
+                    json.dump(self.app_state.license_info, f)
+                self.play_sound("success")
+                _quick_status("✅  Activated successfully!", ("#059669", "#10B981"))
+                win.after(500, lambda: [activated.set(True), win.destroy()])
+            except Exception as e:
+                logger.debug("activate_from_oauth failed: %s", e, exc_info=True)
+                _quick_status(f"❌  {e}", ("#DC2626", "#EF4444"))
+                _set_quick_buttons("normal")
+
+        def _oauth_poll(rid: str) -> None:
+            def _thread():
+                try:
+                    resp = self.app_state.http_session.get(
+                        f"{config.LICENSE_SERVER_URL}/api/oauth/status",
+                        params={"request_id": rid}, timeout=8)
+                    data = resp.json()
+                except Exception:
+                    data = {"status": "error", "reason": "Server se connect nahi ho paya."}
+
+                def _handle():
+                    if not win.winfo_exists():
+                        return
+                    if _oauth_state.get("request_id") != rid:
+                        return  # cancelled / replaced
+                    st = data.get("status")
+                    if st == "pending":
+                        if time.time() > _oauth_state["deadline"]:
+                            _quick_status("⏱️  Login session expire ho gaya. Dobara try karein.",
+                                          ("#DC2626", "#EF4444"))
+                            _set_quick_buttons("normal")
+                            _oauth_state["request_id"] = None
+                            return
+                        _oauth_state["poll_job"] = win.after(2000, lambda: _oauth_poll(rid))
+                    elif st == "needs_profile":
+                        _show_profile_form(rid, data.get("profile") or {})
+                    elif st == "success" or "key" in data:
+                        _activate_from_oauth(data)
+                    else:
+                        _quick_status(f"❌  {data.get('reason', 'Login failed.')}",
+                                      ("#DC2626", "#EF4444"))
+                        _set_quick_buttons("normal")
+                        _oauth_state["request_id"] = None
+
+                self.after(0, _handle)
+
+            threading.Thread(target=_thread, daemon=True).start()
+
+        def _start_oauth(provider: str) -> None:
+            if _oauth_state.get("request_id"):
+                return
+            _set_quick_buttons("disabled")
+            cb = _quick_ui.get("cancel")
+            if cb is not None:
+                cb.configure(state="normal")
+            _quick_status("⏳  Starting...", ("#2563EB", "#60A5FA"))
+
+            def _thread():
+                try:
+                    resp = self.app_state.http_session.post(
+                        f"{config.LICENSE_SERVER_URL}/api/oauth/begin",
+                        json={"provider": provider, "machine_id": self.app_state.machine_id},
+                        timeout=12)
+                    data = resp.json()
+                    if resp.status_code == 200 and data.get("status") == "success":
+                        rid = data["request_id"]
+                        _oauth_state["request_id"] = rid
+                        _oauth_state["deadline"] = time.time() + 600
+
+                        def _open():
+                            webbrowser.open_new_tab(data["auth_url"])
+                            _quick_status("🖥️  Browser khul gaya — wahan login karein...",
+                                          ("#2563EB", "#60A5FA"))
+                            _oauth_poll(rid)
+                        self.after(0, _open)
+                    else:
+                        reason = data.get("reason", "Failed to start login.")
+                        self.after(0, lambda: (
+                            _quick_status(f"❌  {reason}", ("#DC2626", "#EF4444")),
+                            _set_quick_buttons("normal"),
+                        ))
+                except Exception as e:
+                    self.after(0, lambda: (
+                        _quick_status(f"❌  {e}", ("#DC2626", "#EF4444")),
+                        _set_quick_buttons("normal"),
+                    ))
+
+            threading.Thread(target=_thread, daemon=True).start()
+
+        # ── Profile completion (registration gating for new Google users) ──
+        def _show_profile_form(rid: str, profile: Dict[str, Any]) -> None:
+            for wgt in quick_inner.winfo_children():
+                wgt.destroy()
+            _quick_ui.clear()
+
+            ctk.CTkLabel(quick_inner,
+                         text="📝  Registration Complete Karein",
+                         font=ctk.CTkFont(size=14, weight="bold"), anchor="w").pack(fill="x")
+            name_lbl = profile.get("name") or ""
+            email_lbl = profile.get("email") or ""
+            info_txt = f"Google: {email_lbl}"
+            if name_lbl:
+                info_txt = f"{name_lbl}\n{email_lbl}"
+            ctk.CTkLabel(quick_inner, text=info_txt, font=ctk.CTkFont(size=11),
+                         text_color="gray60", anchor="w", justify="left",
+                         wraplength=390).pack(fill="x", pady=(2, 4))
+            ctk.CTkLabel(quick_inner,
+                         text="Mobile number, state, district aur block bharna zaroori hai — iske baad hi registration complete hogi.",
+                         font=ctk.CTkFont(size=11), text_color="gray60", anchor="w",
+                         justify="left", wraplength=390).pack(fill="x", pady=(0, 10))
+
+            # Mobile
+            ctk.CTkLabel(quick_inner, text="Mobile Number *", anchor="w",
+                         font=ctk.CTkFont(size=11, weight="bold")).pack(fill="x")
+            mobile_entry = ctk.CTkEntry(quick_inner, placeholder_text="10-digit mobile",
+                                        font=ctk.CTkFont(size=12), height=32)
+            mobile_entry.pack(fill="x", pady=(2, 8))
+
+            # State + District (dependent dropdowns)
+            loc_row = ctk.CTkFrame(quick_inner, fg_color="transparent")
+            loc_row.pack(fill="x", pady=(0, 8))
+            loc_row.grid_columnconfigure(0, weight=1, uniform="loc")
+            loc_row.grid_columnconfigure(1, weight=1, uniform="loc")
+
+            ctk.CTkLabel(loc_row, text="State *", anchor="w",
+                         font=ctk.CTkFont(size=11, weight="bold")).grid(row=0, column=0, sticky="w", padx=(0, 6))
+            state_var = tkinter.StringVar(value="Select a State")
+            state_menu = ctk.CTkOptionMenu(loc_row, values=["Select a State"] + sorted(STATE_DISTRICT_MAP.keys()),
+                                           variable=state_var, height=32, font=ctk.CTkFont(size=12))
+            state_menu.grid(row=1, column=0, sticky="ew", padx=(0, 6))
+
+            ctk.CTkLabel(loc_row, text="District *", anchor="w",
+                         font=ctk.CTkFont(size=11, weight="bold")).grid(row=0, column=1, sticky="w")
+            dist_var = tkinter.StringVar(value="Select State First")
+            dist_menu = ctk.CTkOptionMenu(loc_row, values=["Select State First"],
+                                          variable=dist_var, height=32,
+                                          font=ctk.CTkFont(size=12), state="disabled")
+            dist_menu.grid(row=1, column=1, sticky="ew")
+
+            def _on_state(s: str) -> None:
+                dists = STATE_DISTRICT_MAP.get(s, [])
+                if dists:
+                    dist_menu.configure(values=dists, state="normal")
+                    if dist_var.get() not in dists:
+                        dist_var.set("Select District")
+                else:
+                    dist_menu.configure(state="disabled")
+                    dist_var.set("Select State First")
+            state_var.trace_add("write", lambda *a: _on_state(state_var.get()))
+
+            # Block
+            ctk.CTkLabel(quick_inner, text="Block *", anchor="w",
+                         font=ctk.CTkFont(size=11, weight="bold")).pack(fill="x")
+            block_entry = ctk.CTkEntry(quick_inner, placeholder_text="Block name",
+                                       font=ctk.CTkFont(size=12), height=32)
+            block_entry.pack(fill="x", pady=(2, 8))
+
+            # Referral (optional)
+            ctk.CTkLabel(quick_inner, text="Referral Code (Optional)", anchor="w",
+                         font=ctk.CTkFont(size=11, weight="bold")).pack(fill="x")
+            referral_entry = ctk.CTkEntry(quick_inner, placeholder_text="Ask your friend for a code",
+                                          font=ctk.CTkFont(size=12), height=32)
+            referral_entry.pack(fill="x", pady=(2, 10))
+
+            pf_status = ctk.CTkLabel(quick_inner, text="", font=ctk.CTkFont(size=11),
+                                     anchor="w", wraplength=390, justify="left")
+            pf_status.pack(fill="x", pady=(0, 6))
+
+            def _submit_profile() -> None:
+                mobile = mobile_entry.get().strip()
+                state = state_var.get()
+                district = dist_var.get()
+                block = block_entry.get().strip()
+                missing = []
+                if len(mobile) < 10 or not mobile.isdigit():
+                    missing.append("Mobile Number")
+                if not state or state == "Select a State":
+                    missing.append("State")
+                if not district or district in ("Select State First", "Select District"):
+                    missing.append("District")
+                if not block:
+                    missing.append("Block")
+                if missing:
+                    self.play_sound("error")
+                    pf_status.configure(text=f"⚠️  Please fill: {', '.join(missing)}",
+                                        text_color=("#DC2626", "#EF4444"))
+                    return
+
+                submit_btn.configure(state="disabled", text="⏳ Registering...")
+                pf_status.configure(text="⏳  Registration ho rahi hai...",
+                                    text_color=("#2563EB", "#60A5FA"))
+
+                def _thread():
+                    try:
+                        payload = {
+                            "request_id": rid,
+                            "mobile": mobile,
+                            "state": state,
+                            "district": district,
+                            "block": block,
+                            "referral_code": referral_entry.get().strip(),
+                        }
+                        resp = self.app_state.http_session.post(
+                            f"{config.LICENSE_SERVER_URL}/api/oauth/complete-profile",
+                            json=payload, timeout=20)
+                        data = resp.json()
+                        if resp.status_code == 200 and "key" in data:
+                            self.after(0, lambda: _activate_from_oauth(data))
+                        else:
+                            reason = data.get("reason", "Registration failed.")
+                            self.after(0, lambda r=reason: (
+                                self.play_sound("error"),
+                                pf_status.configure(text=f"❌  {r}",
+                                                    text_color=("#DC2626", "#EF4444")),
+                                submit_btn.configure(state="normal", text="Register"),
+                            ))
+                    except Exception as e:
+                        self.after(0, lambda: (
+                            self.play_sound("error"),
+                            pf_status.configure(text=f"❌  {e}",
+                                                text_color=("#DC2626", "#EF4444")),
+                            submit_btn.configure(state="normal", text="Register"),
+                        ))
+
+                threading.Thread(target=_thread, daemon=True).start()
+
+            submit_btn = ctk.CTkButton(
+                quick_inner, text="Register", command=_submit_profile,
+                fg_color=("#059669", "#10B981"), hover_color=("#047857", "#059669"),
+                height=38, corner_radius=8,
+                font=ctk.CTkFont(size=13, weight="bold"))
+            submit_btn.pack(fill="x", pady=(2, 4))
+
+            back_lbl = ctk.CTkLabel(quick_inner, text="←  Back", cursor="hand2",
+                                    text_color=("#2563EB", "#60A5FA"),
+                                    font=ctk.CTkFont(size=12))
+            back_lbl.pack(pady=(6, 0))
+            # Reset the handshake state first so a fresh OAuth flow can start
+            back_lbl.bind("<Button-1>",
+                          lambda e: [_cancel_oauth(), _build_quick_login_tab()])
+
+        def _fetch_oauth_config() -> None:
+            """Disable providers the server has not enabled (e.g. Google)."""
+            def _thread():
+                try:
+                    resp = self.app_state.http_session.get(
+                        f"{config.LICENSE_SERVER_URL}/api/oauth/config", timeout=8)
+                    data = resp.json()
+                    ok = data.get("status") == "success"
+                except Exception:
+                    ok = False
+                    data = {}
+
+                def _apply():
+                    if not win.winfo_exists():
+                        return
+                    g = _quick_ui.get("google")
+                    if g is not None:
+                        if not ok or not data.get("google_enabled"):
+                            g.configure(state="disabled",
+                                        text="Google login unavailable")
+                self.after(0, _apply)
+            threading.Thread(target=_thread, daemon=True).start()
+
+        _build_quick_login_tab()
+        _fetch_oauth_config()
 
         # ==============================================================
         # BOTTOM SECTION (outside tabs)

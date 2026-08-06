@@ -1,4 +1,14 @@
 {
+  "3.1.7": [
+      "🔐 **Google Login:** Ab aap apne Google account se directly login kar sakte hain — desktop app ke 'Quick Login' tab aur web portal dono jagah. Nayi registration me Google ka name/email apne aap aa jata hai.",
+      "🪪 **Passkey Login (WebAuthn):** Windows Hello, Touch ID ya apne phone ke passkey se bina password login karein. Passkey ko Account page se add/remove kiya ja sakta hai.",
+      "📝 **Smarter Registration:** Google se login karne par mobile number, state, district aur block bharne ke baad hi registration complete hoti hai — Google data sirf prefill karta hai.",
+      "📧 **OTP Login (Web):** Web portal par ab email ya mobile number se OTP login — OTP email aur WhatsApp dono jagah jata hai.",
+      "📦 **Storage Alert:** Cloud storage full ya nearly-full hone par app ab turant alert dikhata hai — ek click me upgrade ya cleanup page khul jata hai.",
+      "▶️ **Progress Tracking:** Running automations ab UI par clearly dikhte hain live status indicators ke saath.",
+      "🔒 **Web Portal Security:** Web portal access aur cloud report syncing me security enhancements.",
+      "🔧 **Stability & Consistency:** Login OTP messaging improvements, mobile number support, aur logging consistency across all tabs."
+  ],
   "3.1.6": [
       "🐞 **ABPS Verification Fix:** Village-wise ABPS verification no longer crashes with 'log_info() unexpected keyword level' — every village now verifies properly and results land in the table. The same log crash was also fixed in Update Estimate, Wagelist Gen, IF Edit and Resend Rejected Wagelist.",
       "⚡ **ABPS Speed:** Fixed a 10-second stall per panchayat caused by a wrong village-dropdown wait selector.",

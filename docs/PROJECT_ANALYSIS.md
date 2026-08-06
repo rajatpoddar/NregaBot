@@ -495,7 +495,7 @@ Run `web/update_nregabot.py` to sync release assets to the NAS, or manually:
 | URL | Purpose |
 |-----|---------|
 | `https://nregabot.com` | Main website + `version.json` |
-| `https://license.nregabot.com` | License validation API |
+| `https://nregabot.com` | License validation API |
 | `https://github.com/your-org/nregabot` | Source code + Releases |
 
 ## Appendix: Security Notes

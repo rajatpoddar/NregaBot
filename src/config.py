@@ -9,9 +9,9 @@ APP_TAGLINE: str = "Your NREGA Task Management Companion"
 APP_DESCRIPTION: str = "A comprehensive tool for managing NREGA tasks efficiently."
 APP_AUTHOR: str = "Rajat Poddar"
 APP_AUTHOR_EMAIL: str = "Rajatpoddar@outlook.com"
-APP_VERSION: str = "3.1.6"
+APP_VERSION: str = "3.1.7"
 import os
-LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://license.nregabot.com')
+LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://nregabot.com')
 
 # --- Beta build support ---
 # scripts/build_beta_portable.bat bundles a config/beta.json marker into the

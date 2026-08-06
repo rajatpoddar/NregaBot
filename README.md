@@ -149,7 +149,7 @@ Download the latest version from the official website:
 
 Download the app and get your 30-day free trial by registering on our website. After registering, you will receive a trial key via email. Activate the app using your registered email or the provided key.
 
-👉 **[Register for Free Trial](https://license.nregabot.com/trial)**
+👉 **[Register for Free Trial](https://nregabot.com/trial)**
 
 ---
 
@@ -247,7 +247,7 @@ Download the app and get your 30-day free trial by registering on our website. A
 
 Affordable Monthly, Quarterly, Half-Yearly, and Yearly license plans are available. Please visit our website to purchase a key.
 
-👉 **[Get Your License Key](https://license.nregabot.com/buy)**
+👉 **[Get Your License Key](https://nregabot.com/buy)**
 
 🎉 **New Referral Program!** Refer a new user with your code (from your 'My Account' page) and get 15 extra days when they buy their first plan!
 
