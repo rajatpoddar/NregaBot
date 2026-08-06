@@ -140,6 +140,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.content_frames: Dict[str, Any] = {}  # Per-tab wrapper frames (like main app)
         self.active_automations: Set[str] = set()
         self.automation_threads: Dict[str, Any] = {}
+        self._automation_progress: Dict[str, float] = {}  # footer '%' display ke liye
         self.license_info: Dict[str, Any] = {}
         self.update_info: Dict[str, Any] = {"status": "Checking...", "version": None, "url": None}
         self.is_licensed = False
@@ -584,11 +585,17 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             text_color=("gray50", "gray50")
         ).pack(side="left", padx=(0, 10))
 
-        self.running_automation_label = ctk.CTkLabel(
-            left_frame, text="", font=ctk.CTkFont(size=11, weight="bold"),
+        # Running Automation Indicator (clickable chips) — naam par click karne
+        # se woh automation ka tab khul jata hai.
+        self.running_automation_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
+        self.running_automation_frame.pack(side="left", padx=(0, 5))
+        self.running_automation_prefix = ctk.CTkLabel(
+            self.running_automation_frame, text="",
+            font=ctk.CTkFont(size=11, weight="bold"),
             text_color=("#2563EB", "#60A5FA")
         )
-        self.running_automation_label.pack(side="left", padx=(0, 5))
+        self.running_automation_prefix.pack(side="left")
+        self.running_automation_chips: List[Any] = []
 
         ctk.CTkFrame(left_frame, width=1, height=14, fg_color=("gray80", "gray40")).pack(side="left", padx=(8, 0))
 
@@ -835,6 +842,8 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
         self.active_automations.add(key)
         self.stop_events[key] = threading.Event()
+        # Fresh run: purana progress clear karo
+        self._automation_progress.pop(key, None)
         self._update_emergency_stop_btn()
         self._update_running_automation_indicator()
 
@@ -862,6 +871,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
     def _on_automation_finished(self, key: str) -> None:
         self.active_automations.discard(key)
+        self._automation_progress.pop(key, None)
         self._update_running_automation_indicator()
         self.set_status("Ready")
         if not self.active_automations:
@@ -886,27 +896,156 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             pass
         count = len(self.active_automations)
         self.active_automations.clear()
+        # Emergency stop → koi automation active nahi — progress state bhi clean
+        self._automation_progress.clear()
         self._update_running_automation_indicator()
         self.set_status(f"Stopped {count} automation(s)")
         self.show_toast(f"🛑 Stopped {count} automation(s)", "warning", duration=5000)
         self._update_emergency_stop_btn()
 
     def _update_running_automation_indicator(self) -> None:
-        """Update the footer's '▶ Running: ...' label with the currently
-        active automation display names. Safe to call before the footer is
-        built (label may not exist yet)."""
-        label = getattr(self, 'running_automation_label', None)
-        if label is None:
+        """Update the footer's '▶ Running: ...' indicator with the currently
+        active automation display names. Har naam ek clickable chip hai jo us
+        automation ka tab kholta hai. Safe to call before the footer is built."""
+        frame = getattr(self, 'running_automation_frame', None)
+        if frame is None:
             return
         try:
-            if not label.winfo_exists():
+            if not frame.winfo_exists():
                 return
             active = list(self.active_automations)
             if not active:
-                label.configure(text="")
-            else:
-                names = [_automation_display_name(k) for k in sorted(active)]
-                label.configure(text="▶ Running: " + ", ".join(names))
+                self._clear_running_chips()
+                self.running_automation_prefix.configure(text="")
+                return
+            # Sirf tab set change hone par rebuild karo (avoid churn)
+            cur_keys = tuple(sorted(active))
+            if getattr(self, '_running_chip_keys', None) == cur_keys:
+                return
+            self._running_chip_keys = cur_keys
+            self._clear_running_chips()
+            self.running_automation_prefix.configure(text="▶ Running: ")
+            tab_map = self._automation_key_to_tab_name()
+            for idx, k in enumerate(cur_keys):
+                if idx > 0:
+                    sep = ctk.CTkLabel(frame, text=",", text_color=("#2563EB", "#60A5FA"),
+                                       font=ctk.CTkFont(size=11, weight="bold"))
+                    sep.pack(side="left")
+                    self.running_automation_chips.append(sep)
+                name = _automation_display_name(k)
+                tab_name = tab_map.get(k)
+                chip = ctk.CTkLabel(
+                    frame, text=name,
+                    font=ctk.CTkFont(size=11, weight="bold"),
+                    text_color=("#2563EB", "#60A5FA"),
+                    cursor="hand2" if tab_name else ""
+                )
+                chip.pack(side="left")
+                if tab_name:
+                    chip.bind("<Button-1>", lambda e, tn=tab_name: self.show_frame(tn))
+                    chip.bind("<Enter>", lambda e, c=chip: c.configure(text_color=("#1E40AF", "#93C5FD")))
+                    chip.bind("<Leave>", lambda e, c=chip: c.configure(text_color=("#2563EB", "#60A5FA")))
+                self.running_automation_chips.append(chip)
+                # Progress % label — sirf agar tab ne progress report kiya ho
+                pct = self._automation_progress.get(k)
+                pct_label = ctk.CTkLabel(
+                    frame,
+                    text=f" {int(round(float(pct) * 100))}%" if pct is not None else "",
+                    font=ctk.CTkFont(size=10, weight="bold"),
+                    text_color=("#1E40AF", "#93C5FD")
+                )
+                pct_label.pack(side="left")
+                self.running_automation_chips.append(pct_label)
+                self._running_pct_labels[k] = pct_label
+        except Exception:
+            pass
+
+    def _clear_running_chips(self) -> None:
+        """Destroy all footer running-indicator chips (comma separators included)."""
+        try:
+            for w in getattr(self, 'running_automation_chips', []):
+                try:
+                    if w.winfo_exists():
+                        w.destroy()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        self.running_automation_chips = []
+        self._running_pct_labels = {}
+
+    def _automation_key_to_tab_name(self) -> Dict[str, str]:
+        """Map automation_key → tab display name for footer chip clicks.
+
+        Loaded tab instances are authoritative (their automation_key matches
+        the active_automations keys). Falls back to the lite tab_config 'key'
+        field, then a small override map for known mismatches.
+        """
+        mapping: Dict[str, str] = {}
+        try:
+            for name, inst in self.tab_instances.items():
+                key = getattr(inst, 'automation_key', None)
+                if key:
+                    mapping.setdefault(key, name)
+        except Exception:
+            pass
+        try:
+            for _cat, tabs in self.get_tabs_definition().items():
+                for name, info in tabs.items():
+                    k = info.get("key")
+                    if k:
+                        mapping.setdefault(k, name)
+        except Exception:
+            pass
+        for k, n in {
+            "gen": "Gen Wagelist",
+            "send": "Send Wagelist",
+            "muster": "Muster Roll Gen",
+            "msr": "MR Payment",
+            "if_edit": "IF Editor",
+            "jc_verify": "Job Card Verify",
+            "abps_verify": "Verify ABPS",
+            "resend_wg": "Resend Rejected WG",
+            "sad_auto": "Sarkar Aapke Dwar",
+            "fto_gen_del": "FTO Generation",
+            "macro": "Macro Manager",
+            "pdf_merger": "PDF Merger",
+        }.items():
+            mapping.setdefault(k, n)
+        return mapping
+
+    def report_automation_progress(self, key: str, fraction: float) -> None:
+        """Automation tab apna progress fraction (0.0–1.0) yahan report karta hai.
+        Footer me us automation ke naam ke aage '%' dikhata hai (thread-safe)."""
+        try:
+            frac = max(0.0, min(1.0, float(fraction)))
+            if abs(self._automation_progress.get(key, -1.0) - frac) < 0.001:
+                return
+            self._automation_progress[key] = frac
+            self.after(0, self._refresh_running_pct_labels)
+        except Exception:
+            pass
+
+    def _refresh_running_pct_labels(self) -> None:
+        """Footer me '%' labels live-update karo — chip rebuild nahi, sirf text."""
+        try:
+            labels = getattr(self, '_running_pct_labels', None)
+            if not labels:
+                return
+            for k, lbl in list(labels.items()):
+                try:
+                    if not lbl.winfo_exists():
+                        continue
+                    frac = self._automation_progress.get(k)
+                    if frac is None:
+                        txt = ""
+                    else:
+                        pct = min(99, int(round(float(frac) * 100)))
+                        txt = f" {pct}%"
+                    if lbl.cget("text") != txt:
+                        lbl.configure(text=txt)
+                except Exception:
+                    pass
         except Exception:
             pass
 

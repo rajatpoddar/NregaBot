@@ -1,6 +1,6 @@
 # tabs/jobcard_verify_tab.py
 import tkinter
-from tkinter import messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 import time, os, sys, json
 from datetime import datetime
@@ -24,6 +24,10 @@ class JobcardVerifyTab(BaseAutomationTab):
         super().__init__(parent, app_instance, automation_key="jc_verify")
         self.photo_folder_path = ""
         self.pref_file = os.path.join(os.path.abspath("."), "jc_verify_prefs.json") 
+        # Result tracking (WhatsApp summary + Excel report ke liye)
+        self._jc_success = 0
+        self._jc_failed = 0
+        self._jc_skipped = 0
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(3, weight=1)
         self._create_widgets()
         self._load_saved_preferences()
@@ -106,6 +110,29 @@ class JobcardVerifyTab(BaseAutomationTab):
         notebook.grid(row=3, column=0, sticky="nsew")
         self._create_log_and_status_area(parent_notebook=notebook)
         self.progress_bar.grid_forget()
+
+        # ── Results Tab (results_tree → WhatsApp summary + Excel report) ──
+        results_tab = notebook.add("Results")
+        results_tab.grid_columnconfigure(0, weight=1)
+        results_tab.grid_rowconfigure(0, weight=1)
+        self.results_tree = ttk.Treeview(
+            results_tab, columns=("timestamp", "panchayat", "village", "jobcard", "status", "details"),
+            show="headings")
+        for col, text, width, anchor in [
+            ("timestamp", "Time", 70, "center"),
+            ("panchayat", "Panchayat", 110, "w"),
+            ("village", "Village", 110, "w"),
+            ("jobcard", "Jobcard No", 150, "w"),
+            ("status", "Status", 100, "center"),
+            ("details", "Details", 260, "w"),
+        ]:
+            self.results_tree.heading(col, text=text)
+            self.results_tree.column(col, width=width, anchor=anchor)
+        self.style_treeview(self.results_tree)
+        rsb = ttk.Scrollbar(results_tab, orient="vertical", command=self.results_tree.yview)
+        self.results_tree.configure(yscrollcommand=rsb.set)
+        self.results_tree.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        rsb.grid(row=0, column=1, sticky="ns")
 
     def _toggle_village_entry(self):
         if self.process_all_villages_var.get():
@@ -193,6 +220,15 @@ class JobcardVerifyTab(BaseAutomationTab):
         }
         if not all_panchayats:
             self._save_preferences(panchayat, village)
+        # Fresh run: reset result counters + clear previous results tree
+        self._jc_success = 0
+        self._jc_failed = 0
+        self._jc_skipped = 0
+        try:
+            for i in self.results_tree.get_children():
+                self.results_tree.delete(i)
+        except Exception:
+            pass
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def _get_photo_for_jobcard(self, jobcard_no):
@@ -267,11 +303,15 @@ class JobcardVerifyTab(BaseAutomationTab):
                         break
                     self._process_single_village(driver, wait, inputs, location_village)
 
-            if not self.is_stopped():
-                self.log_info(f"{'='*50}")
-
-            self.log_info("📊 Jobcard verification complete for all selected villages.")
-            self.log_info(f"{'='*50}")
+            # ── Structured completion summary ──
+            total = self._jc_success + self._jc_failed + self._jc_skipped
+            self.log_info(f"\n{'='*40}")
+            self.log_info("📊 Jobcard Verification Summary")
+            self.log_info(f"✅ Success: {self._jc_success}")
+            self.log_info(f"❌ Failed: {self._jc_failed}")
+            self.log_info(f"⏭️ Skipped: {self._jc_skipped}")
+            self.log_info(f"📁 Total processed: {total}")
+            self.log_info(f"{'='*40}")
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e).splitlines()[0]}"
             self.log_error(f"Error: {error_msg}")
@@ -304,7 +344,8 @@ class JobcardVerifyTab(BaseAutomationTab):
         page_count = 1
         while not self.is_stopped():
             self.log_info(f"   > Processing Page {page_count}")
-            self._process_jobcards_for_current_page(driver, wait, inputs['verify_account_only'])
+            self._process_jobcards_for_current_page(
+                driver, wait, inputs['verify_account_only'], inputs['panchayat'], location_village)
 
             # Pass the current page number so we know what to look for (Next = page_count + 1)
             if not self._handle_pagination(driver, wait, page_count):
@@ -314,7 +355,28 @@ class JobcardVerifyTab(BaseAutomationTab):
             page_count += 1
             time.sleep(2)
 
-    def _process_jobcards_for_current_page(self, driver, wait, verify_account_only):
+    def _add_jc_result_row(self, panchayat, village, jobcard_no, status, details):
+        """Insert a row into results_tree (thread-safe) + track counters.
+
+        `safe_tree_insert` via app.after(0, ...) se main thread par insert
+        hota hai — WhatsApp summary/Excel `results_tree` se hi banta hai.
+        """
+        status_lower = status.lower()
+        if 'success' in status_lower:
+            self._jc_success += 1
+            tags = ("success",)
+        elif 'fail' in status_lower:
+            self._jc_failed += 1
+            tags = ("failed",)
+        else:
+            self._jc_skipped += 1
+            tags = ("skipped",)
+        self.safe_tree_insert(
+            (datetime.now().strftime("%H:%M:%S"), panchayat, village, jobcard_no, status, details),
+            tags=tags,
+        )
+
+    def _process_jobcards_for_current_page(self, driver, wait, verify_account_only, panchayat, village):
         row_index = 2 
         while not self.is_stopped():
             row_id_base = f"ctl00_ContentPlaceHolder1_grdData_ctl{row_index:02d}"
@@ -335,8 +397,11 @@ class JobcardVerifyTab(BaseAutomationTab):
                     ac_element = driver.find_elements(By.ID, f"{row_id_base}_lblAc")
                     if not ac_element or not ac_element[0].text.strip():
                         self.log_info(f"   - Skipping Jobcard {jobcard_no} (No Account Number)")
+                        self._add_jc_result_row(panchayat, village, jobcard_no, "⏭️ Skipped", "No Account Number")
                         should_skip = True
-                except Exception: should_skip = True
+                except Exception:
+                    self._add_jc_result_row(panchayat, village, jobcard_no, "⏭️ Skipped", "Account check error")
+                    should_skip = True
 
             if should_skip:
                 row_index += 1
@@ -346,6 +411,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             photo_to_upload = self._get_photo_for_jobcard(jobcard_no)
             
             upload_link = None
+            upload_ok = False
             try:
                 links = driver.find_elements(By.ID, f"{row_id_base}_link_img_F")
                 if not links: links = driver.find_elements(By.ID, f"{row_id_base}_link_img_W")
@@ -365,6 +431,7 @@ class JobcardVerifyTab(BaseAutomationTab):
                     file_input.send_keys(photo_to_upload)
                     driver.find_element(By.CSS_SELECTOR, 'input[type="submit"]').click()
                     wait.until(EC.alert_is_present()).accept()
+                    upload_ok = True
                     self.log_success("     - Photo uploaded successfully.")
                 except Exception as ex:
                     self.log_error(f"     - Upload failed: {str(ex)}")
@@ -394,8 +461,11 @@ class JobcardVerifyTab(BaseAutomationTab):
                 # Element wait handled by WebDriverWait below
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch")))
                 row_index = 2
+                detail = "Photo uploaded + Saved" if upload_ok else "Saved"
+                self._add_jc_result_row(panchayat, village, jobcard_no, "✅ Success", detail)
             except Exception as e:
                 self.log_error(f"     - Error saving row: {e}")
+                self._add_jc_result_row(panchayat, village, jobcard_no, "❌ Failed", str(e)[:150])
                 row_index += 1
 
     def _handle_pagination(self, driver, wait, current_page_num):

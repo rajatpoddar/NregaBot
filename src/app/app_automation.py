@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 
 from tkinter import messagebox
 
+import customtkinter as ctk
+
 import requests
 
 from src import config
@@ -123,6 +125,8 @@ class AutomationMixin:
         self.prevent_sleep()
         self.app_state.active_automations.add(key)
         self.app_state.stop_events[key] = threading.Event()
+        # Fresh run: purana progress clear karo (footer '%' stale na rahe)
+        self.app_state.automation_progress.pop(key, None)
         self._update_emergency_stop_btn()
         self._update_running_automation_indicator()
 
@@ -375,6 +379,7 @@ class AutomationMixin:
     def on_automation_finished(self, key, duration=0.0, tab_instance=None, error_msg=''):
         if key in self.app_state.active_automations:
             self.app_state.active_automations.remove(key)
+        self.app_state.automation_progress.pop(key, None)
         self._update_running_automation_indicator()
         self.set_status("Finished")
         self.after(5000, lambda: self.set_status("Ready"))
@@ -459,6 +464,16 @@ class AutomationMixin:
         """
         if status not in ("success", "failed"):
             return
+
+        # Fresh read of details on the MAIN thread — tabs jo rows async insert
+        # karte hain (safe_tree_insert via app.after), unke pending inserts yahan
+        # tak process ho chuke hote hain, isliye summary counts accurate milte hain
+        # (wrapper() me bg-thread par liya gaya details stale ho sakta hai).
+        if tab_instance is not None:
+            try:
+                details = getattr(tab_instance, 'activity_details', details) or details
+            except Exception:
+                pass
 
         # Single merged setting (legacy whatsapp_excel_send bhi honor karta hai)
         if not (get_config("whatsapp_automation_notify", False)
@@ -668,6 +683,8 @@ class AutomationMixin:
         # 4. Clean up all active automation tracking
         count = len(self.app_state.active_automations)
         self.app_state.active_automations.clear()
+        # Emergency stop → koi automation active nahi — progress state bhi clean
+        self.app_state.automation_progress.clear()
         self.allow_sleep()
 
         self.play_sound("error")
@@ -677,23 +694,167 @@ class AutomationMixin:
         self.after(0, self._update_running_automation_indicator)
 
     def _update_running_automation_indicator(self) -> None:
-        """Update the footer's '▶ Running: ...' label with the currently
-        active automation display names. Safe to call before the footer is
-        built (label may not exist yet)."""
-        label = getattr(self, 'running_automation_label', None)
-        if label is None:
+        """Update the footer's '▶ Running: ...' indicator with the currently
+        active automation display names. Har naam ek clickable chip hai jo
+        us automation ka tab kholta hai. Safe to call before the footer is
+        built (frame may not exist yet)."""
+        frame = getattr(self, 'running_automation_frame', None)
+        if frame is None:
             return
         try:
-            if not label.winfo_exists():
+            if not frame.winfo_exists():
                 return
             active = list(self.app_state.active_automations)
             if not active:
-                label.configure(text="")
-            else:
-                names = [f"{_automation_display_name(k)}" for k in sorted(active)]
-                label.configure(text="▶ Running: " + ", ".join(names))
+                self._clear_running_chips()
+                self.running_automation_prefix.configure(text="")
+                return
+            # Sirf tab on change par rebuild karo (avoid churn)
+            cur_keys = tuple(sorted(active))
+            if getattr(self, '_running_chip_keys', None) == cur_keys:
+                return
+            self._running_chip_keys = cur_keys
+            self._clear_running_chips()
+            self.running_automation_prefix.configure(text="▶ Running: ")
+            tab_map = self._automation_key_to_tab_name()
+            for idx, k in enumerate(cur_keys):
+                if idx > 0:
+                    sep = ctk.CTkLabel(frame, text=",", text_color=("#2563EB", "#60A5FA"),
+                                       font=ctk.CTkFont(size=12, weight="bold"))
+                    sep.pack(side="left")
+                    self.running_automation_chips.append(sep)
+                name = _automation_display_name(k)
+                tab_name = tab_map.get(k)
+                chip = ctk.CTkLabel(
+                    frame, text=name,
+                    font=ctk.CTkFont(size=12, weight="bold"),
+                    text_color=("#2563EB", "#60A5FA"),
+                    cursor="hand2" if tab_name else ""
+                )
+                chip.pack(side="left")
+                if tab_name:
+                    chip.bind("<Button-1>", lambda e, tn=tab_name: self._open_running_tab(tn))
+                    chip.bind("<Enter>", lambda e, c=chip: c.configure(text_color=("#1E40AF", "#93C5FD")))
+                    chip.bind("<Leave>", lambda e, c=chip: c.configure(text_color=("#2563EB", "#60A5FA")))
+                self.running_automation_chips.append(chip)
+                # Progress % label — sirf agar tab ne progress report kiya ho
+                pct = self.app_state.automation_progress.get(k)
+                pct_label = ctk.CTkLabel(
+                    frame,
+                    text=f" {int(round(float(pct) * 100))}%" if pct is not None else "",
+                    font=ctk.CTkFont(size=10, weight="bold"),
+                    text_color=("#1E40AF", "#93C5FD")
+                )
+                pct_label.pack(side="left")
+                self.running_automation_chips.append(pct_label)
+                self._running_pct_labels[k] = pct_label
         except Exception:
             logger.debug("Failed to update running automation indicator", exc_info=True)
+
+    def _clear_running_chips(self) -> None:
+        """Destroy all footer running-indicator chips (comma separators included)."""
+        try:
+            for w in getattr(self, 'running_automation_chips', []):
+                try:
+                    if w.winfo_exists():
+                        w.destroy()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        self.running_automation_chips = []
+        self._running_pct_labels = {}
+
+    def _open_running_tab(self, tab_name: str) -> None:
+        """Footer '▶ Running' chip click → switch to the automation's tab."""
+        try:
+            self.show_frame(tab_name)
+            self.set_status(f"Opened {tab_name}")
+        except Exception as e:
+            logger.debug("Failed to open running tab %s: %s", tab_name, e)
+
+    def _automation_key_to_tab_name(self) -> Dict[str, str]:
+        """Map automation_key → tab display name for footer chip clicks.
+
+        Loaded tab instances are authoritative (their automation_key matches
+        the active_automations keys exactly — e.g. 'gen' for Wagelist Gen).
+        Falls back to the tab_config 'key' field, then a small override map
+        for the known config-key vs automation-key mismatches.
+        """
+        mapping: Dict[str, str] = {}
+        try:
+            instances = getattr(self.app_state, 'tab_instances', {}) or {}
+            for name, inst in instances.items():
+                key = getattr(inst, 'automation_key', None)
+                if key:
+                    mapping.setdefault(key, name)
+        except Exception:
+            pass
+        try:
+            for _cat, tabs in self.get_tabs_definition().items():
+                for name, info in tabs.items():
+                    k = info.get("key")
+                    if k:
+                        mapping.setdefault(k, name)
+        except Exception:
+            pass
+        for k, n in {
+            "gen": "Gen Wagelist",
+            "send": "Send Wagelist",
+            "muster": "Muster Roll Gen",
+            "msr": "MR Payment",
+            "if_edit": "IF Editor",
+            "jc_verify": "Job Card Verify",
+            "jobcard_verify": "Job Card Verify",
+            "abps_verify": "Verify ABPS",
+            "verify_abps": "Verify ABPS",
+            "resend_wg": "Resend Rejected WG",
+            "sad_auto": "Sarkar Aapke Dwar",
+            "fto_gen_del": "FTO Generation",
+            "macro": "Macro Manager",
+            "pdf_merger": "PDF Merger",
+            "wc_extractor": "Workcode Extractor",
+        }.items():
+            mapping.setdefault(k, n)
+        return mapping
+
+    def report_automation_progress(self, key: str, fraction: float) -> None:
+        """Automation tab apna progress fraction (0.0–1.0) yahan report karta hai.
+
+        Footer me us automation ke naam ke aage '%' dikhata hai. Thread-safe:
+        value store karke main-thread par label update schedule karta hai.
+        """
+        try:
+            frac = max(0.0, min(1.0, float(fraction)))
+            if abs(self.app_state.automation_progress.get(key, -1.0) - frac) < 0.001:
+                return
+            self.app_state.automation_progress[key] = frac
+            self.after(0, self._refresh_running_pct_labels)
+        except Exception:
+            pass
+
+    def _refresh_running_pct_labels(self) -> None:
+        """Footer me '%' labels live-update karo — chip rebuild nahi, sirf text."""
+        try:
+            labels = getattr(self, '_running_pct_labels', None)
+            if not labels:
+                return
+            for k, lbl in list(labels.items()):
+                try:
+                    if not lbl.winfo_exists():
+                        continue
+                    frac = self.app_state.automation_progress.get(k)
+                    if frac is None:
+                        txt = ""
+                    else:
+                        pct = min(99, int(round(float(frac) * 100)))
+                        txt = f" {pct}%"
+                    if lbl.cget("text") != txt:
+                        lbl.configure(text=txt)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def _update_emergency_stop_btn(self) -> None:
         """Toggle emergency stop indicator + label state.

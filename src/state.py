@@ -73,6 +73,11 @@ class AppState:
     stop_events: Dict[str, Any] = field(default_factory=dict)
     """Mapping of tab key → threading.Event for signalling stop to running tasks."""
 
+    automation_progress: Dict[str, float] = field(default_factory=dict)
+    """Mapping of tab key → progress fraction (0.0–1.0) reported by the running
+    automation for the footer '%' display. Only keys that actually report
+    progress appear here — the rest keep the indeterminate spinner."""
+
     sleep_prevention_process: Any = None
     """Subprocess reference for sleep prevention (Windows-only)."""
 

@@ -151,6 +151,12 @@ class EKycReportTab(BaseAutomationTab):
         self.tree.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         sb.grid(row=1, column=1, sticky="ns")
 
+        # ── results_tree alias ──
+        # Base class helpers (WhatsApp summary + Excel report, cloud sync)
+        # `results_tree` attribute use karte hain — same table ko alias kar do
+        # taaki eKYC report bhi WhatsApp par summary + sheet bhej sake.
+        self.results_tree = self.tree
+
     def _safe_update_status(self, text, progress=None):
         """Safe version of update_status — only runs on main thread via after(0, ...)."""
         if not self._is_alive():
@@ -162,6 +168,12 @@ class EKycReportTab(BaseAutomationTab):
         if progress is not None:
             try:
                 self.progress_bar.set(progress)
+            except Exception:
+                pass
+            # Footer '%' display — app ko progress report karo
+            try:
+                if hasattr(self.app, 'report_automation_progress'):
+                    self.app.report_automation_progress(self.automation_key, progress)
             except Exception:
                 pass
         try:
@@ -234,6 +246,36 @@ class EKycReportTab(BaseAutomationTab):
             )
         
         self.stats_text.configure(text="\n".join(lines))
+
+    def _extract_activity_details(self) -> str:
+        """eKYC-specific result summary: eKYC Done / Pending / ABPS Pending.
+
+        Base heuristic Status column dhunde hai, par eKYC table me Yes/No
+        columns hain — isliye accurate counts yahan se aate hain.
+        """
+        try:
+            items = self.tree.get_children() if getattr(self, 'tree', None) is not None else []
+            if not items:
+                # Khali tree → purani run ke counts leak na karein ("success + no data → skip" bhi sahi ho)
+                return ""
+            total = len(items)
+            done = 0
+            abps_pending = 0
+            for iid in items:
+                vals = self.tree.item(iid, 'values') or []
+                if len(vals) > 6 and 'yes' in str(vals[6]).lower():
+                    done += 1
+                if len(vals) > 5 and 'no' in str(vals[5]).lower():
+                    abps_pending += 1
+            pending = total - done
+            parts = [f"📊 Total: {total}", f"✅ eKYC Done: {done}"]
+            if pending > 0:
+                parts.append(f"⏳ Pending: {pending}")
+            if abps_pending > 0:
+                parts.append(f"ABPS Pending: {abps_pending}")
+            return " | ".join(parts)
+        except Exception:
+            return self.activity_details
 
     def run_process(self):
         try:

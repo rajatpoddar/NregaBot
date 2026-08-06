@@ -947,6 +947,12 @@ class BaseAutomationTab(ctk.CTkFrame):
                 self.progress_bar.set(float(progress))
             except Exception:
                 pass
+            # Footer '%' display — app ko progress report karo (thread-safe)
+            try:
+                if hasattr(self.app, 'report_automation_progress'):
+                    self.app.report_automation_progress(self.automation_key, float(progress))
+            except Exception:
+                pass
         # --- FIXED: Update Global App Status ---
         if hasattr(self.app, 'set_status'):
             self.app.set_status(message)

@@ -261,14 +261,19 @@ class UIMixin:
         self.loading_animation_label = ctk.CTkLabel(status_frame, text="", width=20, font=ctk.CTkFont(size=14))
         self.loading_animation_label.pack(side="left")
 
-        # ── Running Automation Indicator ──
+        # ── Running Automation Indicator (clickable chips) ──
         # Shows WHICH automation(s) are currently running (e.g. "▶ Running: MR Tracking").
+        # Har naam ek clickable chip hai — click karne par woh tab khul jata hai.
         # Updated by AutomationMixin._update_running_automation_indicator().
-        self.running_automation_label = ctk.CTkLabel(
-            status_frame, text="", font=ctk.CTkFont(size=12, weight="bold"),
+        self.running_automation_frame = ctk.CTkFrame(status_frame, fg_color="transparent")
+        self.running_automation_frame.pack(side="left", padx=(0, 5))
+        self.running_automation_prefix = ctk.CTkLabel(
+            self.running_automation_frame, text="",
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=("#2563EB", "#60A5FA")
         )
-        self.running_automation_label.pack(side="left", padx=(0, 5))
+        self.running_automation_prefix.pack(side="left")
+        self.running_automation_chips: List[Any] = []
 
         # Separator between running automation name and status
         ctk.CTkFrame(status_frame, width=2, height=14, corner_radius=0,
