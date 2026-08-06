@@ -19,11 +19,14 @@ logger = get_logger()
 from .base_tab import BaseAutomationTab
 from src import config  # <-- Make sure config is imported
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException, Alignment, Border, Font, PatternFill, Side, pd  # noqa: F401
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException, Alignment, Border, Font, PatternFill, Side, import_pandas  # noqa: F401
 
 
-import pandas as pd
-from webdriver_manager.chrome import ChromeDriverManager
+# Thread-safe lazy pandas load — see import_pandas() docstring in _imports.py.
+# (Previously a module-level `import pandas as pd` here — a migration artifact
+#  that, combined with _imports.py's old pandas import, could crash tab opening
+#  with 'partially initialized module pandas' under concurrent imports.)
+pd = import_pandas()
 
 class MrTrackingTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:

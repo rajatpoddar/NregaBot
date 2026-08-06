@@ -998,7 +998,7 @@ class AutomationMixin:
                     messagebox.showwarning(
                         "Setup Required",
                         "District ya Block data nahi mila.\n\n"
-                        "Pehle Settings > Location Data > 'Scrape from Website' se data sync karein.\n"
+                        "Pehle Settings > Location Data > 'Add Panchayat & Village' se sync karein.\n"
                         "Ya Settings > Location Data mein manual add karein."
                     )
                 ))

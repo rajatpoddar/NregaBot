@@ -112,7 +112,9 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
         # Dimensions & Constraints
         self.initial_width = 1100
         self.initial_height = 800
-        self.minsize(1000, 700)
+        # Chhoti screens (720p laptops) ke liye compact minimum — content
+        # neeche se na kate (Settings ke cards/buttons visible rahen).
+        self.minsize(960, 620)
 
         # Root-window background — drive it through CTk's fg_color as a
         # (light, dark) tuple so it follows the theme on every switch
@@ -429,11 +431,13 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
         # P1: Removed standalone update_idletasks() — the 2x paint loop
         # below already handles all pending layout calculations.
         work_x, work_y, work_width, work_height = self._get_work_area()
-        min_w, min_h = 1000, 700
-        app_height = min(self.initial_height, work_height - 40 if work_height > min_h else work_height)
-        app_width = min(self.initial_width, work_width - 40 if work_width > min_w else work_width)
-        app_height = max(app_height, min_h)
-        app_width = max(app_width, min_w)
+        min_w, min_h = 960, 620
+        # Small screens par window kabhi bhi work-area se badi na ho —
+        # nahi to bottom/side content cut ho jata hai (resolution issue).
+        avail_h = max(min_h, work_height - 40)
+        avail_w = max(min_w, work_width - 40)
+        app_height = min(self.initial_height, avail_h, max(min_h, work_height))
+        app_width = min(self.initial_width, avail_w, max(min_w, work_width))
 
         x = work_x + (work_width // 2) - (app_width // 2)
         y = work_y + (work_height // 2) - (app_height // 2)

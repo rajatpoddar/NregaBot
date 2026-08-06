@@ -13,7 +13,11 @@ from datetime import datetime
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException, Alignment, Border, Font, PatternFill, Side, get_column_letter, pd  # noqa: F401
+from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException, Alignment, Border, Font, PatternFill, Side, get_column_letter, import_pandas  # noqa: F401
+
+
+# Thread-safe lazy pandas load — see import_pandas() docstring in _imports.py.
+pd = import_pandas()
 
 
 
@@ -1114,7 +1118,6 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
     def _write_excel(self, path: str, date_str: str):
         """Write multi-sheet Excel with MR Summary, Workers Detail, Block Overview, and embedded photos."""
-        import pandas as pd
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
 

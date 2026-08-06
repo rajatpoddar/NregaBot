@@ -41,7 +41,7 @@ class LoginAutomationTab(BaseAutomationTab):
         
         ctk.CTkLabel(info_frame,
             text="💡  Bot automatically detects your District & Block from saved settings.\n"
-                 "Pehle Settings > Location Data > 'Scrape Now' se data sync karein.\n"
+                 "Pehle Settings > Location Data > 'Add Panchayat & Village' se sync karein.\n"
                  "Browser launch hone ke baad aapko User ID & Password manual enter karna hoga.",
             font=ctk.CTkFont(size=12),
             text_color=("gray40", "gray80"),
@@ -159,7 +159,7 @@ class LoginAutomationTab(BaseAutomationTab):
         # Note
         if not self.district or not self.block:
             ctk.CTkLabel(loc_frame,
-                text="⚠️  Location data nahi mila. Pehle Settings > Location Data > 'Scrape from Website' se data sync karein.",
+                text="⚠️  Location data nahi mila. Pehle Settings > Location Data > 'Add Panchayat & Village' se sync karein.",
                 font=ctk.CTkFont(size=11),
                 text_color=("#DC2626", "#F87171"),
                 wraplength=600, justify="left",
@@ -187,7 +187,7 @@ class LoginAutomationTab(BaseAutomationTab):
         if not (district and block):
             messagebox.showwarning("Missing Data",
                 "District ya Block data nahi mila.\n\n"
-                "Pehle Settings > Location Data > 'Scrape from Website' se data sync karein,\n"
+                "Pehle Settings > Location Data > 'Add Panchayat & Village' se sync karein,\n"
                 "ya Settings > Location Data mein manually add karein.")
             return
 

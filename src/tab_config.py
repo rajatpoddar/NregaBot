@@ -9,7 +9,15 @@
 # lambdas that import the tab class on first call. The imports are cached
 # so subsequent calls reuse the same class.
 
+import threading
 from typing import Any, Dict
+
+# Tab-module imports are serialized through this lock. Tab modules (and their
+# shared _imports hub) import heavy libraries — previously a concurrent tab
+# load (e.g. user click racing a license-validation thread / workflow handoff /
+# frozen-build import) could trigger the same slow import twice and crash with
+# 'partially initialized module pandas' / 'cannot import name ... from _imports'.
+_TAB_MODULE_IMPORT_LOCK = threading.Lock()
 
 
 def _lazy_import(class_name: str, module_path: str) -> Any:
@@ -18,14 +26,24 @@ def _lazy_import(class_name: str, module_path: str) -> Any:
     Returns a factory function that lazily imports the module and class
     only when first invoked. The class reference is cached so subsequent
     calls just instantiate without re-importing.
+
+    Thread-safe: the (possibly slow) importlib.import_module() call runs
+    under a module-level lock, so two threads can never import tab modules
+    concurrently and race on their shared heavy imports.
+
+    NOTE: because the lock is held across import_module(), tab modules must
+    NOT call another _lazy_import factory during their own module-level
+    import (that would deadlock on the same lock). None do today.
     """
     _cache: Dict[str, Any] = {}
     def factory(parent: Any, app: Any) -> Any:
         nonlocal _cache
         if class_name not in _cache:
             import importlib
-            mod = importlib.import_module(module_path)
-            _cache[class_name] = getattr(mod, class_name)
+            with _TAB_MODULE_IMPORT_LOCK:
+                if class_name not in _cache:  # double-checked locking
+                    mod = importlib.import_module(module_path)
+                    _cache[class_name] = getattr(mod, class_name)
         return _cache[class_name](parent, app)
     return factory
 

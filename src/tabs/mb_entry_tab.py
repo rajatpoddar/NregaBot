@@ -534,56 +534,12 @@ class MbEntryTab(BaseAutomationTab):
             time.sleep(1.0)  # Short wait after click
 
             self.log_info("⏳ Waiting for Period Dropdown...")
-            period_dropdown_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod")))
-            period_dropdown = Select(period_dropdown_elem)
-            if len(period_dropdown.options) <= 1: raise ValueError("No measurement period found.")
-            extracted_mr_period = period_dropdown.options[1].text
-            period_element_to_stale = period_dropdown_elem
-            period_dropdown.select_by_index(1)
-            
-            self.log_info("⏳ Waiting for Refresh...")
-            try: wait.until(EC.staleness_of(period_element_to_stale))
-            except TimeoutException: pass
-
-            wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days')))
-            wait.until(lambda d: d.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days').get_attribute('value') != '')
-
-            try: extracted_mr_no = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_lbl_msr").text
-            except: extracted_mr_no = "-"
-
-            pd_elem = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days')
-            total_persondays = int(pd_elem.get_attribute('value') or 0)
-            if total_persondays == 0: raise ValueError("0 Persondays / eMB already Booked")
-
-            self.app.after(0, self.app.set_status, f"Filling activity details...")
-            prefix = self._find_activity_prefix(driver) 
-            total_cost = total_persondays * int(cfg["unit_cost"])
-            
-            driver.execute_script(f"document.getElementsByName('{prefix}$qty')[0].value = '{total_persondays}';")
-            driver.execute_script(f"document.getElementsByName('{prefix}$unitcost')[0].value = '{cfg['unit_cost']}';")
-            self.log_info("⚙️ Triggering Auto-Calculation (check)...")
-            driver.execute_script("if(typeof check === 'function') { check(); }")
-            driver.execute_script(f"document.getElementsByName('{prefix}$labcomp')[0].value = '{total_cost}';")
-            self.log_info("⚙️ Triggering Validation (checkLabCom)...")
-            driver.execute_script("if(typeof checkLabCom === 'function') { checkLabCom(); }")
-            
-            try: driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpit').value = '{cfg['default_pit_count']}';")
-            except Exception as e: logger.debug("MBEntry: Could not set pit count: %s", e)
-            random_mate = random.choice(mate_names_list)
-            driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txt_mat_name').value = '{random_mate}';")
-
-            self.app.after(0, self.app.set_status, f"Saving...")
-            save_btn = driver.find_element(By.XPATH, '//input[@value="Save"]')
-            driver.execute_script("arguments[0].click();", save_btn)
-            
-            try:
-                alert = wait.until(EC.alert_is_present())
-                alert_text = alert.text
-                alert.accept()
-                status = "Success" if "success" in alert_text.lower() or "saved" in alert_text.lower() else "Failed"
-                self._log_result(cfg, work_code, status, alert_text, extracted_work_name, extracted_mr_no, extracted_mr_period)
-            except TimeoutException:
-                self._log_result(cfg, work_code, "Failed", "No Alert Received", extracted_work_name, extracted_mr_no, extracted_mr_period)
+            # Process EVERY available Measurement Period for this work — not
+            # just the first (top) one. Previously only index 1 was processed;
+            # now all available dates in the dropdown get an entry saved.
+            self._process_all_measurement_periods(
+                driver, wait, cfg, work_code, extracted_work_name, mate_names_list,
+            )
         
         except Exception as e:
             err_msg = str(e).splitlines()[0]
@@ -718,46 +674,133 @@ class MbEntryTab(BaseAutomationTab):
                 driver.execute_script("arguments[0].click();", radio_btn)
                 time.sleep(1.0)  # Short wait after click
 
-                # Wait for Period Dropdown
-                period_dropdown_elem = wait.until(
+                # Process EVERY available Measurement Period for this work
+                # (previously only the first/top period was processed).
+                self._process_all_measurement_periods(
+                    driver, wait, cfg, work_code, work_name, mate_names_list,
+                )
+
+                # Small delay between works
+                time.sleep(2)
+
+            except Exception as e:
+                err_msg = str(e).splitlines()[0]
+                self.log_error(f"Error on {work_code}: {err_msg}")
+                self._log_result(cfg, work_code, "Failed", "Script Error", work_name)
+
+        self.log_info("✅ All dropdown works processed.")
+
+    def _process_all_measurement_periods(self, driver, wait, cfg, work_code, work_name, mate_names_list):
+        """Process EVERY available Measurement Period for the currently selected work.
+
+        The 'Select Measurement Period' dropdown (ddlSelMPeriod) lists one option
+        per MR period / date range (e.g. '06/07/2026~~~~19/07/2026'). Previously
+        only the FIRST (top) option was processed; now every period gets its own
+        measurement entry saved, so all available dates are covered.
+        """
+        # Read all available periods (skip the '-----Select-----' placeholder)
+        period_elem = wait.until(
+            EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod"))
+        )
+        period_select = Select(period_elem)
+        period_options = [o for o in period_select.options if o.get_attribute("value")]
+        if not period_options:
+            self._log_result(cfg, work_code, "Failed", "No measurement period found", work_name)
+            return
+
+        self.log_info(f"   Found {len(period_options)} measurement period(s) for {work_code}:")
+        for opt in period_options:
+            self.log_info(f"      - {opt.text}")
+
+        for idx, period_option in enumerate(period_options, 1):
+            if self.is_stopped():
+                self.log_warning("Automation stopped.")
+                break
+            period_value = period_option.get_attribute("value")
+            period_text = period_option.text
+            self.app.after(0, self.app.set_status, f"{work_code}: period {idx}/{len(period_options)} ({period_text})")
+            self.app.after(0, self.update_status,
+                           f"{work_code}: period {idx}/{len(period_options)} ({period_text})",
+                           idx / len(period_options))
+            self.log_info(f"   [{idx}/{len(period_options)}] Processing period: {period_text}")
+
+            try:
+                # Clear any lingering alert from the previous save before
+                # touching the page — an open alert would make the next
+                # select/postback throw 'unexpected alert open'.
+                try:
+                    driver.switch_to.alert.accept()
+                    time.sleep(1)
+                except Exception:
+                    pass
+
+                # Re-fetch the period dropdown fresh each iteration — the page
+                # state can change after the previous save — then select this
+                # period by its VALUE (robust even if the dropdown was reset).
+                period_elem = wait.until(
                     EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod"))
                 )
-                period_dropdown = Select(period_dropdown_elem)
-                if len(period_dropdown.options) <= 1:
-                    self._log_result(cfg, work_code, "Failed", "No measurement period found", work_name)
+                period_select = Select(period_elem)
+                target_idx = None
+                for i, o in enumerate(period_select.options):
+                    if o.get_attribute("value") == period_value:
+                        target_idx = i
+                        break
+                if target_idx is None:
+                    self._log_result(cfg, work_code, "Failed", f"Period '{period_text}' disappeared from dropdown",
+                                     work_name, "-", period_text)
                     continue
 
-                extracted_mr_period = period_dropdown.options[1].text
-                period_stale = period_dropdown_elem
-                period_dropdown.select_by_index(1)
+                # If this period is ALREADY the active selection, the onchange
+                # postback won't fire and person-days could stay stale from the
+                # previous period/work. Reset to the placeholder first so the
+                # target select below is guaranteed to trigger a postback.
+                try:
+                    if period_select.first_selected_option.get_attribute("value") == period_value:
+                        period_select.select_by_index(0)  # '-----Select-----'
+                        try:
+                            wait.until(EC.staleness_of(period_elem))
+                        except TimeoutException:
+                            pass
+                        period_elem = wait.until(
+                            EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod"))
+                        )
+                        period_select = Select(period_elem)
+                        for i, o in enumerate(period_select.options):
+                            if o.get_attribute("value") == period_value:
+                                target_idx = i
+                                break
+                except Exception:
+                    pass
+
+                period_stale = period_elem
+                period_select.select_by_index(target_idx)
                 try:
                     wait.until(EC.staleness_of(period_stale))
                 except TimeoutException:
                     pass
 
-                # Wait for person days to load
+                # Wait for person days to load for this period
                 wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days')))
                 wait.until(
                     lambda d: d.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days').get_attribute('value') != ''
                 )
 
-                # Get MR No
                 try:
-                    extracted_mr_no = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_lbl_msr").text
+                    mr_no = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_lbl_msr").text
                 except Exception:
-                    extracted_mr_no = "-"
+                    mr_no = "-"
 
-                # Check person days
                 pd_elem = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days')
                 total_persondays = int(pd_elem.get_attribute('value') or 0)
                 if total_persondays == 0:
-                    self._log_result(
-                        cfg, work_code, "Failed", "0 Persondays / eMB already Booked",
-                        work_name, extracted_mr_no, extracted_mr_period
-                    )
+                    self.log_info(f"      Period '{period_text}': 0 persondays / eMB already booked — skipping.")
+                    self._log_result(cfg, work_code, "Skipped", "0 Persondays / eMB already Booked",
+                                     work_name, mr_no, period_text)
                     continue
 
                 # Fill activity details
+                self.app.after(0, self.app.set_status, f"Filling activity details for {period_text}...")
                 prefix = self._find_activity_prefix(driver)
                 total_cost = total_persondays * int(cfg["unit_cost"])
 
@@ -771,14 +814,14 @@ class MbEntryTab(BaseAutomationTab):
 
                 try:
                     driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpit').value = '{cfg['default_pit_count']}';")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("MBEntry: Could not set pit count: %s", e)
 
                 random_mate = random.choice(mate_names_list)
                 driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txt_mat_name').value = '{random_mate}';")
 
                 # Save
-                self.app.after(0, self.app.set_status, f"Saving {work_code}...")
+                self.app.after(0, self.app.set_status, f"Saving {work_code} ({period_text})...")
                 save_btn = driver.find_element(By.XPATH, '//input[@value="Save"]')
                 driver.execute_script("arguments[0].click();", save_btn)
 
@@ -788,20 +831,22 @@ class MbEntryTab(BaseAutomationTab):
                     alert_text = alert.text
                     alert.accept()
                     status = "Success" if "success" in alert_text.lower() or "saved" in alert_text.lower() else "Failed"
-                    self._log_result(cfg, work_code, status, alert_text, work_name, extracted_mr_no, extracted_mr_period)
-                    self.log_info(f"{work_code}: {status} — {alert_text}")
+                    self._log_result(cfg, work_code, status, alert_text, work_name, mr_no, period_text)
+                    self.log_info(f"      {period_text}: {status} — {alert_text}")
                 except TimeoutException:
-                    self._log_result(cfg, work_code, "Failed", "No Alert Received", work_name, extracted_mr_no, extracted_mr_period)
+                    self._log_result(cfg, work_code, "Failed", "No Alert Received", work_name, mr_no, period_text)
 
-                # Small delay between entries
+                # Let the postback settle before the next period
                 time.sleep(2)
 
             except Exception as e:
                 err_msg = str(e).splitlines()[0]
-                self.log_error(f"Error on {work_code}: {err_msg}")
-                self._log_result(cfg, work_code, "Failed", "Script Error", work_name)
+                self.log_error(f"Error on {work_code} period '{period_text}': {err_msg}")
+                self._log_result(cfg, work_code, "Failed", "Script Error", work_name, "-", period_text)
+                # Continue with the next period — a transient error on one period
+                # shouldn't abort the remaining periods of this work.
+                continue
 
-        self.log_info("✅ All dropdown works processed.")
     def _find_activity_prefix(self, driver):
         self.log_info("Searching for 'Earth work' activity...")
         for i in range(1, 61): 

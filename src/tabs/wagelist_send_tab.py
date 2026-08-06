@@ -7,7 +7,7 @@ from datetime import datetime
 from src import config
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from ._imports import By, Select, WebDriverWait, EC  # noqa: F401
+from ._imports import By, Select, WebDriverWait, EC, NoAlertPresentException, TimeoutException, UnexpectedAlertPresentException  # noqa: F401
 
 
 class WagelistSendTab(BaseAutomationTab):
@@ -254,11 +254,88 @@ class WagelistSendTab(BaseAutomationTab):
             self.app.after(5000, lambda: self.app.set_status("Ready"))
             self.app.after(5000, lambda: self.update_status("Ready", 0.0))
 
+    # ------------------------------------------------------------------
+    # Alert helpers — the NREGA portal shows a JS alert ("Record Update
+    # sucessfully") after every submit. The alert can appear LATE (after a
+    # slow postback) or flash-and-vanish, which previously made the single
+    # WebDriverWait(5).alert_is_present() miss it. A leftover open alert
+    # then crashed the whole run at the next page interaction with
+    # "unexpected alert open". These helpers make alert handling robust.
+    # ------------------------------------------------------------------
+    def _dismiss_pending_alert(self, driver, timeout=1.0):
+        """Safely accept & clear any JavaScript alert that may be open.
+
+        Returns True if an alert was handled. Never raises — a lingering
+        alert must never abort the automation (the critical failure seen in
+        production). Fast path: probes for an already-open alert first (the
+        common leftover case) so the happy path costs ~0s; only if none is
+        open does it briefly wait for a late-appearing alert.
+        """
+        try:
+            alert = driver.switch_to.alert
+        except NoAlertPresentException:
+            # Not open right now — give a short window for a late alert from
+            # the previous wagelist's slow postback.
+            try:
+                WebDriverWait(driver, timeout).until(EC.alert_is_present())
+                alert = driver.switch_to.alert
+            except TimeoutException:
+                return False
+            except Exception:
+                return False
+        except Exception:
+            return False
+        # Alert is present — accept it, retrying because the alert can
+        # vanish between detection and accept() (flash behaviour).
+        for _ in range(3):
+            try:
+                driver.switch_to.alert.accept()
+                time.sleep(0.8)  # let the postback settle after accepting
+                return True
+            except (NoAlertPresentException, UnexpectedAlertPresentException):
+                time.sleep(0.3)
+            except Exception:
+                time.sleep(0.3)
+        return True
+
+    def _accept_submit_alert(self, driver, timeout=6.0):
+        """Wait for (up to `timeout`s) and accept the submit success alert.
+
+        Polls frequently so a late-appearing alert is still caught, and
+        retries accept() so a flashing alert is handled. Returns True when
+        an alert was accepted.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if self.is_stopped():
+                return False
+            try:
+                alert = driver.switch_to.alert
+            except NoAlertPresentException:
+                time.sleep(0.3)
+                continue
+            except UnexpectedAlertPresentException:
+                time.sleep(0.3)
+                continue
+            try:
+                alert.accept()
+            except Exception:
+                pass
+            time.sleep(0.8)  # give the postback a moment to settle
+            return True
+        return False
+
     def _process_single_wagelist(self, driver, wait, wagelist, fin_year):
         """Processes a single wagelist (Background Safe)."""
         for attempt in range(2):
             if self.is_stopped(): return False
             try:
+                # Any lingering alert from the PREVIOUS wagelist's late
+                # postback must be dismissed BEFORE touching the page —
+                # otherwise Selenium raises 'unexpected alert open' and the
+                # whole multi-wagelist run crashes (reported bug).
+                self._dismiss_pending_alert(driver)
+
                 # Select Wagelist (Presence check)
                 wl_dropdown = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_sel")))
                 Select(wl_dropdown).select_by_value(wagelist)
@@ -286,13 +363,23 @@ class WagelistSendTab(BaseAutomationTab):
                 submit_btn = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_btnsubmit")
                 driver.execute_script("arguments[0].click();", submit_btn)
                 
-                WebDriverWait(driver, 5).until(EC.alert_is_present()).accept()
-                
+                # Wait for the success alert ('Record Update sucessfully' etc.)
+                # and accept it — tolerates alerts that appear late or flash.
+                if not self._accept_submit_alert(driver):
+                    # No alert surfaced within the window (some postbacks skip
+                    # it or it appears later). The submit was clicked — mark it
+                    # sent rather than crashing the run, but log it so support
+                    # can tell this happened.
+                    self.log_warning(f"   - No success alert observed for {wagelist}; assuming submitted.")
                 self.log_success(f"{wagelist} submitted successfully.")
                 return True
             except Exception as e:
                 self.log_warning(f"[WARN] Attempt {attempt+1} failed for {wagelist}: {type(e).__name__}")
                 if (attempt == 0):
+                    # CRITICAL: clear any open alert BEFORE refresh() — an
+                    # open alert makes driver.refresh() itself throw
+                    # 'unexpected alert open' and abort the entire run.
+                    self._dismiss_pending_alert(driver)
                     driver.refresh()
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlfin")))
                     Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddlfin")).select_by_value(fin_year)

@@ -32,6 +32,9 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 
 logger = get_logger()
 
+# Scrape card ka button label — simple language (users ko "Scrape" confusing lagta tha)
+SCRAPE_BTN_TEXT = "➕  Add Panchayat & Village"
+
 
 class SettingsTab(ctk.CTkFrame):
     """Settings dashboard — 3 streamlined tabs."""
@@ -95,21 +98,30 @@ class SettingsTab(ctk.CTkFrame):
     # ════════════════════════════════════════════════════════════════
     def _build_location_tab(self) -> None:
         c = self.tab_location
-        c.grid_rowconfigure(4, weight=1)
+        c.grid_rowconfigure(0, weight=1)
         c.grid_columnconfigure(0, weight=1)
 
+        # ── Scrollable container ──
+        # Chhote screens (720p laptops, low resolution) par cards + list neeche
+        # se nahi katein — poori Location Data tab scroll ho sakti hai.
+        bg = ctk.ThemeManager.theme["CTkFrame"]["fg_color"]
+        scroll = ctk.CTkScrollableFrame(c, fg_color=bg, corner_radius=0)
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.grid_columnconfigure(0, weight=1)
+
         # Info banner
-        info = ctk.CTkFrame(c, fg_color=("gray95", "gray25"), corner_radius=8)
+        info = ctk.CTkFrame(scroll, fg_color=("gray95", "gray25"), corner_radius=8)
         info.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         ctk.CTkLabel(info,
-            text="💡 State, District aur Block server se auto-sync hote hain. Panchayat aur Village data 'Scrape from Website' "
-                 "se fetch karein. Yahan sirf delete kar sakte hain — koi Panchayat delete karenge to uske villages bhi delete ho jayenge.",
+            text="💡 State, District aur Block server se auto-sync hote hain — 'Sync Now' ya 'Fix Location' se sahi karein. "
+                 "Panchayat aur Village NREGA website se add karein. Delete karne ke liye neeche list se select karke "
+                 "Delete dabayein (uske villages bhi delete ho jayenge).",
             font=ctk.CTkFont(size=12), text_color=("gray40", "gray80"),
-            wraplength=700, justify="left",
+            wraplength=680, justify="left",
         ).pack(padx=15, pady=10)
 
         # ── Server Synced Data Card ──
-        self._server_data_frame = ctk.CTkFrame(c, fg_color=("#F0FDF4", "#0F2A1D"), corner_radius=8,
+        self._server_data_frame = ctk.CTkFrame(scroll, fg_color=("#F0FDF4", "#0F2A1D"), corner_radius=8,
                                                 border_width=1, border_color=("#BBF7D0", "#166534"))
         self._server_data_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(2, 2))
         self._server_data_frame.grid_columnconfigure(0, weight=1)
@@ -188,7 +200,7 @@ class SettingsTab(ctk.CTkFrame):
         self._srv_sync_status.pack(side="left", padx=(8, 0))
 
         # ── Scrape from Live Website Card ──
-        self._scrape_frame = ctk.CTkFrame(c, fg_color=("#FFF7ED", "#1C1917"), corner_radius=8,
+        self._scrape_frame = ctk.CTkFrame(scroll, fg_color=("#FFF7ED", "#1C1917"), corner_radius=8,
                                             border_width=1, border_color=("#FDBA74", "#9A3412"))
         self._scrape_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(3, 5))
         self._scrape_frame.grid_columnconfigure(0, weight=1)
@@ -196,26 +208,30 @@ class SettingsTab(ctk.CTkFrame):
         # Header
         sc_header = ctk.CTkFrame(self._scrape_frame, fg_color="transparent")
         sc_header.pack(fill="x", padx=12, pady=(8, 4))
-        ctk.CTkLabel(sc_header, text="🌐  Scrape from Live NREGA Website",
+        ctk.CTkLabel(sc_header, text="🌐  Panchayat & Village Add Karein (NREGA Website)",
                      font=ctk.CTkFont(size=13, weight="bold"),
                      text_color=("#9A3412", "#FDBA74")).pack(side="left")
 
-        # Info note
+        # Info note — simple language
         sc_note = ctk.CTkFrame(self._scrape_frame, fg_color="transparent")
         sc_note.pack(fill="x", padx=12, pady=(2, 4))
         ctk.CTkLabel(sc_note,
-            text="💡  Pehle Login Automation se NREGA mein login karein, fir yahan 'Scrape Now' dabayein.\n"
-                 "Bot automatically Demand page se Panchayat aur Village names scrape karega.",
-            font=ctk.CTkFont(size=10),
+            text="Ye button NREGA website (VB-G-RAM G) se aapke Panchayat aur Village ke naam app mein add karta hai.\n\n"
+                 "Sirf 3 kaam karein:\n"
+                 "1️⃣  Browser launch karein\n"
+                 "2️⃣  PO login se login karein\n"
+                 "3️⃣  Neeche 'Add Panchayat & Village' dabayein\n\n"
+                 "Bot khud saare Panchayat aur unke Villages sync kar dega.",
+            font=ctk.CTkFont(size=11),
             text_color=("gray50", "gray60"),
-            wraplength=650, justify="left",
+            wraplength=620, justify="left",
         ).pack(anchor="w")
 
         # Button row
         sc_btn_row = ctk.CTkFrame(self._scrape_frame, fg_color="transparent")
         sc_btn_row.pack(fill="x", padx=12, pady=(2, 6))
 
-        self._scrape_btn = ctk.CTkButton(sc_btn_row, text="🚀 Scrape Now", width=120, height=30,
+        self._scrape_btn = ctk.CTkButton(sc_btn_row, text=SCRAPE_BTN_TEXT, width=200, height=30,
             font=ctk.CTkFont(size=12, weight="bold"),
             fg_color=("#F97316", "#EA580C"), text_color="white",
             hover_color=("#EA580C", "#C2410C"),
@@ -229,7 +245,7 @@ class SettingsTab(ctk.CTkFrame):
         self._scrape_status.pack(side="left", padx=(8, 0))
 
         # ── Toolbar ──
-        toolbar = ctk.CTkFrame(c, fg_color="transparent")
+        toolbar = ctk.CTkFrame(scroll, fg_color="transparent")
         toolbar.grid(row=3, column=0, sticky="ew", padx=10, pady=(5, 2))
         toolbar.grid_columnconfigure(0, weight=1)
         self.loc_count_label = ctk.CTkLabel(toolbar, text="", font=ctk.CTkFont(size=12),
@@ -244,13 +260,13 @@ class SettingsTab(ctk.CTkFrame):
             text_color=("#DC2626", "#F87171"), hover_color=("#FECACA", "#7F1D1D"),
             command=self._delete_selected_loc).pack(side="right", padx=(5, 0))
 
-        # ── Listbox ──
-        lc = ctk.CTkFrame(c, fg_color="transparent")
-        lc.grid(row=4, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        # ── Listbox (fixed height — scrollable page ke andar bhi hamesha dikhe) ──
+        lc = ctk.CTkFrame(scroll, fg_color="transparent")
+        lc.grid(row=4, column=0, sticky="ew", padx=10, pady=(0, 6))
         lc.grid_rowconfigure(0, weight=1)
         lc.grid_columnconfigure(0, weight=1)
         bc = self._resolve_color(("#CBD5E1", "#475569"))
-        self.loc_listbox = tkinter.Listbox(lc, selectmode=tkinter.EXTENDED,
+        self.loc_listbox = tkinter.Listbox(lc, selectmode=tkinter.EXTENDED, height=12,
             font=("Segoe UI", 12), bg=self._get_listbox_bg(), fg=self._get_listbox_fg(),
             selectbackground="#3B82F6", selectforeground="white",
             borderwidth=0, highlightthickness=1,
@@ -261,7 +277,41 @@ class SettingsTab(ctk.CTkFrame):
         self.loc_listbox.configure(yscrollcommand=scrollbar.set)
         self.loc_listbox.bind("<Double-1>", lambda e: self._delete_selected_loc())
         self.loc_listbox.bind("<Delete>", lambda e: self._delete_selected_loc())
+
+        # Mousewheel over listbox → listbox ko scroll kare, page ko nahi
+        # (listbox ab scrollable page ke andar hai)
+        def _on_listbox_wheel(event):
+            try:
+                if getattr(event, "delta", 0):
+                    self.loc_listbox.yview_scroll(int(-event.delta / 120), "units")
+                elif event.num in (4, 5):
+                    self.loc_listbox.yview_scroll(-1 if event.num == 4 else 1, "units")
+            except Exception:
+                pass
+            return "break"
+
+        self.loc_listbox.bind("<MouseWheel>", _on_listbox_wheel, add="+")
+        self.loc_listbox.bind("<Button-4>", _on_listbox_wheel, add="+")
+        self.loc_listbox.bind("<Button-5>", _on_listbox_wheel, add="+")
         self._refresh_loc_list()
+
+        # ── Prominent Delete bar (row 5) — chhoti screen par bhi clearly dikhe ──
+        del_bar = ctk.CTkFrame(scroll, fg_color=("gray95", "gray25"), corner_radius=8)
+        del_bar.grid(row=5, column=0, sticky="ew", padx=10, pady=(4, 14))
+        del_bar.grid_columnconfigure(1, weight=1)
+        self._del_big_btn = ctk.CTkButton(
+            del_bar, text="🗑️  Delete Selected Panchayat", height=34,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=("#DC2626", "#DC2626"), text_color="white",
+            hover_color=("#B91C1C", "#B91C1C"),
+            command=self._delete_selected_loc,
+        )
+        self._del_big_btn.grid(row=0, column=0, padx=(10, 10), pady=8)
+        ctk.CTkLabel(del_bar,
+            text="💡  Pehle list mein Panchayat par click karke select karein (Ctrl+click = ek se zyada), "
+                 "phir Delete dabayein — ya item par double-click karein. Villages bhi delete ho jayenge.",
+            font=ctk.CTkFont(size=10), text_color=("gray45", "gray65"),
+            justify="left", wraplength=560).grid(row=0, column=1, sticky="w", padx=(0, 10), pady=8)
 
     # ── Helpers ──
     LISTBOX_FG_LIGHT = "#374151"
@@ -425,13 +475,15 @@ class SettingsTab(ctk.CTkFrame):
 
     def _fix_location_now(self) -> None:
         """
-        User ke state/district ko app ke valid location data (STATE_DISTRICT_MAP)
-        se compare karta hai. Mismatch ho to dropdown-based popup dikhata hai jahan
-        user apna sahi location select kar ke save kar sakta hai (local + server).
+        User apna State, District aur Block sahi kar sakta hai.
+        State/District dropdown se (valid lists), Block entry se
+        (kyunki block ka spelling galat ho sakta hai). Dono local
+        app + server par update hote hain.
         """
         lic = self.app.license_info if hasattr(self.app, 'license_info') else {}
         cur_state = (lic.get('user_state') or '').strip().upper()
         cur_dist = (lic.get('user_district') or '').strip().upper()
+        cur_block = (lic.get('user_block') or '').strip().upper()
 
         valid_states = sorted(STATE_DISTRICT_MAP.keys())
         state_ok = cur_state in [s.upper() for s in valid_states]
@@ -441,19 +493,12 @@ class SettingsTab(ctk.CTkFrame):
                 next((s for s in valid_states if s.upper() == cur_state), cur_state), [])]
             dist_ok = cur_dist in valid_dists
 
-        if state_ok and dist_ok and cur_state and cur_dist:
-            self._srv_sync_status.configure(
-                text=f"✅ Location sahi hai: {cur_state} / {cur_dist}",
-                text_color=("#16A34A", "#4ADE80"))
-            self.after(5000, lambda: self._srv_sync_status.configure(text=""))
-            return
-
-        # ── Mismatch → show fix popup ──
+        # ── Fix popup — hamesha khulta hai taaki block spelling bhi sahi ki ja sake ──
         win = ctk.CTkToplevel(self)
         win.title(f"{config.APP_SHORT_NAME} - Fix Location")
         win.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        w, h = min(440, sw - 40), min(460, sh - 40)
+        w, h = min(480, sw - 40), min(580, sh - 40)
         win.geometry(f'{w}x{h}+{(sw//2)-(w//2)}+{(sh//2)-(h//2)}')
         win.resizable(False, False)
         win.transient(self.winfo_toplevel())
@@ -462,7 +507,7 @@ class SettingsTab(ctk.CTkFrame):
         outer = ctk.CTkFrame(win, fg_color="transparent")
         outer.pack(expand=True, fill="both", padx=20, pady=16)
 
-        ctk.CTkLabel(outer, text="🔧 Location Mismatch Detected",
+        ctk.CTkLabel(outer, text="🔧  Location Fix Karein",
                      font=ctk.CTkFont(size=16, weight="bold"),
                      text_color=("#F97316", "#FB923C")).pack(anchor="w")
 
@@ -472,12 +517,14 @@ class SettingsTab(ctk.CTkFrame):
         if cur_state and state_ok and not dist_ok:
             reason_lines.append(f"• District '{cur_dist or '(empty)'}' {cur_state} ke valid districts se match nahi karta.")
         if not cur_state and not cur_dist:
-            reason_lines.append("• Aapne abhi state/district set nahi ki hai — server sync karein ya neeche select karein.")
-        reason_text = "\n".join(reason_lines) if reason_lines else "• Location data thoda sahi nahi hai."
+            reason_lines.append("• Aapne abhi state/district set nahi ki hai.")
+        if reason_lines:
+            reason_text = "\n".join(reason_lines)
+        else:
+            reason_text = "• Sab kuch sahi lag raha hai — phir bhi block ka spelling ya location update karna ho to yahan se karein."
 
         ctk.CTkLabel(outer,
-            text=f"Aapka registered location sahi nahi hai:\n\n{reason_text}\n\n"
-                 "Neeche se sahi state aur district select karein — ye aapke app aur server dono mein update ho jayega.",
+            text=f"Neeche apna sahi State, District aur Block select/likhein — ye app aur server dono mein update ho jayega.\n\n{reason_text}",
             font=ctk.CTkFont(size=12), text_color=("gray40", "gray80"),
             justify="left", wraplength=w - 50).pack(anchor="w", pady=(4, 12))
 
@@ -486,9 +533,9 @@ class SettingsTab(ctk.CTkFrame):
         state_row.pack(fill="x", pady=4)
         ctk.CTkLabel(state_row, text="State:", width=80,
                      font=ctk.CTkFont(size=13, weight="bold"), anchor="w").pack(side="left")
-        state_var = ctk.StringVar(value=cur_state if state_ok else "Select a State")
+        state_var = ctk.StringVar(value="Select a State")
         state_menu = ctk.CTkOptionMenu(state_row, values=["Select a State"] + valid_states,
-                                       variable=state_var, width=230, font=ctk.CTkFont(size=12))
+                                       variable=state_var, width=250, font=ctk.CTkFont(size=12))
         state_menu.pack(side="left", expand=True, fill="x")
 
         # District dropdown
@@ -498,7 +545,7 @@ class SettingsTab(ctk.CTkFrame):
                      font=ctk.CTkFont(size=13, weight="bold"), anchor="w").pack(side="left")
         dist_var = ctk.StringVar(value="Select District")
         dist_menu = ctk.CTkOptionMenu(dist_row, values=["Select District"],
-                                      variable=dist_var, width=230, state="disabled",
+                                      variable=dist_var, width=250, state="disabled",
                                       font=ctk.CTkFont(size=12))
         dist_menu.pack(side="left", expand=True, fill="x")
 
@@ -519,6 +566,43 @@ class SettingsTab(ctk.CTkFrame):
                 dist_var.set(next((d for d in STATE_DISTRICT_MAP.get(state_var.get(), []) if d.upper() == cur_dist), "Select District"))
         state_var.trace_add("write", lambda *args: _on_state(state_var.get()))
 
+        # Block — editable entry (spelling galat ho sakta hai) + suggestions
+        block_row = ctk.CTkFrame(outer, fg_color="transparent")
+        block_row.pack(fill="x", pady=4)
+        ctk.CTkLabel(block_row, text="Block:", width=80,
+                     font=ctk.CTkFont(size=13, weight="bold"), anchor="w").pack(side="left")
+        block_entry = ctk.CTkEntry(block_row, font=ctk.CTkFont(size=12), height=32,
+                                   placeholder_text="Block ka sahi naam likhein...")
+        block_entry.pack(side="left", expand=True, fill="x")
+        if cur_block:
+            block_entry.insert(0, cur_block)
+
+        block_sugg = self._collect_block_suggestions()
+        if block_sugg:
+            ctk.CTkLabel(outer,
+                text="💡  Block suggestions (click karke fill karein):",
+                font=ctk.CTkFont(size=10), text_color=("gray45", "gray65"),
+                anchor="w", justify="left").pack(fill="x", pady=(6, 2))
+
+            def _set_block(v):
+                block_entry.delete(0, "end")
+                block_entry.insert(0, v)
+
+            # 2 chips per row — long block names bhi popup ke andar hi wrap honge
+            chips_grid = ctk.CTkFrame(outer, fg_color="transparent")
+            chips_grid.pack(fill="x")
+            for i, s in enumerate(block_sugg[:6]):
+                row, col = divmod(i, 2)
+                chips_grid.grid_columnconfigure(col, weight=1)
+                label = s if len(s) <= 24 else s[:23] + "…"
+                ctk.CTkButton(chips_grid, text=label, height=26,
+                              font=ctk.CTkFont(size=10),
+                              fg_color=("#E2E8F0", "#334155"),
+                              text_color=("#1E293B", "#F1F5F9"),
+                              hover_color=("#CBD5E1", "#475569"),
+                              command=lambda v=s: _set_block(v),
+                              ).grid(row=row, column=col, sticky="ew", padx=(0, 4), pady=1)
+
         status_line = ctk.CTkLabel(outer, text="", font=ctk.CTkFont(size=11),
                                    text_color=("gray50", "gray60"), justify="left", wraplength=w - 50)
         status_line.pack(fill="x", pady=(10, 4))
@@ -526,6 +610,7 @@ class SettingsTab(ctk.CTkFrame):
         def _save():
             state = state_var.get().strip()
             dist = dist_var.get().strip()
+            block = block_entry.get().strip().upper()
             if state == "Select a State" or not state:
                 status_line.configure(text="⚠️  Please select a state.", text_color=("#DC2626", "#EF4444"))
                 return
@@ -539,21 +624,27 @@ class SettingsTab(ctk.CTkFrame):
                 hm.save_entry(k, state.upper())
             for k in ["location_district", "mr_track_district", "issued_mr_district", "mis_district", "dashboard_district"]:
                 hm.save_entry(k, dist.upper())
+            if block:
+                for k in ["location_block", "mr_track_block", "issued_mr_block", "mis_block", "dashboard_block"]:
+                    hm.save_entry(k, block)
 
             status_line.configure(text="⏳  Saving to server...", text_color=("#2563EB", "#60A5FA"))
 
             def _worker():
                 ok = False
                 try:
-                    ok = self.app.fix_location_on_server(state, dist)
+                    ok = self.app.fix_location_on_server(state, dist, block)
                 except Exception as e:
                     logger.error("Fix location worker error: %s", e)
 
                 def _done():
                     try:
                         if ok:
+                            parts = [state.upper(), dist.upper()]
+                            if block:
+                                parts.append(block)
                             status_line.configure(
-                                text=f"✅ Location updated: {state.upper()} / {dist.upper()}",
+                                text=f"✅ Location updated: {' / '.join(parts)}",
                                 text_color=("#16A34A", "#4ADE80"))
                             self._refresh_server_data_card()
                             self._refresh_loc_list()
@@ -581,6 +672,25 @@ class SettingsTab(ctk.CTkFrame):
                       fg_color="gray", width=100, height=38,
                       font=ctk.CTkFont(size=12)
                       ).grid(row=0, column=1, padx=(6, 0))
+
+    def _collect_block_suggestions(self) -> List[str]:
+        """Block fix popup ke liye suggestions — saved blocks (history) + hierarchy."""
+        blocks = set()
+        try:
+            hm = self.app.history_manager
+            for k in ["location_block", "mr_track_block", "issued_mr_block",
+                      "mis_block", "dashboard_block"]:
+                for s in hm.get_suggestions(k):
+                    v = str(s).strip().upper()
+                    if v:
+                        blocks.add(v)
+        except Exception:
+            pass
+        try:
+            blocks.update(get_hierarchy().get_parent_names("Panchayat"))
+        except Exception:
+            pass
+        return sorted(blocks, key=str.lower)
 
     def _scrape_from_website(self) -> None:
         """
@@ -718,7 +828,7 @@ class SettingsTab(ctk.CTkFrame):
             text=result,
             text_color=("#16A34A", "#4ADE80")
         )
-        self._scrape_btn.configure(state="normal", text="🚀 Scrape Now")
+        self._scrape_btn.configure(state="normal", text=SCRAPE_BTN_TEXT)
 
         # Show detail popup
         detail_lines = []
@@ -746,7 +856,7 @@ class SettingsTab(ctk.CTkFrame):
             text=f"❌ {error_msg}",
             text_color=("#DC2626", "#F87171")
         )
-        self._scrape_btn.configure(state="normal", text="🚀 Scrape Now")
+        self._scrape_btn.configure(state="normal", text=SCRAPE_BTN_TEXT)
         messagebox.showerror("Scrape Failed",
             f"Data scrape nahi ho paya.\n\n{error_msg}",
             parent=self.winfo_toplevel())
