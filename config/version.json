@@ -1,19 +1,29 @@
 {
-  "latest_version": "3.1.7",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.1.7-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.1.7-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.1.7-Linux.tar.gz",
+  "latest_version": "3.2.0",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.0-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.0-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.0-Linux.tar.gz",
   "core_update": {
-    "version": "3.1.7",
-    "url": "https://nregabot.com/updates/core_v3.1.7.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.1.7.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.1.7.zip",
+    "version": "3.2.0",
+    "url": "https://nregabot.com/updates/core_v3.2.0.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.0.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.0.zip",
     "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "50b39d320fee402350e09a2c0cc4b5d72742cc16263caabe21c4896c1110c268",
-    "hash_macos": "3fd5f8e081573ceaa45ea9d38f34b45a614aa91ae928173c18e0083f90d0a55b"
+    "hash_windows": "",
+    "hash_macos": ""
   },
   "changelog": {
+    "3.2.0": [
+      "📍 **Panchayat Column in Results:** Har automation ke results table me ab Panchayat column dikhta hai — 'My Saved Panchayats' mode me bhi clearly pata chalta hai kaunsa row kis panchayat ka hai (16 tabs updated).",
+      "🔢 **Serial Number (Sr. No.):** Har results table ka pehla column ab apna local serial number (1, 2, 3...) hota hai — website ka serial ignore hota hai. Excel/CSV/PDF/WhatsApp reports me bhi serial pehle column me.",
+      "📅 **Smart File Names:** Export hone wali har report ke naam me ab date & time (e.g. ABPS_Verify_20260807_143055.xlsx) — din me kitni baar bhi export karo, file overwrite nahi hogi aur rename nahi karni padegi.",
+      "🏘️ **Saved Panchayats:** Saved panchayats ko process karne ka support — ABPS Verify, Muster Roll, eMB Verify aur Wagelist Gen me.",
+      "🔁 **Multi-Panchayat:** MR Tracking, MSR aur Zero MR tabs me enhanced multi-panchayat processing.",
+      "💬 **WhatsApp Report Toggle:** Automation settings me WhatsApp report notification ke liye ab alag toggle.",
+      "🖨️ **Print-Ready Excel Reports:** Excel exports ab A4 landscape, fit-to-width, repeat headers aur page numbers ke saath — print karke office me submit kiya ja sakta hai.",
+      "🧩 **Windows Update Fix:** Windows core zip handling improved — compiled files se version detection ab sahi kaam karta hai."
+    ],
     "3.1.7": [
       "🔐 **Google Login:** Ab aap apne Google account se directly login kar sakte hain — desktop app ke 'Quick Login' tab aur web portal dono jagah. Nayi registration me Google ka name/email apne aap aa jata hai.",
       "🪪 **Passkey Login (WebAuthn):** Windows Hello, Touch ID ya apne phone ke passkey se bina password login karein. Passkey ko Account page se add/remove kiya ja sakta hai.",
