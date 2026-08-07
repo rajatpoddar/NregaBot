@@ -397,7 +397,7 @@ class DemandTab(BaseAutomationTab):
         results_tab.grid_columnconfigure(1, weight=0) # Scrollbar
 
         # Treeview
-        cols = ("#", "Job Card No", "Applicant Name", "Status")
+        cols = ("#", "Panchayat", "Job Card No", "Applicant Name", "Status")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         self.results_tree.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         
@@ -495,11 +495,11 @@ class DemandTab(BaseAutomationTab):
         successful_pairs = set()
         for item in self.results_tree.get_children():
             values = self.results_tree.item(item)['values']
-            # values = (RowID, JC, Name, Status)
-            if len(values) >= 4:
-                jc = str(values[1]).strip()
-                name = str(values[2]).strip()
-                status = str(values[3]).lower()
+            # values = (RowID, Panchayat, JC, Name, Status)
+            if len(values) >= 5:
+                jc = str(values[2]).strip()
+                name = str(values[3]).strip()
+                status = str(values[4]).lower()
                 
                 # Agar status me Success ya Already hai, tabhi uncheck karein
                 if "success" in status or "already" in status:
@@ -1134,13 +1134,13 @@ class DemandTab(BaseAutomationTab):
         """
         Configures the columns and headings for the results table.
         """
-        cols = ("#", "Job Card No", "Applicant Name", "Status")
+        cols = ("#", "Panchayat", "Job Card No", "Applicant Name", "Status")
         self.results_tree["columns"] = cols
         self.results_tree.column("#0", width=0, stretch=tkinter.NO); self.results_tree.column("#", anchor='c', width=40)
-        self.results_tree.column("Job Card No", anchor='w', width=180); self.results_tree.column("Applicant Name", anchor='w', width=150)
+        self.results_tree.column("Panchayat", anchor='w', width=140); self.results_tree.column("Job Card No", anchor='w', width=180); self.results_tree.column("Applicant Name", anchor='w', width=150)
         self.results_tree.column("Status", anchor='w', width=250)
         self.results_tree.heading("#0", text=""); self.results_tree.heading("#", text="#")
-        self.results_tree.heading("Job Card No", text="Job Card No"); self.results_tree.heading("Applicant Name", text="Applicant Name")
+        self.results_tree.heading("Panchayat", text="Panchayat"); self.results_tree.heading("Job Card No", text="Job Card No"); self.results_tree.heading("Applicant Name", text="Applicant Name")
         self.results_tree.heading("Status", text="Status")
         self.style_treeview(self.results_tree)
 
@@ -1264,9 +1264,9 @@ class DemandTab(BaseAutomationTab):
                     successful_names = set()
                     for item_id in self.results_tree.get_children():
                         values = self.results_tree.item(item_id)['values']
-                        status = str(values[3]).lower()
+                        status = str(values[4]).lower()
                         if "success" in status or "already" in status:
-                            successful_names.add(str(values[2]).strip())
+                            successful_names.add(str(values[3]).strip())
                     
                     # 2. Map Successful applicants to their Allocation Work Codes
                     allocation_map = {} 
@@ -1643,6 +1643,7 @@ class DemandTab(BaseAutomationTab):
         Adds a new row to the results treeview with correct color tags.
         """
         jc, name, status = data
+        panchayat = self.panchayat_var.get().strip() or "-"
         row_id = len(self.results_tree.get_children()) + 1
         
         status_str = str(status)
@@ -1664,7 +1665,7 @@ class DemandTab(BaseAutomationTab):
         # Display Text Truncation
         disp_status = (status_str[:100] + '...') if len(status_str) > 100 else status_str
         
-        self.results_tree.insert("", "end", iid=row_id, values=(row_id, jc, name, disp_status), tags=tags)
+        self.results_tree.insert("", "end", iid=row_id, values=(row_id, panchayat, jc, name, disp_status), tags=tags)
         self.results_tree.yview_moveto(1)
 
     def _retry_failed_applicants(self):
@@ -1692,8 +1693,8 @@ class DemandTab(BaseAutomationTab):
                 values = self.results_tree.item(item_id, 'values')
                 if not values: continue
                 
-                jc_no = values[1]
-                name = values[2]
+                jc_no = values[2]
+                name = values[3]
 
                 # Find this applicant in the master data list and mark for re-selection
                 found = False

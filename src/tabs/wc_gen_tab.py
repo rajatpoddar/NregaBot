@@ -159,10 +159,10 @@ class WcGenTab(BaseAutomationTab):
         self.export_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", fg_color="#107C10", hover_color="#0B5E0B", command=self.export_report)
         self.export_button.pack(side="left")
         
-        cols = ("Work Code", "Job Card", "Beneficiary Type")
+        cols = ("Panchayat", "Work Code", "Job Card", "Beneficiary Type")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
-        self.results_tree.column("Work Code", width=180); self.results_tree.column("Job Card", width=180); self.results_tree.column("Beneficiary Type", width=150)
+        self.results_tree.column("Panchayat", width=140); self.results_tree.column("Work Code", width=180); self.results_tree.column("Job Card", width=180); self.results_tree.column("Beneficiary Type", width=150)
         self.results_tree.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)
         scrollbar = ctk.CTkScrollbar(results_tab, command=self.results_tree.yview)
         self.results_tree.configure(yscroll=scrollbar.set); scrollbar.grid(row=1, column=1, sticky='ns')
@@ -244,6 +244,7 @@ class WcGenTab(BaseAutomationTab):
 
     def _log_result(self, result_data):
         self.safe_tree_insert((
+            self.panchayat_var.get().strip() or '-',
             truncate_workcode(result_data.get('work_code', 'N/A')),
             result_data.get('job_card', 'N/A'),
             result_data.get('beneficiary_type', 'N/A')

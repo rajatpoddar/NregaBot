@@ -205,7 +205,7 @@ class MateMrGenTab(BaseAutomationTab):
             text_color="#DAA520", font=ctk.CTkFont(weight="bold"))
         self.skipped_label.grid(row=0, column=1, sticky='w')
 
-        cols = ("Timestamp", "Work Code/Key", "Status", "Details")
+        cols = ("Timestamp", "Panchayat", "Work Code/Key", "Status", "Details")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols:
             self.results_tree.heading(col, text=col)
@@ -283,9 +283,9 @@ class MateMrGenTab(BaseAutomationTab):
             self.output_action_var.set(data.get('output_action', 'Save as PDF'))
 
     #  Results helpers                                                     #
-    def _log_result(self, item_key, status, details):
+    def _log_result(self, panchayat, item_key, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")
-        values = (timestamp, item_key, status, details)
+        values = (timestamp, panchayat, item_key, status, details)
         tags = ('success',) if 'success' in status.lower() else ('failed',)
         if status == "Success":
             self.success_count += 1
@@ -350,8 +350,8 @@ class MateMrGenTab(BaseAutomationTab):
         failed_items = []
         for item_id in self.results_tree.get_children():
             values = self.results_tree.item(item_id)['values']
-            if "success" not in str(values[2]).lower():
-                failed_items.append(str(values[1]))
+            if "success" not in str(values[3]).lower():
+                failed_items.append(str(values[2]))
         if not failed_items:
             messagebox.showinfo("Retry", "No failed items found to retry.")
             return
@@ -600,7 +600,7 @@ class MateMrGenTab(BaseAutomationTab):
                 driver, wait, item, inputs['auto_mode'])
 
             if full_work_code_text in session_skip_list:
-                self._log_result(item, "Skipped", "Already processed in this session.")
+                self._log_result(inputs['panchayat'], item, "Skipped", "Already processed in this session.")
                 return
 
             # 4. Fill dates via JS (bypasses datepicker widget)
@@ -651,7 +651,7 @@ class MateMrGenTab(BaseAutomationTab):
                 alert = driver.switch_to.alert
                 alert_text = alert.text
                 alert.accept()
-                self._log_result(item, "Failed", f"Server Alert: {alert_text}")
+                self._log_result(inputs['panchayat'], item, "Failed", f"Server Alert: {alert_text}")
                 return
             except TimeoutException:
                 pass
@@ -661,7 +661,7 @@ class MateMrGenTab(BaseAutomationTab):
             # 9. Check known error messages
             error_reason = self._check_for_page_errors(driver)
             if error_reason:
-                self._log_result(item, "Skipped", error_reason)
+                self._log_result(inputs['panchayat'], item, "Skipped", error_reason)
                 session_skip_list.add(full_work_code_text)
                 return
 
@@ -679,16 +679,16 @@ class MateMrGenTab(BaseAutomationTab):
             if inputs['output_action'] == "Print" and pdf_path:
                 self._print_file(pdf_path)
 
-            self._log_result(item, "Success" if pdf_path else "Failed", log_detail)
+            self._log_result(inputs['panchayat'], item, "Success" if pdf_path else "Failed", log_detail)
             session_skip_list.add(full_work_code_text)
 
         except TimeoutException:
             self.log_error(f"Error on '{item}': Timeout (Slow Network)")
-            self._log_result(item, "Failed", "Timeout - Slow Network")
+            self._log_result(inputs['panchayat'], item, "Failed", "Timeout - Slow Network")
         except Exception as e:
             error_msg = str(e).splitlines()[0] if str(e) else "Unknown Error"
             self.log_error(f"Error on '{item}': {error_msg}")
-            self._log_result(item, "Failed", error_msg)
+            self._log_result(inputs['panchayat'], item, "Failed", error_msg)
 
     #  Page error checker                                                 #
     def _check_for_page_errors(self, driver) -> str | None:
@@ -894,7 +894,7 @@ class MateMrGenTab(BaseAutomationTab):
         data_to_export = []
         for item_id in self.results_tree.get_children():
             row_values = self.results_tree.item(item_id)['values']
-            status = row_values[2].upper()
+            status = row_values[3].upper()
             if filter_option == "Export All":
                 data_to_export.append(row_values)
             elif filter_option == "Success Only" and "SUCCESS" in status:

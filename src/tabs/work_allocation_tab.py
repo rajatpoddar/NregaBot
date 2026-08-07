@@ -114,7 +114,7 @@ class WorkAllocationTab(BaseAutomationTab):
         self.export_button.pack(side='left')
 
         # --- Results Treeview ---
-        cols = ("Work Key", "Selected Work Code", "Status", "Details", "Timestamp")
+        cols = ("Panchayat", "Work Key", "Selected Work Code", "Status", "Details", "Timestamp")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
         self.results_tree.column("Work Key", anchor='center', width=100)
@@ -378,7 +378,7 @@ class WorkAllocationTab(BaseAutomationTab):
             if not matching_option:
                 error_msg = "Workcode not found in dropdown."
                 self.log_error(f"   - FAILED: {error_msg}")
-                self._log_result(work_key, "N/A", "Failed", error_msg)
+                self._log_result(self.panchayat_var.get().strip(), work_key, "N/A", "Failed", error_msg)
                 return 
             
             selected_work_code_text = matching_option.text
@@ -424,7 +424,7 @@ class WorkAllocationTab(BaseAutomationTab):
                     self.log_warning(f"   - {msg}")
                     # Use 'warning' tag (yellow) or 'failed' (red) as preferred. 
                     # Assuming 'skipped' tag maps to yellow in base_tab.
-                    self._log_result(work_key, selected_work_code_text, "Skipped", msg)
+                    self._log_result(self.panchayat_var.get().strip(), work_key, selected_work_code_text, "Skipped", msg)
                     return 
 
             # --- Step 6: Click Save (with 5 MIN WAIT) ---
@@ -445,21 +445,21 @@ class WorkAllocationTab(BaseAutomationTab):
             else:
                 detail_msg = alert_text
 
-            self._log_result(work_key, selected_work_code_text, "Success", detail_msg)
+            self._log_result(self.panchayat_var.get().strip(), work_key, selected_work_code_text, "Success", detail_msg)
             # Use save_wait for settling after save as well
             self._wait_for_settle(driver, save_wait, "Save")
 
         except (TimeoutException, NoAlertPresentException, StaleElementReferenceException) as e:
             error_msg = f"Page error (Timeout/Alert): {str(e).splitlines()[0]}"
             self.log_error(f"   - FAILED: {error_msg}")
-            self._log_result(work_key, selected_work_code_text, "Failed", error_msg)
+            self._log_result(self.panchayat_var.get().strip(), work_key, selected_work_code_text, "Failed", error_msg)
             try: driver.get(config.WORK_ALLOCATION_CONFIG["url"]); self.log_info("   - Refreshing page..."); return
             except Exception: return
         
         except Exception as e:
             error_msg = f"Critical error: {e}"
             self.log_error(f"   - FAILED: {error_msg}")
-            self._log_result(work_key, selected_work_code_text, "Failed", error_msg)
+            self._log_result(self.panchayat_var.get().strip(), work_key, selected_work_code_text, "Failed", error_msg)
 
     def _load_demand_csv(self):
         """Loads the Demand CSV and groups workers by Work Code."""
@@ -511,9 +511,9 @@ class WorkAllocationTab(BaseAutomationTab):
             self.log_error(f"Error loading CSV: {e}")
             messagebox.showerror("Error", f"Failed to load CSV: {e}")
 
-    def _log_result(self, work_key, work_code, status, details):
+    def _log_result(self, panchayat, work_key, work_code, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")
-        values = (work_key, truncate_workcode(work_code), status, details, timestamp)
+        values = (panchayat, work_key, truncate_workcode(work_code), status, details, timestamp)
         
         # --- Update: Color Tags ---
         tags = ()
@@ -540,8 +540,8 @@ class WorkAllocationTab(BaseAutomationTab):
         for item_id in all_items:
             values = self.results_tree.item(item_id)['values']
             # Tree columns: Work Key, Work Code, Status, Details, Timestamp
-            work_key = str(values[0])
-            status = str(values[2]).lower()
+            work_key = str(values[1])
+            status = str(values[3]).lower()
             
             if "success" not in status:
                 if work_key not in failed_keys:

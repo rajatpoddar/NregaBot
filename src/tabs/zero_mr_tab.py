@@ -88,7 +88,7 @@ class ZeroMrTab(BaseAutomationTab):
         self.export_button.pack(side='left')
 
         # --- Results Treeview ---
-        cols = ("Search Key", "MSR No", "Status", "Details", "Timestamp")
+        cols = ("Panchayat", "Search Key", "MSR No", "Status", "Details", "Timestamp")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
         self.results_tree.column("Search Key", anchor='center', width=100)
@@ -238,7 +238,7 @@ class ZeroMrTab(BaseAutomationTab):
                         status_msg = f"Processing [{g_idx}/{total_groups}] {i}/{total_items}: Key={work_key}, MSR={msr_no}"
                         self.app.after(0, self.app.set_status, status_msg)
                         self.app.after(0, self.update_status, status_msg, i / max(total_items, 1))
-                        self._process_single_item(driver, wait, work_key, msr_no)
+                        self._process_single_item(driver, wait, work_key, msr_no, p_name)
             else:
                 # --- Single panchayat ---
                 self._select_zero_mr_panchayat(driver, wait, inputs['panchayat_name'])
@@ -251,7 +251,7 @@ class ZeroMrTab(BaseAutomationTab):
                     status_msg = f"Processing {i+1}/{total_items}: Key={work_key}, MSR={msr_no}"
                     self.app.after(0, self.app.set_status, status_msg)
                     self.app.after(0, self.update_status, status_msg, (i+1)/total_items)
-                    self._process_single_item(driver, wait, work_key, msr_no)
+                    self._process_single_item(driver, wait, work_key, msr_no, inputs['panchayat_name'])
 
         except Exception as e:
             error_msg = f"A critical error occurred: {e}"
@@ -260,8 +260,8 @@ class ZeroMrTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Error")
         finally:
             # Count success/fail from results_tree
-            success_count = sum(1 for item in self.results_tree.get_children() if 'success' in str(self.results_tree.item(item)['values'][2]).lower())
-            fail_count = sum(1 for item in self.results_tree.get_children() if 'success' not in str(self.results_tree.item(item)['values'][2]).lower())
+            success_count = sum(1 for item in self.results_tree.get_children() if 'success' in str(self.results_tree.item(item)['values'][3]).lower())
+            fail_count = sum(1 for item in self.results_tree.get_children() if 'success' not in str(self.results_tree.item(item)['values'][3]).lower())
             total_count = success_count + fail_count
             self.log_info(f"📊 Zero MR Complete: ✅ {success_count} generated, ❌ {fail_count} failed (of {total_count} total)")
             self.app.after(0, self.set_ui_state, False)
@@ -290,7 +290,7 @@ class ZeroMrTab(BaseAutomationTab):
             except TimeoutException:
                 pass
 
-    def _process_single_item(self, driver, wait, work_key, msr_no):
+    def _process_single_item(self, driver, wait, work_key, msr_no, panchayat):
         try:
             self.log_info(f"   - Processing Key: {work_key}, MSR: {msr_no}")
             
@@ -375,7 +375,7 @@ class ZeroMrTab(BaseAutomationTab):
                 options_preview = [o.text for o in msr_select.options if "Select" not in o.text][:3]
                 error_msg = f"MSR '{target_msr}' not found in dropdown. Available: {options_preview}..."
                 self.log_error(f"   - FAILED: {error_msg}")
-                self._log_result(work_key, msr_no, "Failed", error_msg)
+                self._log_result(panchayat, work_key, msr_no, "Failed", error_msg)
                 return
 
             # 5. Click Save
@@ -397,24 +397,24 @@ class ZeroMrTab(BaseAutomationTab):
 
             if "successfully" in message_text.lower() or "saved" in message_text.lower() or "updated" in message_text.lower():
                 self.log_success(f"   - Success: {message_text}")
-                self._log_result(work_key, msr_no, "Success", message_text)
+                self._log_result(panchayat, work_key, msr_no, "Success", message_text)
             else:
                 self.log_error(f"   - Failed: {message_text}")
-                self._log_result(work_key, msr_no, "Failed", message_text)
+                self._log_result(panchayat, work_key, msr_no, "Failed", message_text)
             
             time.sleep(1)
 
         except (TimeoutException, NoSuchElementException) as e:
             error_msg = f"Element not found/timeout. {str(e).splitlines()[0]}"
             self.log_error(f"   - FAILED: {error_msg}")
-            self._log_result(work_key, msr_no, "Failed", error_msg)
+            self._log_result(panchayat, work_key, msr_no, "Failed", error_msg)
         except Exception as e:
             if "stale element" in str(e).lower():
                 error_msg = "Page refreshed unexpectedly."
             else:
                 error_msg = f"Unexpected error: {e}"
             self.log_error(f"   - FAILED: {error_msg}")
-            self._log_result(work_key, msr_no, "Failed", error_msg)
+            self._log_result(panchayat, work_key, msr_no, "Failed", error_msg)
     def retry_logic_handler(self) -> None:
         """
         Custom Retry Logic for Work Allocation.
@@ -432,8 +432,8 @@ class ZeroMrTab(BaseAutomationTab):
             values = self.results_tree.item(item_id)['values']
             # Tree columns: Work Key, Work Code, Status, Details, Timestamp
             # Index 0 is Work Key, Index 2 is Status
-            work_key = str(values[0]).strip()
-            status = str(values[2]).lower()
+            work_key = str(values[1]).strip()
+            status = str(values[3]).lower()
             
             # Check for failure keywords (non-success)
             if "success" not in status:
@@ -471,9 +471,9 @@ class ZeroMrTab(BaseAutomationTab):
         self.log_info(f"Retrying {len(failed_keys)} failed work keys...")
         self.app.after(200, self.start_automation)
 
-    def _log_result(self, work_key, msr_no, status, details):
+    def _log_result(self, panchayat, work_key, msr_no, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")
-        values = (truncate_workcode(work_key), msr_no, status, details, timestamp)
+        values = (panchayat, truncate_workcode(work_key), msr_no, status, details, timestamp)
         tags = ('failed',) if 'success' not in status.lower() else ()
         self.safe_tree_insert(values, tags)
 
@@ -493,7 +493,7 @@ class ZeroMrTab(BaseAutomationTab):
         data_to_export = []
         for item_id in all_items:
             row_values = self.results_tree.item(item_id)['values']
-            status = row_values[2].upper()
+            status = row_values[3].upper()
             if filter_option == "Export All": data_to_export.append(row_values)
             elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)

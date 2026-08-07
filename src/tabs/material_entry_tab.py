@@ -277,7 +277,7 @@ class MaterialEntryTab(BaseAutomationTab):
         results_tab.grid_rowconfigure(1, weight=1)
         res_tree_frame.grid_columnconfigure(0, weight=1)
         res_tree_frame.grid_rowconfigure(0, weight=1)
-        cols = ("Timestamp", "Work Key", "Bill No", "Status", "Details")
+        cols = ("Timestamp", "Panchayat", "Work Key", "Bill No", "Status", "Details")
         self.results_tree = ttk.Treeview(res_tree_frame, columns=cols, show='headings')
         for col in cols:
             self.results_tree.heading(col, text=col)
@@ -469,7 +469,7 @@ class MaterialEntryTab(BaseAutomationTab):
                                 raise
                             time.sleep(1)
                     if not found_wc:
-                        self._log_result(work_key, bill_no, "Failed", "Work code not found in dropdown")
+                        self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", "Work code not found in dropdown")
                         fail_count += 1
                         continue
                     time.sleep(1.5)  # Brief wait for postback to begin
@@ -501,7 +501,7 @@ class MaterialEntryTab(BaseAutomationTab):
                                 raise
                             time.sleep(1.5)  # Brief wait for postback to begin
                     if not vendor_found:
-                        self._log_result(work_key, bill_no, "Failed", "Vendor not found after search")
+                        self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", "Vendor not found after search")
                         fail_count += 1
                         continue
                     time.sleep(1.5)  # Brief wait for postback to begin
@@ -540,7 +540,7 @@ class MaterialEntryTab(BaseAutomationTab):
                         except (StaleElementReferenceException, ElementNotInteractableException) as e:
                             self.log_warning(f"  ⚠ Error filling '{mat['name']}': {str(e)}")
                     if filled_count == 0:
-                        self._log_result(work_key, bill_no, "Failed", "No materials could be filled")
+                        self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", "No materials could be filled")
                         fail_count += 1
                         continue
                     time.sleep(1.5)  # Brief wait for postback to begin
@@ -565,33 +565,33 @@ class MaterialEntryTab(BaseAutomationTab):
                         success_msg = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_lblMsg"))).text
                         if "successfully" in success_msg.lower() or "saved" in success_msg.lower():
                             self.log_info(f"✅ SUCCESS: {success_msg}")
-                            self._log_result(work_key, bill_no, "Success", success_msg)
+                            self._log_result(inputs['panchayat'], work_key, bill_no, "Success", success_msg)
                             success_count += 1
                         else:
                             self.log_warning(f"Unexpected message: {success_msg}")
-                            self._log_result(work_key, bill_no, "Warning", success_msg)
+                            self._log_result(inputs['panchayat'], work_key, bill_no, "Warning", success_msg)
                     except TimeoutException:
                         self.log_warning("⚠ Could not verify success message")
-                        self._log_result(work_key, bill_no, "Unknown", "No confirmation message found")
+                        self._log_result(inputs['panchayat'], work_key, bill_no, "Unknown", "No confirmation message found")
                 except TimeoutException as e:
                     error_msg = f"Timeout: Element not found - {str(e)}"
                     self.log_error(f"{error_msg}")
-                    self._log_result(work_key, bill_no, "Failed", error_msg)
+                    self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
                 except NoSuchElementException as e:
                     error_msg = f"Element not found: {str(e)}"
                     self.log_error(f"{error_msg}")
-                    self._log_result(work_key, bill_no, "Failed", error_msg)
+                    self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
                 except WebDriverException as e:
                     error_msg = f"WebDriver error: {str(e)}"
                     self.log_error(f"{error_msg}")
-                    self._log_result(work_key, bill_no, "Failed", error_msg)
+                    self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
                 except Exception as e:
                     error_msg = f"Unexpected error: {str(e)}"
                     self.log_error(f"{error_msg}")
-                    self._log_result(work_key, bill_no, "Failed", error_msg)
+                    self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
                     fail_count += 1
         except Exception as e:
             self.handle_error(e)
@@ -603,10 +603,10 @@ class MaterialEntryTab(BaseAutomationTab):
             self.log_info(summary)
             self.log_info(f"{'=' * 60}")
             self.log_info(f"📊 {summary}")
-    def _log_result(self, work_key, bill_no, status, details):
+    def _log_result(self, panchayat, work_key, bill_no, status, details):
         ts = datetime.now().strftime("%H:%M:%S")
         tags = ('success',) if 'success' in status.lower() else ('failed',) if 'failed' in status.lower() else ()
-        self.safe_tree_insert((ts, truncate_workcode(work_key), bill_no, status, details), tags)
+        self.safe_tree_insert((ts, panchayat, truncate_workcode(work_key), bill_no, status, details), tags)
     def reset_ui(self) -> None:
         super().reset_ui()
         self.vendor_code_entry.delete(0, "end")

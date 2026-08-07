@@ -126,7 +126,7 @@ class DuplicateMrTab(BaseAutomationTab):
         self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="duplicate_mr_results.xlsx", filter_mode="Export All"))
         self.export_csv_button.pack(side="left") # Changed to left
 
-        cols = ("Timestamp", "Work Code", "MSR No", "Status")
+        cols = ("Timestamp", "Panchayat", "Work Code", "MSR No", "Status")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
         self.results_tree.column("Timestamp", width=100, anchor="center")
@@ -170,9 +170,9 @@ class DuplicateMrTab(BaseAutomationTab):
         pass
 
 
-    def _log_result(self, work_code, msr_no, status):
+    def _log_result(self, panchayat, work_code, msr_no, status):
         timestamp = time.strftime("%H:%M:%S")
-        self.safe_tree_insert((timestamp, truncate_workcode(work_code), msr_no, status))
+        self.safe_tree_insert((timestamp, panchayat, truncate_workcode(work_code), msr_no, status))
     def start_automation(self) -> None:
         panchayat = self.panchayat_var.get().strip()
         work_codes_raw = self.work_codes_textbox.get("1.0", "end").strip()
@@ -355,8 +355,8 @@ class DuplicateMrTab(BaseAutomationTab):
                 self.log_info("   - Print page is ready.")                
                 pdf_path = self._save_mr_as_pdf(driver, work_code, msr_no, orientation, scale, self.output_dir)
                 
-                if pdf_path: self._log_result(work_code, msr_no, "Saved as PDF")
-                else: self._log_result(work_code, msr_no, "PDF Save Failed")
+                if pdf_path: self._log_result(panchayat, work_code, msr_no, "Saved as PDF")
+                else: self._log_result(panchayat, work_code, msr_no, "PDF Save Failed")
 
                 if "Print and Save" in action and pdf_path:
                     driver.execute_script("window.print();")
@@ -366,13 +366,13 @@ class DuplicateMrTab(BaseAutomationTab):
         
         except TimeoutException:
             self.log_error(f"Timeout: Page element not found for work code {work_code}")
-            self._log_result(work_code, "N/A", "Timeout")
+            self._log_result(panchayat, work_code, "N/A", "Timeout")
         except NoSuchElementException:
             self.log_error(f"Element not found for work code {work_code}")
-            self._log_result(work_code, "N/A", "Element not found")
+            self._log_result(panchayat, work_code, "N/A", "Element not found")
         except Exception as e:
             self.log_error(f"Error processing {work_code}: {str(e).splitlines()[0]}")
-            self._log_result(work_code, "N/A", "Unexpected Error")
+            self._log_result(panchayat, work_code, "N/A", "Unexpected Error")
 
     def _get_msr_list(self, driver, wait, work_code, panchayat, url):
         """Helper to get list of MSRs (Background Safe)."""
@@ -399,7 +399,7 @@ class DuplicateMrTab(BaseAutomationTab):
             
             if not msr_options:
                 self.log_warning("No MSR numbers found.")
-                self._log_result(work_code, "N/A", "No MSRs found")
+                self._log_result(panchayat, work_code, "N/A", "No MSRs found")
                 return []
             
             self.log_info(f"Found {len(msr_options)} MSRs: {', '.join(msr_options)}")

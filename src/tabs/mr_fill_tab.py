@@ -119,7 +119,7 @@ class MrFillTab(BaseAutomationTab):
         self.export_button.pack(side='left')
 
         # Results Treeview
-        cols = ("Workcode", "MR No.", "Status", "Details", "Timestamp")
+        cols = ("Panchayat", "Workcode", "MR No.", "Status", "Details", "Timestamp")
         self.results_tree = ttk.Treeview(results_frame, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
         self.results_tree.column("Workcode", width=200)
@@ -415,14 +415,14 @@ class MrFillTab(BaseAutomationTab):
                 try:
                     alert = driver.switch_to.alert; txt = alert.text; alert.accept()
                     if "Saved Successfully" in txt or "has been saved" in txt:
-                        self._log_result(work_key, current_mr_no, "Success", txt)
+                        self._log_result(panchayat_name, work_key, current_mr_no, "Success", txt)
                     else:
-                        self._log_result(work_key, current_mr_no, "Failed", txt)
+                        self._log_result(panchayat_name, work_key, current_mr_no, "Failed", txt)
                     outcome_found = True; break
                 except NoAlertPresentException: time.sleep(1)
 
             if not outcome_found: 
-                self._log_result(work_key, current_mr_no, "Failed", "Timeout: No confirmation alert.")
+                self._log_result(panchayat_name, work_key, current_mr_no, "Failed", "Timeout: No confirmation alert.")
 
         except Exception as e:
             # --- ERROR CLEANING ---
@@ -433,7 +433,7 @@ class MrFillTab(BaseAutomationTab):
             if "Message:" in err_msg:
                  err_msg = err_msg.replace("Message:", "").strip()
             
-            self._log_result(work_key, current_mr_no, "Failed", err_msg)
+            self._log_result(panchayat_name, work_key, current_mr_no, "Failed", err_msg)
     def retry_logic_handler(self) -> None:
         """
         Retry Logic: Reads 'Failed' items from Results and restarts automation.
@@ -447,9 +447,9 @@ class MrFillTab(BaseAutomationTab):
 
         for item_id in all_items:
             values = self.results_tree.item(item_id)['values']
-            # Column 0 is Workcode, Column 2 is Status
-            work_code = str(values[0])
-            status = str(values[2]).upper()
+            # Column 1 is Workcode, Column 3 is Status (0 = Panchayat)
+            work_code = str(values[1])
+            status = str(values[3]).upper()
             
             if "SUCCESS" not in status:
                 failed_items.append(work_code)
@@ -472,7 +472,7 @@ class MrFillTab(BaseAutomationTab):
             self.start_automation()
 
     # 2. FIX: Update this method to apply the 'success' tag for green color
-    def _log_result(self, work_key, mr_no, status, msg):
+    def _log_result(self, panchayat, work_key, mr_no, status, msg):
         """Logs the result to the log display and the results tree."""
         # Clean up message for display
         details = msg.replace("\n", " ").replace("\r", " ").strip()
@@ -501,7 +501,7 @@ class MrFillTab(BaseAutomationTab):
             self.log_error(f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}")
         else:
             self.log_info(f"'{work_key}' (MR: {mr_no}) - {status.upper()}: {details}")        
-        self.safe_tree_insert((work_key, mr_no, status.upper(), details, timestamp), (tag,))
+        self.safe_tree_insert((panchayat, work_key, mr_no, status.upper(), details, timestamp), (tag,))
 
     def export_report(self):
         self.export_treeview_to_excel(
@@ -522,7 +522,7 @@ class MrFillTab(BaseAutomationTab):
         data_to_export = []
         for item_id in all_items:
             row_values = self.results_tree.item(item_id)['values']
-            status = row_values[2].upper() # Status column
+            status = row_values[3].upper() # Status column
             if filter_option == "Export All": data_to_export.append(row_values)
             elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)

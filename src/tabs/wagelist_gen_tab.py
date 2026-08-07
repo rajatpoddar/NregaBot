@@ -88,7 +88,7 @@ class WagelistGenTab(BaseAutomationTab):
         results_tab.grid_rowconfigure(1, weight=0)
 
         # Treeview (Full Height)
-        cols = ("Timestamp", "Work Code", "Status", "Wagelist No.", "Job Card No.", "Applicant Name")
+        cols = ("Timestamp", "Panchayat", "Work Code", "Status", "Wagelist No.", "Job Card No.", "Applicant Name")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
         
@@ -329,7 +329,7 @@ class WagelistGenTab(BaseAutomationTab):
                                 pdf_info = " (PDF Saved)" if pdf_path else " (PDF Failed)"
 
                             self.log_success(f"   SUCCESS: {wagelist_no}{pdf_info}")
-                            self._log_result(work_code, "Success", wagelist_no, "", "")
+                            self._log_result(agency_name_part, work_code, "Success", wagelist_no, "", "")
                             # Stay at index 0 because processed item is gone
                             pass 
 
@@ -340,7 +340,7 @@ class WagelistGenTab(BaseAutomationTab):
                             except: err_text = "Unknown Error"
                             
                             self.log_error(f"   Failed: {err_text}")
-                            self._log_result(work_code, f"Failed ({err_text[:20]})", "N/A", "", "")
+                            self._log_result(agency_name_part, work_code, f"Failed ({err_text[:20]})", "N/A", "", "")
                             total_errors_to_skip += 1 # Skip this failed item
 
                     except Exception as e:
@@ -377,10 +377,10 @@ class WagelistGenTab(BaseAutomationTab):
             else:
                 self.app.after(3000, lambda: self.app.set_status("Ready"))
 
-    def _log_result(self, work_code, status, wagelist_no, job_card, applicant_name):
+    def _log_result(self, panchayat, work_code, status, wagelist_no, job_card, applicant_name):
         timestamp = datetime.now().strftime("%H:%M:%S")
         tags = ('success',) if 'success' in status.lower() else ('failed',)
-        self.safe_tree_insert((timestamp, truncate_workcode(work_code), status, wagelist_no, job_card, applicant_name), tags)
+        self.safe_tree_insert((timestamp, panchayat, truncate_workcode(work_code), status, wagelist_no, job_card, applicant_name), tags)
 
     # --- NEW METHOD: Save Page as PDF ---
     def _save_page_as_pdf(self, driver, wagelist_no, work_code, output_dir):
@@ -456,7 +456,7 @@ class WagelistGenTab(BaseAutomationTab):
         data_to_export = []
         for item_id in all_items:
             row_values = self.results_tree.item(item_id)['values']
-            status = row_values[2].upper() # Status is the third column
+            status = row_values[3].upper() # Status is the third column
             if filter_option == "Export All": data_to_export.append(row_values)
             elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)

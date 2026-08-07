@@ -99,7 +99,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         )
         self.export_pdf_button.pack(side="left")
 
-        cols = ("Job Card No.", "Applicant Name", "Status", "Timestamp")
+        cols = ("Panchayat", "Job Card No.", "Applicant Name", "Status", "Timestamp")
         self.results_tree = ttk.Treeview(results_frame, columns=cols, show='headings')
         for col in cols:
             self.results_tree.heading(col, text=col)
@@ -321,10 +321,10 @@ class AbpsVerifyTab(BaseAutomationTab):
                         # Read Status
                         final_row = wait.until(EC.presence_of_element_located((By.XPATH, f"//tr[contains(., '{job_card}') and contains(., '{app_name}')]")))
                         status_msg = final_row.find_element(By.XPATH, ".//td[9]/span").get_attribute("innerText")
-                        self._log_result(job_card, app_name, status_msg or "Checked")
+                        self._log_result(p_name, job_card, app_name, status_msg or "Checked")
 
                     except (TimeoutException, StaleElementReferenceException, NoSuchElementException) as e:
-                        self._log_result(job_card, app_name, f"Error: {type(e).__name__}")
+                        self._log_result(p_name, job_card, app_name, f"Error: {type(e).__name__}")
                     finally:
                         if unique_key:
                             session_processed_jobcards.add(unique_key)
@@ -356,7 +356,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         except Exception as village_error:
             self.log_error(f"Error in {current_village}: {village_error}. Skipping.")
 
-    def _log_result(self, job_card, app_name, status):
+    def _log_result(self, panchayat, job_card, app_name, status):
         timestamp = datetime.now().strftime("%H:%M:%S")
         
         tags = ()
@@ -377,14 +377,14 @@ class AbpsVerifyTab(BaseAutomationTab):
             self.log_error(msg)
         else:
             self.log_info(msg)
-        self.safe_tree_insert((job_card, app_name, status, timestamp), tags)
+        self.safe_tree_insert((panchayat, job_card, app_name, status, timestamp), tags)
 
     def _show_abps_summary(self):
         """Show professional summary after ABPS verification finishes."""
         if not self._is_alive():
             return
         total = len(self.results_tree.get_children())
-        success = sum(1 for item in self.results_tree.get_children() if 'success' in str(self.results_tree.item(item)['values'][2]).lower() or 'checked' in str(self.results_tree.item(item)['values'][2]).lower() or 'verified' in str(self.results_tree.item(item)['values'][2]).lower())
+        success = sum(1 for item in self.results_tree.get_children() if 'success' in str(self.results_tree.item(item)['values'][3]).lower() or 'checked' in str(self.results_tree.item(item)['values'][3]).lower() or 'verified' in str(self.results_tree.item(item)['values'][3]).lower())
         failed = total - success
         summary = f"✅ Verified: {success}\n❌ Failed/Error: {failed}\n📊 Total: {total}"
         self.update_status(f"✅ {success}/{total} verified", 1.0)

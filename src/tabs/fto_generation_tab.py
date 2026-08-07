@@ -111,9 +111,10 @@ class FtoGenerationTab(BaseAutomationTab):
         results_frame.grid_columnconfigure(0, weight=1)
         results_frame.grid_rowconfigure(0, weight=1)
         
-        cols = ("Type", "Status", "Info", "Timestamp")
+        cols = ("Panchayat", "Type", "Status", "Info", "Timestamp")
         self.results_tree = ttk.Treeview(results_frame, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
+        self.results_tree.column("Panchayat", width=140)
         self.results_tree.column("Type", width=150)
         self.results_tree.column("Status", width=100)
         self.results_tree.column("Info", width=300)
@@ -219,7 +220,8 @@ class FtoGenerationTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key + "_del", self.run_delete_logic)
 
     def _log_result(self, r_type, status, info):
-        self.safe_tree_insert((r_type, status, info, datetime.now().strftime("%H:%M:%S")))
+        panchayat = (self.stored_location_data or {}).get('panchayat', '') or '-'
+        self.safe_tree_insert((panchayat, r_type, status, info, datetime.now().strftime("%H:%M:%S")))
 
     # ============================================================================
     # GENERATION LOGIC (WITH FIXED SCRAPING) - UNTOUCHED

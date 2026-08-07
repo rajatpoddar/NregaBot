@@ -101,7 +101,7 @@ class EmbVerifyTab(BaseAutomationTab):
         self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side='left')
 
-        cols = ("Work Code", "Status", "Details", "Timestamp")
+        cols = ("Panchayat", "Work Code", "Status", "Details", "Timestamp")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
         self.results_tree.column("Work Code", width=250); self.results_tree.column("Status", width=100, anchor='center'); self.results_tree.column("Details", width=350); self.results_tree.column("Timestamp", width=120, anchor='center')
@@ -154,7 +154,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(panchayat, verify_amount, work_codes))
 
-    def _log_result(self, work_code, status, details):
+    def _log_result(self, panchayat, work_code, status, details):
         """Logs a result to the treeview with professional status tracking."""
         timestamp = datetime.now().strftime("%H:%M:%S")
         work_code = truncate_workcode(work_code)
@@ -162,7 +162,7 @@ class EmbVerifyTab(BaseAutomationTab):
         tags = ('success',) if 'success' in status_lower or 'verified' in status_lower else ()
         if 'fail' in status_lower or 'rejected' in status_lower or 'error' in status_lower:
             tags = ('failed',)
-        self.safe_tree_insert((work_code, status, details, timestamp), tags)
+        self.safe_tree_insert((panchayat, work_code, status, details, timestamp), tags)
 
     def _show_emb_summary(self, total_work):
         """Show professional summary after eMB verification finishes."""
@@ -240,7 +240,7 @@ class EmbVerifyTab(BaseAutomationTab):
                     work_codes_to_process = [opt.text for opt in work_code_select_element.options if opt.get_attribute('value')]
                     if not work_codes_to_process:
                         self.log_warning("No work codes found for this Panchayat.")
-                        self._log_result("N/A", "Skipped", "No work codes found.")
+                        self._log_result(p_name, "N/A", "Skipped", "No work codes found.")
 
                 total += len(work_codes_to_process)
                 for i, current_wc in enumerate(work_codes_to_process):
@@ -252,7 +252,7 @@ class EmbVerifyTab(BaseAutomationTab):
                     self.log_info(f"  🔄 [{i+1}/{len(work_codes_to_process)}] Verifying: {truncate_workcode(current_wc)} ({pct:.0f}%)")
                     self.app.after(0, self.update_status, f"{p_name}: {i+1}/{len(work_codes_to_process)}",
                                    (p_idx + (i + 1) / max(len(work_codes_to_process), 1)) / max(total_p, 1))
-                    self._process_single_work_code(driver, wait, current_wc, use_search, verify_amount)
+                    self._process_single_work_code(driver, wait, current_wc, use_search, verify_amount, p_name)
 
                     if use_search and i < len(work_codes_to_process) - 1:
                         self.log_info("Navigating back for next work code...")
@@ -284,7 +284,7 @@ class EmbVerifyTab(BaseAutomationTab):
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
 
-    def _process_single_work_code(self, driver, wait, work_code, use_search, verify_amount):
+    def _process_single_work_code(self, driver, wait, work_code, use_search, verify_amount, panchayat):
         """Handles the logic for a single work code verification."""
         try:
             self.log_info(f"Selecting work code: {work_code}")
@@ -313,7 +313,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
             period_select = Select(period_dropdown_element)
             if len(period_select.options) <= 1:
-                self._log_result(work_code, "Skipped", "No measurement period available.")
+                self._log_result(panchayat, work_code, "Skipped", "No measurement period available.")
                 return
             period_select.select_by_index(1)
             
@@ -330,13 +330,13 @@ class EmbVerifyTab(BaseAutomationTab):
 
             if unit_cost == verify_amount and wage_per_day == verify_amount:
                 self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_btn_verify").click()
-                self._log_result(work_code, "Verified", f"Unit Cost & Wage were correct ({verify_amount}).")
+                self._log_result(panchayat, work_code, "Verified", f"Unit Cost & Wage were correct ({verify_amount}).")
             else:
                 rejection_reason = "unit cost is not correct"
                 self.log_warning(f"Rejecting. Unit Cost: {unit_cost}, Wage: {wage_per_day}")
                 self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_txt_rejection_reason").send_keys(rejection_reason)
                 self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_btn_reject").click()
-                self._log_result(work_code, "Rejected", f"Unit Cost: {unit_cost}, Wage: {wage_per_day}. Reason sent.")
+                self._log_result(panchayat, work_code, "Rejected", f"Unit Cost: {unit_cost}, Wage: {wage_per_day}. Reason sent.")
 
             try:
                 final_alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
@@ -348,14 +348,14 @@ class EmbVerifyTab(BaseAutomationTab):
         except UnexpectedAlertPresentException as e:
             try:
                 alert = driver.switch_to.alert
-                self._log_result(work_code, "Failed", f"Unexpected Alert: {alert.text}")
+                self._log_result(panchayat, work_code, "Failed", f"Unexpected Alert: {alert.text}")
                 alert.accept()
             except Exception as e: logger.warning("EmbVerify: Failed to dismiss alert: %s", e)
         except (TimeoutException, NoSuchElementException) as e:
-            self._log_result(work_code, "Failed", f"Could not find a required element or work code not found.")
+            self._log_result(panchayat, work_code, "Failed", f"Could not find a required element or work code not found.")
             self.log_error(f"Error details: {e}")
         except Exception as e:
-            self._log_result(work_code, "Error", f"An unexpected error occurred: {e}")
+            self._log_result(panchayat, work_code, "Error", f"An unexpected error occurred: {e}")
 
     def export_report(self):
         self.export_treeview_to_excel(

@@ -180,7 +180,7 @@ class MusterrollGenTab(BaseAutomationTab):
         self.success_label = ctk.CTkLabel(summary_frame, text="Success: 0", text_color="#2E8B57", font=ctk.CTkFont(weight="bold")); self.success_label.grid(row=0, column=0, sticky='w')
         self.skipped_label = ctk.CTkLabel(summary_frame, text="Skipped/Failed: 0", text_color="#DAA520", font=ctk.CTkFont(weight="bold")); self.skipped_label.grid(row=0, column=1, sticky='w')
         
-        cols = ("Timestamp", "Work Code/Key", "Status", "Details"); self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
+        cols = ("Timestamp", "Panchayat", "Work Code/Key", "Status", "Details"); self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
         self.results_tree.column("Timestamp", width=80, anchor='center'); self.results_tree.column("Work Code/Key", width=250); self.results_tree.column("Status", width=100, anchor='center'); self.results_tree.column("Details", width=400)
         self.results_tree.grid(row=2, column=0, sticky='nsew')
@@ -323,8 +323,8 @@ class MusterrollGenTab(BaseAutomationTab):
         failed_items = []
         for item_id in self.results_tree.get_children():
             values = self.results_tree.item(item_id)['values']
-            work_code = str(values[1])
-            status = str(values[2]).lower()
+            work_code = str(values[2])
+            status = str(values[3]).lower()
             if "success" not in status:
                 failed_items.append(work_code)
         
@@ -555,7 +555,7 @@ class MusterrollGenTab(BaseAutomationTab):
             full_work_code_text = self._select_work_code(driver, wait, item, inputs['auto_mode'])
             
             if full_work_code_text in session_skip_list:
-                self._log_result(item, "Skipped", "Already processed in this session.")
+                self._log_result(inputs['panchayat'], item, "Skipped", "Already processed in this session.")
                 return
 
             self.log_info("   - Entering dates and staff details...")
@@ -589,7 +589,7 @@ class MusterrollGenTab(BaseAutomationTab):
                 alert = driver.switch_to.alert
                 alert_text = alert.text
                 alert.accept()
-                self._log_result(item, "Failed", f"Server Alert: {alert_text}")
+                self._log_result(inputs['panchayat'], item, "Failed", f"Server Alert: {alert_text}")
                 return
             except TimeoutException: pass
             
@@ -597,7 +597,7 @@ class MusterrollGenTab(BaseAutomationTab):
             
             error_reason = self._check_for_page_errors(driver)
             if error_reason:
-                self._log_result(item, "Skipped", error_reason)
+                self._log_result(inputs['panchayat'], item, "Skipped", error_reason)
                 session_skip_list.add(full_work_code_text)
                 return
             self.log_info("   - Muster Roll is valid. Generating output...")
@@ -617,16 +617,16 @@ class MusterrollGenTab(BaseAutomationTab):
             if inputs['output_action'] == "Print" and pdf_path:
                 self._print_file(pdf_path)
 
-            self._log_result(item, "Success" if pdf_path else "Failed", log_detail)
+            self._log_result(inputs['panchayat'], item, "Success" if pdf_path else "Failed", log_detail)
             session_skip_list.add(full_work_code_text)
 
         except TimeoutException:
             self.log_error(f"Error on '{item}': Timeout (Slow Network)")
-            self._log_result(item, "Failed", "Timeout - Slow Network")
+            self._log_result(inputs['panchayat'], item, "Failed", "Timeout - Slow Network")
         except Exception as e:
             error_msg = str(e).splitlines()[0] if str(e) else "Unknown Error"
             self.log_error(f"Error on '{item}': {error_msg}")
-            self._log_result(item, "Failed", error_msg)
+            self._log_result(inputs['panchayat'], item, "Failed", error_msg)
 
     def _save_mr_as_pdf(self, driver, full_work_code, output_dir, orientation, scale):
         try:
@@ -840,9 +840,9 @@ class MusterrollGenTab(BaseAutomationTab):
             return "Skipped: Date period overlaps with existing MR"
         return None
 
-    def _log_result(self, item_key, status, details):
+    def _log_result(self, panchayat, item_key, status, details):
         timestamp = datetime.now().strftime("%H:%M:%S")
-        values = (timestamp, item_key, status, details)
+        values = (timestamp, panchayat, item_key, status, details)
         
         # --- FIX: Explicit Success Tag ---
         # Pehle code sirf 'failed' check kar raha tha, ab 'success' bhi check karega
@@ -916,7 +916,7 @@ class MusterrollGenTab(BaseAutomationTab):
         data_to_export = []
         for item_id in self.results_tree.get_children():
             row_values = self.results_tree.item(item_id)['values']
-            status = row_values[2].upper() 
+            status = row_values[3].upper() 
             if filter_option == "Export All": data_to_export.append(row_values)
             elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)

@@ -161,7 +161,7 @@ class SchemeClosingTab(BaseAutomationTab):
         self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
         self.export_button.pack(side='left')
 
-        cols = ("Timestamp", "Work Code", "Status", "Details")
+        cols = ("Timestamp", "Panchayat", "Work Code", "Status", "Details")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         for col in cols: self.results_tree.heading(col, text=col)
         self.results_tree.column("Timestamp", width=100, anchor="center"); self.results_tree.column("Work Code", width=250); self.results_tree.column("Status", width=100, anchor="center"); self.results_tree.column("Details", width=350)
@@ -291,7 +291,7 @@ class SchemeClosingTab(BaseAutomationTab):
                 
                 self.log_info(f"  🔄 [{i+1}/{total_codes}] Closing: {truncate_workcode(work_code)}")                
                 status, details = self._process_single_work_code(driver, inputs, work_code, current_cert_no)
-                self._log_result(work_code, status, details)
+                self._log_result(inputs['panchayat'], work_code, status, details)
                 
                 if status == "Success":
                     current_cert_no += 1
@@ -311,10 +311,10 @@ class SchemeClosingTab(BaseAutomationTab):
             self.log_info("--- Automation Finished ---")
             self.app.after(0, self.app.set_status, "Automation Finished")
 
-    def _log_result(self, work_code, status, details):
+    def _log_result(self, panchayat, work_code, status, details):
         timestamp = time.strftime("%H:%M:%S")
         tags = ('failed',) if 'success' not in status.lower() else ()
-        self.safe_tree_insert((timestamp, truncate_workcode(work_code), status, details), tags)
+        self.safe_tree_insert((timestamp, panchayat, truncate_workcode(work_code), status, details), tags)
 
     def _process_single_work_code(self, driver, inputs, work_code, cert_no):
         wait = WebDriverWait(driver, 20)
@@ -484,7 +484,7 @@ class SchemeClosingTab(BaseAutomationTab):
         data_to_export = []
         for item_id in self.results_tree.get_children():
             row_values = self.results_tree.item(item_id)['values']
-            status = row_values[2].upper()
+            status = row_values[3].upper()
             if filter_option == "Export All": data_to_export.append(row_values)
             elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)

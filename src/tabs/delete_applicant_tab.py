@@ -177,9 +177,9 @@ class DeleteApplicantTab(BaseAutomationTab):
                                        font=ctk.CTkFont(size=12), text_color="gray60")
         self.export_lbl.pack(side="left", padx=10)
 
-        cols_r = ("#", "Deletion Date", "Jobcard No", "Applicant Name", "Status", "Details")
+        cols_r = ("#", "Panchayat", "Deletion Date", "Jobcard No", "Applicant Name", "Status", "Details")
         self.results_tree = ttk.Treeview(res_tab, columns=cols_r, show='headings')
-        width_map = {"#": 40, "Deletion Date": 100, "Jobcard No": 160,
+        width_map = {"#": 40, "Panchayat": 140, "Deletion Date": 100, "Jobcard No": 160,
                      "Applicant Name": 180, "Status": 90, "Details": 350}
         for c in cols_r:
             self.results_tree.heading(c, text=c)
@@ -416,7 +416,7 @@ class DeleteApplicantTab(BaseAutomationTab):
             seq = result_seq[0]
             self.app.after(0, lambda s=seq, j=jc, a=app_name, st=status, d=detail: \
                 self.results_tree.insert("", "end",
-                    values=(s, del_date, j, a, st, d),
+                    values=(s, self.excel_panchayat or "-", del_date, j, a, st, d),
                     tags=('success',) if 'success' in st.lower()
                          else ('warning',) if 'skipped' in st.lower()
                          else ('failed',)))

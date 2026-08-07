@@ -12,7 +12,10 @@ import os
 import json
 import base64
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+# Thread-safe lock for the cloud-report dedupe cache file writes.
+_SYNC_DEDUPE_LOCK = threading.Lock()
 
 from tkinter import messagebox
 
@@ -605,6 +608,19 @@ class AutomationMixin:
                 logger.debug("Cloud reports: no rows for %s — skip sync", key)
                 return
 
+            # ── Dedupe (same-day repeat runs) ───────────────────────────
+            # Agar user ne ek automation ko din me 5 baar run kiya aur same
+            # data mila to wo rows server par sirf EK baar sync hongi —
+            # combine/web report me duplicate row 2 baar nahi dikhega.
+            new_hashes: List[str] = []
+            try:
+                rows, new_hashes = self._dedupe_sync_rows(key, rows)
+            except Exception as e:
+                logger.debug("Cloud reports dedupe error for %s: %s", key, e)
+            if not rows:
+                logger.info("Cloud reports: all rows for %s already synced today — skipping duplicate sync", key)
+                return
+
             lic = getattr(self.app_state, 'license_info', {}) or {}
             license_key = (lic or {}).get('key', '')
             if not license_key:
@@ -637,6 +653,13 @@ class AutomationMixin:
                         json=payload, timeout=20)
                     if resp.status_code in (200, 201):
                         logger.info("Cloud reports synced for %s (%d rows)", key, len(rows))
+                        # Cache SIRF successful sync ke baad commit karo — agar
+                        # server offline hai to rows dobara sync ho saken (data loss nahi).
+                        if new_hashes:
+                            try:
+                                self._commit_dedupe_hashes(key, new_hashes)
+                            except Exception as e:
+                                logger.debug("Cloud reports dedupe commit error for %s: %s", key, e)
                     else:
                         logger.debug("Cloud reports sync failed for %s: %s", key, resp.text)
                 except Exception as e:
@@ -645,6 +668,88 @@ class AutomationMixin:
             threading.Thread(target=_send, daemon=True).start()
         except Exception as e:
             logger.debug("Cloud reports pre-check error for %s: %s", key, e)
+
+    def _dedupe_sync_rows(self, key: str, rows: List[List]) -> Tuple[List[List], List[str]]:
+        """
+        Same automation ko same din me multiple baar run karne par identical
+        result rows ko sirf pehli baar sync karta hai.
+
+        Local cache (Temp/_sync_dedupe_cache.json) me (automation_key + date)
+        ke hisaab se row-hashes store hote hain. Isse:
+          - Web portal / combine report me duplicate rows nahi dikhti
+          - Baad me dobara run karne par pehle se synced rows skip ho jaati hain
+
+        Returns:
+            (filtered_rows, new_hashes) — sirf wahi rows jo aaj is automation
+            ke liye nayi hain, aur unke hashes (cache me commit karne ke liye
+            sirf successful server response ke baad — _commit_dedupe_hashes).
+        """
+        import hashlib
+        import json as _json
+        cache_dir = self.get_nregabot_path("Temp")
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_path = os.path.join(cache_dir, "_sync_dedupe_cache.json")
+        today = datetime.now().strftime("%Y-%m-%d")
+        bucket = f"{key}|{today}"
+        cache: Dict = {}
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                cache = _json.load(f)
+        except Exception:
+            cache = {}
+
+        seen = set(cache.get(bucket, []) or [])
+        out: List[List] = []
+        added: List[str] = []
+        for row in rows:
+            try:
+                normalized = "|".join("" if v is None else str(v).strip() for v in row)
+                h = hashlib.md5(normalized.encode("utf-8", "ignore")).hexdigest()
+            except Exception:
+                continue
+            if h in seen:
+                continue
+            added.append(h)
+            out.append(row)
+        return out, added
+
+    def _commit_dedupe_hashes(self, key: str, hashes: List[str]) -> None:
+        """Successful cloud sync ke baad row hashes ko local cache me commit
+        karta hai (30-din purana data saaf karke).
+
+        Note: sync fail hone par cache update NAHI hota, taaki wahi rows
+        dobara sync ho sakein (web report me data loss na ho).
+        """
+        import json as _json
+        cache_dir = self.get_nregabot_path("Temp")
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_path = os.path.join(cache_dir, "_sync_dedupe_cache.json")
+        today = datetime.now().strftime("%Y-%m-%d")
+        bucket = f"{key}|{today}"
+
+        with _SYNC_DEDUPE_LOCK:
+            cache: Dict = {}
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    cache = _json.load(f)
+            except Exception:
+                cache = {}
+            seen = set(cache.get(bucket, []) or [])
+            seen.update(hashes)
+            cache[bucket] = sorted(seen)
+            # Purana data (30 din se zyada purana) cache se hatao — size control
+            try:
+                from datetime import timedelta as _td
+                cutoff = (datetime.now() - _td(days=30)).strftime("%Y-%m-%d")
+                cache = {k: v for k, v in cache.items()
+                         if (k.split("|")[-1] if "|" in k else "") >= cutoff}
+            except Exception:
+                pass
+            try:
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    _json.dump(cache, f)
+            except Exception:
+                pass
 
     def _emergency_stop_all(self) -> None:
         """Emergency stop ALL running automations immediately.
