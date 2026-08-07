@@ -1078,30 +1078,62 @@ class MrTrackingTab(BaseAutomationTab):
 
     # --- UPDATED RUN METHODS (Replace existing ones with these) ---
 
-    def _run_mr_payment(self):
-        """Send clean codes to MR Payment tab"""
-        clean_codes = self.get_clean_workcodes()
-        panchayat_name = self.panchayat_var.get().strip()
+    def _get_grouped_workcodes(self):
+        """
+        Returns {panchayat_name: [clean workcodes]} from the current results table.
+        This lets the Run MR Payment / Run eMB Entry buttons process EVERY
+        panchayat's data (not just the one selected in the dropdown) — exactly
+        matching how MR Tracking collected the data.
+        """
+        groups = {}
+        for item_id in self.results_tree.get_children():
+            values = self.results_tree.item(item_id, 'values')
+            if not values or len(values) < 6:
+                continue
+            panchayat = str(values[1]).strip()
+            work_code = str(values[5]).strip()
+            if not panchayat or not work_code:
+                continue
+            short = work_code.split('/')[-1][-6:] if "/" in work_code else work_code
+            short = short.strip()
+            if short:
+                groups.setdefault(panchayat, set()).add(short)
+        return {p: list(codes) for p, codes in groups.items()}
 
-        if not clean_codes:
+    def _run_mr_payment(self):
+        """Send clean codes to MR Payment tab (multi-panchayat aware)."""
+        grouped = self._get_grouped_workcodes()
+        if not grouped:
             messagebox.showwarning("No Data", "No valid workcodes found to transfer.", parent=self)
             return
-        
-        # List ko string bana kar bhejo, taaki old logic bhi support kare
-        final_workcodes = "\n".join(clean_codes)
-        self.app.switch_to_msr_tab_with_data(final_workcodes, panchayat_name)
+
+        panchayat_name = self.panchayat_var.get().strip()
+        if len(grouped) == 1:
+            # Single panchayat — flat list (backward compatible with macro handoff)
+            panchayat, codes = next(iter(grouped.items()))
+            final_workcodes = "\n".join(codes)
+            self.app.switch_to_msr_tab_with_data(final_workcodes, panchayat)
+        else:
+            # Multiple panchayats — grouped dict; MR Payment processes each
+            # panchayat's codes under that panchayat.
+            self.log_info(f"📦 Sending workcodes of {len(grouped)} panchayats to MR Payment: {', '.join(grouped.keys())}")
+            self.app.switch_to_msr_tab_with_data(grouped, panchayat_name)
 
     def _run_emb_entry(self):
-        """Send clean codes to eMB Entry tab"""
-        clean_codes = self.get_clean_workcodes()
-        panchayat_name = self.panchayat_var.get().strip()
-
-        if not clean_codes:
+        """Send clean codes to eMB Entry tab (multi-panchayat aware)."""
+        grouped = self._get_grouped_workcodes()
+        if not grouped:
             messagebox.showwarning("No Data", "No valid workcodes found.", parent=self)
             return
 
-        final_workcodes = "\n".join(clean_codes)
-        self.app.switch_to_emb_entry_with_data(final_workcodes, panchayat_name)
+        panchayat_name = self.panchayat_var.get().strip()
+        if len(grouped) == 1:
+            panchayat, codes = next(iter(grouped.items()))
+            final_workcodes = "\n".join(codes)
+            self.app.switch_to_emb_entry_with_data(final_workcodes, panchayat)
+        else:
+            self.log_info(f"📦 Sending workcodes of {len(grouped)} panchayats to eMB Entry: {', '.join(grouped.keys())}")
+            self.app.switch_to_emb_entry_with_data(grouped, panchayat_name)
 
     def _run_zero_mr(self):
         """Send clean codes to Zero MR tab"""

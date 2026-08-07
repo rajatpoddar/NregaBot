@@ -280,6 +280,7 @@ class MbEntryTab(BaseAutomationTab):
             self.mb_no_entry.configure(state="disabled")
     def reset_ui(self) -> None:
         if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
+            self._mr_tracking_panchayat_data = None
             self._load_inputs()
             self.config_vars['location_panchayat'].set("") 
             self.work_codes_text.configure(state="normal")
@@ -391,24 +392,31 @@ class MbEntryTab(BaseAutomationTab):
                 return
 
             # Determine which panchayats to process
+            grouped_data = getattr(self, '_mr_tracking_panchayat_data', None) or {}
+            self._mr_tracking_panchayat_data = None
             panchayat_target = cfg['location_panchayat']
-            all_mode = panchayat_target in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
-            saved_mode = panchayat_target == config.MY_PANCHAYATS_LABEL
             panchayats_to_process = []
-            if all_mode:
-                driver.get(config.MB_ENTRY_CONFIG["url"])
-                panch_dd = Select(WebDriverWait(driver, 20).until(
-                    EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch'))))
-                panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if t]
-                if saved_mode:
-                    panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
-                    self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
-                else:
-                    self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
-                if self._abort_if_no_saved_panchayats(panchayats_to_process):
-                    return
+            if grouped_data:
+                # 📦 MR Tracking grouped mode — process every panchayat's own codes
+                panchayats_to_process = list(grouped_data.keys())
+                self.log_info(f"📦 MR Tracking data: processing {len(panchayats_to_process)} panchayats.")
             else:
-                panchayats_to_process = [panchayat_target]
+                all_mode = panchayat_target in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
+                saved_mode = panchayat_target == config.MY_PANCHAYATS_LABEL
+                if all_mode:
+                    driver.get(config.MB_ENTRY_CONFIG["url"])
+                    panch_dd = Select(WebDriverWait(driver, 20).until(
+                        EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch'))))
+                    panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if t]
+                    if saved_mode:
+                        panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
+                        self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
+                    else:
+                        self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                    if self._abort_if_no_saved_panchayats(panchayats_to_process):
+                        return
+                else:
+                    panchayats_to_process = [panchayat_target]
 
             total_p = len(panchayats_to_process)
             for p_idx, p_name in enumerate(panchayats_to_process):
@@ -425,16 +433,19 @@ class MbEntryTab(BaseAutomationTab):
                     for mate in mate_names_list:
                         self.app.update_history(mate_key, mate)
 
+                # Per-panchayat codes in MR Tracking grouped mode, else user-entered codes
+                codes_for_panchayat = grouped_data.get(p_name, []) if grouped_data else work_codes_raw
+
                 # If no work codes entered by user, process all works from dropdown
-                if not work_codes_raw:
+                if not codes_for_panchayat:
                     self._process_all_works_from_dropdown(driver, cfg, mate_names_list)
                     continue
 
                 processed_codes = set()
-                total = len(work_codes_raw)
+                total = len(codes_for_panchayat)
                 self.app.after(0, self.app.set_status, f"eMB Entry for {p_name}: {total} workcodes...")
 
-                for i, work_code in enumerate(work_codes_raw):
+                for i, work_code in enumerate(codes_for_panchayat):
                     if self.is_stopped():
                         self.log_warning("Automation stopped.")
                         break
@@ -880,6 +891,32 @@ class MbEntryTab(BaseAutomationTab):
         )
     
     def load_data_from_mr_tracking(self, workcodes, panchayat_name: str):
+        self._mr_tracking_panchayat_data = None
+
+        # --- Grouped multi-panchayat data: {panchayat: [codes]} ---
+        if isinstance(workcodes, dict) and workcodes:
+            self._mr_tracking_panchayat_data = {
+                p: list(dict.fromkeys(c)) for p, c in workcodes.items() if c
+            }
+            all_codes = [code for codes in self._mr_tracking_panchayat_data.values() for code in codes]
+            display_text = "\n".join(all_codes)
+            self.config_vars["location_panchayat"].set(panchayat_name or config.ALL_PANCHAYATS_LABEL)
+            self._on_panchayat_change()
+
+            self.work_codes_text.configure(state="normal")
+            self.work_codes_text.delete("1.0", tkinter.END)
+            self.work_codes_text.insert("1.0", display_text)
+            self.work_codes_text.configure(state="disabled")
+
+            if self.notebook:
+                self.notebook.set("Work Codes")
+
+            count = len(all_codes)
+            self.log_info(f"Loaded {count} codes across {len(self._mr_tracking_panchayat_data)} panchayats from MR Tracking: "
+                          f"{', '.join(self._mr_tracking_panchayat_data.keys())}")
+            return
+
+        # --- Single panchayat: flat string/list of codes ---
         self.config_vars["location_panchayat"].set(panchayat_name)
         self._on_panchayat_change()
         

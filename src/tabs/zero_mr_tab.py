@@ -112,6 +112,7 @@ class ZeroMrTab(BaseAutomationTab):
         self.work_list_text.configure(state=state)
         self.export_button.configure(state=state)
     def reset_ui(self) -> None:
+        self._mr_tracking_panchayat_data = None
         self.panchayat_var.set("")
         self.work_list_text.delete("1.0", tkinter.END)
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
@@ -205,36 +206,52 @@ class ZeroMrTab(BaseAutomationTab):
                     pass
 
             self.app.after(0, self.app.set_status, "Setting Panchayat...")
-            self.log_info(f"Selecting Panchayat: {inputs['panchayat_name']}")
-            panchayat_select = Select(wait.until(EC.element_to_be_clickable((By.ID, "ddlpanch"))))
-            match = next((opt.text for opt in panchayat_select.options if inputs['panchayat_name'].strip().lower() in opt.text.lower()), None)
-            if not match:
-                raise ValueError(f"Panchayat '{inputs['panchayat_name']}' not found in dropdown.")
-            
-            if panchayat_select.first_selected_option.text != match:
-                panchayat_select.select_by_visible_text(match)
-                self.log_info("Waiting for Panchayat postback...")
-                try:
-                    WebDriverWait(driver, 10).until(
-                        lambda d: d.execute_script('return document.readyState') == 'complete'
-                    )
-                except TimeoutException:
-                    pass
-            
-            self.log_success("Setup complete. Starting item processing...")
-            
-            # --- Process each item ---
-            total_items = len(inputs['work_items'])
-            for i, (work_key, msr_no) in enumerate(inputs['work_items']):
-                if self.is_stopped():
-                    self.log_warning("Stop signal received.")
-                    break
-                
-                status_msg = f"Processing {i+1}/{total_items}: Key={work_key}, MSR={msr_no}"
-                self.app.after(0, self.app.set_status, status_msg)
-                self.app.after(0, self.update_status, status_msg, (i+1)/total_items)
-                
-                self._process_single_item(driver, wait, work_key, msr_no)
+
+            # --- Multi-panchayat data from MR Tracking? Process every panchayat ---
+            grouped_items = getattr(self, '_mr_tracking_panchayat_data', None)
+            self._mr_tracking_panchayat_data = None
+            if grouped_items:
+                groups = {}
+                for item in grouped_items:
+                    p = (item.get("panchayat") or "").strip()
+                    wc = (item.get("work_code") or "").strip()
+                    msr = (item.get("msr_no") or "").strip()
+                    if not p or not wc or not msr:
+                        continue
+                    groups.setdefault(p, []).append((wc, msr))
+                total_groups = len(groups)
+                for g_idx, (p_name, items) in enumerate(groups.items(), 1):
+                    if self.is_stopped():
+                        self.log_warning("Stop signal received.")
+                        break
+                    self.log_info(f"===== Panchayat {g_idx}/{total_groups}: {p_name} =====")
+                    try:
+                        self._select_zero_mr_panchayat(driver, wait, p_name)
+                    except ValueError as e:
+                        self.log_error(f"⛔ Skipping panchayat '{p_name}': {e}")
+                        continue
+                    total_items = len(items)
+                    for i, (work_key, msr_no) in enumerate(items, 1):
+                        if self.is_stopped():
+                            self.log_warning("Stop signal received.")
+                            break
+                        status_msg = f"Processing [{g_idx}/{total_groups}] {i}/{total_items}: Key={work_key}, MSR={msr_no}"
+                        self.app.after(0, self.app.set_status, status_msg)
+                        self.app.after(0, self.update_status, status_msg, i / max(total_items, 1))
+                        self._process_single_item(driver, wait, work_key, msr_no)
+            else:
+                # --- Single panchayat ---
+                self._select_zero_mr_panchayat(driver, wait, inputs['panchayat_name'])
+                self.log_success("Setup complete. Starting item processing...")
+                total_items = len(inputs['work_items'])
+                for i, (work_key, msr_no) in enumerate(inputs['work_items']):
+                    if self.is_stopped():
+                        self.log_warning("Stop signal received.")
+                        break
+                    status_msg = f"Processing {i+1}/{total_items}: Key={work_key}, MSR={msr_no}"
+                    self.app.after(0, self.app.set_status, status_msg)
+                    self.app.after(0, self.update_status, status_msg, (i+1)/total_items)
+                    self._process_single_item(driver, wait, work_key, msr_no)
 
         except Exception as e:
             error_msg = f"A critical error occurred: {e}"
@@ -254,6 +271,24 @@ class ZeroMrTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, final_status)
             self.app.after(0, self.update_status, final_status, 1.0)
             self.log_info(f"📊 {final_status}")
+
+    def _select_zero_mr_panchayat(self, driver, wait, panchayat_name):
+        """Selects the panchayat dropdown on the Zero MR page (postback aware)."""
+        self.app.after(0, self.app.set_status, f"Setting Panchayat: {panchayat_name}")
+        self.log_info(f"Selecting Panchayat: {panchayat_name}")
+        panchayat_select = Select(wait.until(EC.element_to_be_clickable((By.ID, "ddlpanch"))))
+        match = next((opt.text for opt in panchayat_select.options if panchayat_name.strip().lower() in opt.text.lower()), None)
+        if not match:
+            raise ValueError(f"Panchayat '{panchayat_name}' not found in dropdown.")
+        if panchayat_select.first_selected_option.text != match:
+            panchayat_select.select_by_visible_text(match)
+            self.log_info("Waiting for Panchayat postback...")
+            try:
+                WebDriverWait(driver, 10).until(
+                    lambda d: d.execute_script('return document.readyState') == 'complete'
+                )
+            except TimeoutException:
+                pass
 
     def _process_single_item(self, driver, wait, work_key, msr_no):
         try:
@@ -495,9 +530,8 @@ class ZeroMrTab(BaseAutomationTab):
     def load_data_from_mr_tracking(self, data_list: list):
         """
         Receives data from the MR Tracking tab and populates the form.
-        NOTE: This tab processes one panchayat at a time. If data for multiple
-        panchayats is received, it will load data for the *first* panchayat
-        and notify the user.
+        Supports multi-panchayat data — every panchayat's items are kept and
+        processed panchayat-by-panchayat during the automation.
         """
         if not data_list:
             messagebox.showwarning("No Data", "No data was received from the MR Tracking tab.", parent=self)
@@ -509,54 +543,35 @@ class ZeroMrTab(BaseAutomationTab):
         self.panchayat_var.set("")
         self.work_list_text.delete("1.0", tkinter.END)
         self.safe_tree_clear()
+        self._mr_tracking_panchayat_data = None
 
-        # Get the first panchayat from the list
-        target_panchayat = data_list[0].get("panchayat")
-        if not target_panchayat:
-            messagebox.showerror("Data Error", "Received data is missing Panchayat name.", parent=self)
-            return
-            
-        self.panchayat_var.set(target_panchayat)
-        self.log_info(f"Set Panchayat to: {target_panchayat}")
-
-        work_list_entries = []
-        other_panchayats_found = []
-
+        # Keep ALL valid items (multi-panchayat support)
+        valid_items = []
         for item in data_list:
-            panchayat = item.get("panchayat")
-            work_code = item.get("work_code")
-            msr_no = item.get("msr_no")
-
+            panchayat = (item.get("panchayat") or "").strip()
+            work_code = (item.get("work_code") or "").strip()
+            msr_no = (item.get("msr_no") or "").strip()
             if not all([panchayat, work_code, msr_no]):
                 self.log_warning(f"Skipping invalid item: {item}")
                 continue
+            valid_items.append({"panchayat": panchayat, "work_code": work_code, "msr_no": msr_no})
 
-            if panchayat == target_panchayat:
-                # Format: SearchKey,MSRNo
-                work_list_entries.append(f"{work_code},{msr_no}")
-            else:
-                if panchayat not in other_panchayats_found:
-                    other_panchayats_found.append(panchayat)
+        if not valid_items:
+            messagebox.showerror("Data Error", "Received data is missing Panchayat/Workcode/MSR details.", parent=self)
+            return
 
-        # Populate the textbox
-        if work_list_entries:
-            self.work_list_text.insert("1.0", "\n".join(work_list_entries))
-            self.log_success(f"Loaded {len(work_list_entries)} items for {target_panchayat}.")
-        
-        # Show warning if other panchayats were skipped
-        if other_panchayats_found:
-            skipped_panchayats_str = ", ".join(other_panchayats_found[:3])
-            if len(other_panchayats_found) > 3:
-                skipped_panchayats_str += ", ..."
-            
-            messagebox.showwarning(
-                "Partial Data Loaded",
-                f"Successfully loaded {len(work_list_entries)} items for Panchayat:\n{target_panchayat}\n\n"
-                f"Data for other panchayats ({skipped_panchayats_str}) was found but not loaded. "
-                f"Please run the 'T+8 to T+15' filter again for those panchayats individually.",
-                parent=self
-            )
-            self.log_warning(f"Skipped items for other panchayats: {skipped_panchayats_str}")
+        self._mr_tracking_panchayat_data = valid_items
+
+        # Group panchayats for display
+        panchayats = list(dict.fromkeys(item["panchayat"] for item in valid_items))
+        self.panchayat_var.set(panchayats[0])
+        self.log_info(f"Set Panchayat to: {panchayats[0]}")
+
+        work_list_entries = [f"{item['work_code']},{item['msr_no']}" for item in valid_items]
+        self.work_list_text.insert("1.0", "\n".join(work_list_entries))
+        self.log_success(f"Loaded {len(work_list_entries)} items across {len(panchayats)} panchayat(s).")
+        if len(panchayats) > 1:
+            self.log_info(f"Panchayats: {', '.join(panchayats)}")
 
     def _save_inputs(self, inputs):
         """Saves the financial year and panchayat name."""
