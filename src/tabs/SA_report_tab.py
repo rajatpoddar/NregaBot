@@ -150,7 +150,8 @@ class SAReportTab(BaseAutomationTab):
                 except TimeoutException: self.log_warning("Modal backdrop did not disappear normally. Proceeding...")
                 
                 result_data = (sr_no, district, block, panchayat, issue_no, issue_type, forwarded_to, status, issue_description)
-                self.app.after(0, lambda data=result_data: self.results_tree.insert("", "end", values=data))
+                # Website ka SR# ignore — local serial auto-fill hota hai (_tree_insert)
+                self.app.after(0, lambda data=result_data: self._tree_insert(self.results_tree, data))
         except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as e: error_msg = f"A browser error occurred: {str(e).splitlines()[0]}"; self.log_error(error_msg); messagebox.showerror("Automation Error", error_msg)
         except Exception as e: self.log_error(f"An unexpected error occurred: {e}"); messagebox.showerror("Critical Error", f"An unexpected error occurred: {e}")
         finally:

@@ -755,7 +755,7 @@ class MrTrackingTab(BaseAutomationTab):
                     self.log_info(f"      > Found pending: {applicant_name} ({jobcard_no})")
                     for mr in mr_list:
                         result_data = (mr["panchayat"], mr["mr_no"], mr["work_code"], wagelist_no, applicant_name, jobcard_no)
-                        self.app.after(0, lambda data=result_data: self.abps_results_tree.insert("", "end", values=data))
+                        self.app.after(0, lambda data=result_data: self._tree_insert(self.abps_results_tree, data))
             
             if not found_workers:
                  self.log_info(f"   No pending workers found in {wagelist_no}.")
@@ -920,8 +920,8 @@ class MrTrackingTab(BaseAutomationTab):
             
         columns = ["SL NO", "Panchayat", "Total Pending", "T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8+"]
         
-        # File Dialog
-        filename = f"Pendency_Report_{datetime.now().strftime('%d-%m-%Y')}.xlsx"
+        # File Dialog (filename me date+time → baar-baar export karne par overwrite nahi)
+        filename = f"Pendency_Report_{datetime.now().strftime('%d-%m-%Y_%H%M%S')}.xlsx"
         save_path = filedialog.asksaveasfilename(
             defaultextension=".xlsx", 
             initialdir=self.app.get_report_path("MR Tracking"),

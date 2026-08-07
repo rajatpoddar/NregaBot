@@ -224,7 +224,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         timestamp = datetime.now().strftime("%H:%M:%S")
         tag = 'Success' if status == 'Success' else ('Failed' if status == 'Failed' else 'Info')
         
-        self.results_tree.insert("", "0", values=(timestamp, name, scheme_rem, status, ack_no), tags=(tag,))
+        self._tree_insert_top(self.results_tree, (timestamp, name, scheme_rem, status, ack_no), (tag,))
         
         if status == "Success": self.success_count += 1
         elif status == "Failed": self.fail_count += 1

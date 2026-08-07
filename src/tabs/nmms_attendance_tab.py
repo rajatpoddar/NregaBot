@@ -432,7 +432,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
                             detail.get("photo2_taken",""), detail.get("photo2_uploaded",""),
                             detail.get("photo2_geo",""),
                             detail.get("photo1_saved","N/A"), detail.get("photo2_saved","N/A"))
-                    self.app.after(0, lambda r=srow: self.results_tree.insert("", "end", values=r))
+                    self.app.after(0, lambda r=srow: self._tree_insert(self.results_tree, r))
 
                     # Store photo paths for Excel embedding (keyed by sequential index)
                     row_key = summary_sno  # int key at time of insertion

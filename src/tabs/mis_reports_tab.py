@@ -199,7 +199,7 @@ class MisReportsTab(BaseAutomationTab):
         # --- NEW: Create suggested directory structure (standardized) ---
         try:
             target_dir = self.app.get_report_path("MIS")
-            today_str_file = datetime.now().strftime("%d-%m-%Y")
+            today_str_file = datetime.now().strftime("%d-%m-%Y_%H%M%S")
             initial_filename = f"MIS_Reports_{today_str_file}.xlsx"
         except Exception as e:
             messagebox.showerror("Folder Error", f"Could not create default save directory.\n{e}")
@@ -555,7 +555,7 @@ class MisReportsTab(BaseAutomationTab):
                         page_tables = driver.find_elements(By.TAG_NAME, "table")
                         if not page_tables:
                             self.log_warning(f"No HTML tables found on this page. Data may be rendered via JavaScript.")
-                            self.app.after(0, lambda r=report_name: self.results_tree.insert("", "end", values=(r, "Failed", "No HTML tables on page"), tags=('failed',)))
+                            self.app.after(0, lambda r=report_name: self._tree_insert(self.results_tree, (r, "Failed", "No HTML tables on page"), ('failed',)))
                             driver.close()
                             driver.switch_to.window(main_tab)
                             time.sleep(1)
@@ -568,7 +568,7 @@ class MisReportsTab(BaseAutomationTab):
                         
                         if report_df.empty:
                             self.log_warning(f"No data found for '{report_name}'.")
-                            self.app.after(0, lambda r=report_name: self.results_tree.insert("", "end", values=(r, "Failed", "No data found"), tags=('failed',)))
+                            self.app.after(0, lambda r=report_name: self._tree_insert(self.results_tree, (r, "Failed", "No data found"), ('failed',)))
                             try:
                                 driver.close()
                             except: pass
@@ -663,7 +663,7 @@ class MisReportsTab(BaseAutomationTab):
                             pass
                         
                         self.log_success(f"'{report_name}' saved ({len(report_df)} rows).")
-                        self.app.after(0, lambda r=report_name: self.results_tree.insert("", "end", values=(r, "Success", f"{len(report_df)} rows")))
+                        self.app.after(0, lambda r=report_name: self._tree_insert(self.results_tree, (r, "Success", f"{len(report_df)} rows")))
                         
                         # ── Close new tab and switch back to accordion ──
                         try:
@@ -674,11 +674,11 @@ class MisReportsTab(BaseAutomationTab):
                         
                     except NoSuchElementException:
                         self.log_warning(f"Report '{report_name}' not found in accordion.")
-                        self.app.after(0, lambda r=report_name: self.results_tree.insert("", "end", values=(r, "Failed", "Link not found"), tags=('failed',)))
+                        self.app.after(0, lambda r=report_name: self._tree_insert(self.results_tree, (r, "Failed", "Link not found"), ('failed',)))
                     except Exception as e:
                         error_msg = str(e).split('\n')[0]
                         self.log_error(f"Failed to process '{report_name}': {error_msg}")
-                        self.app.after(0, lambda r=report_name, d=error_msg: self.results_tree.insert("", "end", values=(r, "Failed", d), tags=('failed',)))
+                        self.app.after(0, lambda r=report_name, d=error_msg: self._tree_insert(self.results_tree, (r, "Failed", d), ('failed',)))
                         # Try to close the new tab and go back to accordion
                         try:
                             driver.close()

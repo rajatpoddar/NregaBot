@@ -413,11 +413,14 @@ class AbpsVerifyTab(BaseAutomationTab):
             messagebox.showinfo("No Data", "There are no results to export.")
             return
 
-        # 2. Prepare Data
-        headers = ["Job Card No.", "Applicant Name", "Status", "Timestamp"]
+        # 2. Prepare Data — local serial pehle column, tree ka Panchayat col
+        #    PDF ke in headers me nahi hai isliye skip (Job Card se aage).
+        headers = ["Sr. No.", "Job Card No.", "Applicant Name", "Status", "Timestamp"]
         data = []
-        for item in self.results_tree.get_children():
-            data.append(self.results_tree.item(item)['values'])
+        for idx, item in enumerate(self.results_tree.get_children()):
+            vals = list(self.results_tree.item(item)['values'])
+            core = vals[1:] if len(vals) >= 2 else vals  # (Panchayat, JobCard, Name, Status, Time)
+            data.append([idx + 1] + core)
 
         # 3. Setup Filename and Directory
         panchayat = self.panchayat_var.get().strip() or "Report"
@@ -440,7 +443,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         # 4. Ask User for Save Location
         file_path = filedialog.asksaveasfilename(
             initialdir=target_dir,
-            initialfile=default_filename,
+            initialfile=self._timestamped_filename(default_filename),
             defaultextension=".pdf",
             filetypes=[("PDF Documents", "*.pdf"), ("All Files", "*.*")],
             title="Save PDF Report"
@@ -450,9 +453,8 @@ class AbpsVerifyTab(BaseAutomationTab):
             return
 
         # 5. Define Column Widths (in mm, total approx 280mm for A4 Landscape)
-        # Headers: JobCard, Name, Status, Time
-        # Approx: 60, 90, 80, 40
-        col_widths = [60, 90, 80, 40]
+        # Headers: Sr.No, JobCard, Name, Status, Time
+        col_widths = [15, 60, 90, 80, 40]
 
         # 6. Call Base Tab PDF Generator
         success = self.generate_report_pdf(data, headers, col_widths, title, f"Date: {date_str}", file_path)

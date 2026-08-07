@@ -157,7 +157,7 @@ class SadUpdateTab(BaseAutomationTab):
         # Map status to tags for coloring
         tag = status 
         if status not in ['Success', 'Skipped']: tag = 'Failed'
-        self.results_tree.insert("", "0", values=(ack_no, status, message), tags=(tag,))
+        self._tree_insert_top(self.results_tree, (ack_no, status, message), (tag,))
 
     def copy_logs(self):
         try:

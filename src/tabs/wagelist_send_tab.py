@@ -203,7 +203,7 @@ class WagelistSendTab(BaseAutomationTab):
                 timestamp = datetime.now().strftime("%H:%M:%S")
                 
                 self.app.after(0, lambda w=wagelist, s=status_text, t=timestamp, tg=tags: 
-                               self.results_tree.insert("", tkinter.END, values=(w, s, t), tags=tg))
+                               self._tree_insert(self.results_tree, (w, s, t), tg))
 
                 time.sleep(1)
 

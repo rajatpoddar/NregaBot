@@ -13,6 +13,23 @@ from src.utils import resource_path, get_logger, truncate_workcode
 
 logger = get_logger()
 
+# Serial-number style column names (pehla column). In trees jinke first column
+# ka naam inme se koi hai, serial number values[0] se auto-fill hota hai (local
+# serial, website ka serial ignore). Baaki trees me #0 column 'Sr. No.' dikhta hai.
+# Comparison normalization-based hai (dots/spaces strip): 'Sr. No.' → 'srno'.
+_SERIAL_COL_NAMES = {"sno", "srno", "sr", "slno", "serial", "serialno", "srn", "#"}
+
+
+def _is_serial_col_name(name: Any) -> bool:
+    """Serial-style column name check (case/dot/space insensitive)."""
+    try:
+        raw = str(name).strip().lower()
+        if raw == "#":
+            return True
+        return re.sub(r"[^a-z0-9]", "", raw) in _SERIAL_COL_NAMES
+    except Exception:
+        return False
+
 # Module-level imports for selenium and openpyxl (P4: moved from lazy imports in method bodies)
 from selenium.common.exceptions import NoSuchWindowException, WebDriverException
 from selenium.webdriver.common.by import By
@@ -236,6 +253,75 @@ class BaseAutomationTab(ctk.CTkFrame):
         except Exception:
             return [], []
 
+    # ────────────────────────────────────────────────────────────────
+    # SERIAL NUMBER HELPERS — har results table ka pehla column 'Sr. No.'
+    # (local serial 1, 2, 3... — website ka serial yahan use NAHI hota)
+    # ────────────────────────────────────────────────────────────────
+
+    def _tree_has_serial_col(self, tree: Any) -> bool:
+        """True agar tree ka pehla NAMED column serial-style hai (sno/sr#/s no/#).
+        Aise trees me serial values[0] me fill hota hai, #0 column nahi chahiye."""
+        try:
+            cols = list(tree["columns"])
+            if not cols:
+                return False
+            return _is_serial_col_name(cols[0])
+        except Exception:
+            return False
+
+    def _tree_has_serial(self, tree: Any) -> bool:
+        """True agar tree ka #0 column 'Sr. No.' ke roop me configured hai
+        (style_treeview me auto-set)."""
+        try:
+            return _is_serial_col_name(tree.heading("#0").get("text", ""))
+        except Exception:
+            return False
+
+    def _serial_text(self, tree: Any) -> str:
+        """Ab tak ki rows ke hisaab se agla serial number (1-based)."""
+        try:
+            return str(len(tree.get_children()) + 1)
+        except Exception:
+            return ""
+
+    def _tree_insert(self, tree: Any, values: tuple, tags: tuple = (),
+                     position: str = "end") -> None:
+        """Main-thread row insert with auto serial:
+        - Pehla named column serial-style hai → values[0] ko LOCAL serial se
+          replace karo (website ka serial ignore).
+        - #0 column 'Sr. No.' configured hai → text=serial ke saath insert.
+        - Nahi to normal insert.
+
+        NOTE: values[0] replacement sirf serial-named first column wale trees
+        me hota hai (sno/sr#/s no/#) — unme values[0] hamesha serial hota hai.
+        """
+        try:
+            if self._tree_has_serial_col(tree):
+                vals = list(values)
+                if vals:
+                    vals[0] = self._serial_text(tree)
+                tree.insert("", position, values=tuple(vals), tags=tags)
+            elif self._tree_has_serial(tree):
+                tree.insert("", position, text=self._serial_text(tree), values=values, tags=tags)
+            else:
+                tree.insert("", position, values=values, tags=tags)
+        except Exception:
+            pass
+
+    def _tree_insert_top(self, tree: Any, values: tuple, tags: tuple = ()) -> None:
+        """_tree_insert jaisa, lekin row ko TOP par (position '0') insert karta hai."""
+        self._tree_insert(tree, values, tags, position="0")
+
+    def _timestamped_filename(self, filename: str) -> str:
+        """Export filename me date-time stamp: 'Report.xlsx' → 'Report_20260807_143055.xlsx'.
+        Din me kitni baar bhi export karo — file overwrite nahi hogi, rename nahi karni padegi."""
+        try:
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            name, ext = os.path.splitext(filename or "report")
+            return f"{name}_{ts}{ext}"
+        except Exception:
+            return filename
+
     def _refresh_activity_data(self) -> None:
         """Call before/after automation to sync activity data from widgets."""
         self.activity_panchayat = self._extract_activity_panchayat()
@@ -426,8 +512,8 @@ class BaseAutomationTab(ctk.CTkFrame):
                 col_widths_pixels = [default_width] * num_cols
                 
                 sno_index = -1
-                if any(str(h).lower() in ["s no.", "sno.", "s.no"] for h in headers):
-                    sno_index = next((i for i, h in enumerate(headers) if str(h).lower() in ["s no.", "sno.", "s.no"]), -1)
+                if any(str(h).lower() in ["s no.", "sno.", "s.no", "sr. no.", "sr. no"] for h in headers):
+                    sno_index = next((i for i, h in enumerate(headers) if str(h).lower() in ["s no.", "sno.", "s.no", "sr. no.", "sr. no"]), -1)
                     if sno_index != -1:
                         col_widths_pixels[sno_index] = max(80, default_width * 0.4)
                         
@@ -1107,6 +1193,24 @@ class BaseAutomationTab(ctk.CTkFrame):
             treeview_widget.tag_configure('success', background=success_bg, foreground=success_fg)
             treeview_widget.tag_configure('warning', background=skip_bg, foreground=skip_fg)
 
+        # ── 'Sr. No.' as the FIRST column (tree #0) for results tables ──
+        # Har results table me local serial number 1, 2, 3... dikhta hai. Trees
+        # jinke pehle NAMED column me khud ka serial hai (sno/sr#/# etc.) unhe
+        # skip karte hain — warna serial do baar dikhega.
+        try:
+            if treeview_widget is not None:
+                is_results_tree = (
+                    treeview_widget is getattr(self, 'results_tree', None) or
+                    treeview_widget is getattr(self, 'abps_results_tree', None) or
+                    treeview_widget is getattr(self, 'abps_tree', None)
+                )
+                if is_results_tree and not self._tree_has_serial_col(treeview_widget):
+                    treeview_widget.configure(show="tree headings")
+                    treeview_widget.heading("#0", text="Sr. No.")
+                    treeview_widget.column("#0", width=52, minwidth=36, stretch=False, anchor="center")
+        except Exception:
+            pass
+
     def _setup_treeview_sorting(self, tree: Any) -> None:
         for col in tree["columns"]:
             tree.heading(col, text=col, command=lambda _col=col: self._treeview_sort_column(tree, _col, False))
@@ -1168,15 +1272,22 @@ class BaseAutomationTab(ctk.CTkFrame):
             key, key.replace("_", " ").title() or "Reports")
 
     def export_treeview_to_csv(self, tree: Any, default_filename: str, category: str = "") -> None:
-        """Export treeview contents to CSV inside the standard report folder."""
+        """Export treeview contents to CSV inside the standard report folder.
+
+        'Sr. No.' pehla column hota hai (agar tree me khud ka serial column
+        nahi hai) aur filename me date-time stamp lagta hai.
+        """
         reports_dir = self.app.get_report_path(category or self._report_category())
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialdir=reports_dir, initialfile=default_filename, title="Save CSV Report")
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")], initialdir=reports_dir, initialfile=self._timestamped_filename(default_filename), title="Save CSV Report")
         if not file_path: return
         try:
+            has_serial = self._tree_has_serial_col(tree)
             with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
                 writer = csv.writer(f)
-                writer.writerow(tree["columns"])
-                for item_id in tree.get_children(): writer.writerow(tree.item(item_id)['values'])
+                writer.writerow(list(tree["columns"]) if has_serial else ["Sr. No."] + list(tree["columns"]))
+                for idx, item_id in enumerate(tree.get_children()):
+                    vals = list(tree.item(item_id)['values'])
+                    writer.writerow(vals if has_serial else [idx + 1] + vals)
             messagebox.showinfo("Success", f"Report successfully exported to\n{file_path}", parent=self)
         except Exception as e:
             messagebox.showerror("Export Failed", f"An error occurred while saving the CSV file:\n{e}", parent=self)
@@ -1263,13 +1374,18 @@ class BaseAutomationTab(ctk.CTkFrame):
             messagebox.showinfo("Empty", "No data matches the selected filter.")
             return None
 
-        # ── Save file dialog ──
+        # ── Serial column: tree me khud ka serial col ho to use rakho, warna
+        #    'Sr. No.' pehla column banao (local serial 1..n). ──
+        has_serial = self._tree_has_serial_col(tree)
+        export_columns = list(columns) if has_serial else ["Sr. No."] + list(columns)
+
+        # ── Save file dialog (filename me date-time → baar-baar rename nahi) ──
         reports_dir = self.app.get_report_path(category or self._report_category())
         file_path = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel Workbook", "*.xlsx")],
             initialdir=reports_dir,
-            initialfile=default_filename,
+            initialfile=self._timestamped_filename(default_filename),
             title="Save Excel Report"
         )
         if not file_path:
@@ -1304,7 +1420,7 @@ class BaseAutomationTab(ctk.CTkFrame):
                 bottom=Side(style='thin', color='B0B0B0')
             )
 
-            ncols = len(columns)
+            ncols = len(export_columns)
 
             # ═══════════════════════════════════════════════
             # ROW 1: Main Title (merged across all columns)
@@ -1363,7 +1479,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             # ROW 7: Data table header
             # ═══════════════════════════════════════════════
             data_start_row = 7
-            for i, col_name in enumerate(columns, 1):
+            for i, col_name in enumerate(export_columns, 1):
                 c = ws.cell(row=data_start_row, column=i, value=col_name)
                 c.font = header_font
                 c.fill = header_fill
@@ -1386,7 +1502,10 @@ class BaseAutomationTab(ctk.CTkFrame):
                 else:
                     row_fill = gray_fill if is_even else white_fill
 
-                for j, val in enumerate(row_data):
+                # Serial prepend hone par status column ek position shift ho jata hai
+                status_cell_idx = status_idx if has_serial else status_idx + 1
+                row_values = list(row_data) if has_serial else [idx + 1] + list(row_data)
+                for j, val in enumerate(row_values):
                     c = ws.cell(row=r, column=j + 1, value=str(val))
                     c.fill = row_fill
                     c.border = thin_border
@@ -1394,7 +1513,7 @@ class BaseAutomationTab(ctk.CTkFrame):
                     # Alignment — first column & status column centred
                     if j == 0:
                         c.alignment = center_align
-                    elif j == status_idx:
+                    elif j == status_cell_idx:
                         c.alignment = center_align
                         if "SUCCESS" in status_text:
                             c.font = Font(color="006100", bold=True)
@@ -1406,7 +1525,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             # ═══════════════════════════════════════════════
             # AUTO COLUMN WIDTHS
             # ═══════════════════════════════════════════════
-            for i, col_name in enumerate(columns, 1):
+            for i, col_name in enumerate(export_columns, 1):
                 max_width = len(str(col_name)) + 2
                 for row_idx in range(data_start_row + 1, data_start_row + 1 + len(data_to_export)):
                     cell_val = ws.cell(row=row_idx, column=i).value or ""
@@ -1508,7 +1627,11 @@ class BaseAutomationTab(ctk.CTkFrame):
         if not data_to_export:
             return None
 
-        # ── Save to temp file (no dialog) ──
+        # Serial column: khud ka serial col ho to use rakho, warna 'Sr. No.' prepend
+        has_serial = self._tree_has_serial_col(tree)
+        export_columns = list(columns) if has_serial else ["Sr. No."] + list(columns)
+
+        # ── Save to temp file (no dialog) — filename me date-time pehle se hai ──
         temp_dir = self.app.get_nregabot_path("Temp")
         os.makedirs(temp_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1523,7 +1646,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             ws = wb.active
             ws.title = "Report"
 
-            ncols = len(columns)
+            ncols = len(export_columns)
             header_font = Font(bold=True, color="FFFFFF", size=11)
             header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
             white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
@@ -1581,7 +1704,7 @@ class BaseAutomationTab(ctk.CTkFrame):
 
             # Header row
             data_start_row = 7
-            for i, col_name in enumerate(columns, 1):
+            for i, col_name in enumerate(export_columns, 1):
                 c = ws.cell(row=data_start_row, column=i, value=col_name)
                 c.font = header_font
                 c.fill = header_fill
@@ -1599,13 +1722,16 @@ class BaseAutomationTab(ctk.CTkFrame):
                     row_fill = failed_fill if is_even else PatternFill(start_color="FFF3E0", end_color="FFF3E0", fill_type="solid")
                 else:
                     row_fill = gray_fill if is_even else white_fill
-                for j, val in enumerate(row_data):
+                # Serial prepend hone par status column ek position shift ho jata hai
+                status_cell_idx = status_idx if has_serial else status_idx + 1
+                row_values = list(row_data) if has_serial else [idx + 1] + list(row_data)
+                for j, val in enumerate(row_values):
                     c = ws.cell(row=r, column=j + 1, value=str(val))
                     c.fill = row_fill
                     c.border = thin_border
-                    if j == 0 or j == status_idx:
+                    if j == 0 or j == status_cell_idx:
                         c.alignment = center_align
-                        if j == status_idx:
+                        if j == status_cell_idx:
                             if "SUCCESS" in status_text:
                                 c.font = Font(color="006100", bold=True)
                             elif "FAIL" in status_text or "ERROR" in status_text:
@@ -1614,7 +1740,7 @@ class BaseAutomationTab(ctk.CTkFrame):
                         c.alignment = left_align
 
             # Auto column widths
-            for i, col_name in enumerate(columns, 1):
+            for i, col_name in enumerate(export_columns, 1):
                 max_width = len(str(col_name)) + 2
                 for row_idx in range(data_start_row + 1, data_start_row + 1 + len(data_to_export)):
                     cell_val = ws.cell(row=row_idx, column=i).value or ""
@@ -1955,12 +2081,15 @@ class BaseAutomationTab(ctk.CTkFrame):
 
         After:
             self.safe_tree_insert((work_code, status, details, timestamp), tags)
+
+        Serial number automatically bhar diya jaata hai (dekh _tree_insert).
         """
         if not self._is_alive():
             return
         if not hasattr(self, 'results_tree') or self.results_tree is None:
             return
-        self.app.after(0, lambda: self.results_tree.insert("", "end", values=values, tags=tags))
+        tree = self.results_tree
+        self.app.after(0, lambda: self._tree_insert(tree, values, tags))
 
     def _insert_rows_batch(self, batch: List[tuple]) -> None:
         """Insert a batch of rows into the results tree (main thread only).
@@ -1975,7 +2104,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             return
         try:
             for data in batch:
-                self.results_tree.insert("", "end", values=data)
+                self._tree_insert(self.results_tree, data)
         except Exception:
             pass
 
