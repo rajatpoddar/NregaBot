@@ -65,7 +65,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # --- Note for auto-mode ---
-        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' to process all panchayats, and '🌐 All Villages' for all villages of a panchayat.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky="w", padx=15, pady=(0, 15))
+        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' for all panchayats, '⭐ My Saved Panchayats' for only your saved panchayats, and '🌐 All Villages' for all villages of a panchayat.", text_color="gray50").grid(row=1, column=1, columnspan=3, sticky="w", padx=15, pady=(0, 15))
 
         # --- Action Buttons (OUTSIDE the card) ---
         action_frame = self._create_action_buttons(parent_frame=self)
@@ -167,12 +167,19 @@ class AbpsVerifyTab(BaseAutomationTab):
                 return
 
             # Determine which panchayats to process
-            all_mode = panchayat == config.ALL_PANCHAYATS_LABEL
+            all_mode = panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
+            saved_mode = panchayat == config.MY_PANCHAYATS_LABEL
             panchayats_to_process = []
             if all_mode:
                 panch_dd = Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']"))))
                 panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if t]
-                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if saved_mode:
+                    panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
+                    self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
+                else:
+                    self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if self._abort_if_no_saved_panchayats(panchayats_to_process):
+                    return
             else:
                 panchayats_to_process = [panchayat]
 

@@ -73,7 +73,7 @@ class DelDemandTab(BaseAutomationTab):
         self.panchayat_var.trace_add("write", _on_panchayat_change)
 
         # 3. Explanatory Note
-        note_text = "💡 Select '🌐 All Panchayats' for all panchayats, and '🌐 All Villages' for all villages of a panchayat."
+        note_text = "💡 Select '🌐 All Panchayats' for all panchayats, '⭐ My Saved Panchayats' for only your saved panchayats, and '🌐 All Villages' for all villages of a panchayat."
         note_label = ctk.CTkLabel(controls_frame, text=note_text, font=ctk.CTkFont(size=11, slant="italic"), text_color="gray60")
         note_label.grid(row=1, column=0, columnspan=4, sticky="w", padx=15, pady=(0, 12))
 
@@ -139,7 +139,7 @@ class DelDemandTab(BaseAutomationTab):
 
         self.safe_tree_clear()
 
-        if panchayat != config.ALL_PANCHAYATS_LABEL:
+        if panchayat not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
             self.app.update_history("location_panchayat", panchayat)
         if village:
             self.app.update_history("location_village", village)
@@ -166,7 +166,8 @@ class DelDemandTab(BaseAutomationTab):
             url = config.DEL_DEMAND_CONFIG.get("url", "https://nregade4.dord.gov.in/Netnrega/deletedemand.aspx")
             
             # Determine which panchayats to process
-            all_mode = target_panchayat == config.ALL_PANCHAYATS_LABEL
+            all_mode = target_panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
+            saved_mode = target_panchayat == config.MY_PANCHAYATS_LABEL
             panchayats_to_process = []
             if all_mode:
                 self.log_info("Fetching all panchayats from the website...")
@@ -178,7 +179,13 @@ class DelDemandTab(BaseAutomationTab):
                 except NoSuchElementException:
                     self.log_error("🌐 All Panchayats mode requires PO login (Panchayat dropdown not found).")
                     return
-                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if saved_mode:
+                    panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
+                    self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
+                else:
+                    self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if self._abort_if_no_saved_panchayats(panchayats_to_process):
+                    return
             else:
                 panchayats_to_process = [target_panchayat]
 

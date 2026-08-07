@@ -193,7 +193,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         # Parse multiple dates
         target_dates = [d.strip() for d in from_dates_raw.split(',') if d.strip()]
         
-        if panchayat != config.ALL_PANCHAYATS_LABEL:
+        if panchayat not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
             self.app.update_history("location_panchayat", panchayat)
         
         # Start Thread
@@ -265,14 +265,21 @@ class DelWorkAllocTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
 
             # Determine which panchayats to process
-            all_mode = panchayat == config.ALL_PANCHAYATS_LABEL
+            all_mode = panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
+            saved_mode = panchayat == config.MY_PANCHAYATS_LABEL
             panchayats_to_process = []
             if all_mode:
                 if not self._safe_load_page(driver, url):
                     raise Exception("Failed to load page after multiple attempts.")
                 panchayat_dropdown = Select(wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code"))))
                 panchayats_to_process = [t for t in self._get_select_option_texts(panchayat_dropdown) if t]
-                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if saved_mode:
+                    panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
+                    self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
+                else:
+                    self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if self._abort_if_no_saved_panchayats(panchayats_to_process):
+                    return
             else:
                 panchayats_to_process = [panchayat]
 

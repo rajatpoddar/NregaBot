@@ -146,7 +146,7 @@ class PendingBillsTab(BaseAutomationTab):
         ctk.CTkLabel(inputs_card, text="Panchayat", font=ctk.CTkFont(size=12, weight="bold")).grid(
             row=3, column=0, sticky="w", padx=(16, 10), pady=5)
         self.panchayat_menu = ctk.CTkOptionMenu(inputs_card, variable=self.panchayat_var,
-                                                values=[ALL_PANCHAYATS_LABEL], width=240)
+                                                values=[ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL], width=240)
         self.panchayat_menu.grid(row=3, column=1, sticky="ew", padx=(0, 16), pady=5)
 
         # Financial Year
@@ -274,7 +274,7 @@ class PendingBillsTab(BaseAutomationTab):
     def _on_block_change(self, *_):
         self.panchayat_var.set(ALL_PANCHAYATS_LABEL)
         self.panchayat_menu.configure(
-            values=[ALL_PANCHAYATS_LABEL] + [v for v in self._panchayat_values(self.block_var.get().strip()) if v])
+            values=[ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL] + [v for v in self._panchayat_values(self.block_var.get().strip()) if v])
 
     # ────────────────────────────────────────────────────────────────────────
     # STATE / INPUT MANAGEMENT
@@ -346,6 +346,8 @@ class PendingBillsTab(BaseAutomationTab):
         panchayat = self.panchayat_var.get().strip().upper()
         if panchayat == ALL_PANCHAYATS_LABEL.upper():
             panchayat = ""
+        elif panchayat == config.MY_PANCHAYATS_LABEL.upper():
+            panchayat = config.MY_PANCHAYATS_LABEL  # Keep marker → filtered in scraper
         fy = self.fy_var.get().strip()
         if fy == ALL_FY_LABEL:
             fy = ""
@@ -478,7 +480,16 @@ class PendingBillsTab(BaseAutomationTab):
 
                     # ── page=B → panchayat codes ──
                     panchayats = self._get_panchayats(cfg, b_html)
-                    if panchayat:
+                    if panchayat == config.MY_PANCHAYATS_LABEL:
+                        saved = {self._normalize_name(p) for p in self._get_saved_panchayats() if p and p.strip()}
+                        if not saved:
+                            self.log_warning("  ⚠ No saved panchayat found in Settings > Location Data.")
+                            self._reset_ui_state_safe()
+                            return
+                        panchayats = [p for p in panchayats
+                                      if self._normalize_name(p["name"]) in saved]
+                        self.log_info(f"  ⭐ My Saved Panchayats mode: {len(panchayats)} saved panchayat(s) will be processed.")
+                    elif panchayat:
                         panchayats = [p for p in panchayats
                                       if self._normalize_name(p["name"]) == panchayat]
                     if not panchayats:

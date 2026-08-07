@@ -309,7 +309,7 @@ class MrTrackingTab(BaseAutomationTab):
         self.app.update_history("location_state", inputs['state'])
         self.app.update_history("location_district", inputs['district'])
         self.app.update_history("location_block", inputs['block'])
-        if inputs['panchayat'] != config.ALL_PANCHAYATS_LABEL:
+        if inputs['panchayat'] not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
             self.app.update_history("location_panchayat", inputs['panchayat'])
         
         driver = self.app.get_driver()
@@ -406,7 +406,8 @@ class MrTrackingTab(BaseAutomationTab):
                 return Select(wait.until(EC.element_to_be_clickable((By.ID, PANCH_ID))))
 
             # --- Determine which panchayats to process ---
-            all_mode = inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL
+            all_mode = inputs['panchayat'] in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
+            saved_mode = inputs['panchayat'] == config.MY_PANCHAYATS_LABEL
             panchayats_to_process = []
             skip_first_nav = False
             if all_mode:
@@ -420,14 +421,20 @@ class MrTrackingTab(BaseAutomationTab):
                     if t.upper() in ("ALL", "ALL PANCHAYATS", "ALL PANCHAYAT", "ALL GPs", "ALL GP"):
                         all_option = t
                         break
-                if all_option:
+                if all_option and not saved_mode:
                     panchayats_to_process = [all_option]
                     skip_first_nav = True
                     self.log_info(f"🌐 Portal has a built-in '{all_option}' option — processing all panchayats in one run.")
                 else:
                     panchayats_to_process = [t for t in self._get_select_option_texts(panchayat_dd)
                                              if t and t.strip().upper() not in ("ALL", "ALL PANCHAYATS", "ALL PANCHAYAT", "ALL GPs", "ALL GP")]
-                    self.log_info(f"🌐 No built-in 'ALL' option found — looping over {len(panchayats_to_process)} panchayats.")
+                    if saved_mode:
+                        panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
+                        self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
+                    else:
+                        self.log_info(f"🌐 No built-in 'ALL' option found — looping over {len(panchayats_to_process)} panchayats.")
+                if self._abort_if_no_saved_panchayats(panchayats_to_process):
+                    return
             else:
                 panchayats_to_process = [inputs['panchayat']]
 

@@ -81,7 +81,7 @@ class MusterrollGenTab(BaseAutomationTab):
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var,
                                                 values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=0, column=1, columnspan=3, sticky='ew', padx=15, pady=(15,0))
-        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' to generate Muster Rolls for every panchayat of the block.",
+        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' for every panchayat of the block, or '⭐ My Saved Panchayats' for only your saved panchayats.",
                      text_color="gray50", font=ctk.CTkFont(size=11)).grid(row=1, column=1, columnspan=3, sticky='w', padx=15, pady=(2, 0))
         
         # --- Start Date ---
@@ -313,7 +313,7 @@ class MusterrollGenTab(BaseAutomationTab):
         if not all(inputs[k] for k in ['panchayat', 'start_date', 'end_date', 'designation', 'staff']):
             messagebox.showwarning("Input Error", "All fields are required (except Work Search Keys).")
             return
-        if inputs['panchayat'] != config.ALL_PANCHAYATS_LABEL:
+        if inputs['panchayat'] not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
             self._save_mapping_pair(inputs['panchayat'], inputs['staff'])
         inputs['work_codes'] = [line.strip() for line in inputs['work_codes_raw'].split('\n') if line.strip()]
         inputs['auto_mode'] = not bool(inputs['work_codes'])
@@ -417,7 +417,8 @@ class MusterrollGenTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         panchayat_target = inputs.get('panchayat', '')
-        all_mode = panchayat_target == config.ALL_PANCHAYATS_LABEL
+        all_mode = panchayat_target in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
+        saved_mode = panchayat_target == config.MY_PANCHAYATS_LABEL
         self.log_info(f"Starting MR generation for: {panchayat_target}")
         self.app.after(0, self.app.set_status, "Running MR Generation...")
         
@@ -439,7 +440,13 @@ class MusterrollGenTab(BaseAutomationTab):
                     if t.startswith(prefix):
                         t = t[len(prefix):]
                     panchayats_to_process.append(t.strip())
-                self.log_info(f"Found {len(panchayats_to_process)} panchayats to process.")
+                if saved_mode:
+                    panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
+                    self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
+                else:
+                    self.log_info(f"Found {len(panchayats_to_process)} panchayats to process.")
+                if self._abort_if_no_saved_panchayats(panchayats_to_process):
+                    return
             else:
                 panchayats_to_process = [panchayat_target]
 

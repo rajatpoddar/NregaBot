@@ -49,7 +49,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var,
                                                 values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=10)
-        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' to verify jobcards in every panchayat of the block.",
+        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' for every panchayat of the block, or '⭐ My Saved Panchayats' for only your saved panchayats.",
                      text_color="gray50", font=ctk.CTkFont(size=11)).grid(row=4, column=0, columnspan=2, sticky='w', padx=15, pady=(0, 10))
         
         ctk.CTkLabel(controls_frame, text="Village Name:").grid(row=1, column=0, sticky='w', padx=15, pady=10)
@@ -198,7 +198,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         process_all = self.process_all_villages_var.get()
         verify_account_only = self.verify_account_only_var.get()
 
-        all_panchayats = panchayat == config.ALL_PANCHAYATS_LABEL
+        all_panchayats = panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
 
         if not panchayat:
             messagebox.showwarning("Input Required", "Panchayat name is required.")
@@ -261,12 +261,19 @@ class JobcardVerifyTab(BaseAutomationTab):
             url = config.JOBCARD_VERIFY_CONFIG["url"]
             driver.get(url)
             
-            all_mode = inputs.get('all_panchayats', False) or inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL
+            all_mode = inputs.get('all_panchayats', False) or inputs['panchayat'] in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
+            saved_mode = inputs.get('panchayat', '') == config.MY_PANCHAYATS_LABEL
             panchayats_to_process = []
             if all_mode:
                 panch_dd = Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_UC_panch_vill_reg1_ddlpnch"))))
                 panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if "--Select" not in t]
-                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if saved_mode:
+                    panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
+                    self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
+                else:
+                    self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if self._abort_if_no_saved_panchayats(panchayats_to_process):
+                    return
             else:
                 panchayats_to_process = [inputs['panchayat']]
 

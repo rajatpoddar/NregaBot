@@ -423,6 +423,11 @@ AGENCY_PREFIX: str = "Gram Panchayat -"
 # Tabs that support this feature prepend it to their Panchayat dropdown options.
 ALL_PANCHAYATS_LABEL: str = "🌐 All Panchayats"
 
+# Dropdown label used when the user wants to process ONLY the panchayats they
+# have saved in the app (Settings > Location Data) instead of every panchayat
+# present on the live NREGA website.
+MY_PANCHAYATS_LABEL: str = "⭐ My Saved Panchayats"
+
 MUSTER_ROLL_CONFIG: Dict[str, object] = {
     "base_url": "https://vbgramgde2.dord.gov.in/vbgramg/preprintmsr.aspx",
     "output_folder_name": "NREGABot_MR_Output",

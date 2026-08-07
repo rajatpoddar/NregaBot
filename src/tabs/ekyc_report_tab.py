@@ -19,7 +19,8 @@ from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException  # n
 logger = get_logger()
 
 # Dropdown labels used when the user wants to process ALL panchayats / ALL villages
-ALL_PANCHAYATS_LABEL = "🌐 All Panchayats"
+ALL_PANCHAYATS_LABEL = config.ALL_PANCHAYATS_LABEL
+MY_PANCHAYATS_LABEL = config.MY_PANCHAYATS_LABEL
 ALL_VILLAGES_LABEL = "🌐 All Villages"
 
 class EKycReportTab(BaseAutomationTab):
@@ -69,7 +70,7 @@ class EKycReportTab(BaseAutomationTab):
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar(value=ALL_PANCHAYATS_LABEL)
         self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var,
-                                                values=[ALL_PANCHAYATS_LABEL] + [v for v in p_vals if v], width=140)
+                                                values=[ALL_PANCHAYATS_LABEL, MY_PANCHAYATS_LABEL] + [v for v in p_vals if v], width=140)
         self.panchayat_menu.grid(row=0, column=1, padx=5, pady=10, sticky="ew")
 
         # Village Input (Autocomplete Linked to Global History)
@@ -83,7 +84,7 @@ class EKycReportTab(BaseAutomationTab):
         # Filter villages when panchayat changes
         def _on_panchayat_change(*_):
             pan = self.panchayat_var.get()
-            if pan and pan != ALL_PANCHAYATS_LABEL:
+            if pan and pan not in (ALL_PANCHAYATS_LABEL, MY_PANCHAYATS_LABEL):
                 vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or []
             else:
                 vals = self.app.history_manager.get_suggestions("location_village") or []
@@ -98,7 +99,7 @@ class EKycReportTab(BaseAutomationTab):
         self.filter_menu = ctk.CTkOptionMenu(input_frame, variable=self.filter_var, values=["All", "Verified (Yes)", "Not Verified (No)"], width=130)
         self.filter_menu.grid(row=0, column=5, padx=5, pady=10, sticky="ew")
 
-        note_label = ctk.CTkLabel(settings_tab, text="💡 Note: Select '🌐 All Panchayats' to scan all panchayats.",
+        note_label = ctk.CTkLabel(settings_tab, text="💡 Note: Select '🌐 All Panchayats' to scan all panchayats, or '⭐ My Saved Panchayats' for only your saved panchayats.",
                                   text_color=("gray40", "gray70"), font=("Arial", 11, "italic"))
         note_label.grid(row=1, column=0, sticky="w", padx=20, pady=(6, 4))
 
@@ -284,6 +285,8 @@ class EKycReportTab(BaseAutomationTab):
             # Map the "All" dropdown labels back to empty (process everything)
             if panchayat_target == ALL_PANCHAYATS_LABEL:
                 panchayat_target = ""
+            elif panchayat_target == MY_PANCHAYATS_LABEL:
+                panchayat_target = MY_PANCHAYATS_LABEL  # Keep marker → filtered below
             if village_target == ALL_VILLAGES_LABEL:
                 village_target = ""
 
@@ -309,7 +312,7 @@ class EKycReportTab(BaseAutomationTab):
             # 2. Determine Panchayats to Process
             panchayats_to_process = []
             
-            if panchayat_target:
+            if panchayat_target and panchayat_target != MY_PANCHAYATS_LABEL:
                 panchayats_to_process.append(panchayat_target)
                 self.app.update_history("location_panchayat", panchayat_target)
             else:
@@ -324,7 +327,19 @@ class EKycReportTab(BaseAutomationTab):
                         if val not in ["00", "99"] and txt != "---Select---" and "All" not in txt:
                             panchayats_to_process.append(txt)
                     
-                    self.log_info(f"Found {len(panchayats_to_process)} panchayats to scan.")
+                    if panchayat_target == MY_PANCHAYATS_LABEL:
+                        panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
+                        self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
+                        if not panchayats_to_process:
+                            try:
+                                self.app.after(0, self.export_btn.configure, state="normal")
+                            except Exception:
+                                pass
+                            self.log_warning("⚠️ No saved panchayat found on the website. Check Settings > Location Data.")
+                            self._reset_ui_state_safe()
+                            return
+                    else:
+                        self.log_info(f"Found {len(panchayats_to_process)} panchayats to scan.")
                 except Exception as e:
                     raise Exception(f"Could not fetch panchayat list: {e}")
 
@@ -569,6 +584,7 @@ class EKycReportTab(BaseAutomationTab):
         village = self.village_var.get().strip()
         if panchayat == ALL_PANCHAYATS_LABEL:
             panchayat = ""  # Save as empty = all panchayats
+        # MY_PANCHAYATS_LABEL is kept as-is so the mode restores on next launch
         if village == ALL_VILLAGES_LABEL:
             village = ""  # Save as empty = all villages
         data = {

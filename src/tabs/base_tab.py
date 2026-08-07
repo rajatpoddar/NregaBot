@@ -1731,20 +1731,76 @@ class BaseAutomationTab(ctk.CTkFrame):
         return texts
 
     def _with_all_panchayats(self, menu_widget: Any) -> None:
-        """Prepend the '🌐 All Panchayats' option to an option menu's values."""
+        """Prepend the '🌐 All Panchayats' + '⭐ My Saved Panchayats' options to an option menu's values."""
         try:
             vals = list(menu_widget.cget("values"))
         except Exception:
             return
-        clean = [v for v in vals if v and v != config.ALL_PANCHAYATS_LABEL]
+        clean = [v for v in vals if v and v not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)]
         if not clean:
             clean = [""]
-        menu_widget.configure(values=[config.ALL_PANCHAYATS_LABEL] + clean)
+        menu_widget.configure(values=[config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL] + clean)
 
     def _all_panchayat_values(self, raw_vals: Optional[List[str]]) -> List[str]:
-        """Build option-menu values = [All Panchayats] + deduped non-empty values."""
-        vals = [v for v in (raw_vals or []) if v and v != config.ALL_PANCHAYATS_LABEL]
-        return [config.ALL_PANCHAYATS_LABEL] + vals
+        """Build option-menu values = [All Panchayats, My Saved Panchayats] + deduped non-empty values."""
+        vals = [v for v in (raw_vals or []) if v and v not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)]
+        return [config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL] + vals
+
+    def _get_saved_panchayats(self) -> List[str]:
+        """All unique panchayat names saved in the app (Settings > Location Data).
+
+        Mirrors SettingsTab._get_panchayat_suggestions() so exactly the panchayats
+        the user has set/stored in the app are considered — not the full website list.
+        """
+        try:
+            hm = self.app.history_manager
+            keys = ["location_panchayat", "panchayat_name", "panchayat",
+                    "dashboard_panchayat", "mr_track_panchayat",
+                    "issued_mr_panchayat", "audit_panchayat_respond"]
+            vals = set()
+            for k in keys:
+                for s in (hm.get_suggestions(k) or []):
+                    if s and str(s).strip():
+                        vals.add(str(s).strip())
+            return sorted(vals)
+        except Exception:
+            return []
+
+    @staticmethod
+    def _normalize_panchayat_name(name: str) -> str:
+        """Collapse whitespace + uppercase — matches portal names and saved names robustly."""
+        return re.sub(r"\s+", " ", str(name or "")).strip().upper()
+
+    def _filter_panchayats_to_saved(self, website_panchayats: List[str]) -> List[str]:
+        """Keep only the website's panchayats that the user has saved in the app.
+
+        Case-insensitive match (whitespace-collapsed). Returns [] when nothing is
+        saved or nothing matches, so callers can log a clear warning and abort.
+        """
+        saved = {self._normalize_panchayat_name(p) for p in self._get_saved_panchayats() if p and p.strip()}
+        if not saved:
+            return []
+        return [p for p in (website_panchayats or []) if p and self._normalize_panchayat_name(p) in saved]
+
+    def _reset_ui_state_safe(self) -> None:
+        """Reset automation UI state from a background thread (safe no-op if unsupported)."""
+        try:
+            resetter = getattr(self, "set_ui_state", None) or getattr(self, "set_common_ui_state", None)
+            if resetter:
+                self.app.after(0, resetter, False)
+        except Exception:
+            pass
+
+    def _abort_if_no_saved_panchayats(self, panchayats_to_process: List[str]) -> bool:
+        """Log a warning + reset UI when the saved-panchayat filter matched nothing.
+
+        Returns True when the caller should abort (return) the automation run.
+        """
+        if panchayats_to_process:
+            return False
+        self.log_warning("⚠️ No saved panchayat found on the website. Check Settings > Location Data.")
+        self._reset_ui_state_safe()
+        return True
 
     @staticmethod
     def _is_aggregate_panchayat_name(name: str) -> bool:

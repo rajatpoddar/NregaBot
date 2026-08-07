@@ -450,7 +450,8 @@ class IssuedMrReportTab(BaseAutomationTab):
                 wait.until(EC.presence_of_element_located((By.XPATH, main_table_xpath)))
 
             target_panchayat = inputs['panchayat'].strip()
-            all_mode = target_panchayat == config.ALL_PANCHAYATS_LABEL
+            all_mode = target_panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
+            saved_mode = target_panchayat == config.MY_PANCHAYATS_LABEL
 
             # Collect target panchayat name(s) from the summary table
             panchayat_names = []
@@ -465,9 +466,15 @@ class IssuedMrReportTab(BaseAutomationTab):
                     elif p_name.lower() == target_panchayat.lower():
                         panchayat_names.append(p_name)
                         break
+            if saved_mode:
+                panchayat_names = self._filter_panchayats_to_saved(panchayat_names)
+                self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayat_names)} saved panchayat(s) will be processed.")
             if not panchayat_names:
                 if all_mode:
-                    self.log_warning("No panchayats found in the summary table.")
+                    if saved_mode:
+                        self.log_warning("⚠️ No saved panchayat found in the summary table. Check Settings > Location Data.")
+                    else:
+                        self.log_warning("No panchayats found in the summary table.")
                     self.success_message = None
                     return
                 raise ValueError(f"Panchayat '{target_panchayat}' not found in table.")

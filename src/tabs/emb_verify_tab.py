@@ -46,7 +46,7 @@ class EmbVerifyTab(BaseAutomationTab):
         self.panchayat_menu = ctk.CTkOptionMenu(config_frame, variable=self.panchayat_var,
                                                 values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=15)
-        ctk.CTkLabel(config_frame, text="💡 Select '🌐 All Panchayats' to verify every panchayat of the block.",
+        ctk.CTkLabel(config_frame, text="💡 Select '🌐 All Panchayats' for every panchayat of the block, or '⭐ My Saved Panchayats' for only your saved panchayats.",
                      text_color="gray50", font=ctk.CTkFont(size=11)).grid(row=2, column=0, columnspan=2, sticky='w', padx=15, pady=(0, 8))
         
         # Verify Amount input field
@@ -147,7 +147,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
         work_codes = [line.strip() for line in self.work_codes_text.get("1.0", "end-1c").splitlines() if line.strip()]
         
-        if panchayat != config.ALL_PANCHAYATS_LABEL:
+        if panchayat not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
             self.app.update_history("location_panchayat", panchayat)
         for wc in work_codes:
             self.app.update_history("work_code", wc)
@@ -191,13 +191,20 @@ class EmbVerifyTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
 
             # Determine which panchayats to process
-            all_mode = panchayat == config.ALL_PANCHAYATS_LABEL
+            all_mode = panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
+            saved_mode = panchayat == config.MY_PANCHAYATS_LABEL
             panchayats_to_process = []
             if all_mode:
                 driver.get(config.EMB_VERIFY_CONFIG["url"])
                 panch_dd = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
                 panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if t]
-                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if saved_mode:
+                    panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
+                    self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
+                else:
+                    self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if self._abort_if_no_saved_panchayats(panchayats_to_process):
+                    return
             else:
                 panchayats_to_process = [panchayat]
 

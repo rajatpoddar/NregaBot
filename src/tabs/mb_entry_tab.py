@@ -392,14 +392,21 @@ class MbEntryTab(BaseAutomationTab):
 
             # Determine which panchayats to process
             panchayat_target = cfg['location_panchayat']
-            all_mode = panchayat_target == config.ALL_PANCHAYATS_LABEL
+            all_mode = panchayat_target in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
+            saved_mode = panchayat_target == config.MY_PANCHAYATS_LABEL
             panchayats_to_process = []
             if all_mode:
                 driver.get(config.MB_ENTRY_CONFIG["url"])
                 panch_dd = Select(WebDriverWait(driver, 20).until(
                     EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch'))))
                 panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if t]
-                self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if saved_mode:
+                    panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
+                    self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
+                else:
+                    self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
+                if self._abort_if_no_saved_panchayats(panchayats_to_process):
+                    return
             else:
                 panchayats_to_process = [panchayat_target]
 
