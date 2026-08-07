@@ -68,10 +68,10 @@ jobs:
             scripts\build_windows.bat
           shell: cmd
   
-        - name: Create Secure Core Zip (Windows)
+        - name: Create Core Zip (Windows)
           shell: python
           run: |
-            import os, shutil, zipfile, compileall
+            import os, shutil, zipfile
             
             version = '${{ needs.get-release-info.outputs.version }}'
             zip_name = f'dist/core_win_v{version}.zip'
@@ -87,13 +87,18 @@ jobs:
                 return ignored
             
             shutil.copytree('.', temp_dir, ignore=ignore_func)
-            print('Compiling Windows Core (Py3.11)...')
-            compileall.compile_dir(temp_dir, force=True, legacy=True)
             
+            # IMPORTANT: .py source files ARE included (same as the macOS core
+            # zip built by scripts/build_update.py). The deployed loader EXE
+            # reads app_live/src/config.py to detect the installed version.
+            # A compiled-only zip (all .py stripped, only .pyc shipped) made
+            # that read fail on Windows, so the loader treated the install as
+            # version 0.0.0 and re-downloaded + re-extracted the core zip on
+            # EVERY launch. Shipping the source lets already-installed loaders
+            # self-heal through the next smart update without reinstalling.
             with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zf:
                 for root, dirs, files in os.walk(temp_dir):
                     for file in files:
-                        if file.endswith('.py'): continue
                         if file.endswith(('.exe', '.bat', '.sh', '.spec', '.ps1', '.iss')): continue
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, temp_dir)

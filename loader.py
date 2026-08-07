@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import hashlib
+import re
 import requests
 import zipfile
 import json
@@ -242,17 +243,58 @@ class ModernSplashScreen(ctk.CTk):
         Returns '' if app_live isn't extracted yet. Used by the HEAL logic to
         detect the stuck state where core_version.json claims a version the
         extracted code doesn't actually have.
+
+        Windows core zips (built by GitHub Actions CI) ship COMPILED .pyc
+        files only — every .py source file is stripped out — so src/config.py
+        does NOT exist there. In that case the version is read out of
+        src/config.pyc instead (see _read_version_from_pyc). Without this
+        fallback the loader could never match the server version on Windows
+        and re-downloaded + re-extracted the core zip on EVERY launch.
+        """
+        cfg_path = os.path.join(EXTRACTED_DIR, "src", "config.py")
+        pyc_path = os.path.join(EXTRACTED_DIR, "src", "config.pyc")
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        stripped = line.strip()
+                        if stripped.startswith("APP_VERSION:") or stripped.startswith("APP_VERSION ="):
+                            val = stripped.split("=", 1)[1].split("=")[-1].strip()
+                            return val.strip('"').strip("'").replace("-LITE", "").replace("-lite", "").strip()
+            except Exception:
+                pass
+            # config.py exists but APP_VERSION couldn't be read from it — fall
+            # through to the compiled config.pyc before giving up (defensive).
+
+        # Windows: compiled-only core zip → parse the marshalled config.pyc.
+        if os.path.exists(pyc_path):
+            return self._read_version_from_pyc(pyc_path)
+        return ""
+
+    def _read_version_from_pyc(self, pyc_path: str) -> str:
+        """Read APP_VERSION out of a compiled src/config.pyc (Windows core zip).
+
+        Legacy .pyc files are a short header followed by the marshalled code
+        object. The header is 8 bytes for Python 3.0-3.2, 12 for 3.3-3.6, and
+        16 for 3.7+ (both the timestamp and hash-based forms are 16 bytes);
+        CI builds with compileall(legacy=True) produce the 12-byte form. We
+        try each known header size and scan the code object's constants for
+        the first semver-looking string — that is APP_VERSION.
         """
         try:
-            cfg_path = os.path.join(EXTRACTED_DIR, "src", "config.py")
-            if not os.path.exists(cfg_path):
-                return ""
-            with open(cfg_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    stripped = line.strip()
-                    if stripped.startswith("APP_VERSION:") or stripped.startswith("APP_VERSION ="):
-                        val = stripped.split("=", 1)[1].split("=")[-1].strip()
-                        return val.strip('"').strip("'").replace("-LITE", "").replace("-lite", "").strip()
+            import marshal
+            with open(pyc_path, 'rb') as f:
+                data = f.read()
+            for header_len in (12, 16, 20, 8):
+                try:
+                    code = marshal.loads(data[header_len:])
+                except Exception:
+                    continue
+                for const in getattr(code, 'co_consts', ()):
+                    if isinstance(const, str):
+                        v = const.replace("-LITE", "").replace("-lite", "").strip()
+                        if re.match(r'^\d+\.\d+\.\d+', v):
+                            return v
         except Exception:
             pass
         return ""
