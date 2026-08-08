@@ -7,12 +7,10 @@ from datetime import datetime
 
 from src import config
 from .base_tab import BaseAutomationTab
-from src.utils import get_logger, truncate_workcode
+from src.utils import truncate_workcode
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException, UnexpectedAlertPresentException  # noqa: F401
+from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
-
-logger = get_logger()
 
 class AddActivityTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
@@ -203,148 +201,333 @@ class AddActivityTab(BaseAutomationTab):
         """Override to map the retry button to the work_keys_text box."""
         self.retry_failed_automation(self.work_keys_text)
 
+    def _scroll_to(self, driver, element):
+        """Scroll an element into view so clicks/keypresses land on it."""
+        try:
+            driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});",
+                element
+            )
+        except Exception:
+            pass
+        time.sleep(0.3)
+
+    @staticmethod
+    def _find_work_option(work_select, work_key):
+        """Find the dropdown option that matches the work key.
+
+        The redesigned page pre-loads EVERY work of the block into the work
+        dropdown, so picking option index 1 would silently select the WRONG
+        work code. Match precisely instead:
+          1. exact option value           (full code, e.g. 3422003001/IF/IAY/18030)
+          2. value ending '/<key>'        (last path segment, e.g. 18030)
+          3. value ending with <key>      (loose suffix)
+          4. option text contains <key>   (last resort)
+        """
+        key = (work_key or "").strip()
+        if not key:
+            return None
+        # Drop the placeholder option(s) — value '00' only ever belongs to
+        # "---Select---" / "--Select Activity--" placeholders on this page.
+        options = [
+            opt for opt in work_select.options
+            if (opt.get_attribute("value") or "").strip() not in ("", "00")
+        ]
+        for opt in options:
+            val = (opt.get_attribute("value") or "").strip()
+            if val == key:
+                return opt
+        for opt in options:
+            val = (opt.get_attribute("value") or "").strip()
+            if val.endswith("/" + key):
+                return opt
+        for opt in options:
+            val = (opt.get_attribute("value") or "").strip()
+            if val.endswith(key):
+                return opt
+        for opt in options:
+            if key in (opt.text or ""):
+                return opt
+        return None
+
+    def _wait_for_settle(self, driver, timeout=20, action_name=""):
+        """Wait for the UpdatePanelMain 'Please Wait...' overlay to finish.
+
+        The activity section lives inside an UpdatePanel, so every action after
+        selecting the work (activity dropdown, unit price, quantity, save) runs
+        an ASYNC postback that swaps the panel content in place. Staleness waits
+        are unreliable there — touching an element mid-swap raises
+        stale-element errors — so we wait on the UpdateProgress overlay instead.
+        """
+        overlay_id = 'ctl00_ContentPlaceHolder1_UpdateProgress2'
+        try:
+            # Short wait: does the overlay appear at all? (fast postbacks <100ms
+            # never show it because displayAfter=100).
+            short = WebDriverWait(driver, 2)
+            if short.until(EC.visibility_of_element_located((By.ID, overlay_id))):
+                # Postback is running — wait for it to finish.
+                WebDriverWait(driver, timeout).until(
+                    EC.invisibility_of_element_located((By.ID, overlay_id))
+                )
+                if action_name:
+                    self.log_info(f"   - Page settled after '{action_name}'.")
+        except TimeoutException:
+            pass  # overlay never appeared (fast async postback) — assume settled
+        # Full postbacks (search, work select) reload the whole page — make sure
+        # the document actually finished loading before touching anything.
+        try:
+            WebDriverWait(driver, timeout).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+        except Exception:
+            pass
+        time.sleep(0.6)
+
+    def _js_set_value(self, driver, element, value):
+        """Set an input's value WITHOUT firing its onchange handler.
+
+        On this page the Unit Price & Quantity textboxes carry
+        onchange=__doPostBack inside the UpdatePanel — send_keys into one and
+        then focusing the sibling field BLURS the first one, firing an async
+        postback that re-renders the panel and wipes both fields (live symptom:
+        'Pls Enter Numeric...' at Save + page errors from the racing postback).
+        Setting .value via JS keeps the change event silent; the value stays in
+        the DOM and is submitted together with the Save postback.
+        """
+        driver.execute_script("arguments[0].value = arguments[1];", element, str(value))
+
+    def _read_save_result(self, driver):
+        """Read the post-save state: success/error labels and validation spans.
+
+        btsave is a VALIDATED submit (WebForm_PostBackOptions with group 'aa') —
+        if validation fails the click does NOT postback and nothing is saved, so
+        we must detect the visible validator spans instead of assuming success.
+        Returns (status, detail); status is None when no verdict found yet.
+        """
+        def _txt(eid):
+            try:
+                return driver.find_element(By.ID, eid).get_attribute("innerText").strip()
+            except Exception:
+                return ""
+
+        msg = _txt('ctl00_ContentPlaceHolder1_lblmsg')
+        err = _txt('ctl00_ContentPlaceHolder1_lblError')
+        err1 = _txt('ctl00_ContentPlaceHolder1_lbl_err1')
+
+        valid_txt = ""
+        for vid in ('ctl00_ContentPlaceHolder1_req_act',
+                    'ctl00_ContentPlaceHolder1_Req_txtMat_UnitPrice',
+                    'ctl00_ContentPlaceHolder1_Req_txtMat_Qty'):
+            try:
+                el = driver.find_element(By.ID, vid)
+                if el.is_displayed() and el.get_attribute("innerText").strip():
+                    valid_txt = el.get_attribute("innerText").strip()
+                    break
+            except Exception:
+                pass
+
+        if err:
+            return "Failed", err
+        if err1:
+            return "Failed", err1
+        if valid_txt:
+            return "Failed", f"Validation blocked save: {valid_txt}"
+        if msg:
+            return "Success", msg
+        return None, ""
+
+    def _activity_in_grid(self, driver, grid_id, activity_code):
+        """Ground truth: did the activity row actually land in the grid?"""
+        try:
+            grid = driver.find_element(By.ID, grid_id)
+            inner = grid.get_attribute("innerText")
+            if "No Activity Found" in inner:
+                return False
+            return activity_code in inner
+        except NoSuchElementException:
+            return False
+
     def _process_single_work_key(self, driver, work_key, unit_price, quantity):
         """
-        Processes a single work key.
-        OPTIMIZED: Uses Staleness Check to ensure page refresh before selecting Work Code.
+        Processes a single work key on the IAY_Act_Mat.aspx page.
+
+        Rewritten for the redesigned portal (verified against saved live pages):
+          * FRESH PAGE LOAD per key, then the work key is TYPED into the search
+            box (txtwrksearchkey) — the portal filters the work dropdown on that
+            postback (saved page 'add act.htm' shows the search box holding the
+            work's last-6 digits and the dropdown filtered to that one work).
+            The postback is a FULL page reload, so we wait for the OLD dropdown
+            to go stale instead of a fixed sleep (the fixed sleep was the flaky
+            part in an earlier version).
+          * If the search doesn't surface the work, we fall back to matching
+            directly from the fresh page's dropdown, which pre-loads EVERY work
+            of the block (saved page 'add activity.htm').
+          * The work is picked by EXACT option match, never index 1.
+          * The activity section is inside an UpdatePanel (async postbacks) —
+            each action waits for the 'Please Wait...' overlay to settle.
+          * btsave is a VALIDATED submit — the save verdict checks the error
+            labels AND the visible validator spans, and falls back to verifying
+            the activity actually appears in the grid (no more blind
+            "Implicit Success").
+          * Alert dismissal is wrapped in a blanket except — the old code only
+            caught UnexpectedAlertPresentException, so a page WITHOUT an alert
+            raised NoAlertPresentException and failed EVERY work key instantly.
         """
         wait = WebDriverWait(driver, 20)
         activity_code = config.ADD_ACTIVITY_CONFIG['defaults']['activity_code']
+        url = config.ADD_ACTIVITY_CONFIG["url"]
+        work_name_dd_id = 'ctl00_ContentPlaceHolder1_ddlworkName'
+        activity_dd_id = 'ctl00_ContentPlaceHolder1_ddlAct'
+        grid_id = 'ctl00_ContentPlaceHolder1_grdDisplayAct'
 
         try:
-            # Dismiss alerts if any
-            try: driver.switch_to.alert.accept()
-            except UnexpectedAlertPresentException: pass
-
-            if config.ADD_ACTIVITY_CONFIG["url"] not in driver.current_url:
-                driver.get(config.ADD_ACTIVITY_CONFIG["url"])
-
-            # --- 1. Enter work key and Wait for Reload ---
-            self.log_info(f"Searching for work key: {work_key}")            
-            # Capture the OLD dropdown element to check for refresh later
-            work_name_dd_id = 'ctl00_ContentPlaceHolder1_ddlworkName'
+            # Dismiss alerts if any (blanket except — 'no alert' is the normal case)
             try:
-                old_work_ddl = driver.find_element(By.ID, work_name_dd_id)
-            except NoSuchElementException:
-                old_work_ddl = None
-
-            # Input Key via JS
-            work_key_input = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtwrksearchkey')))
-            driver.execute_script("arguments[0].value = arguments[1];", work_key_input, work_key)
-            
-            # Trigger PostBack
-            driver.execute_script("javascript:setTimeout('__doPostBack(\\'ctl00$ContentPlaceHolder1$txtwrksearchkey\\',\\'\\')', 0)")
-
-            # CRITICAL FIX: Wait for the old dropdown to go 'stale' (page reload)
-            if old_work_ddl:
-                try:
-                    wait.until(EC.staleness_of(old_work_ddl))
-                except TimeoutException:
-                    self.log_warning("Page didn't refresh quickly, forcing wait...")            
-            try:
-                WebDriverWait(driver, 10).until(
-                    lambda d: d.execute_script('return document.readyState') == 'complete'
-                )
-            except TimeoutException:
+                driver.switch_to.alert.accept()
+            except Exception:
                 pass
 
-            # --- 2. Select work from dropdown ---
-            # Re-find the element
+            # --- 1. Fresh page load, then SEARCH the work key ---
+            # The portal filters the work dropdown on the search postback (the
+            # user expects to see the key typed in the box). The search box is
+            # outside the UpdatePanel, so its postback is a FULL page reload.
+            driver.get(url)
+            wait.until(EC.presence_of_element_located((By.ID, work_name_dd_id)))
+
+            self.log_info(f"Searching for work key: {work_key}")
+            search_input = wait.until(EC.element_to_be_clickable((By.ID, 'ctl00_ContentPlaceHolder1_txtwrksearchkey')))
+            self._scroll_to(driver, search_input)
+            search_input.clear()
+            search_input.send_keys(work_key)
+
+            # Capture the OLD dropdown — it goes stale when the search postback
+            # reloads the page (deterministic wait, not a fixed sleep).
+            old_work_ddl = driver.find_element(By.ID, work_name_dd_id)
+            search_input.send_keys(Keys.TAB)   # blur → onchange → __doPostBack
+            try:
+                WebDriverWait(driver, 15).until(EC.staleness_of(old_work_ddl))
+            except TimeoutException:
+                time.sleep(2)  # page didn't reload — continue anyway
+
+            # --- 2. Select the EXACT matching work (never blind index 1) ---
             work_ddl_element = wait.until(EC.presence_of_element_located((By.ID, work_name_dd_id)))
-            work_select = Select(work_ddl_element)
+            target_option = self._find_work_option(Select(work_ddl_element), work_key)
 
-            # Retry logic if options are not loaded yet
-            if len(work_select.options) <= 1:
-                # Element wait handled by WebDriverWait below
-                work_select = Select(driver.find_element(By.ID, work_name_dd_id))
-
-            if len(work_select.options) > 1:
-                work_select.select_by_index(1)
-                self.log_info("Work selected. Loading details...")
-            else:
-                # If still empty, the work key might be invalid
-                self._log_result(work_key, "Failed", "Work Key not found or Dropdown empty.")
-                return
-            
-            # Check for existing activity (Use innerText)
-            try:
-                activity_table = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_grdDisplayAct')))
-                if "No Activity Found" in activity_table.get_attribute("innerText"):
-                    self.log_info("No existing activity. Proceeding to add.")
-                else:
-                    self.log_warning("Activity already exists. Skipping.")
-                    self._log_result(work_key, "Skipped", "An activity is already present.")
+            if target_option is None:
+                # Search didn't surface our work — reload fresh: the initial
+                # page pre-loads EVERY work of the block into the dropdown, so
+                # match directly from that full list.
+                self.log_info("Work not found after search — reloading full list...")
+                driver.get(url)
+                work_ddl_element = wait.until(EC.presence_of_element_located((By.ID, work_name_dd_id)))
+                target_option = self._find_work_option(Select(work_ddl_element), work_key)
+                if target_option is None:
+                    self._log_result(work_key, "Failed", "Work Key not found in dropdown.")
                     return
-            except (NoSuchElementException, TimeoutException):
-                # Sometimes the table doesn't load instantly, assume safe to proceed
-                self.log_info("Activity table check passed.")
-            # --- 3. Select Activity ---
-            activity_dd_id = 'ctl00_ContentPlaceHolder1_ddlAct'
-            try:
-                # Capture old activity dropdown
-                old_act_ddl = driver.find_element(By.ID, activity_dd_id)
-                
-                Select(old_act_ddl).select_by_value(activity_code)
-                
-                # Wait for refresh (selecting activity usually triggers a small reload)
-                wait.until(EC.staleness_of(old_act_ddl))
-            except NoSuchElementException:
-                self._log_result(work_key, "Failed", "Activity Dropdown not found.")
+
+            self._scroll_to(driver, work_ddl_element)
+            Select(work_ddl_element).select_by_value(target_option.get_attribute("value"))
+            self.log_info("Work selected. Loading details...")
+
+            # --- 3. Wait for the activity section to appear (full postback).
+            # The work selection is a FULL page reload — first let the document
+            # finish loading (readyState check), then wait for the activity
+            # section. The find_elements poll can raise during navigation, so
+            # retry instead of letting a mid-nav exception kill the key.
+            self._wait_for_settle(driver, timeout=25)
+            # Poll for the activity section with a blanket except — mid-navigation
+            # WebDriverException/StaleElement errors are normal here, so ANY
+            # failure just means "keep polling" rather than killing the key.
+            section_ok = False
+            deadline = time.time() + 25
+            while time.time() < deadline:
+                try:
+                    if driver.find_elements(By.ID, activity_dd_id) or driver.find_elements(By.ID, grid_id):
+                        section_ok = True
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.8)
+            if not section_ok:
+                self._log_result(work_key, "Failed", "Activity section not found after selecting work.")
                 return
 
-            # --- 4. Fill Unit Price (JS Safe) ---
-            unit_price_input = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtAct_UnitPrice')))
-            driver.execute_script("arguments[0].value = arguments[1];", unit_price_input, unit_price)
-            driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", unit_price_input)
-            
-            # Click body to trigger blur/calculations
-            driver.execute_script("document.body.click();")
-            
-            # Wait for calculation refresh
+            # Skip if this activity is already present on the work
             try:
-                wait.until(EC.staleness_of(unit_price_input))
-            except TimeoutException: pass
+                activity_table = driver.find_element(By.ID, grid_id)
+                inner = activity_table.get_attribute("innerText")
+                if "No Activity Found" not in inner:
+                    if activity_code in inner:
+                        self.log_warning("Activity already exists. Skipping.")
+                        self._log_result(work_key, "Skipped", "An activity is already present.")
+                        return
+                    self.log_info("Work has other activities; adding the default one.")
+            except NoSuchElementException:
+                self.log_info("No activity grid; proceeding to add.")
 
-            # --- 5. Fill Quantity (JS Safe) ---
-            quantity_input = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtAct_Qty')))
-            driver.execute_script("arguments[0].value = arguments[1];", quantity_input, quantity)
-            driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", quantity_input)
+            # --- 4. Select the activity code (fires an async postback — settle) ---
+            act_dd = wait.until(EC.element_to_be_clickable((By.ID, activity_dd_id)))
+            self._scroll_to(driver, act_dd)
+            Select(act_dd).select_by_value(activity_code)
+            self._wait_for_settle(driver, action_name="Activity Select")
 
-            time.sleep(1.5)  # Brief wait for postback to begin
+            # --- 5/6. Fill Unit Price & Quantity.
+            # CRITICAL: both textboxes carry onchange=__doPostBack (they live
+            # inside UpdatePanelMain). send_keys into price and then moving
+            # focus to qty BLURS price → its change event fires → an async
+            # postback re-renders the panel and WIPES both fields. Live symptom
+            # of that race: 'Pls Enter Numeric...' shown at Save (fields came
+            # back empty) plus page errors from the racing postback. So the
+            # values are set via JS (no blur, no change event, no postback) and
+            # are submitted together with the Save postback.
+            price_input = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtAct_UnitPrice')))
+            self._js_set_value(driver, price_input, unit_price)
+            qty_input = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtAct_Qty')))
+            self._js_set_value(driver, qty_input, quantity)
+            time.sleep(0.3)
 
-            # --- 6. Click Save (JS Safe) ---
-            self.log_info("Saving activity...")
-            save_button = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_btsave')))
-            driver.execute_script("arguments[0].click();", save_button)
-
-            # --- 7. Check Result ---
-            outcome_found = False
-            for _ in range(3):
+            # --- 7. Re-verify fields (cheap guard) then Save (validated submit) ---
+            re_selected = False
+            try:
+                sel = Select(driver.find_element(By.ID, activity_dd_id))
+                if (sel.first_selected_option.get_attribute("value") or "") != activity_code:
+                    sel.select_by_value(activity_code)
+                    re_selected = True
+            except Exception:
+                pass
+            if re_selected:
+                self._wait_for_settle(driver, action_name="Activity re-select")
+            for eid, expected in (('ctl00_ContentPlaceHolder1_txtAct_UnitPrice', unit_price),
+                                  ('ctl00_ContentPlaceHolder1_txtAct_Qty', quantity)):
                 try:
-                    # Check for Success Message
-                    try:
-                        lbl_msg = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lblmsg')
-                        txt = lbl_msg.get_attribute("innerText").strip()
-                        if txt: 
-                            self._log_result(work_key, "Success", txt)
-                            outcome_found = True; break
-                    except NoSuchElementException: pass
+                    el = driver.find_element(By.ID, eid)
+                    if (el.get_attribute("value") or "").strip() != expected.strip():
+                        self._js_set_value(driver, el, expected)
+                except Exception:
+                    pass
 
-                    # Check for Error Message
-                    try:
-                        lbl_err = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lblError')
-                        txt = lbl_err.get_attribute("innerText").strip()
-                        if txt:
-                            self._log_result(work_key, "Failed", txt)
-                            outcome_found = True; break
-                    except NoSuchElementException: pass
-                    
-                    time.sleep(1.5)  # Brief wait for postback to begin
-                except Exception as e: logger.debug("AddActivity: Failed to process: %s", e)
+            self.log_info("Saving activity...")
+            save_button = wait.until(EC.element_to_be_clickable((By.ID, 'ctl00_ContentPlaceHolder1_btsave')))
+            self._scroll_to(driver, save_button)
+            driver.execute_script("arguments[0].click();", save_button)
+            self._wait_for_settle(driver, timeout=25, action_name="Save")
 
-            if not outcome_found:
-                # If no message appears, assume success if inputs cleared, or log warning
-                self._log_result(work_key, "Success", "Saved (Implicit - No error found).")
+            # --- 8. Check Result (labels → validation spans → grid ground truth) ---
+            outcome = None
+            detail = ""
+            for _ in range(3):
+                outcome, detail = self._read_save_result(driver)
+                if outcome:
+                    break
+                time.sleep(1.5)
+
+            if outcome is None:
+                if self._activity_in_grid(driver, grid_id, activity_code):
+                    outcome, detail = "Success", "Activity saved (verified in grid)."
+                else:
+                    outcome, detail = "Failed", "Save completed but no confirmation found."
+
+            self._log_result(work_key, outcome, detail)
 
         except Exception as e:
             self._log_result(work_key, "Failed", f"Error: {str(e).splitlines()[0]}")

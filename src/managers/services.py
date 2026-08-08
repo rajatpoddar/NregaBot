@@ -14,6 +14,31 @@ from tkinter import messagebox
 from src import config
 from src.utils import get_data_path, get_user_downloads_path, parse_version
 
+
+def _is_dev_mode() -> bool:
+    """Detect running from the source tree (python main_app / python lite_app).
+
+    Production installs run the app from the loader-managed app_live folder (or
+    as a frozen bundle); dev runs execute the source directly. Update checks
+    must be skipped in dev mode — the loader already skips updates for dev
+    builds, and the app's same-version hotfix hash comparison is meaningless
+    against a source checkout: there is no core_version.json there, so the local
+    hash is '' and a non-empty server hash would trigger a false
+    'bug-fix update' popup on EVERY launch.
+    """
+    if getattr(sys, 'frozen', False):
+        return False  # packaged build (NREGABot / NREGABot Lite) — normal update flow
+    try:
+        from appdirs import user_data_dir
+        prod_root = os.path.realpath(os.path.join(user_data_dir("NREGABot", "PoddarSolutions"), "app_live"))
+    except Exception:
+        prod_root = ""
+    here = os.path.realpath(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    )
+    return not prod_root or here != prod_root
+
+
 class ServiceManager:
     def __init__(self, app: object) -> None:
         self.app = app
@@ -102,6 +127,15 @@ class ServiceManager:
         if config.BETA_BUILD:
             # Beta builds never auto-update from version.json
             self.app.update_info = {"status": "beta", "version": config.APP_VERSION}
+            self.app.after(0, self.app._update_about_tab_info)
+            return
+
+        if _is_dev_mode():
+            # Dev runs (python main_app) must never auto-check or prompt — the
+            # loader already skips updates for dev builds, and the hotfix hash
+            # comparison (server hash vs the empty local core_version.json hash)
+            # would otherwise pop a false "bug-fix update" dialog every launch.
+            self.app.update_info = {"status": "updated", "version": config.APP_VERSION}
             self.app.after(0, self.app._update_about_tab_info)
             return
 

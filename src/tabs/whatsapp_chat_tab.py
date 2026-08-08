@@ -37,6 +37,8 @@ class WhatsAppChatTab(ctk.CTkFrame):
         self.app = app_instance
         self.poll_after_id = None
         self.last_message_id = 0
+        self._awaiting_ai = False       # AI reply aane tak typing indicator
+        self._awaiting_ai_after = None  # indicator timeout (reply na aaye to reset)
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -79,17 +81,24 @@ class WhatsAppChatTab(ctk.CTkFrame):
             header, width=42, height=42, highlightthickness=0,
             bg=WHATSAPP_DARK, bd=0
         )
-        avatar_canvas.grid(row=0, column=0, padx=(14, 10), pady=11)
+        avatar_canvas.grid(row=0, column=0, rowspan=2, padx=(14, 10), pady=11)
         avatar_canvas.create_oval(2, 2, 40, 40, fill="#34B7F1", outline="")
-        avatar_canvas.create_text(21, 22, text="S", fill="white",
-                                  font=("Segoe UI", 18, "bold"))
+        avatar_canvas.create_text(21, 22, text="AI", fill="white",
+                                  font=("Segoe UI", 15, "bold"))
 
         # Title
         ctk.CTkLabel(
             header, text="Support Chat",
             font=ctk.CTkFont(size=16, weight="bold"),
             text_color="white"
-        ).grid(row=0, column=1, sticky="w")
+        ).grid(row=0, column=1, sticky="w", pady=(12, 0))
+
+        # Subtitle — AI assistant pehle reply karta hai, phir human support
+        ctk.CTkLabel(
+            header, text="🤖 AI Assistant • 24x7 Support",
+            font=ctk.CTkFont(size=10),
+            text_color="#A8D8EA"
+        ).grid(row=1, column=1, sticky="w", pady=(0, 10))
 
         self.status_label = ctk.CTkLabel(
             header, text="🟢 Online",
@@ -156,7 +165,16 @@ class WhatsAppChatTab(ctk.CTkFrame):
 
         original_text = message
         self.message_entry.delete(0, "end")
-        self.sound_indicator.configure(text="")
+        # AI typing indicator — reply polling me aate hi hat jayega
+        # (safety: 90s ke baad timeout — reply na aaye to bhi reset ho jaye)
+        self.sound_indicator.configure(text="🤖 AI soch raha hai...")
+        self._awaiting_ai = True
+        if self._awaiting_ai_after:
+            try:
+                self.after_cancel(self._awaiting_ai_after)
+            except Exception:
+                pass
+        self._awaiting_ai_after = self.after(90000, self._reset_ai_indicator)
 
         self.send_button.configure(state="disabled", text="⏳")
         self.message_entry.configure(state="disabled")
@@ -203,6 +221,7 @@ class WhatsAppChatTab(ctk.CTkFrame):
             self.status_label.configure(text="🟢 Online")
             self.load_messages()
         else:
+            self._reset_ai_indicator()
             self.status_label.configure(text="🔴 Error")
             messagebox.showerror(
                 "Send Failed",
@@ -298,6 +317,10 @@ class WhatsAppChatTab(ctk.CTkFrame):
             self._append_message(msg)
             if msg.get('sender') == 'admin':
                 has_new_admin_msg = True
+
+        # AI reply aa gaya — typing indicator hatao
+        if has_new_admin_msg and self._awaiting_ai:
+            self._reset_ai_indicator()
 
         # Play notification sound when a new admin reply arrives
         if has_new_admin_msg:
@@ -408,8 +431,28 @@ class WhatsAppChatTab(ctk.CTkFrame):
                     text_color=("#8696A0", "#4ADE80")
                 ).pack(anchor="e", padx=10, pady=(0, 6))
 
+    # ── AI indicator helpers ──────────────────────────────────
+    def _reset_ai_indicator(self):
+        """Typing indicator reset — reply aane par ya timeout par."""
+        self._awaiting_ai = False
+        if self._awaiting_ai_after:
+            try:
+                self.after_cancel(self._awaiting_ai_after)
+            except Exception:
+                pass
+            self._awaiting_ai_after = None
+        try:
+            self.sound_indicator.configure(text="🔔 Notification on reply")
+        except Exception:
+            pass
+
     # ── Cleanup ───────────────────────────────────────────────
     def destroy(self):
         if self.poll_after_id:
             self.app.after_cancel(self.poll_after_id)
+        if self._awaiting_ai_after:
+            try:
+                self.app.after_cancel(self._awaiting_ai_after)
+            except Exception:
+                pass
         super().destroy()
