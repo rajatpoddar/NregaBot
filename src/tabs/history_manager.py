@@ -799,7 +799,22 @@ class HistoryManager:
             try:
                 conn = self._get_connection()
                 cursor = conn.cursor()
-                
+
+                # ── DPDP: log/store hone se pehle PII mask ──
+                # Description/details/error strings me Aadhaar (12-digit),
+                # mobile, IFSC numbers leak ho sakte hain (tabs jobcard/name
+                # ke saath log karte hain). mask_pii_text inhe redact karta
+                # hai — local SQLite bhi safe, server sync bhi safe.
+                try:
+                    from src.utils import mask_pii_text as _m
+                    description = _m(description)
+                    details = _m(details)
+                    error_type = _m(error_type)
+                    error_source = _m(error_source)
+                    error_traceback = _m(error_traceback)
+                except Exception:
+                    pass
+
                 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 cursor.execute('''
                     INSERT INTO activity_log 

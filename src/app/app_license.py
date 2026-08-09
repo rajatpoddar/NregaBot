@@ -2029,6 +2029,28 @@ class LicenseMixin:
         if cfg:
             data['config'] = cfg
 
+        # ── DPDP: Aadhaar number server par kabhi store NAHI hota. Backup
+        # payload me bhi 12-digit Aadhaar patterns mask hote hain (user ne
+        # suggestions/inputs me Aadhaar type kiya ho sakta hai). Sirf Aadhaar
+        # pattern (exact 12-digit / 4-4-4) mask hota hai — baaki data (mobile,
+        # name, staff maps) user ka apna consented backup hai, restore feature
+        # ke liye intact rehta hai. Local data kabhi mutate nahi hota.
+        try:
+            from src.utils import mask_aadhaar_text as _mask_a
+
+            def _mask_recursive(obj):
+                if isinstance(obj, dict):
+                    return {k: _mask_recursive(v) for k, v in obj.items()}
+                if isinstance(obj, list):
+                    return [_mask_recursive(v) for v in obj]
+                if isinstance(obj, str):
+                    return _mask_a(obj)
+                return obj
+
+            data = _mask_recursive(data)
+        except Exception:
+            pass  # Backup flow kabhi crash nahi hota — unmasked hi chala jayega
+
         return data
 
     def push_user_data_backup(self) -> bool:

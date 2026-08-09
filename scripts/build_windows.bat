@@ -27,6 +27,7 @@ pyinstaller --noconfirm --windowed --onedir ^
 --add-data="assets:assets" ^
 --add-data="config:config" ^
 --add-data="docs/changelog.json:docs/" ^
+--add-data="docs/license.txt:docs/" ^
 --add-data="src:src" ^
 --add-data=".env:." ^
 --collect-all customtkinter ^
@@ -67,6 +68,7 @@ pyinstaller --noconfirm --windowed --onedir ^
 --icon="assets/app_icon.ico" ^
 --add-data="assets:assets" ^
 --add-data="config:config" ^
+--add-data="docs/license.txt:docs/" ^
 --add-data="src:src" ^
 --add-data=".env:." ^
 --collect-all customtkinter ^

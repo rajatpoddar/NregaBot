@@ -6,7 +6,7 @@ import logging
 import re
 import shutil
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, List, Optional
 from appdirs import user_data_dir
 
 # --- C8: Centralized Logging Setup ---
@@ -42,7 +42,7 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
         from logging.handlers import RotatingFileHandler
         fh = RotatingFileHandler(log_path, maxBytes=5*1024*1024, backupCount=2, encoding="utf-8")
         fh.setLevel(level)
-        fh.setFormatter(logging.Formatter(
+        fh.setFormatter(_PiiMaskingFormatter(
             "%(asctime)s [%(levelname)-5s] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S"
         ))
@@ -54,7 +54,7 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
     # --- Console Handler (WARNING+ only, to avoid cluttering stdout) ---
     ch = logging.StreamHandler(sys.stderr)
     ch.setLevel(logging.WARNING)
-    ch.setFormatter(logging.Formatter("%(levelname)-8s %(message)s"))
+    ch.setFormatter(_PiiMaskingFormatter("%(levelname)-8s %(message)s"))
     logger.addHandler(ch)
 
     _LOGGER_SETUP_DONE = True
@@ -231,6 +231,136 @@ def format_bytes(amount: Any, binary: bool = False) -> str:
     return f"{size:.1f} {units[unit_idx]}"
 
 
+# ── DPDP Act 2023: PII masking helpers ──────────────────────────
+# Rule: Aadhaar number kabhi bhi store/transfer NAHI hota (na local DB, na
+# server, na logs, na reports). Cloud/sync boundary par sensitive fields
+# (Aadhaar, bank account, IFSC, mobile, jobcard, applicant name) mask ho kar
+# jaate hain — server par hamesha non-sensitive metadata hi pahunchta hai.
+#
+# Local results tree / exported Excel user ke apne PC par rehta hai (user ka
+# apna data, office report ke liye) — SERVER ko jaane wale data me masking
+# hamesha applied hoti hai.
+
+# NOTE: `[\s-]?` optional separators ki wajah se ye pattern plain 12-digit
+# numbers ko bhi match karta hai (alag `\d{12}` regex redundant hai — dono
+# client `src/utils.py` aur server `nrega-server/app/pii_mask.py` me identical
+# rehna chahiye, drift ho to dono ek saath update karo).
+_AADHAAR_SPACED_RE = re.compile(r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}\b")
+_MOBILE_RE = re.compile(r"(?<!\d)[6-9]\d{9}(?!\d)")
+_IFSC_RE = re.compile(r"\b[A-Z]{4}0[A-Z0-9]{6}\b")
+
+# Sensitive column-name keywords (word-boundary match — "panchayat" me "pan"
+# false-positive nahi hota, "filename" me "name" bhi nahi).
+_SENSITIVE_COL_KEYWORDS = (
+    "aadhaar", "aadhar", "uid", "account", "bank", "ifsc",
+    "mobile", "phone", "voter", "pan", "jobcard", "job card",
+    "job-card", "bankac", "ac no", "acno", "name",
+)
+
+
+def mask_aadhaar_text(text: str) -> str:
+    """12-digit Aadhaar (contiguous ya 4-4-4 spaced) ko XXXX-XXXX-XXXX banao."""
+    if not text:
+        return text or ""
+    return _AADHAAR_SPACED_RE.sub(lambda m: "XXXX-XXXX-XXXX", text)
+
+
+def mask_pii_text(text: Any) -> str:
+    """Kisi bhi string me PII patterns (Aadhaar, mobile, IFSC) mask karo.
+
+    - Aadhaar (12-digit / 4-4-4) → XXXX-XXXX-XXXX
+    - Mobile (10-digit, 6-9 se shuru) → 9X******X0
+    - IFSC → XXXX0XXXXXX
+
+    Kabhi raise nahi karta — logs/errors/tracebacks me bhi safe.
+    """
+    if text is None:
+        return ""
+    s = str(text)
+    s = mask_aadhaar_text(s)
+    s = _MOBILE_RE.sub(lambda m: m.group(0)[:2] + "******" + m.group(0)[-2:], s)
+    s = _IFSC_RE.sub("XXXX0XXXXXX", s)
+    return s
+
+
+class _PiiMaskingFormatter(logging.Formatter):
+    """DPDP: formatted output (message + exc_info traceback) me PII mask karo.
+
+    Plain logging.Filter sirf ``record.msg`` ko dekhta hai — exception
+    traceback (``exc_info``) Formatter me format hone par filter ke BAAD judta
+    hai, isliye Filter usse cover nahi karta. Isliye Formatter-level masking
+    FINAL formatted string par hoti hai — message + traceback dono safe
+    (``logger.error(msg, exc_info=True)`` bhi). Local nregabot.log + crash
+    reporter ke last-log-lines dono isi se safe rehte hain. Kabhi raise nahi
+    karta — logging path 100% safe.
+    """
+
+    def format(self, record):
+        out = super().format(record)
+        try:
+            return mask_pii_text(out)
+        except Exception:
+            return out
+
+
+def _is_sensitive_col(name: Any) -> bool:
+    """Column name sensitive hai? (aadhaar/uid/account/mobile/jobcard/name...)"""
+    try:
+        low = str(name or "").strip().lower()
+        if not low:
+            return False
+        return any(re.search(r"\b" + re.escape(kw) + r"\b", low)
+                   for kw in _SENSITIVE_COL_KEYWORDS)
+    except Exception:
+        return False
+
+
+def mask_sensitive_col_value(col_name: Any, value: Any) -> str:
+    """Sensitive column ka value mask karo.
+
+    - Aadhaar/UID column → XXXX-XXXX-XXXX (full mask)
+    - Baaki sensitive columns (account/jobcard/mobile/name...) → ****<last4>
+    """
+    low = str(col_name or "").lower()
+    s = "" if value is None else str(value)
+    if not s.strip():
+        return s
+    if any(k in low for k in ("aadhaar", "aadhar", "uid")):
+        return "XXXX-XXXX-XXXX"
+    digits = re.sub(r"\D", "", s)
+    if digits:
+        return "****" + digits[-4:]
+    return "****"
+
+
+def mask_columns_rows(columns: List[str], rows: List[List]) -> tuple:
+    """Cloud reports ke liye columns+rows me sensitive data mask karo.
+
+    - Sensitive columns (Aadhaar/UID/account/mobile/jobcard/name...) ke
+      values mask hote hain
+    - Har cell me accidental 12-digit Aadhaar/mobile pattern bhi mask hota
+      hai (column-agnostic leak guard)
+
+    Naya (columns, rows) return karta hai — original lists mutate nahi hoti.
+    """
+    try:
+        if not columns or not rows:
+            return columns, rows
+        sens_idx = [i for i, c in enumerate(columns) if _is_sensitive_col(c)]
+        new_rows = []
+        for r in rows:
+            nr = list(r)
+            for i in sens_idx:
+                if i < len(nr):
+                    nr[i] = mask_sensitive_col_value(columns[i], nr[i])
+            for i in range(len(nr)):
+                nr[i] = mask_pii_text(nr[i])
+            new_rows.append(nr)
+        return columns, new_rows
+    except Exception:
+        return columns, rows
+
+
 # ── Error translation (user-friendly Hinglish) ───────────────────
 # India-level UX: raw Selenium/exception messages ko aam users nahi
 # samajhte. translate_error() generic errors ka friendly Hinglish deta hai.
@@ -336,13 +466,15 @@ def install_crash_reporter() -> None:
             from src import config
 
             now = _dt.now()
+            # DPDP: crash file me bhi raw exception message/traceback PII leak
+            # nahi karta — Aadhaar/mobile/IFSC redact hoke likha jaata hai.
             lines = [
                 f"Time      : {now.strftime('%Y-%m-%d %H:%M:%S')}",
                 f"App       : {config.APP_NAME} v{config.APP_VERSION}",
                 f"OS        : {config.OS_SYSTEM}",
-                f"Exception : {exc_type.__name__}: {exc_value}",
+                f"Exception : {mask_pii_text(f'{exc_type.__name__}: {exc_value}')}",
                 "--- Traceback ---",
-                "".join(_tb.format_exception(exc_type, exc_value, exc_tb)),
+                mask_pii_text("".join(_tb.format_exception(exc_type, exc_value, exc_tb))),
             ]
 
             # App log ke last ~30 lines — crash se pehle kya ho raha tha
@@ -352,7 +484,7 @@ def install_crash_reporter() -> None:
                     with open(log_path, "r", encoding="utf-8", errors="replace") as f:
                         tail = f.readlines()[-30:]
                     lines.append("--- Last log lines ---")
-                    lines.extend(line.rstrip("\n") for line in tail)
+                    lines.extend(mask_pii_text(line.rstrip("\n")) for line in tail)
             except Exception:
                 pass
 

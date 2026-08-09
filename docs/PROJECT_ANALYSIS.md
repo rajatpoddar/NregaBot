@@ -113,7 +113,7 @@ NREGA Bot is a Python-based desktop application for automating tasks on the VB-G
 │   ├── 📄 PROJECT_ANALYSIS.md       ← ★ THIS FILE
 │   ├── 📄 changelog.json            ← Historical changelog (deprecated — now in version.json)
 │   ├── 📄 license.txt               ← EULA / License terms
-│   ├── 📄 disclaimer.txt            ← Software disclaimer
+│   ├── 📄 license.txt               ← EULA / License terms (also shown in About tab)
 │   ├── 📄 infobefore.txt            ← Pre-install info for Inno Setup
 │   ├── 📄 Guide.txt                 ← Deployment guide
 │   ├── 📄 last_conversatation.txt   ← Previous Freebuff conversation log

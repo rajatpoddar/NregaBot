@@ -20,8 +20,113 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
-# --- REMOVED ---
-# DEVICE_NAMES_FILE = 'device_names.json'
+# ── License & Terms content ──────────────────────────────────────────────
+# Full EULA docs/license.txt se load hota hai (ab build me bundled). Agar
+# packaged app me file na mile (purana build), to ye condensed fallback
+# dikhta hai — License & Terms tab kabhi khali nahi rahta.
+_LICENSE_FALLBACK = """\
+NREGA BOT — END USER LICENSE AGREEMENT (SUMMARY)
+Copyright (c) 2025-2026 Rajat Poddar (PoddarSolutions). All rights reserved.
+
+The complete End User License Agreement is available at
+https://nregabot.com/terms.html and in docs/license.txt.
+
+1. LICENSE GRANT
+   You are granted a personal, non-exclusive, non-transferable,
+   revocable license to use NREGA Bot on your own device(s), per
+   the plan you purchased (Trial / Monthly / Quarterly / Yearly).
+   License keys are device-bound and may not be shared or resold.
+
+2. RESTRICTIONS
+   You may not sell, rent, redistribute or sublicense the Software
+   or its license keys; reverse engineer, decompile or modify it;
+   share license keys; or use tools that bypass activation or
+   trial restrictions.
+
+3. GOVERNMENT PORTAL USE
+   The Software automates data entry on government portals using
+   credentials you provide. It does not bypass login or security
+   controls. You are solely responsible for the credentials you
+   enter, your authority to use the portal, compliance with
+   applicable rules, and the accuracy of all data submitted.
+   Always verify automated output against official records.
+
+4. USER DATA & PRIVACY (DPDP Act 2023)
+   Aadhaar numbers and other sensitive identifiers are NEVER
+   stored or transmitted in readable form — they are masked at
+   every storage boundary. Portal credentials are never stored.
+   Only non-sensitive activity metadata and data you explicitly
+   sync (cloud backup, WhatsApp reports) leave your device.
+
+5. DISCLAIMER OF WARRANTIES
+   The Software is provided "AS IS" without warranty of any kind.
+   The author is not affiliated with any government body and is
+   not responsible for portal changes, data entry errors, or any
+   consequences of use.
+
+6. LIMITATION OF LIABILITY
+   To the maximum extent permitted by law, the author shall not
+   be liable for indirect or consequential damages. Total
+   aggregate liability is limited to the amount paid in the
+   12 months preceding the claim.
+
+7. TERMINATION / REFUNDS
+   Violation of these terms revokes your license. Payments are
+   generally non-refundable; see https://nregabot.com/refund.html
+   for exceptions.
+
+8. GOVERNING LAW
+   This agreement is governed by the laws of the Republic of India.
+
+Full terms: https://nregabot.com/terms.html
+Contact    : nregabot@gmail.com
+"""
+
+_DISCLAIMER_TEXT = """\
+DISCLAIMER — NREGA Bot
+
+1. NO GOVERNMENT AFFILIATION
+   NREGA Bot is an independent software product. We are not
+   affiliated with, endorsed by, or connected to any government
+   body, department, or the MGNREGA / VB-G-RAM-G scheme.
+
+2. AUTOMATION OF LIVE GOVERNMENT WEBSITES
+   The Software automates data entry on live government portals
+   using credentials that YOU provide. It does not bypass login,
+   authentication, or security controls — it performs the same
+   actions a human operator would perform.
+   • You are responsible for the credentials you enter.
+   • You must have the authority to access the portal and
+     perform the automated operations.
+   • You are responsible for compliance with your organization's
+     policies and applicable government rules.
+   • You are responsible for the accuracy of all data submitted.
+
+3. PORTAL CHANGES
+   Government portals may change their structure or policies at
+   any time. If the portal changes, some features may break until
+   the Software is updated.
+
+4. DATA PRIVACY & AADHAAR (DPDP Act 2023)
+   • Portal credentials are never stored.
+   • Aadhaar numbers and sensitive identifiers are never stored
+     or transmitted in readable form — always masked.
+   • Beneficiary data stays on your computer unless you opt into
+     cloud features (masked before sync).
+
+5. NO WARRANTY
+   The Software is provided "AS IS". Automated output should
+   always be verified against official records. The developer is
+   not liable for data entry errors, missed entries, portal
+   downtime, or any consequences of use.
+
+6. NOT GOVERNMENT ADVICE
+   Nothing in the Software or its documentation constitutes
+   government advice or endorsement.
+
+Full terms: https://nregabot.com/disclaimer.html
+Contact    : nregabot@gmail.com
+"""
 
 class AboutTab(ctk.CTkFrame):
     def __init__(self, parent: Any, app_instance: Any) -> None:
@@ -295,6 +400,53 @@ class AboutTab(ctk.CTkFrame):
         versions_link = ctk.CTkLabel(update_tab, text="View Full Version History Online ↗", text_color=(config.COLORS["blue"], config.COLORS["blue_light"]), cursor="hand2")
         versions_link.grid(row=6, column=0, sticky='s', pady=(10, 5))
         versions_link.bind("<Button-1>", lambda e: webbrowser.open(versions_url))
+
+        # --- License & Terms Tab (EULA + Disclaimer) ---
+        lt_tab = self.tab_view.add("License & Terms")
+        lt_tab.grid_rowconfigure(0, weight=1)
+        lt_tab.grid_columnconfigure(0, weight=1)
+
+        self.lt_tabview = ctk.CTkTabview(lt_tab, fg_color="transparent")
+        self.lt_tabview.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.lt_tabview.add("End User License Agreement")
+        self.lt_tabview.add("Disclaimer")
+
+        # EULA sub-tab
+        eula_sub = self.lt_tabview.tab("End User License Agreement")
+        eula_sub.grid_rowconfigure(0, weight=1)
+        eula_sub.grid_columnconfigure(0, weight=1)
+        self.eula_text = ctk.CTkTextbox(eula_sub, wrap=tkinter.WORD, state="disabled",
+                                        font=ctk.CTkFont(size=12))
+        self.eula_text.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+        self.eula_text.configure(state="normal")
+        self.eula_text.delete("1.0", tkinter.END)
+        self.eula_text.insert(tkinter.END, self._load_license_text())
+        self.eula_text.configure(state="disabled")
+
+        # Disclaimer sub-tab
+        disc_sub = self.lt_tabview.tab("Disclaimer")
+        disc_sub.grid_rowconfigure(0, weight=1)
+        disc_sub.grid_columnconfigure(0, weight=1)
+        self.disclaimer_text = ctk.CTkTextbox(disc_sub, wrap=tkinter.WORD, state="disabled",
+                                              font=ctk.CTkFont(size=12))
+        self.disclaimer_text.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+        self.disclaimer_text.configure(state="normal")
+        self.disclaimer_text.delete("1.0", tkinter.END)
+        self.disclaimer_text.insert(tkinter.END, self._load_disclaimer_text())
+        self.disclaimer_text.configure(state="disabled")
+
+    # --- License & Terms content loaders ---
+    def _load_license_text(self) -> str:
+        """Full EULA docs/license.txt se load karo; na mile to summary fallback."""
+        try:
+            path = resource_path(os.path.join("docs", "license.txt"))
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                return f.read()
+        except Exception:
+            return _LICENSE_FALLBACK
+
+    def _load_disclaimer_text(self) -> str:
+        return _DISCLAIMER_TEXT
 
     def update_subscription_details(self, license_info):
         self.license_info = license_info

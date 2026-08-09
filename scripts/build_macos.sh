@@ -87,6 +87,7 @@ $PYINSTALLER_CMD --noconfirm --clean --windowed --name "${APP_NAME}" \
 --add-data="assets:assets" \
 --add-data="config:config" \
 --add-data="docs/changelog.json:docs/" \
+--add-data="docs/license.txt:docs/" \
 --add-data="src:src" \
 --add-data=".env:." \
 --collect-all customtkinter \
@@ -115,6 +116,7 @@ $PYINSTALLER_CMD --noconfirm --clean --windowed --name "${LITE_APP_NAME}" \
 --icon="$ICON_FILE" \
 --add-data="assets:assets" \
 --add-data="config:config" \
+--add-data="docs/license.txt:docs/" \
 --add-data="src:src" \
 --add-data=".env:." \
 --collect-all customtkinter \

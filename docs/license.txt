@@ -1,21 +1,496 @@
-MIT License
+=============================================================
+           NREGA BOT — END USER LICENSE AGREEMENT (EULA)
+=============================================================
 
-Copyright (c) 2025 Rajat Poddar
+Software          : NREGA Bot (including NREGA Bot Lite)
+Version           : 3.x (and all subsequent versions/updates)
+Owner / Licensor  : Rajat Poddar (PoddarSolutions)
+Contact           : nregabot@gmail.com
+Website           : https://nregabot.com
+Last updated      : August 2026
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+IMPORTANT — PLEASE READ THIS AGREEMENT CAREFULLY BEFORE
+INSTALLING OR USING THE SOFTWARE.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+By installing, copying, downloading, activating or otherwise using
+NREGA Bot ("the Software"), you ("Licensee" / "you") agree to be
+bound by the terms and conditions of this End User License
+Agreement. If you do not agree to these terms, do not install or
+use the Software, and delete any copies already downloaded.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+This is a legal agreement between you and the Licensor. This
+Agreement applies to the full version, the trial version, and the
+Lite version of the Software, and to all updates, upgrades,
+patches and modifications provided to you by the Licensor.
+
+
+-------------------------------------------------------------
+1. DEFINITIONS
+-------------------------------------------------------------
+
+"Software"         : The NREGA Bot desktop application, its
+                     components, updates, documentation,
+                     configuration files, icons and related
+                     assets, in any form (executable, source,
+                     archive or otherwise).
+"License Key"      : A unique activation key issued by the
+                     Licensor which permits the Software to run
+                     on your device.
+"Trial"            : A time-limited, feature-restricted evaluation
+                     license issued by the Licensor.
+"Subscription"     : A renewable, time-limited paid license
+                     (for example monthly, quarterly or yearly)
+                     purchased by you.
+"Device"           : A single computer (desktop/laptop) on which
+                     the Software is activated.
+"Licensor"         : Rajat Poddar (PoddarSolutions) and any
+                     person or entity acting with his authority.
+"You / Licensee"   : The individual or entity that installs and
+                     uses the Software under a valid license.
+
+
+-------------------------------------------------------------
+2. LICENSE GRANT
+-------------------------------------------------------------
+
+2.1  The Licensor grants you a personal, non-exclusive,
+     non-transferable, revocable, limited license to install and
+     use the Software on your own Device(s), strictly in
+     accordance with this Agreement and with the license plan you
+     have purchased (or the Trial granted to you).
+
+2.2  This license is granted to YOU only. It may not be shared,
+     rented, leased, sold, sub-licensed, distributed, or
+     otherwise transferred to any other person or organization,
+     except as expressly permitted in writing by the Licensor.
+
+2.3  Device binding: Each License Key is bound to a limited
+     number of Devices (the number depends on your plan). To move
+     the Software to a new Device, you must first deactivate an
+     existing Device through the Software or the account website.
+     Attempting to activate more Devices than your plan allows
+     may require additional purchase or approval.
+
+2.4  You may make one (1) backup copy of the Software installer
+     for archival purposes only. Such copy may not be
+     distributed to third parties.
+
+2.5  All rights not expressly granted to you under this Agreement
+     are reserved by the Licensor.
+
+
+-------------------------------------------------------------
+3. LICENSE TYPES
+-------------------------------------------------------------
+
+3.1  TRIAL LICENSE
+     - Issued free of charge for evaluation.
+     - Valid only for the duration stated at the time of
+       registration (typically a limited number of days).
+     - Grants access to a restricted set of features; some
+       automation features are disabled during the Trial.
+     - One Trial may be issued per person/entity; obtaining
+       multiple Trials to circumvent payment is a breach of this
+       Agreement.
+     - On expiry, the Trial cannot be renewed; you must purchase
+       a paid license to continue using the Software.
+
+3.2  SUBSCRIPTION LICENSE (Monthly / Quarterly / Yearly)
+     - Grants use of the Software for the purchased duration.
+     - Renewal: If you enable auto-renewal, your subscription
+       will renew automatically for the same plan until
+       cancelled, and the applicable renewal fee will be charged
+       through the payment method you provided.
+     - You may disable auto-renewal at any time from your account
+       page before the next renewal date.
+     - The Software stops functioning on expiry if the license is
+       not renewed. Your data remains intact and will be
+       accessible again after renewal.
+
+3.3  LIFETIME / OTHER PLANS
+     - If the Licensor offers a lifetime or other one-time
+       plan, the terms of that specific plan (as described on the
+       purchase page) apply in addition to this Agreement.
+
+
+-------------------------------------------------------------
+4. LICENSE ACTIVATION
+-------------------------------------------------------------
+
+4.1  The Software must be activated with a valid License Key
+     issued by the Licensor. Activation is performed online
+     against the Licensor's license server and binds the key to
+     your Device (via a machine identifier).
+
+4.2  An internet connection is normally required for initial
+     activation and periodic license validation. The Software
+     includes an offline-first mechanism so that a valid,
+     previously activated license continues to work briefly
+     without internet; however, the Licensor reserves the right
+     to require periodic online validation.
+
+4.3  You must not:
+     - use a License Key without authorization;
+     - share your License Key with others;
+     - publish, sell or distribute License Keys;
+     - use tools, patches or modifications that bypass,
+       disable or circumvent license activation, validation,
+       trial restrictions or expiry checks.
+
+
+-------------------------------------------------------------
+5. RESTRICTIONS ON USE
+-------------------------------------------------------------
+
+You may NOT (and may not permit others to):
+
+5.1  Copy, reproduce, duplicate or publish the Software (or any
+     part of it) except as expressly allowed in Section 2.4.
+
+5.2  Sell, rent, lease, lend, sublicense or redistribute the
+     Software or its License Keys.
+
+5.3  Reverse engineer, decompile, disassemble, or otherwise
+     attempt to derive the source code of the Software, except
+     and only to the extent that such activity is expressly
+     permitted by applicable law.
+
+5.4  Modify, adapt, translate or create derivative works of the
+     Software.
+
+5.5  Remove, alter or obscure any copyright, trademark or other
+     proprietary notices from the Software.
+
+5.6  Use the Software in any manner that violates applicable
+     laws, regulations, government directives, or the terms of
+     use of any website or portal with which the Software
+     interacts.
+
+5.7  Use the Software to perform any unlawful, fraudulent or
+     harmful activity, or to gain unauthorized access to any
+     system or account.
+
+5.8  Use one paid license across multiple offices, branches or
+     organizations unless your plan expressly allows it. Each
+     license is intended for a single organization/office.
+
+
+-------------------------------------------------------------
+6. GOVERNMENT PORTAL USE — IMPORTANT NOTICE
+-------------------------------------------------------------
+
+6.1  The Software automates data entry and processing on official
+     government portals (including NREGA/MGNREGA related portals).
+     The Software does NOT bypass login, authentication, or
+     security controls. It performs, on your behalf, the same
+     actions a human operator would perform, using credentials
+     that you yourself provide.
+
+6.2  YOU are solely responsible for:
+     - the credentials you enter and the sessions you create;
+     - ensuring that you have the legal and administrative
+       authority to access the portal and to perform the
+       automated operations;
+     - compliance with your organization's policies and with the
+       rules, circulars and instructions issued by the
+       government department concerned; and
+     - the accuracy and correctness of all data processed,
+       submitted or reported using the Software.
+
+6.3  The Software is a tool of convenience. It does not alter,
+     fabricate or validate the underlying official records. All
+     entries made through the Software are subject to the same
+     verification and audit processes as manual entries.
+
+6.4  You should review the output of every automation run and
+     confirm it against official records. Do not assume
+     automated output is error-free.
+
+
+-------------------------------------------------------------
+7. USER DATA & PRIVACY (DPDP ACT 2023)
+-------------------------------------------------------------
+
+7.1  DATA THE SOFTWARE COLLECTS FROM YOU
+     To provide and secure the license and cloud services, the
+     Licensor's servers may receive and store limited personal
+     data, including:
+     - your name, email address and mobile number (provided by
+       you at registration/purchase);
+     - your License Key and machine identifier;
+     - your district/block/state settings (if you choose to
+       provide them);
+     - non-sensitive activity metadata (automation type,
+       timestamps, duration, success/failure status,
+       panchayat/village names);
+     - error diagnostics (error type, app version, OS, and
+       masked error details) to improve the Software.
+
+7.2  AADHAAR AND OTHER SENSITIVE NUMBERS
+     - The Licensor's cloud services do NOT collect, store or
+       transmit Aadhaar numbers or other sensitive identifier
+       numbers in readable form.
+     - The Software masks Aadhaar-like, bank-account-like, mobile
+       and IFSC patterns before any data is synchronized to the
+       Licensor's servers, and at every storage boundary.
+     - Any Aadhaar-related data you view or process remains on
+       your own Device and is never uploaded in unmasked form.
+
+7.3  CLOUD BACKUP (OPT-IN)
+     - The cloud backup feature is optional and is performed only
+       when you explicitly trigger it.
+     - The backup stores your app settings, saved inputs and
+       staff/mate mappings under your own account. Aadhaar
+       patterns in backup data are masked before upload.
+     - You may delete your stored backup at any time from the
+       account website.
+
+7.4  DATA RETENTION & DELETION
+     - You may request deletion of your personal data and license
+       records at any time by contacting nregabot@gmail.com.
+     - Activity logs are retained only as long as needed for
+       support and diagnostics (automation results are
+       automatically removed after a limited retention period).
+     - When you delete your account, the Licensor will delete or
+       anonymize your personal data, except where retention is
+       required by law.
+
+7.5  THIRD-PARTY PROCESSING
+     The Licensor may use third-party services (for example
+     payment gateways, WhatsApp messaging, email delivery,
+     hosting) to operate the Software. Those services process
+     data under their own policies and only for the purposes
+     stated in this Agreement.
+
+7.6  For full details, refer to the Privacy Policy available on
+     https://nregabot.com.
+
+
+-------------------------------------------------------------
+8. UPDATES
+-------------------------------------------------------------
+
+8.1  The Licensor may, from time to time, provide updates,
+     upgrades, patches and bug fixes for the Software. Updates
+     may be delivered automatically through the Software's
+     update mechanism and are verified by cryptographic checksums
+     (SHA-256).
+
+8.2  Updates are provided free of charge to users holding a valid
+     license for the plan that covers those updates, unless
+     stated otherwise at the time of release.
+
+8.3  The Licensor is not obligated to provide updates for any
+     particular duration, and may discontinue support for older
+     versions. Some features depend on third-party websites whose
+     structure may change; the Licensor will make reasonable
+     efforts to keep the Software working but does not guarantee
+     uninterrupted compatibility.
+
+
+-------------------------------------------------------------
+9. THIRD-PARTY COMPONENTS
+-------------------------------------------------------------
+
+9.1  The Software uses open-source libraries and components
+     (including but not limited to Python, Selenium,
+     CustomTkinter, Flask, psycopg2, Pillow and others). These
+     components are the property of their respective owners and
+     are licensed under their own open-source licenses (MIT,
+     BSD, Apache, etc.), which are complied with.
+
+9.2  Nothing in this Agreement restricts or modifies the rights
+     granted to you by the licenses of those open-source
+     components. Those components may be used, copied and
+     distributed in accordance with their own license terms,
+     independent of this Agreement.
+
+9.3  This Agreement applies only to the NREGA Bot application
+     itself, and not to the open-source components embedded
+     within it.
+
+
+-------------------------------------------------------------
+10. DISCLAIMER OF WARRANTIES
+-------------------------------------------------------------
+
+10.1 THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE",
+     WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+     INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF
+     MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+     ACCURACY, RELIABILITY AND NON-INFRINGEMENT.
+
+10.2 THE LICENSOR DOES NOT WARRANT THAT:
+     - the Software will meet your requirements or produce
+       error-free results;
+     - the Software will be uninterrupted, timely, secure or
+       free from defects;
+     - results obtained from the Software will be accurate or
+       reliable; or
+     - any errors in the Software will be corrected.
+
+10.3 The Licensor is not responsible for changes made to third-
+     party websites (including government portals) which may
+     temporarily or permanently affect the functioning of the
+     Software.
+
+
+-------------------------------------------------------------
+11. LIMITATION OF LIABILITY
+-------------------------------------------------------------
+
+11.1 TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO
+     EVENT SHALL THE LICENSOR BE LIABLE FOR ANY INDIRECT,
+     INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, OR
+     FOR ANY LOSS OF PROFITS, REVENUE, DATA, GOODWILL OR
+     BUSINESS OPPORTUNITIES, ARISING OUT OF OR IN CONNECTION
+     WITH THE USE OF, OR INABILITY TO USE, THE SOFTWARE — EVEN
+     IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+11.2 THE LICENSOR'S TOTAL AGGREGATE LIABILITY ARISING OUT OF OR
+     IN CONNECTION WITH THIS AGREEMENT SHALL NOT EXCEED THE
+     TOTAL AMOUNT ACTUALLY PAID BY YOU FOR THE SOFTWARE DURING
+     THE TWELVE (12) MONTHS IMMEDIATELY PRECEDING THE EVENT
+     GIVING RISE TO THE CLAIM.
+
+11.3 The Software automates actions on live websites using data
+     supplied by you. You are solely responsible for all data
+     entered, all actions performed, and all consequences of
+     those actions. The Licensor accepts no liability for any
+     loss, penalty, fine or action taken by any authority
+     arising from the use, misuse or malfunction of the
+     Software.
+
+11.4 Some jurisdictions do not allow the exclusion or limitation
+     of certain warranties or liability, so some of the above
+     limitations may not apply to you.
+
+
+-------------------------------------------------------------
+12. INDEMNIFICATION
+-------------------------------------------------------------
+
+You agree to indemnify, defend and hold harmless the Licensor,
+his affiliates, employees and agents from and against any and all
+claims, damages, losses, liabilities, costs and expenses
+(including reasonable legal fees) arising out of or related to:
+(a) your use or misuse of the Software; (b) your violation of
+this Agreement; (c) your violation of any law or regulation; or
+(d) any data, entries or actions you perform through the
+Software.
+
+
+-------------------------------------------------------------
+13. TERMINATION
+-------------------------------------------------------------
+
+13.1 This Agreement is effective until terminated.
+
+13.2 The Licensor may terminate this Agreement and revoke your
+     license immediately, without notice, if you breach any
+     term of this Agreement (including unauthorized use,
+     sharing of License Keys, or circumvention of activation).
+
+13.3 Upon termination you must:
+     - cease all use of the Software;
+     - uninstall the Software from all Devices; and
+     - destroy all copies of the Software in your possession.
+
+13.4 Sections 5, 6, 7, 10, 11, 12, 14 and 16 of this Agreement
+     shall survive termination.
+
+
+-------------------------------------------------------------
+14. REFUND POLICY
+-------------------------------------------------------------
+
+14.1 Refund eligibility is governed by the policy stated on the
+     purchase page (https://nregabot.com/buy) at the time of
+     purchase, and by applicable consumer protection law.
+
+14.2 As a general rule, requests made within a short period
+     after purchase (as stated on the purchase page) for a
+     product that has not been substantially used may be
+     eligible for a refund. Renewal charges may be refunded if
+     auto-renewal was cancelled before the renewal date and the
+     renewal was charged in error.
+
+14.3 To request a refund, contact nregabot@gmail.com with your
+     order details. The Licensor will process eligible refunds
+     within a reasonable time.
+
+
+-------------------------------------------------------------
+15. INTELLECTUAL PROPERTY
+-------------------------------------------------------------
+
+15.1 The Software, including all code, structure, design, user
+     interface, icons, sounds, documentation and all related
+     intellectual property rights, is owned by the Licensor and
+     is protected by copyright and other applicable laws.
+
+15.2 You acknowledge that no title or ownership in the Software
+     is transferred to you by this Agreement. You obtain only a
+     limited right of use as described in Section 2.
+
+15.3 Unauthorized copying, distribution or use of the Software
+     constitutes copyright infringement and may subject you to
+     civil and criminal penalties.
+
+
+-------------------------------------------------------------
+16. GENERAL PROVISIONS
+-------------------------------------------------------------
+
+16.1 GOVERNING LAW: This Agreement shall be governed by and
+     construed in accordance with the laws of the Republic of
+     India, without regard to conflict-of-law principles. Any
+     dispute arising out of this Agreement shall be subject to
+     the exclusive jurisdiction of the courts of India.
+
+16.2 ENTIRE AGREEMENT: This Agreement constitutes the entire
+     agreement between you and the Licensor regarding the
+     Software and supersedes all prior agreements, discussions
+     and representations.
+
+16.3 AMENDMENTS: The Licensor may update this Agreement from
+     time to time. Continued use of the Software after changes
+     are posted constitutes acceptance of the updated terms.
+     The current version is always available with the Software
+     and on the Licensor's website.
+
+16.4 SEVERABILITY: If any provision of this Agreement is held to
+     be invalid or unenforceable, the remaining provisions shall
+     continue in full force and effect.
+
+16.5 WAIVER: The failure of the Licensor to enforce any right or
+     provision of this Agreement shall not constitute a waiver
+     of such right or provision.
+
+16.6 ASSIGNMENT: You may not assign or transfer this Agreement,
+     or any rights or obligations under it, without the prior
+     written consent of the Licensor.
+
+16.7 SUPPORT: Support is provided through the channels listed on
+     https://nregabot.com (including WhatsApp and email). The
+     Licensor will make reasonable efforts to respond, but does
+     not guarantee response times.
+
+
+-------------------------------------------------------------
+17. CONTACT
+-------------------------------------------------------------
+
+For questions about this Agreement, license purchases,
+renewals, refunds, data deletion requests, or any other matter:
+
+    Email : nregabot@gmail.com
+    Web   : https://nregabot.com
+
+-------------------------------------------------------------
+
+BY INSTALLING, ACTIVATING OR USING THE SOFTWARE, YOU ACKNOWLEDGE
+THAT YOU HAVE READ THIS AGREEMENT, UNDERSTAND IT, AND AGREE TO
+BE BOUND BY ITS TERMS AND CONDITIONS.
+
+--- End of Agreement ---

@@ -96,7 +96,14 @@ def _extract_error_context(e: Exception) -> Tuple[str, str, str, str]:
                          call hua), sirf summary chain nahi.
     """
     error_type = type(e).__name__
-    error_msg = f"{error_type}: {str(e)}"[:600]
+    # ── DPDP: exception message me Aadhaar/account/mobile numbers leak ho
+    #    sakte hain (e.g. "element with value 123412341234 not found") —
+    #    log/store hone se pehle PII mask karo.
+    try:
+        from src.utils import mask_pii_text
+        error_msg = mask_pii_text(f"{error_type}: {str(e)}")[:600]
+    except Exception:
+        error_msg = f"{error_type}: {str(e)}"[:600]
     error_source = ""
     error_traceback = ""
     try:
@@ -113,9 +120,16 @@ def _extract_error_context(e: Exception) -> Tuple[str, str, str, str]:
                  for f in user_frames[-2:]]
         error_source = " -> ".join(parts)
         # Full stack — formatting karte time exception bhi append hota hai.
-        error_traceback = ''.join(
-            traceback.format_exception(type(e), e, e.__traceback__)
-        )[:4000]
+        # Traceback me bhi PII values ho sakti hain (locals/args) — mask karo.
+        try:
+            from src.utils import mask_pii_text as _m
+            error_traceback = _m(''.join(
+                traceback.format_exception(type(e), e, e.__traceback__)
+            ))[:4000]
+        except Exception:
+            error_traceback = ''.join(
+                traceback.format_exception(type(e), e, e.__traceback__)
+            )[:4000]
     except Exception:
         pass
     return error_type, error_msg, error_source, error_traceback
@@ -214,20 +228,24 @@ class AutomationMixin:
                 # ki kis tab/function se error aaya (debugging ke liye critical).
                 error_type, error_msg, error_source, error_traceback = _extract_error_context(e)
 
-                # ── Failure screenshot (admin debugging ke liye) ──
-                # Fully guarded — koi bhi failure yahan crash nahi karega.
-                # Screenshot Temp/error_screenshots/ me save hota hai.
+                # ── Failure screenshot (OPT-IN — DPDP-safe) ──
+                # Browser screenshot me Aadhaar/worker data dikh sakta hai —
+                # isliye DEFAULT OFF (settings me 'save_error_screenshots'
+                # ON karne par hi save hota hai, aur wo sirf LOCAL Temp me).
+                # Kabhi server par upload nahi hota.
                 try:
-                    _inst = getattr(target, '__self__', None)
-                    if _inst is not None and getattr(_inst, 'driver', None) is not None:
-                        _shot_dir = os.path.join(self.get_nregabot_path("Temp"), "error_screenshots")
-                        os.makedirs(_shot_dir, exist_ok=True)
-                        _shot_path = os.path.join(
-                            _shot_dir,
-                            f"{key}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                        )
-                        _inst.driver.save_screenshot(_shot_path)
-                        logger.info("Error screenshot saved: %s", _shot_path)
+                    from src.utils import get_config
+                    if get_config("save_error_screenshots", False):
+                        _inst = getattr(target, '__self__', None)
+                        if _inst is not None and getattr(_inst, 'driver', None) is not None:
+                            _shot_dir = os.path.join(self.get_nregabot_path("Temp"), "error_screenshots")
+                            os.makedirs(_shot_dir, exist_ok=True)
+                            _shot_path = os.path.join(
+                                _shot_dir,
+                                f"{key}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                            )
+                            _inst.driver.save_screenshot(_shot_path)
+                            logger.info("Error screenshot saved (local only): %s", _shot_path)
                 except Exception:
                     pass
                 # Safety net: never let an uncaught automation exception crash

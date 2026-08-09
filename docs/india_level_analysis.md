@@ -182,7 +182,7 @@ PostgreSQL + Redis cache + Celery tasks + Evolution API (WhatsApp) + Docker
 | 7 | **Error auto-clustering (GROUP BY)** | Admin ko aggregate chahiye, 300 rows nahi | `/admin/api/activity-errors/summary` — top error patterns with counts, users, times | 🟢 Done (90-day bounded) |
 | 8 | **AI error triage** | AI infra already hai — use karo | Server cron: naye error patterns → AI summary + suggested fix → admin panel | ⬜ Baki |
 | 9 | **Multi-state portal config** | Sirf 3 states configured | `STATE_DEMAND_CONFIG` pattern ko generalize karo — DB-driven per-state portal configs | ⬜ Baki |
-| 10 | **DPDP Act 2023 compliance** | Worker/PII data India law ke under hai | Privacy policy, consent flow, data minimization, breach notification plan | ⬜ Baki |
+| 10 | **DPDP Act 2023 compliance** | Worker/PII data India law ke under hai | Privacy policy, consent flow, data minimization, breach notification plan | 🟢 PII minimization done (see §4.1); consent/breach-plan docs baki |
 | 11 | **User-facing error messages (Hinglish)** | Users ko raw Selenium errors dikhte hain | Error translation layer — `utils` me map | 🟢 Done (dialog me translation; log me original) |
 | 12 | **App telemetry opt-in** | "Yeh feature kaun use karta hai" ka data | Anonymized feature-usage stats (aggregate + daily digest) | ⬜ Baki |
 
@@ -234,7 +234,28 @@ EVO_API_KEY  = os.environ.get("EVO_API_KEY", "NregaBotSecretKey123")
 - [x] Rate limiting + validation on sync endpoints — **done** (activity-log + automation-results: per-key + per-IP limits, license check, entry validation)
 - [x] Rate Limits admin visibility — **done** (`/admin/rate-limits`: configured limits, current-hour per-key usage, 24h volume chart, env-var override docs)
 - [x] Uptime monitoring: `/healthz` endpoint — **done** (uptime robot baki)
-- [ ] DPDP compliance (privacy, consent, PII minimization)
+- [x] DPDP compliance — PII minimization done (**see §4.1**); consent/breach-notification docs baki
+
+### 4.1 DPDP Act 2023 — PII Minimization (implemented)
+
+> **Rule:** Aadhaar number kabhi bhi store/transfer NAHI hota — na local DB, na server, na logs, na reports. Server ko sirf non-sensitive metadata jaata hai.
+
+**Client (v3.2.1+, `src/utils.py` — central chokepoint):**
+- `mask_pii_text()` / `mask_aadhaar_text()` — 12-digit Aadhaar (contiguous + 4-4-4) → `XXXX-XXXX-XXXX`, mobile → `9X******X0`, IFSC → `XXXX0XXXXXX`. Kabhi raise nahi karta.
+- `mask_columns_rows()` — cloud reports ke liye: sensitive columns (aadhaar/uid/account/bank/ifsc/mobile/phone/voter/pan/jobcard/name — word-boundary match) full-mask/`****last4`, har cell me accidental pattern bhi masked.
+- Wired in: `base_tab._extract_tree_columns_rows` (results-tree → cloud), `app_automation` (error context/traceback), `history_manager.log_activity_structured` (local SQLite bhi safe).
+- **Failure screenshots default OFF** (opt-in `SAVE_FAILURE_SCREENSHOTS`) — screenshot me Aadhaar number dikh sakta tha.
+- **Cloud backup payload me Aadhaar masking** — `_collect_user_data` (suggestions/inputs me user Aadhaar type kar sakta hai) → upload se pehle exact Aadhaar patterns mask; baaki data (mobile/name/staff maps) user ka consented restore data intact.
+- **Local `nregabot.log` + crash files bhi masked** — `setup_logging()` me `_PiiMaskingFormatter` (Formatter-level chokepoint): FINAL formatted output par mask — message + `exc_info` traceback dono safe, chahe koi call-site ho. `install_crash_reporter` bhi exception/traceback + last-log-lines mask karta hai. Aadhaar "kahi bhi" store nahi — local log bhi nahi.
+
+**Server (defense-in-depth — purane clients bhi covered):**
+- `app/pii_mask.py` — same helpers server-side (client `utils.py` ke saath identical — drift ho to dono ek saath update karo).
+- `automation_results_repo.sync_run` + `activity_log_repo.sync_batch` — store hone se pehle columns/rows + details/traceback masked.
+- `user_data_backup_upload` — backup JSON me recursive Aadhaar masking.
+- `broadcast_logs` — daily-report log me mobile ab `mask_pii_text` se jata hai (full number kabhi store nahi).
+- **Migration 019 — historical backfill**: deploy par existing `activity_logs`/`activity_logs_archive` rows me bhi Aadhaar/mobile/IFSC patterns mask hote hain (idempotent, text columns only). `automation_results` (30-day retention) aur `user_data_backups` (UPSERT replace) self-heal — purani rows expire/overwrite.
+
+**Design note:** Local results tree / exported Excel user ke apne PC par rehta hai (user ka apna data, office report) — masking sirf server-boundary + logs par hoti hai. ABPS tab UID value kabhi extract/store nahi karta (sirf verify click). **Restore trade-off:** backup pull karne par Aadhaar-shaped suggestions `XXXX-XXXX-XXXX` ke roop me wapas aati hain (intentional — Aadhaar server se recoverable nahi hota).
 - [x] Secret rotation: EVO secrets ab env-var based (fallback same) — **done** (rotate values + remove fallback defaults)
 - [ ] Multi-state DB-driven portal configs
 

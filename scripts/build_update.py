@@ -39,14 +39,14 @@ OUTPUT_PATH = os.path.join(PROJECT_ROOT, DIST_DIR, OUTPUT_FILENAME)
 # ---------------------------------------------------------------------------
 # WHITELIST — only these top-level entries are packaged.
 # Anything not listed here (nrega-server/, web/, scripts/, .github/, docs/
-# beyond the changelog, .env, hooks.json, firebase-service-account.json, ...)
-# is EXCLUDED.
+# beyond changelog.json + license.txt, .env, hooks.json,
+# firebase-service-account.json, ...) is EXCLUDED.
 # ---------------------------------------------------------------------------
 ALLOWED_TOP_LEVEL = {
     "main_app.py", "lite_app.py", "lite_loader.py", "requirements.txt",
     "src", "config", "assets", "docs",
 }
-ALLOWED_DOCS = {"changelog.json"}   # only this file from docs/
+ALLOWED_DOCS = {"changelog.json", "license.txt"}   # changelog + EULA (shown in About tab)
 ALLOWED_EXT = (".py", ".json", ".txt", ".html", ".css", ".js", ".bat", ".sh",
                ".md", ".png", ".ico", ".icns", ".wav", ".ttf", ".bmp",
                ".jpeg", ".jpg", ".csv")
@@ -68,9 +68,9 @@ def _is_allowed(rel_path: str) -> bool:
     first = norm.split("/")[0]
     if first not in ALLOWED_TOP_LEVEL:
         return False
-    # docs/ -> only changelog.json
+    # docs/ -> only the whitelisted files (changelog.json, license.txt)
     if first == "docs":
-        return norm == "docs/changelog.json"
+        return norm in {f"docs/{f}" for f in ALLOWED_DOCS}
     # Root-level files -> only the explicitly allowed ones
     if "/" not in norm:
         return norm in ALLOWED_TOP_LEVEL

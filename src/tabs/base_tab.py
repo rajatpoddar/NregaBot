@@ -234,10 +234,16 @@ class BaseAutomationTab(ctk.CTkFrame):
     
     def _extract_tree_columns_rows(self) -> Tuple[List[str], List[List]]:
         """
-        results_tree se raw columns + rows extract karta hai (cloud reports ke liye).
+        results_tree se columns + rows extract karta hai (cloud reports ke liye).
+
+        DPDP compliance: server ko jaane wala data hamesha MASKED hota hai —
+        sensitive columns (Aadhaar/UID, bank account, IFSC, mobile, jobcard,
+        applicant name) ke values aur har cell me accidental 12-digit Aadhaar
+        patterns ``mask_columns_rows`` se redact ho jaate hain. Local tree/
+        exports apne aap me unmasked rehte hain (user ke apne PC par).
 
         Returns:
-            (columns, rows) — rows list-of-lists, values stringified.
+            (columns, rows) — masked rows list-of-lists, values stringified.
             Agar tree khali/nahi hai to ([], []).
         """
         try:
@@ -249,6 +255,12 @@ class BaseAutomationTab(ctk.CTkFrame):
             for item_id in tree.get_children():
                 values = tree.item(item_id)['values']
                 rows.append(["" if v is None else str(v) for v in values])
+            # ── DPDP: server-sync boundary par PII mask ──
+            try:
+                from src.utils import mask_columns_rows
+                columns, rows = mask_columns_rows(columns, rows)
+            except Exception:
+                pass
             return columns, rows
         except Exception:
             return [], []
