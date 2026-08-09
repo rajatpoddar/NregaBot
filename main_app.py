@@ -63,7 +63,7 @@ from src.state import AppState
 from src.utils import (
     resource_path, get_data_path, get_user_downloads_path, get_nregabot_path,
     get_report_path, get_config, save_config, validate_config,
-    setup_logging, get_logger
+    setup_logging, get_logger, install_crash_reporter
 )
 
 # Note: Heavy libraries (Selenium) are imported inside
@@ -76,6 +76,9 @@ from src.utils import (
 # C8: Initialize centralized logging before anything else
 setup_logging()
 logger = get_logger()
+
+# Crash reporter — uncaught exceptions Temp/crashes/ me save hote hain
+install_crash_reporter()
 
 load_dotenv()
 config.create_default_config_if_not_exists()

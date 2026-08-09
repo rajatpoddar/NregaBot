@@ -39,6 +39,7 @@ Ye section batata hai ki error log me **kya-kya hona chahiye** taaki exported re
 | `automation_key` | Kaunsa tab/automation | ✅ Already had |
 | `error_type` | Exception class (e.g. `StaleElementReferenceException`) | ✅ Implemented |
 | `error_source` | `file:line:function` chain — exact function | ✅ Implemented |
+| `error_traceback` | Full exception stack (capped 4000 chars) — root-cause line | ✅ Implemented (v3.2.1+) |
 | `error_message` | Exception ka asli message | ✅ Already had (details) |
 | `details` | Run summary (Total/OK/FAIL/work codes) | ✅ Already had |
 | `user` + `license_key` | Kaun user | ✅ Already had |
@@ -55,23 +56,29 @@ Automation tab (Selenium)
 app_automation.py wrapper()
    │  _extract_error_context() → error_type + error_source (file:line:function)
    ▼
-history_manager.log_automation_finish()  → SQLite (app_version, os, error_type, error_source auto-filled)
+history_manager.log_automation_finish()  → SQLite (app_version, os, error_type,
+   │                                          error_source, error_traceback auto-filled)
    │  sync_activity_log_to_server()  (background, batched 50)
    ▼
-POST /api/activity-log/sync  → PostgreSQL activity_logs (migration 015)
+POST /api/activity-log/sync  → PostgreSQL activity_logs (migrations 015 + 017)
    │
    ▼
-Admin → Error Logs tab → Export CSV  (har entry me 23 detailed columns)
+Admin → Error Logs tab → Export CSV  (har entry me 24 detailed columns)
+   │           → collapsible traceback (admin UI me full stack expand karo)
+   │           → Top Error Patterns cards (auto-clustering, migration 015+)
+   ▼
+Crash reporter (v3.2.1+) — uncaught exception → crash files + last-log-lines
+   (error_screenshots/ bhi — failure par browser screenshot)
 ```
 
-### 2.3 Aage kya improve karna hai (P1)
+### 2.3 Improvement status (P1)
 
-1. **Full traceback capture** — abhi sirf last 2 frames. Uncaught crash par pura traceback (first 1KB) ek `error_traceback` column me save karo. *Why: AI/developer ko exact root-cause line milegi.*
-2. **Screenshot on failure** — tab `handle_error()` / wrapper me page ka screenshot save karke upload karo (browser tab ke liye `driver.save_screenshot()`). Ek screenshot 1000 words ke barabar hai.
-3. **Step-sequence logging** — har tab me automation ke steps log hote hain (log_display). Failure par last 30 log lines ko error entry ke saath attach karo. *Why: "kahan tak pahuncha tha" pata chalega.*
-4. **Crash reporter** — uncaught exceptions + PyInstaller crash → server par `POST /api/crash-report` (app version, OS, traceback, last logs). Yeh app-level logger (`utils.setup_logging`) me global `sys.excepthook` se aayega.
-5. **AI triage** — server par error rows ko ek prompt ke saath AI ko de do (already AI infra hai — `app/ai_bot.py`) → har naya error pattern automatically summarized + suggested fix ke saath admin ko dikhao.
-6. **Error pattern auto-clustering** — same `error_type + error_source` ko count karo (GROUP BY) — admin ko "ye error 142 baar aaya hai, 5 users me, kal raat 8-10 baje" jaisi aggregate dikhao. *Isi se pata chalega priority kya hai.*
+1. ✅ **Full traceback capture** — `error_traceback` column (client SQLite + server PostgreSQL, migration 017), wrapper me full `traceback.format_exception()` (capped 4000). Admin UI me collapsible **▶ Show traceback**.
+2. ✅ **Screenshot on failure** — wrapper me `driver.save_screenshot()` → `Temp/error_screenshots/` (fully guarded, kabhi crash nahi). *Next: server upload.*
+3. ⬜ **Step-sequence logging** — automation ke steps har tab me log hote hain; failure par last 30 log lines attach karna baki.
+4. ✅ **Crash reporter** — `utils.install_crash_reporter()` → global `sys.excepthook` (main_app.py + lite_app.py dono me), crash file + last log lines save. *Next: `POST /api/crash-report` upload + admin Crashes tab.*
+5. ⬜ **AI triage** — AI infra hai (`app/ai_bot.py`); naye error patterns ka auto-summary baki.
+6. ✅ **Error pattern auto-clustering** — `/admin/api/activity-errors/summary` → Top Error Patterns cards (counts, users, first/last seen, fix status). Bounded 90-day scan.
 
 ### 2.4 Known-errors registry ka kamaal
 
@@ -121,8 +128,8 @@ SQLite (history_manager)  →  nrega_local_db.sqlite
 
 **Weaknesses:**
 - `log_activity_structured` me `print(f"Log Error: {e}")` — DB write fail hone par silently daant leta hai
-- No global `sys.excepthook` crash reporter
-- No screenshot-on-failure
+- ✅ Crash reporter ab installed hai (`sys.excepthook`) — server upload baki
+- ✅ Screenshot-on-failure ab hai (local save) — server upload baki
 - Activity log local cap 2000 entries — theek hai abhi, par analytics ke liye low
 - Selenium logic single-file tabs me heavy hai (some tabs 1700+ lines) — maintainability risk jab team badhe
 
@@ -159,25 +166,25 @@ PostgreSQL + Redis cache + Celery tasks + Evolution API (WhatsApp) + Docker
 
 ### 🔴 P0 — Pehle 2-4 hafte (bina iske scale mat karo)
 
-| # | Gap | Why | Solution |
-|---|---|---|---|
-| 1 | **Crash reporting** | Users app crash karein to aapko pata hi na chale | Global `sys.excepthook` + `POST /api/crash-report` + admin "Crashes" tab |
-| 2 | **Full traceback + last-log capture** | Error ka exact root-cause line | `error_traceback` column + last 30 log lines attached on failure |
-| 3 | **Activity log retention policy** | Table unbounded hai | DB job: 90 din ke baad archive/delete; stats tables (daily aggregates) banayein |
-| 4 | **Sync endpoint rate-limit + validation** | Spoof/abuse ka risk | Token/device-id verify + per-key rate limit + entry validation (max length, enum status) |
-| 5 | **Uptime monitoring + health endpoint** | Server down silently | `/healthz` + uptime robot (UptimeRobot/Healthchecks) + admin alert on WhatsApp |
+| # | Gap | Why | Solution | Status |
+|---|---|---|---|---|
+| 1 | **Crash reporting** | Users app crash karein to aapko pata hi na chale | Global `sys.excepthook` + `POST /api/crash-report` + admin "Crashes" tab | 🟡 Local done (v3.2.1+); server upload baki |
+| 2 | **Full traceback + last-log capture** | Error ka exact root-cause line | `error_traceback` column + last 30 log lines attached on failure | 🟢 traceback done (migration 017); last-log baki |
+| 3 | **Activity log retention policy** | Table unbounded hai | DB job: archive/delete; stats tables banayein | 🟢 Opt-in done (migration 016, `.env` me `ACTIVITY_LOG_RETENTION_DAYS=180`); stats tables baki |
+| 4 | **Sync endpoint rate-limit + validation** | Spoof/abuse ka risk | Token/device-id verify + per-key rate limit + entry validation | 🟢 Done — per-license (180/h) + per-IP (600/h) limits, license-existence check (401 on fake keys), per-entry validation (max length, status enum, number coercion) |
+| 5 | **Uptime monitoring + health endpoint** | Server down silently | `/healthz` + uptime robot + admin alert on WhatsApp | 🟢 `/healthz` done; uptime robot baki |
 
 ### 🟠 P1 — 1-2 mahine (scale ke liye zaroori)
 
 | # | Gap | Why | Solution |
 |---|---|---|---|
-| 6 | **Screenshot on failure** | UI issues screenshot se turant samajh aate hain | Failure par `driver.save_screenshot()` → server upload |
-| 7 | **Error auto-clustering (GROUP BY)** | Admin ko aggregate chahiye, 300 rows nahi | `/admin/api/activity-errors/summary` — top error patterns with counts, users, times |
-| 8 | **AI error triage** | AI infra already hai — use karo | Server cron: naye error patterns → AI summary + suggested fix → admin panel |
-| 9 | **Multi-state portal config** | Sirf 3 states configured | `STATE_DEMAND_CONFIG` pattern ko generalize karo — DB-driven per-state portal configs (URLs, digests, dropdown XPaths) |
-| 10 | **DPDP Act 2023 compliance** | Worker/PII data India law ke under hai | Privacy policy, consent flow, data minimization (Aadhaar data ko app me mat store karo — sirf report ke liye use), breach notification plan |
-| 11 | **User-facing error messages (Hinglish)** | Users ko raw Selenium errors dikhte hain | Error translation layer — `utils` me map: `StaleElementReferenceException → "Page refresh ho gaya, phir se try karein"` |
-| 12 | **App telemetry opt-in** | "Yeh feature kaun use karta hai" ka data | Anonymized feature-usage stats (automation_key counts already sync hote hain — aggregate + daily digest) |
+| 6 | **Screenshot on failure** | UI issues screenshot se turant samajh aate hain | Failure par `driver.save_screenshot()` → server upload | 🟢 Local done; server upload baki |
+| 7 | **Error auto-clustering (GROUP BY)** | Admin ko aggregate chahiye, 300 rows nahi | `/admin/api/activity-errors/summary` — top error patterns with counts, users, times | 🟢 Done (90-day bounded) |
+| 8 | **AI error triage** | AI infra already hai — use karo | Server cron: naye error patterns → AI summary + suggested fix → admin panel | ⬜ Baki |
+| 9 | **Multi-state portal config** | Sirf 3 states configured | `STATE_DEMAND_CONFIG` pattern ko generalize karo — DB-driven per-state portal configs | ⬜ Baki |
+| 10 | **DPDP Act 2023 compliance** | Worker/PII data India law ke under hai | Privacy policy, consent flow, data minimization, breach notification plan | ⬜ Baki |
+| 11 | **User-facing error messages (Hinglish)** | Users ko raw Selenium errors dikhte hain | Error translation layer — `utils` me map | 🟢 Done (dialog me translation; log me original) |
+| 12 | **App telemetry opt-in** | "Yeh feature kaun use karta hai" ka data | Anonymized feature-usage stats (aggregate + daily digest) | ⬜ Baki |
 
 ### 🟡 P2 — 3-6 mahine (next level polish)
 
@@ -196,15 +203,15 @@ PostgreSQL + Redis cache + Celery tasks + Evolution API (WhatsApp) + Docker
 
 ## 5. Security Note (immediate action)
 
-`src/config.py` me hardcoded secrets:
+`src/config.py` me EVO secrets ab environment vars se aate hain (fallback = purani values, behavior unchanged):
 
 ```python
-EVO_BASE_URL: str = "http://192.168.29.101:8087"
-EVO_API_KEY: str = "NregaBotSecretKey123"
+EVO_BASE_URL = os.environ.get("EVO_BASE_URL", "http://192.168.29.101:8087")
+EVO_API_KEY  = os.environ.get("EVO_API_KEY", "NregaBotSecretKey123")
 ```
 
-**⚠️ Yeh production secret hai jo source control me hai.** India-level scaling se pehle:
-1. Secrets ko environment vars / server-config me move karo (`.env` pattern server pe already hai)
+**⚠️ Fallback values abhi bhi source control me hain** — overridable hai, par abhi bhi default le sakta hai. India-level scaling se pehle:
+1. Production me `.env` (ya OS env vars) me set karo — ab supported hai ✅
 2. Local-network IP (`192.168.x.x`) ko publicly routable hostname se replace karo
 3. Evolution API ko VPN/firewall ke peeche rakho
 4. Key rotation immediately (maan lo compromised hai)
@@ -214,21 +221,24 @@ EVO_API_KEY: str = "NregaBotSecretKey123"
 ## 6. Suggested Roadmap (Phase-wise)
 
 ### Phase 1 — "Telemetry & Trust" (2-4 weeks)
-- [x] Error log detail spec (version/OS/function/time/fix-status) — **done in this iteration**
-- [x] Admin Error Logs CSV export — **done in this iteration**
-- [ ] Crash reporter + full traceback + last-log capture
-- [ ] Error clustering + AI triage
-- [ ] Activity log retention policy
+- [x] Error log detail spec (version/OS/function/time/fix-status) — **done**
+- [x] Admin Error Logs CSV export — **done**
+- [x] Full traceback capture (`error_traceback`, migration 017 + collapsible UI) — **done**
+- [x] Crash reporter (local: `sys.excepthook` + crash files) — **done** (server upload baki)
+- [x] Error clustering (`/api/activity-errors/summary` + Top Patterns cards) — **done**
+- [x] Activity log retention (opt-in, migration 016 + scheduler 3 AM IST) — **done**
+- [x] Screenshot on failure (local save) — **done** (server upload baki)
+- [ ] AI triage + last-log capture + crash-report upload — **next**
 
 ### Phase 2 — "Scale & Security" (1-2 months)
-- [ ] Rate limiting + validation on all sync endpoints
-- [ ] Uptime monitoring + health checks + admin alerts
+- [x] Rate limiting + validation on sync endpoints — **done** (activity-log + automation-results: per-key + per-IP limits, license check, entry validation)
+- [x] Uptime monitoring: `/healthz` endpoint — **done** (uptime robot baki)
 - [ ] DPDP compliance (privacy, consent, PII minimization)
-- [ ] Secret rotation + secure storage
+- [x] Secret rotation: EVO secrets ab env-var based (fallback same) — **done** (rotate values + remove fallback defaults)
 - [ ] Multi-state DB-driven portal configs
 
 ### Phase 3 — "Experience" (3-6 months)
-- [ ] Hinglish error translation (users ko samajh aaye)
+- [x] Hinglish error translation (users ko samajh aaye) — **done** (v3.2.1+)
 - [ ] Offline queue + auto-resume
 - [ ] Regional language UI
 - [ ] Performance profiling for low-end PCs
@@ -244,11 +254,12 @@ EVO_API_KEY: str = "NregaBotSecretKey123"
 
 ## 7. Quick Wins (aaj hi kar sakte hain)
 
-1. **EVO secrets ko config se bahar** — 30 min ka kaam, security me sabse bada jump
-2. **`/healthz` endpoint + uptime check** — 1 ghante ka kaam
-3. **Activity log retention job** — ek SQL cron
-4. **Error translation map** — `utils.py` me 20-line dict, har tab ka UX turant behtar
-5. **Screenshot on failure** — wrapper me 10 line
+1. ✅ **EVO secrets ko config se bahar** — done (env-var based, fallback same)
+2. ✅ **`/healthz` endpoint + uptime check** — done (`/api/health` pehle se + `/healthz` alias)
+3. ✅ **Activity log retention job** — done (opt-in `ACTIVITY_LOG_RETENTION_DAYS`, .env me 180 set)
+4. ✅ **Error translation map** — done (`utils.translate_error`, Hinglish dialog)
+5. ✅ **Screenshot on failure** — done (wrapper, `Temp/error_screenshots/`)
+6. ➡️ **Next quick win:** crash-report server upload + last-30-log-lines attach + sync rate-limit
 
 ---
 

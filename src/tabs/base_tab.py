@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont 
 
 from src import config
-from src.utils import resource_path, get_logger, truncate_workcode
+from src.utils import resource_path, get_logger, truncate_workcode, translate_error
 
 logger = get_logger()
 
@@ -454,9 +454,15 @@ class BaseAutomationTab(ctk.CTkFrame):
             except Exception:
                 pass
         else:
+            # Log me ORIGINAL raw message rehta hai (admin debugging ke liye);
+            # dialog me user-friendly Hinglish translation dikhti hai.
             self.log_error(f"Error: {e}")
             try:
-                self.app.after(0, lambda: messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}"))
+                friendly = translate_error(e)
+                self.app.after(0, lambda m=friendly: messagebox.showerror(
+                    "Automation Error",
+                    f"Automation me problem aayi:\n\n{m}"
+                ))
             except Exception:
                 pass
 

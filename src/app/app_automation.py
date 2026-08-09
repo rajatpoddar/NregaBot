@@ -81,20 +81,24 @@ def _automation_display_name(key: str) -> str:
     return AUTOMATION_DISPLAY_NAMES.get(key, key.replace("_", " ").title())
 
 
-def _extract_error_context(e: Exception) -> Tuple[str, str, str]:
+def _extract_error_context(e: Exception) -> Tuple[str, str, str, str]:
     """
     Extract structured diagnostics from an uncaught automation exception.
 
-    Returns (error_type, error_message, error_source):
-      - error_type:   exception class name, e.g. 'StaleElementReferenceException'
-      - error_message: 'Type: message' (capped at 600 chars for DB)
-      - error_source:  'file:line:function' chain (last 2 user-code frames)
-                       — admin Error Logs me exactly pata chalta hai ki
-                       automation ke kis function se error aaya.
+    Returns (error_type, error_message, error_source, error_traceback):
+      - error_type:      exception class name, e.g. 'StaleElementReferenceException'
+      - error_message:   'Type: message' (capped at 600 chars for DB)
+      - error_source:    'file:line:function' chain (last 2 user-code frames)
+                         — admin Error Logs me exactly pata chalta hai ki
+                         automation ke kis function se error aaya.
+      - error_traceback: full traceback text (capped at 4000 chars) — admin
+                         ko poora stack milta hai (kaunsa frame kis line se
+                         call hua), sirf summary chain nahi.
     """
     error_type = type(e).__name__
     error_msg = f"{error_type}: {str(e)}"[:600]
     error_source = ""
+    error_traceback = ""
     try:
         import traceback
         frames = traceback.extract_tb(e.__traceback__)
@@ -108,9 +112,13 @@ def _extract_error_context(e: Exception) -> Tuple[str, str, str]:
         parts = [f"{os.path.basename(f.filename)}:{f.lineno}:{f.name}"
                  for f in user_frames[-2:]]
         error_source = " -> ".join(parts)
+        # Full stack — formatting karte time exception bhi append hota hai.
+        error_traceback = ''.join(
+            traceback.format_exception(type(e), e, e.__traceback__)
+        )[:4000]
     except Exception:
         pass
-    return error_type, error_msg, error_source
+    return error_type, error_msg, error_source, error_traceback
 
 
 class AutomationMixin:
@@ -191,6 +199,7 @@ class AutomationMixin:
             error_msg = ''  # set if target() raises — used to log status="failed"
             error_type = ''
             error_source = ''
+            error_traceback = ''
             # Fresh run: forget any browser choice left over from a previous
             # run so this automation gets to pick (if multiple browsers).
             try:
@@ -203,7 +212,24 @@ class AutomationMixin:
                 # Structured diagnostics — error type + message + the exact
                 # file:line:function chain. Admin Error Logs ko ye batata hai
                 # ki kis tab/function se error aaya (debugging ke liye critical).
-                error_type, error_msg, error_source = _extract_error_context(e)
+                error_type, error_msg, error_source, error_traceback = _extract_error_context(e)
+
+                # ── Failure screenshot (admin debugging ke liye) ──
+                # Fully guarded — koi bhi failure yahan crash nahi karega.
+                # Screenshot Temp/error_screenshots/ me save hota hai.
+                try:
+                    _inst = getattr(target, '__self__', None)
+                    if _inst is not None and getattr(_inst, 'driver', None) is not None:
+                        _shot_dir = os.path.join(self.get_nregabot_path("Temp"), "error_screenshots")
+                        os.makedirs(_shot_dir, exist_ok=True)
+                        _shot_path = os.path.join(
+                            _shot_dir,
+                            f"{key}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                        )
+                        _inst.driver.save_screenshot(_shot_path)
+                        logger.info("Error screenshot saved: %s", _shot_path)
+                except Exception:
+                    pass
                 # Safety net: never let an uncaught automation exception crash
                 # the app (e.g. the user closed the browser tab mid-run).
                 try:
@@ -254,8 +280,9 @@ class AutomationMixin:
                         pass
                     tab_instance.driver = None
                 self.after(0, lambda k=key, dur=duration, inst=tab_instance,
-                                 err=error_msg, etype=error_type, esrc=error_source:
-                           self.on_automation_finished(k, dur, inst, err, etype, esrc))
+                                 err=error_msg, etype=error_type, esrc=error_source,
+                                 etb=error_traceback:
+                           self.on_automation_finished(k, dur, inst, err, etype, esrc, etb))
 
         t = threading.Thread(target=wrapper, daemon=True)
         self.app_state.automation_threads[key] = t
@@ -416,7 +443,8 @@ class AutomationMixin:
             logger.debug("Win32 browser minimize failed for %s", browser, exc_info=True)
 
     def on_automation_finished(self, key, duration=0.0, tab_instance=None,
-                               error_msg='', error_type='', error_source=''):
+                               error_msg='', error_type='', error_source='',
+                               error_traceback=''):
         if key in self.app_state.active_automations:
             self.app_state.active_automations.remove(key)
         self.app_state.automation_progress.pop(key, None)
@@ -464,7 +492,8 @@ class AutomationMixin:
                     duration_seconds=duration,
                     details=log_details,
                     error_type=error_type,
-                    error_source=error_source
+                    error_source=error_source,
+                    error_traceback=error_traceback
                 )
             except Exception as e:
                 logger.error(f"Failed to log automation finish for {key}: {e}")

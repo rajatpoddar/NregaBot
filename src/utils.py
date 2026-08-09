@@ -231,6 +231,177 @@ def format_bytes(amount: Any, binary: bool = False) -> str:
     return f"{size:.1f} {units[unit_idx]}"
 
 
+# ── Error translation (user-friendly Hinglish) ───────────────────
+# India-level UX: raw Selenium/exception messages ko aam users nahi
+# samajhte. translate_error() generic errors ka friendly Hinglish deta hai.
+# NOTE: Developer/admin ke liye ORIGINAL message hamesha log hota rehta
+# hai — ye translation sirf user-facing text/dialog me use hota hai.
+_ERROR_TRANSLATIONS = [
+    # (pattern, translated) — lowercase substring match, first hit wins.
+    # Exception class names (bina space) pehle rakhe hain — Selenium ke
+    # class names me spaces nahi hote.
+    ("staleelementreferenceexception",
+     "Page refresh hone ki wajah se element milne me problem hui. Retry karein."),
+    ("nosuchwindowexception",
+     "Browser tab/window band ho gaya — automation ruk gaya. Browser dobara kholkar run karein."),
+    ("nosuchelementexception",
+     "Page par required field nahi mila. Page sahi se khula hai confirm karke Retry karein."),
+    ("elementclickinterceptedexception",
+     "Element click block hua — koi popup/overlay chalu tha. Retry karein."),
+    ("elementnotinteractableexception",
+     "Element click/type nahi ho paya — page abhi load ho raha tha. Retry karein."),
+    ("elementnotvisibleexception",
+     "Element dikh nahi raha — page abhi load ho raha tha. Retry karein."),
+    ("invalidselectorexception",
+     "Element selector galat mila — page layout badla ho sakta hai. Retry karein."),
+    ("webdriverexception",
+     "Browser me technical problem aayi. Browser restart karke Retry karein."),
+    ("no such window",
+     "Browser tab/window band ho gaya — automation ruk gaya. Browser dobara kholkar run karein."),
+    ("target window already closed",
+     "Browser tab band ho gaya tha — automation ruk gaya. Browser dobara kholkar run karein."),
+    ("web view not found",
+     "Browser window nahi mili — browser restart karke dobara try karein."),
+    ("invalid session id",
+     "Browser session lost ho gaya — browser restart karke dobara try karein."),
+    ("element is no longer attached to the dom",
+     "Page reload hone ki wajah se purana element hat gaya. Retry karein."),
+    ("stale element",
+     "Page refresh hone ki wajah se element milne me problem hui. Retry karein."),
+    ("element click intercepted",
+     "Element click block hua — koi popup/overlay chalu tha. Retry karein."),
+    ("element not interactable",
+     "Element click/type nahi ho paya — page abhi load ho raha tha. Retry karein."),
+    ("unable to locate element",
+     "Page par required field nahi mila. Page sahi se khula hai confirm karke Retry karein."),
+    ("no such element",
+     "Page par required field nahi mila. Page sahi se khula hai confirm karke Retry karein."),
+    ("timed out",
+     "Page load me time lag gaya (slow network ya portal busy). Retry karein."),
+    ("timeout",
+     "Page load me time lag gaya (slow network ya portal busy). Retry karein."),
+    ("connection refused",
+     "Portal se connect nahi ho paya — network/internet check karke Retry karein."),
+    ("max retries exceeded",
+     "Internet/portal connection me problem — network check karke Retry karein."),
+    ("failed to establish a new connection",
+     "Internet/portal connection me problem — network check karke Retry karein."),
+    ("no route to host",
+     "Network route nahi mila — internet ya portal down ho sakta hai. Baad me try karein."),
+    ("file not found",
+     "File nahi mili — sahi file select karke dobara try karein."),
+    ("permission denied",
+     "File/folder access me permission problem — file khuli to nahi hai? Check karke Retry karein."),
+    ("not enough values to unpack",
+     "Data format sahi nahi mila — file ka format check karke Retry karein."),
+    ("list index out of range",
+     "Data me kuch missing hai (empty row ho sakti hai). File check karke Retry karein."),
+    ("attributeerror",
+     "Internal issue aaya (AttributeError). App ko latest version me update karke Retry karein."),
+    ("typeerror",
+     "Internal issue aaya (TypeError). App ko latest version me update karke Retry karein."),
+    ("valueerror",
+     "Diyi gayi value galat hai — inputs check karke Retry karein."),
+]
+
+
+# ── Crash reporter (uncaught exceptions → crash files) ───────────
+_CRASH_REPORTER_INSTALLED: bool = False
+
+def install_crash_reporter() -> None:
+    """
+    Global uncaught-exception handler — app crash hone par bhi details save.
+
+    Har crash par ``Temp/crashes/crash_YYYYMMDD_HHMMSS.txt`` banta hai jisme:
+      * App version + OS + time
+      * Exception type + message
+      * Full traceback
+      * App log ke last 30 lines (kahan tak pahuncha tha)
+
+    - Additive: purana sys.excepthook chain hota hai (override nahi)
+    - Idempotent: do baar install hone par duplicate nahi
+    - Kabhi raise nahi karta — crash path me bhi 100% safe
+    """
+    global _CRASH_REPORTER_INSTALLED
+    if _CRASH_REPORTER_INSTALLED:
+        return
+    _CRASH_REPORTER_INSTALLED = True
+
+    old_hook = sys.excepthook
+
+    def _hook(exc_type, exc_value, exc_tb):
+        try:
+            import traceback as _tb
+            from datetime import datetime as _dt
+            from src import config
+
+            now = _dt.now()
+            lines = [
+                f"Time      : {now.strftime('%Y-%m-%d %H:%M:%S')}",
+                f"App       : {config.APP_NAME} v{config.APP_VERSION}",
+                f"OS        : {config.OS_SYSTEM}",
+                f"Exception : {exc_type.__name__}: {exc_value}",
+                "--- Traceback ---",
+                "".join(_tb.format_exception(exc_type, exc_value, exc_tb)),
+            ]
+
+            # App log ke last ~30 lines — crash se pehle kya ho raha tha
+            try:
+                log_path = get_log_path()
+                if os.path.exists(log_path):
+                    with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                        tail = f.readlines()[-30:]
+                    lines.append("--- Last log lines ---")
+                    lines.extend(line.rstrip("\n") for line in tail)
+            except Exception:
+                pass
+
+            crash_dir = get_nregabot_path("Temp/crashes")
+            path = os.path.join(crash_dir, f"crash_{now.strftime('%Y%m%d_%H%M%S')}.txt")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
+            get_logger().error("🚨 App crash recorded: %s (%s)", path, exc_type.__name__)
+        except Exception:
+            pass
+
+        # Original handler ko chain karo — default stderr traceback preserve
+        try:
+            if old_hook is not None:
+                old_hook(exc_type, exc_value, exc_tb)
+        except Exception:
+            pass
+
+    sys.excepthook = _hook
+
+
+def translate_error(error: Any, error_type: str = "") -> str:
+    """
+    Raw exception message → user-friendly Hinglish.
+
+    - Match hone par friendly message return hota hai
+    - Match NAHI hone par original message wapas (koi data loss nahi)
+    - Kabhi raise nahi karta — UI thread ke liye 100% safe
+
+    Args:
+        error: exception ya message string
+        error_type: optional exception class name (message me nahi hai to prefix)
+    """
+    try:
+        raw = str(error or "")
+    except Exception:
+        return ""
+    if not raw.strip():
+        return ""
+    low = raw.lower()
+    for pattern, translated in _ERROR_TRANSLATIONS:
+        if pattern in low:
+            return translated
+    # No pattern match — original message wapas (error_type prefix ke saath)
+    if error_type and not raw.strip().startswith(error_type):
+        return f"{error_type}: {raw.strip()}"
+    return raw.strip()
+
+
 def get_report_path(category: str = "", fin_year: str = "") -> str:
     """
     Standard report directory: ~/Downloads/NregaBot/Report {fin_year}/{category}/

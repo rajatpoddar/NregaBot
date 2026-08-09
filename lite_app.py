@@ -55,7 +55,7 @@ from src.app.app_license import LicenseMixin
 from src.utils import (
     resource_path, get_data_path, get_user_downloads_path, get_nregabot_path,
     get_report_path, get_config, save_config, validate_config,
-    setup_logging, get_logger, _suppress_overscroll
+    setup_logging, get_logger, _suppress_overscroll, install_crash_reporter
 )
 
 # --- Shared automation display names for the footer's "▶ Running: ..."
@@ -86,6 +86,9 @@ if config.OS_SYSTEM == "Windows":
 
 setup_logging()
 logger = get_logger()
+
+# Crash reporter — uncaught exceptions Temp/crashes/ me save hote hain
+install_crash_reporter()
 
 config.create_default_config_if_not_exists()
 validate_config()

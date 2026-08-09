@@ -103,7 +103,8 @@ class HistoryManager:
                         app_version TEXT DEFAULT '',
                         os_platform TEXT DEFAULT '',
                         error_type TEXT DEFAULT '',
-                        error_source TEXT DEFAULT ''
+                        error_source TEXT DEFAULT '',
+                        error_traceback TEXT DEFAULT ''
                     )
                 ''')
                 
@@ -348,6 +349,7 @@ class HistoryManager:
                 "os_platform": "TEXT DEFAULT ''",
                 "error_type": "TEXT DEFAULT ''",
                 "error_source": "TEXT DEFAULT ''",
+                "error_traceback": "TEXT DEFAULT ''",
             }
             for col_name, col_type in new_cols.items():
                 if col_name not in existing:
@@ -768,7 +770,8 @@ class HistoryManager:
                                  automation_key: str = "", panchayat: str = "",
                                  village: str = "", status: str = "",
                                  duration_seconds: float = 0, details: str = "",
-                                 error_type: str = "", error_source: str = ""):
+                                 error_type: str = "", error_source: str = "",
+                                 error_traceback: str = ""):
         """
         Enhanced activity logging with structured fields.
         
@@ -785,6 +788,9 @@ class HistoryManager:
             error_source: 'file:line:function' chain where the error was raised
                 — admin Error Logs me exactly pata chalta hai kis function se
                 error aaya (debugging ke liye sabse useful field).
+            error_traceback: Full exception traceback (capped ~4000 chars) —
+                admin ko stack ka pura chain milta hai (conceptually 'file:line'
+                se bhi aage jaakar saare frames).
         
         app_version aur os_platform apne aap fill hote hain (config se) taaki
         har entry bataye kaunsa app version / OS use ho raha tha.
@@ -799,14 +805,16 @@ class HistoryManager:
                     INSERT INTO activity_log 
                         (timestamp, activity_type, description, automation_key,
                          panchayat, village, status, duration_seconds, details,
-                         app_version, os_platform, error_type, error_source)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         app_version, os_platform, error_type, error_source,
+                         error_traceback)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (now, activity_type, description, automation_key,
                       panchayat, village, status, duration_seconds, details,
                       getattr(config, 'APP_VERSION', ''),
                       getattr(config, 'OS_SYSTEM', ''),
                       (error_type or '')[:255],
-                      (error_source or '')[:500]))
+                      (error_source or '')[:500],
+                      (error_traceback or '')[:4000]))
                 
                 # Auto-Cleanup: Keep last 2000 records
                 cursor.execute("DELETE FROM activity_log WHERE id NOT IN (SELECT id FROM activity_log ORDER BY id DESC LIMIT 2000)")
@@ -833,7 +841,8 @@ class HistoryManager:
     def log_automation_finish(self, automation_key: str, panchayat: str = "",
                                village: str = "", status: str = "success",
                                duration_seconds: float = 0, details: str = "",
-                               error_type: str = "", error_source: str = ""):
+                               error_type: str = "", error_source: str = "",
+                               error_traceback: str = ""):
         """Log when an automation finishes.
 
         error_type / error_source sirf failed runs me bheje jaate hain —
@@ -852,7 +861,8 @@ class HistoryManager:
             duration_seconds=duration_seconds,
             details=details,
             error_type=error_type,
-            error_source=error_source
+            error_source=error_source,
+            error_traceback=error_traceback
         )
 
     def get_recent_activity(self, limit: int = 50) -> list:
@@ -940,7 +950,8 @@ class HistoryManager:
                     SELECT id, timestamp, activity_type, description,
                            automation_key, panchayat, village, status,
                            duration_seconds, details,
-                           app_version, os_platform, error_type, error_source
+                           app_version, os_platform, error_type, error_source,
+                           error_traceback
                     FROM activity_log
                     WHERE synced = 0
                     ORDER BY id ASC
@@ -967,6 +978,7 @@ class HistoryManager:
                         "os_platform": row[11] or getattr(config, 'OS_SYSTEM', ''),
                         "error_type": row[12] or "",
                         "error_source": row[13] or "",
+                        "error_traceback": row[14] or "",
                     })
                 return result
             except Exception as e:

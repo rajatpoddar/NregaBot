@@ -58,9 +58,12 @@ DEFAULT_LAUNCH_URLS: List[str] = [
 SUPPORT_EMAIL: str = "nregabot@gmail.com"
 
 # --- Evolution API Configuration (for WhatsApp messaging) ---
-EVO_BASE_URL: str = "http://192.168.29.101:8087"
-EVO_INSTANCE: str = "NregaBot"
-EVO_API_KEY: str = "NregaBotSecretKey123"
+# Secrets ab environment variables se aate hain — fallback purana value hai,
+# isliye behavior bilkul same. Production me .env / system env me set karo:
+#   EVO_BASE_URL, EVO_INSTANCE, EVO_API_KEY
+EVO_BASE_URL: str = os.environ.get('EVO_BASE_URL', 'http://192.168.29.101:8087')
+EVO_INSTANCE: str = os.environ.get('EVO_INSTANCE', 'NregaBot')
+EVO_API_KEY: str = os.environ.get('EVO_API_KEY', 'NregaBotSecretKey123')
 
 # --- Platform & UI Configuration ---
 import platform
