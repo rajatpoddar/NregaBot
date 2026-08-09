@@ -81,6 +81,38 @@ def _automation_display_name(key: str) -> str:
     return AUTOMATION_DISPLAY_NAMES.get(key, key.replace("_", " ").title())
 
 
+def _extract_error_context(e: Exception) -> Tuple[str, str, str]:
+    """
+    Extract structured diagnostics from an uncaught automation exception.
+
+    Returns (error_type, error_message, error_source):
+      - error_type:   exception class name, e.g. 'StaleElementReferenceException'
+      - error_message: 'Type: message' (capped at 600 chars for DB)
+      - error_source:  'file:line:function' chain (last 2 user-code frames)
+                       — admin Error Logs me exactly pata chalta hai ki
+                       automation ke kis function se error aaya.
+    """
+    error_type = type(e).__name__
+    error_msg = f"{error_type}: {str(e)}"[:600]
+    error_source = ""
+    try:
+        import traceback
+        frames = traceback.extract_tb(e.__traceback__)
+        # Skip framework internals (selenium/site-packages) — keep the last 2
+        # user-code frames so the chain reads like 'demand_tab.py:1234:_process_village'.
+        user_frames = [f for f in frames
+                       if 'site-packages' not in f.filename
+                       and not f.filename.startswith('<')]
+        if not user_frames:
+            user_frames = frames
+        parts = [f"{os.path.basename(f.filename)}:{f.lineno}:{f.name}"
+                 for f in user_frames[-2:]]
+        error_source = " -> ".join(parts)
+    except Exception:
+        pass
+    return error_type, error_msg, error_source
+
+
 class AutomationMixin:
     """Mixin class containing browser and automation dispatch methods.
 
@@ -157,6 +189,8 @@ class AutomationMixin:
 
         def wrapper():
             error_msg = ''  # set if target() raises — used to log status="failed"
+            error_type = ''
+            error_source = ''
             # Fresh run: forget any browser choice left over from a previous
             # run so this automation gets to pick (if multiple browsers).
             try:
@@ -166,9 +200,10 @@ class AutomationMixin:
             try:
                 target(*args)
             except Exception as e:
-                # Include the exception type — much more useful for the admin
-                # error logs when debugging what went wrong.
-                error_msg = f"{type(e).__name__}: {str(e)}"[:600]
+                # Structured diagnostics — error type + message + the exact
+                # file:line:function chain. Admin Error Logs ko ye batata hai
+                # ki kis tab/function se error aaya (debugging ke liye critical).
+                error_type, error_msg, error_source = _extract_error_context(e)
                 # Safety net: never let an uncaught automation exception crash
                 # the app (e.g. the user closed the browser tab mid-run).
                 try:
@@ -184,7 +219,8 @@ class AutomationMixin:
                             )
                         ))
                     else:
-                        logger.error("Unhandled automation error in %s: %s", key, e, exc_info=True)
+                        logger.error("Unhandled automation error in %s: %s (source: %s)",
+                                     key, e, error_source, exc_info=True)
                 except Exception:
                     logger.error("Failed to report automation error for %s: %s", key, e)
             finally:
@@ -217,8 +253,9 @@ class AutomationMixin:
                     except Exception:
                         pass
                     tab_instance.driver = None
-                self.after(0, lambda k=key, dur=duration, inst=tab_instance, err=error_msg:
-                           self.on_automation_finished(k, dur, inst, err))
+                self.after(0, lambda k=key, dur=duration, inst=tab_instance,
+                                 err=error_msg, etype=error_type, esrc=error_source:
+                           self.on_automation_finished(k, dur, inst, err, etype, esrc))
 
         t = threading.Thread(target=wrapper, daemon=True)
         self.app_state.automation_threads[key] = t
@@ -378,7 +415,8 @@ class AutomationMixin:
         except Exception:
             logger.debug("Win32 browser minimize failed for %s", browser, exc_info=True)
 
-    def on_automation_finished(self, key, duration=0.0, tab_instance=None, error_msg=''):
+    def on_automation_finished(self, key, duration=0.0, tab_instance=None,
+                               error_msg='', error_type='', error_source=''):
         if key in self.app_state.active_automations:
             self.app_state.active_automations.remove(key)
         self.app_state.automation_progress.pop(key, None)
@@ -424,7 +462,9 @@ class AutomationMixin:
                     village=village,
                     status=status,
                     duration_seconds=duration,
-                    details=log_details
+                    details=log_details,
+                    error_type=error_type,
+                    error_source=error_source
                 )
             except Exception as e:
                 logger.error(f"Failed to log automation finish for {key}: {e}")

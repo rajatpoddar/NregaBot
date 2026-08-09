@@ -99,7 +99,11 @@ class HistoryManager:
                         village TEXT DEFAULT '',
                         status TEXT DEFAULT '',
                         duration_seconds REAL DEFAULT 0,
-                        details TEXT DEFAULT ''
+                        details TEXT DEFAULT '',
+                        app_version TEXT DEFAULT '',
+                        os_platform TEXT DEFAULT '',
+                        error_type TEXT DEFAULT '',
+                        error_source TEXT DEFAULT ''
                     )
                 ''')
                 
@@ -337,6 +341,13 @@ class HistoryManager:
                 "duration_seconds": "REAL DEFAULT 0",
                 "details": "TEXT DEFAULT ''",
                 "synced": "INTEGER DEFAULT 0",   # 0=not synced, 1=synced to server
+                # ── Error-diagnostics columns (admin Error Logs ke liye) ──
+                # Inse pata chalta hai: kaunsa app version, kaunsa OS,
+                # kaunsa error type, aur kis file:line:function me error aaya.
+                "app_version": "TEXT DEFAULT ''",
+                "os_platform": "TEXT DEFAULT ''",
+                "error_type": "TEXT DEFAULT ''",
+                "error_source": "TEXT DEFAULT ''",
             }
             for col_name, col_type in new_cols.items():
                 if col_name not in existing:
@@ -756,7 +767,8 @@ class HistoryManager:
     def log_activity_structured(self, activity_type: str, description: str,
                                  automation_key: str = "", panchayat: str = "",
                                  village: str = "", status: str = "",
-                                 duration_seconds: float = 0, details: str = ""):
+                                 duration_seconds: float = 0, details: str = "",
+                                 error_type: str = "", error_source: str = ""):
         """
         Enhanced activity logging with structured fields.
         
@@ -769,6 +781,13 @@ class HistoryManager:
             status: Status of the activity (running, success, failed, stopped)
             duration_seconds: How long the automation took
             details: Additional JSON-like details (work codes, counts, etc.)
+            error_type: Exception type name (e.g. 'StaleElementReferenceException')
+            error_source: 'file:line:function' chain where the error was raised
+                — admin Error Logs me exactly pata chalta hai kis function se
+                error aaya (debugging ke liye sabse useful field).
+        
+        app_version aur os_platform apne aap fill hote hain (config se) taaki
+        har entry bataye kaunsa app version / OS use ho raha tha.
         """
         with self.lock:
             try:
@@ -779,10 +798,15 @@ class HistoryManager:
                 cursor.execute('''
                     INSERT INTO activity_log 
                         (timestamp, activity_type, description, automation_key,
-                         panchayat, village, status, duration_seconds, details)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         panchayat, village, status, duration_seconds, details,
+                         app_version, os_platform, error_type, error_source)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (now, activity_type, description, automation_key,
-                      panchayat, village, status, duration_seconds, details))
+                      panchayat, village, status, duration_seconds, details,
+                      getattr(config, 'APP_VERSION', ''),
+                      getattr(config, 'OS_SYSTEM', ''),
+                      (error_type or '')[:255],
+                      (error_source or '')[:500]))
                 
                 # Auto-Cleanup: Keep last 2000 records
                 cursor.execute("DELETE FROM activity_log WHERE id NOT IN (SELECT id FROM activity_log ORDER BY id DESC LIMIT 2000)")
@@ -808,8 +832,14 @@ class HistoryManager:
 
     def log_automation_finish(self, automation_key: str, panchayat: str = "",
                                village: str = "", status: str = "success",
-                               duration_seconds: float = 0, details: str = ""):
-        """Log when an automation finishes."""
+                               duration_seconds: float = 0, details: str = "",
+                               error_type: str = "", error_source: str = ""):
+        """Log when an automation finishes.
+
+        error_type / error_source sirf failed runs me bheje jaate hain —
+        admin Error Logs ko batate hain ki exact exception kya tha aur
+        kis file:line:function se aaya.
+        """
         loc = " | ".join(x for x in (panchayat, village) if x)
         dur = f" ({duration_seconds:.0f}s)" if duration_seconds > 0 else ""
         self.log_activity_structured(
@@ -820,7 +850,9 @@ class HistoryManager:
             village=village,
             status=status,
             duration_seconds=duration_seconds,
-            details=details
+            details=details,
+            error_type=error_type,
+            error_source=error_source
         )
 
     def get_recent_activity(self, limit: int = 50) -> list:
@@ -907,7 +939,8 @@ class HistoryManager:
                 cursor.execute('''
                     SELECT id, timestamp, activity_type, description,
                            automation_key, panchayat, village, status,
-                           duration_seconds, details
+                           duration_seconds, details,
+                           app_version, os_platform, error_type, error_source
                     FROM activity_log
                     WHERE synced = 0
                     ORDER BY id ASC
@@ -929,6 +962,11 @@ class HistoryManager:
                         "status": row[7] or (row[2] or "").lower(),
                         "duration_seconds": float(row[8] or 0),
                         "details": row[9] or row[3] or "",
+                        # Error-diagnostics — empty ho to legacy fallback
+                        "app_version": row[10] or getattr(config, 'APP_VERSION', ''),
+                        "os_platform": row[11] or getattr(config, 'OS_SYSTEM', ''),
+                        "error_type": row[12] or "",
+                        "error_source": row[13] or "",
                     })
                 return result
             except Exception as e:
