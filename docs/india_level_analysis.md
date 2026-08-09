@@ -171,7 +171,7 @@ PostgreSQL + Redis cache + Celery tasks + Evolution API (WhatsApp) + Docker
 | 1 | **Crash reporting** | Users app crash karein to aapko pata hi na chale | Global `sys.excepthook` + `POST /api/crash-report` + admin "Crashes" tab | 🟡 Local done (v3.2.1+); server upload baki |
 | 2 | **Full traceback + last-log capture** | Error ka exact root-cause line | `error_traceback` column + last 30 log lines attached on failure | 🟢 traceback done (migration 017); last-log baki |
 | 3 | **Activity log retention policy** | Table unbounded hai | DB job: archive/delete; stats tables banayein | 🟢 Opt-in done (migration 016, `.env` me `ACTIVITY_LOG_RETENTION_DAYS=180`); stats tables baki |
-| 4 | **Sync endpoint rate-limit + validation** | Spoof/abuse ka risk | Token/device-id verify + per-key rate limit + entry validation | 🟢 Done — per-license (180/h) + per-IP (600/h) limits, license-existence check (401 on fake keys), per-entry validation (max length, status enum, number coercion) |
+| 4 | **Sync endpoint rate-limit + validation** | Spoof/abuse ka risk | Token/device-id verify + per-key rate limit + entry validation | 🟢 Done — per-license + per-IP limits (env-configurable), license-existence check (401 on fake keys), per-entry validation (max length, status enum, number coercion), admin Rate Limits page (per-key usage stats + 24h trend) |
 | 5 | **Uptime monitoring + health endpoint** | Server down silently | `/healthz` + uptime robot + admin alert on WhatsApp | 🟢 `/healthz` done; uptime robot baki |
 
 ### 🟠 P1 — 1-2 mahine (scale ke liye zaroori)
@@ -232,6 +232,7 @@ EVO_API_KEY  = os.environ.get("EVO_API_KEY", "NregaBotSecretKey123")
 
 ### Phase 2 — "Scale & Security" (1-2 months)
 - [x] Rate limiting + validation on sync endpoints — **done** (activity-log + automation-results: per-key + per-IP limits, license check, entry validation)
+- [x] Rate Limits admin visibility — **done** (`/admin/rate-limits`: configured limits, current-hour per-key usage, 24h volume chart, env-var override docs)
 - [x] Uptime monitoring: `/healthz` endpoint — **done** (uptime robot baki)
 - [ ] DPDP compliance (privacy, consent, PII minimization)
 - [x] Secret rotation: EVO secrets ab env-var based (fallback same) — **done** (rotate values + remove fallback defaults)
