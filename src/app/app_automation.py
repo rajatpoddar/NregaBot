@@ -10,7 +10,6 @@ import subprocess
 import socket
 import os
 import json
-import base64
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -437,13 +436,8 @@ class AutomationMixin:
             except Exception as e:
                 logger.debug(f"Failed to show notification for {key}: {e}")
 
-            # ── Notification + Sync (safely wrapped) ──
+            # ── Cloud Sync (safely wrapped) ──
             try:
-                # ── WhatsApp Report (single setting: summary + Excel sath) ──
-                self._send_whatsapp_report_if_enabled(
-                    key, panchayat, status, duration, details, tab_instance
-                )
-
                 # ── Cloud Reports: raw results (columns + rows) sync karo ──
                 self._sync_automation_results_to_cloud(
                     key, panchayat, status, duration, details, tab_instance
@@ -454,132 +448,7 @@ class AutomationMixin:
                 server_license_key = lic.get('key', '')
                 self.history_manager.sync_activity_log_to_server(license_key=server_license_key)
             except Exception as e:
-                logger.error(f"Failed to send notification/sync for {key}: {e}")
-
-    def _send_whatsapp_report_if_enabled(self, key, panchayat, status, duration, details, tab_instance=None):
-        """
-        Ek hi setting (whatsapp_automation_notify) — ON hone par automation finish
-        par summary message + results Excel dono bheje jaate hain.
-
-        - Results data ho → EK hi WhatsApp message: Excel document jiska caption summary hai
-          (message count aadha → throttling risk bhi kam).
-        - Excel nahi bana (koi data nahi / >15MB / fail) → sirf summary text message.
-        """
-        if status not in ("success", "failed"):
-            return
-
-        # Fresh read of details on the MAIN thread — tabs jo rows async insert
-        # karte hain (safe_tree_insert via app.after), unke pending inserts yahan
-        # tak process ho chuke hote hain, isliye summary counts accurate milte hain
-        # (wrapper() me bg-thread par liya gaya details stale ho sakta hai).
-        if tab_instance is not None:
-            try:
-                details = getattr(tab_instance, 'activity_details', details) or details
-            except Exception:
-                pass
-
-        # Single merged setting (legacy whatsapp_excel_send bhi honor karta hai)
-        if not (get_config("whatsapp_automation_notify", False)
-                or get_config("whatsapp_excel_send", False)):
-            return
-
-        # Success + koi result nahi → message bilkul na bhejo.
-        # e.g. Mr Tracking me koi record nahi mila — bina result ke
-        # "Completed Successfully" bhejne ka koi matlab nahi.
-        # Par agar results_tree me data hai (Excel ban sakti hai) to report
-        # chalti rahe — Excel hi result hai.
-        # (Failed status ab bhi notify hota hai — user ko pata hona chahiye.)
-        if status == "success" and (not details or not str(details).strip()):
-            tree = getattr(tab_instance, 'results_tree', None) if tab_instance else None
-            if tree is None or not tree.get_children():
-                logger.info("WhatsApp report skipped for %s — success with no result data", key)
-                return
-
-        # Check if license_info has mobile number + key
-        lic = getattr(self.app_state, 'license_info', {})
-        user_mobile = (lic or {}).get('user_mobile', '')
-        license_key = (lic or {}).get('key', '')
-        if not user_mobile or not license_key:
-            return
-
-        # Build summary (Excel caption bhi yahi use hoga) — escaping-safe list + join
-        duration_str = f"{duration:.0f}s" if duration < 60 else f"{duration/60:.1f}m"
-        emoji = "✅" if status == "success" else "⚠️"
-        status_word = "Completed Successfully" if status == "success" else "Completed with Issues"
-        task_name = _automation_display_name(key)
-        summary_lines = [f"{emoji} {task_name} — {status_word}"]
-        if panchayat:
-            summary_lines.append(f"📍 Panchayat: {panchayat}")
-        summary_lines.append(f"⏱ Duration: {duration_str}")
-        if details:
-            summary_lines.append(f"📊 Result: {details}")
-        summary = chr(10).join(summary_lines)
-
-        # Send to server in background thread
-        def _send():
-            file_path = None
-            try:
-                server_url = config.LICENSE_SERVER_URL
-                if not server_url:
-                    return
-
-                # ── Step 1: Try combined message — Excel with summary caption ──
-                results_tree = getattr(tab_instance, 'results_tree', None) if tab_instance else None
-                try:
-                    if (results_tree is not None and results_tree.get_children()
-                            and hasattr(tab_instance, 'export_treeview_to_excel_auto')):
-                        title_prefix = key.replace('_', ' ').title()
-                        filename = f"{key}_report.xlsx"
-                        file_path = tab_instance.export_treeview_to_excel_auto(
-                            results_tree, default_filename=filename, title_prefix=title_prefix
-                        )
-                        if file_path and os.path.exists(file_path):
-                            size_mb = os.path.getsize(file_path) / (1024 * 1024)
-                            if size_mb <= 15:
-                                with open(file_path, "rb") as f:
-                                    file_b64 = base64.b64encode(f.read()).decode('utf-8')
-                                payload = {
-                                    "user_mobile": user_mobile,
-                                    "filename": filename,
-                                    "file_data": file_b64,
-                                    "caption": summary[:1000],  # Evolution caption limit ~1024
-                                    "license_key": license_key,
-                                }
-                                resp = requests.post(f"{server_url}/api/whatsapp-send-excel",
-                                                     json=payload, timeout=60)
-                                if resp.status_code in (200, 201):
-                                    logger.info("WhatsApp report (summary+Excel) sent for %s", key)
-                                    return
-                except Exception as e:
-                    logger.debug("WhatsApp Excel send failed for %s: %s", key, e)
-
-                # ── Step 2: Fallback — sirf summary text message ──
-                payload = {
-                    "license_key": license_key,
-                    "user_mobile": user_mobile,
-                    "automation_name": key,
-                    "panchayat": panchayat,
-                    "status": status,
-                    "duration_seconds": duration,
-                    "summary": summary,
-                    "details": details,
-                }
-                resp = requests.post(f"{server_url}/api/whatsapp-notify-automation",
-                                     json=payload, timeout=10)
-                if resp.status_code in (200, 201):
-                    logger.info("WhatsApp summary sent for %s", key)
-                else:
-                    logger.debug("WhatsApp summary failed: %s", resp.text)
-            except Exception as e:
-                logger.debug("WhatsApp report error: %s", e)
-            finally:
-                if file_path and os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                    except Exception:
-                        pass
-
-        threading.Thread(target=_send, daemon=True).start()
+                logger.error(f"Failed to sync for {key}: {e}")
 
     # ════════════════════════════════════════════════════════════
     # CLOUD REPORTS — raw results sync (30-day web portal storage)

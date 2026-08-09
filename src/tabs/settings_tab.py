@@ -1164,16 +1164,16 @@ class SettingsTab(ctk.CTkFrame):
                                             text_color=("gray50", "gray60"))
 
     def _on_whatsapp_notify_toggle(self) -> None:
-        """Toggle WhatsApp report on automation finish (summary + Excel dono ek setting)."""
+        """Toggle daily WhatsApp report — subah 6 baje previous day ka combined report."""
         val = self._whatsapp_notify_var.get()
         save_config("whatsapp_automation_notify", val)
         # Legacy key bhi sync — purane versions / cloud backup whitelist ke liye
         save_config("whatsapp_excel_send", val)
         self._update_notif_status_badge()
         if val:
-            self._set_fr_status("📱 WhatsApp reports enabled (summary + Excel)!", "green")
+            self._set_fr_status("📱 Daily WhatsApp report enabled (subah 6 baje)", "green")
         else:
-            self._set_fr_status("📱 WhatsApp reports disabled", "gray")
+            self._set_fr_status("📱 Daily WhatsApp report disabled", "gray")
 
     def _update_notif_status_badge(self) -> None:
         """Update the WhatsApp report status badge ON/OFF."""
@@ -1882,7 +1882,7 @@ class SettingsTab(ctk.CTkFrame):
                      ).grid(row=row_num[0], column=0, columnspan=3, sticky="w", padx=10, pady=(10, 2))
         row_num[0] += 1
 
-        # Banner-style notification card — single merged WhatsApp report setting
+        # Banner-style notification card — daily WhatsApp report setting
         notif_card = ctk.CTkFrame(scroll, fg_color=("#FFF7ED", "#1C1917"), corner_radius=10,
                                    border_width=1, border_color=("#FDBA74", "#9A3412"))
         notif_card.grid(row=row_num[0], column=0, columnspan=3, sticky="ew", padx=10, pady=(2, 10))
@@ -1893,7 +1893,7 @@ class SettingsTab(ctk.CTkFrame):
         notif_header.pack(fill="x", padx=15, pady=(10, 2))
         ctk.CTkLabel(notif_header, text="📱", font=ctk.CTkFont(size=22)).pack(side="left", padx=(0, 8))
         ctk.CTkLabel(notif_header,
-                     text="WhatsApp Automation Report",
+                     text="Daily WhatsApp Report",
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color=("#9A3412", "#FDBA74")).pack(side="left")
 
@@ -1901,13 +1901,13 @@ class SettingsTab(ctk.CTkFrame):
         switch_row = ctk.CTkFrame(notif_card, fg_color="transparent")
         switch_row.pack(fill="x", padx=15, pady=(2, 2))
 
-        # Single merged setting — purane 2 toggles ab ek (summary + Excel dono sath)
+        # Single merged setting — purane 2 config keys ab ek hi toggle control karta hai
         self._whatsapp_notify_var = tkinter.BooleanVar(
             value=get_config("whatsapp_automation_notify", False)
                   or get_config("whatsapp_excel_send", False)
         )
         self._whatsapp_notify_switch = ctk.CTkSwitch(
-            switch_row, text="🔔  Automation Finish par WhatsApp report bhejein (summary + Excel)",
+            switch_row, text="🔔  Subah 6 baje previous day ka report WhatsApp par bhejein",
             variable=self._whatsapp_notify_var,
             command=self._on_whatsapp_notify_toggle,
             font=ctk.CTkFont(size=13),
@@ -1925,10 +1925,11 @@ class SettingsTab(ctk.CTkFrame):
 
         # Description
         ctk.CTkLabel(notif_card,
-            text="💡 Jab bhi koi automation finish hogi (success/fail), aapke registered WhatsApp number par "
-                 "summary message + results ki Excel file ek saath bheji jayegi." + chr(10) +
-                 "Excel file ka caption hi summary hota hai - koi alag message nahi." + chr(10) +
-                 "Koi results na ho ya file 15MB se badi ho to sirf summary message jayega.",
+            text="💡 Subah 6 baje previous day (kal) ki saari automations ka combined report aapke "
+                 "registered WhatsApp number par bheji jayegi — Excel file + summary." + chr(10) +
+                 "Automation har baar complete hone par ab koi WhatsApp message nahi jata." + chr(10) +
+                 "Web portal (nregabot.com → Reports) se aap koi bhi report kabhi bhi manually download "
+                 "ya WhatsApp par bhej sakte hain.",
             font=ctk.CTkFont(size=11),
             text_color=("gray50", "gray60"),
             wraplength=650, justify="left",

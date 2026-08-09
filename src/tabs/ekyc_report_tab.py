@@ -153,7 +153,7 @@ class EKycReportTab(BaseAutomationTab):
         sb.grid(row=1, column=1, sticky="ns")
 
         # ── results_tree alias ──
-        # Base class helpers (WhatsApp summary + Excel report, cloud sync)
+        # Base class helpers (results export + cloud sync)
         # `results_tree` attribute use karte hain — same table ko alias kar do
         # taaki eKYC report bhi WhatsApp par summary + sheet bhej sake.
         self.results_tree = self.tree

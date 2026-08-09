@@ -24,7 +24,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         super().__init__(parent, app_instance, automation_key="jc_verify")
         self.photo_folder_path = ""
         self.pref_file = os.path.join(os.path.abspath("."), "jc_verify_prefs.json") 
-        # Result tracking (WhatsApp summary + Excel report ke liye)
+        # Result tracking (cloud sync + export ke liye)
         self._jc_success = 0
         self._jc_failed = 0
         self._jc_skipped = 0
@@ -111,7 +111,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         self._create_log_and_status_area(parent_notebook=notebook)
         self.progress_bar.grid_forget()
 
-        # ── Results Tab (results_tree → WhatsApp summary + Excel report) ──
+        # ── Results Tab (results_tree → cloud sync + export) ──
         results_tab = notebook.add("Results")
         results_tab.grid_columnconfigure(0, weight=1)
         results_tab.grid_rowconfigure(0, weight=1)
