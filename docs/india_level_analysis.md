@@ -3,7 +3,7 @@
 > **Purpose:** NREGA Bot ko "India level" tak le jaane ke liye kya-kya detailing chahiye — current state ka honest assessment, gap analysis, priority-wise roadmap.
 >
 > **Audience:** Product owner (Rajat), developers, future team members.
-> **Date:** Aug 2026 · **Current version:** 3.2.0
+> **Date:** Aug 2026 · **Current version:** 3.2.0 · **Next version:** 3.2.1 (crash-report upload + License & Terms tab)
 
 ---
 
@@ -68,6 +68,9 @@ Admin → Error Logs tab → Export CSV  (har entry me 24 detailed columns)
    │           → Top Error Patterns cards (auto-clustering, migration 015+)
    ▼
 Crash reporter (v3.2.1+) — uncaught exception → crash files + last-log-lines
+   │  + POST /api/crash-report (background daemon thread, PII-masked payload)
+   ▼
+Admin → Crashes tab (crash_reports table — version/OS/type/traceback/last-log)
    (error_screenshots/ bhi — failure par browser screenshot)
 ```
 
@@ -75,8 +78,8 @@ Crash reporter (v3.2.1+) — uncaught exception → crash files + last-log-lines
 
 1. ✅ **Full traceback capture** — `error_traceback` column (client SQLite + server PostgreSQL, migration 017), wrapper me full `traceback.format_exception()` (capped 4000). Admin UI me collapsible **▶ Show traceback**.
 2. ✅ **Screenshot on failure** — wrapper me `driver.save_screenshot()` → `Temp/error_screenshots/` (fully guarded, kabhi crash nahi). *Next: server upload.*
-3. ⬜ **Step-sequence logging** — automation ke steps har tab me log hote hain; failure par last 30 log lines attach karna baki.
-4. ✅ **Crash reporter** — `utils.install_crash_reporter()` → global `sys.excepthook` (main_app.py + lite_app.py dono me), crash file + last log lines save. *Next: `POST /api/crash-report` upload + admin Crashes tab.*
+3. ✅ **Step-sequence logging** — automation ke steps har tab me log hote hain; failure par **last 30 log lines** ab crash file me attach hote hain (client) + server crash_reports me bhi (upload ke saath).
+4. ✅ **Crash reporter + server upload** — `utils.install_crash_reporter()` → global `sys.excepthook` (main_app.py + lite_app.py dono me), crash file + last 30 log lines save, aur **background daemon thread me `POST /api/crash-report`** (PII-masked payload, license.dat se key, kabhi raise nahi). Server me `crash_reports` table (migration 020) + **admin Crashes tab** (version/OS/type/traceback/last-log lines, filters + pagination).
 5. ⬜ **AI triage** — AI infra hai (`app/ai_bot.py`); naye error patterns ka auto-summary baki.
 6. ✅ **Error pattern auto-clustering** — `/admin/api/activity-errors/summary` → Top Error Patterns cards (counts, users, first/last seen, fix status). Bounded 90-day scan.
 
@@ -168,11 +171,11 @@ PostgreSQL + Redis cache + Celery tasks + Evolution API (WhatsApp) + Docker
 
 | # | Gap | Why | Solution | Status |
 |---|---|---|---|---|
-| 1 | **Crash reporting** | Users app crash karein to aapko pata hi na chale | Global `sys.excepthook` + `POST /api/crash-report` + admin "Crashes" tab | 🟡 Local done (v3.2.1+); server upload baki |
+| 1 | **Crash reporting** | Users app crash karein to aapko pata hi na chale | Global `sys.excepthook` + `POST /api/crash-report` + admin "Crashes" tab | 🟢 Done (v3.2.1+) — client upload + `crash_reports` table (migration 020) + admin Crashes tab; AI triage baki |
 | 2 | **Full traceback + last-log capture** | Error ka exact root-cause line | `error_traceback` column + last 30 log lines attached on failure | 🟢 traceback done (migration 017); last-log baki |
 | 3 | **Activity log retention policy** | Table unbounded hai | DB job: archive/delete; stats tables banayein | 🟢 Opt-in done (migration 016, `.env` me `ACTIVITY_LOG_RETENTION_DAYS=180`); stats tables baki |
 | 4 | **Sync endpoint rate-limit + validation** | Spoof/abuse ka risk | Token/device-id verify + per-key rate limit + entry validation | 🟢 Done — per-license + per-IP limits (env-configurable), license-existence check (401 on fake keys), per-entry validation (max length, status enum, number coercion), admin Rate Limits page (per-key usage stats + 24h trend) |
-| 5 | **Uptime monitoring + health endpoint** | Server down silently | `/healthz` + uptime robot + admin alert on WhatsApp | 🟢 `/healthz` done; uptime robot baki |
+| 5 | **Uptime monitoring + health endpoint** | Server down silently | `/healthz` + uptime robot + admin alert on WhatsApp | 🟢 Done — `/healthz` + internal watchdog (`app/uptime_monitor.py`, DB/Redis/Evolution/WebDAV, state-change → admin WhatsApp) + admin Uptime page + UptimeRobot setup guide |
 
 ### 🟠 P1 — 1-2 mahine (scale ke liye zaroori)
 
@@ -197,7 +200,7 @@ PostgreSQL + Redis cache + Celery tasks + Evolution API (WhatsApp) + Docker
 | 17 | **Admin observability dashboard** | Ek jagah sab kuch | Grafana-style: active users, error rate per version, top failing automations, update adoption curve |
 | 18 | **Bulk user management** | 10k users ke licenses manually? | Bulk import/export (exists for users ✅), auto-renewal, reseller API polish |
 | 19 | **Backup & DR drill** | Backup hai par tested nahi | Monthly restore drill, point-in-time recovery, geo-redundant backup |
-| 20 | **Security audit** | License server = revenue + PII | Pen-test: auth flow, API rate limits, secret rotation (EVO keys abhi config me hardcoded hain!) |
+| 20 | **Security audit** | License server = revenue + PII | Pen-test: auth flow, API rate limits, secret rotation (EVO keys env-var based hain — fallback defaults rotate karo, §5) |
 
 ---
 
@@ -216,6 +219,8 @@ EVO_API_KEY  = os.environ.get("EVO_API_KEY", "NregaBotSecretKey123")
 3. Evolution API ko VPN/firewall ke peeche rakho
 4. Key rotation immediately (maan lo compromised hai)
 
+> ✅ **Progress (3.2.1):** EVO secrets env-var based hain (`os.environ.get` with fallback) — code me hardcode nahi. Fallback defaults (`NregaBotSecretKey123`, `192.168.29.101:8087`) rotate + remove hi abhi baki ka step hai.
+
 ---
 
 ## 6. Suggested Roadmap (Phase-wise)
@@ -224,17 +229,22 @@ EVO_API_KEY  = os.environ.get("EVO_API_KEY", "NregaBotSecretKey123")
 - [x] Error log detail spec (version/OS/function/time/fix-status) — **done**
 - [x] Admin Error Logs CSV export — **done**
 - [x] Full traceback capture (`error_traceback`, migration 017 + collapsible UI) — **done**
-- [x] Crash reporter (local: `sys.excepthook` + crash files) — **done** (server upload baki)
+- [x] Crash reporter (local: `sys.excepthook` + crash files) — **done**
+- [x] Crash-report server upload (`POST /api/crash-report` + `crash_reports` table, migration 020) — **done**
 - [x] Error clustering (`/api/activity-errors/summary` + Top Patterns cards) — **done**
 - [x] Activity log retention (opt-in, migration 016 + scheduler 3 AM IST) — **done**
 - [x] Screenshot on failure (local save) — **done** (server upload baki)
-- [ ] AI triage + last-log capture + crash-report upload — **next**
+- [x] Last-30-log-lines attached on failure — **done** (crash file + server payload)
+- [ ] AI triage — **next**
 
 ### Phase 2 — "Scale & Security" (1-2 months)
 - [x] Rate limiting + validation on sync endpoints — **done** (activity-log + automation-results: per-key + per-IP limits, license check, entry validation)
 - [x] Rate Limits admin visibility — **done** (`/admin/rate-limits`: configured limits, current-hour per-key usage, 24h volume chart, env-var override docs)
-- [x] Uptime monitoring: `/healthz` endpoint — **done** (uptime robot baki)
+- [x] Uptime monitoring: `/healthz` endpoint — **done**
+- [x] Internal uptime watchdog (`app/uptime_monitor.py`) — DB/Redis/Evolution/WebDAV checks har 5 min, state-change par admin WhatsApp alert, fcntl lock (single worker), admin Uptime page + Test Alert button — **done**
+- [ ] External UptimeRobot monitor setup — **setup guide ready** (admin Uptime page par steps; user ko dashboard par monitor bana na hai)
 - [x] DPDP compliance — PII minimization done (**see §4.1**); consent/breach-notification docs baki
+- [x] **Trust & Legal docs** — **done (3.2.1):** full Proprietary EULA (`docs/license.txt`, installer me `LicenseFile`), web pages updated (terms/privacy/refund + naya disclaimer.html), About tab me **License & Terms** window (EULA + Disclaimer sub-tabs), installer `infobefore.txt` update, `docs/Guide.txt` rewrite (7-service Docker stack, port 4991, `LICENSE_SERVER_URL` env var)
 
 ### 4.1 DPDP Act 2023 — PII Minimization (implemented)
 
@@ -281,7 +291,11 @@ EVO_API_KEY  = os.environ.get("EVO_API_KEY", "NregaBotSecretKey123")
 3. ✅ **Activity log retention job** — done (opt-in `ACTIVITY_LOG_RETENTION_DAYS`, .env me 180 set)
 4. ✅ **Error translation map** — done (`utils.translate_error`, Hinglish dialog)
 5. ✅ **Screenshot on failure** — done (wrapper, `Temp/error_screenshots/`)
-6. ➡️ **Next quick win:** crash-report server upload + last-30-log-lines attach + sync rate-limit
+6. ✅ **Crash-report server upload** — done (client daemon-thread upload + `crash_reports` table + admin Crashes tab)
+7. ✅ **About tab License & Terms** — done (EULA + Disclaimer, `docs/license.txt` bundled in all builds incl. core-update zip)
+8. ✅ **Web legal pages** — done (terms/privacy/refund/disclaimer updated to EULA-consistent, DPDP-accurate)
+9. ✅ **Uptime watchdog + admin alerts** — done (internal checks + WhatsApp alerts + admin Uptime page)
+10. ➡️ **Next quick win:** UptimeRobot external monitor dashboard setup (guide admin page par hai) + AI error triage
 
 ---
 

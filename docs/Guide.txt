@@ -1,130 +1,270 @@
-# Guide: Deploying Your License Server on Synology NAS with Docker
+# Guide: Deploying the NREGA Bot Server on Synology NAS with Docker
 
-This guide will walk you through setting up your Flask license server on your Synology NAS. This gives you full control over your backend.
-
----
-
-### **Phase 1: Prepare Your Project**
-
-On your main computer, make sure your project folder contains the following three files:
-1.  `license_server.py`
-2.  `requirements.txt` (containing `Flask` and `gunicorn`)
-3.  `docker-compose.yml`
+This guide walks you through deploying the **NREGA Bot server** (license
+validation, payments, file management, admin dashboard, marketing website and
+auto-update flow) on your Synology NAS with Docker Compose. It replaces the old
+single-file `license_server.py` guide — the server is now a full Flask
+application with PostgreSQL, Redis, Celery, WebDAV and automatic database
+backups.
 
 ---
 
-### **Phase 2: Set Up Your Synology NAS**
+### Architecture Overview
 
-#### **Step 1: Install Container Manager**
+The server runs as **7 Docker Compose services**:
 
-1.  Log in to your Synology DSM (the web interface for your NAS).
-2.  Open the **Package Center**.
-3.  Search for **"Container Manager"** (on older DSM versions, this might be called "Docker").
-4.  Click **Install**.
+| Service | What it does | Host port |
+|---|---|---|
+| `nrega-server-new` | Flask + Gunicorn — API, admin panel, marketing website, license validation | **4991** |
+| `postgres-new` | PostgreSQL 14 database | 5436 (internal only) |
+| `redis` | Celery broker + cache | 6380 (internal only) |
+| `celery-worker` | Background jobs (emails, broadcasts, backups, heavy tasks) | — |
+| `webdav` | WebDAV server — cloud file access from phone/PC | **8080** |
+| `backup-new` | Daily full database dump (kept 30 days) | — |
+| `webhook` | GitHub auto-deploy webhook listener | **9876** (optional) |
 
-#### **Step 2: Upload Your Project Files**
-
-1.  Open **File Station** on your NAS.
-2.  Create a new shared folder to hold your projects, for example, named `docker`.
-3.  Inside the `docker` folder, create a new subfolder for this specific project, for example, `nrega-license-server`.
-4.  Upload the three files (`license_server.py`, `requirements.txt`, `docker-compose.yml`) from your computer into this new `nrega-license-server` folder.
-
----
-
-### **Phase 3: Build and Run the Project**
-
-We will now use the Container Manager to build and run your server from the `docker-compose.yml` file. This is the recommended approach.
-
-1.  Open **Container Manager**.
-2.  On the left menu, go to **Project** and then click the **Create** button.
-3.  Configure the project:
-    * **Project Name:** `nrega-server`
-    * **Source:** Select **"Create from docker-compose.yml"**.
-    * **Path:** Click the button to browse your NAS folders and select the `nrega-license-server` folder (the folder containing your `docker-compose.yml` file).
-4.  Click **Next**. The system will read your `docker-compose.yml` file.
-5.  Review the configuration on the next screen (it should be pre-filled based on your file) and click **Done**.
-6.  Container Manager will now build the image and start the container. This might take a minute or two.
-7.  Your project will now be running. You can see its status in the "Project" list.
-
-Your server is now running on your NAS! The next phase is making it accessible from the internet.
+**Key facts:**
+- Migrations (`nrega-server/migrations/*.sql`) are applied **automatically on
+  server startup** — no manual SQL step.
+- The marketing website (`nrega-server/web/`) is served by the Flask app itself.
+- Update files live in `website/updates/` on the NAS; the app's auto-update
+  reads `config/version.json` and downloads installers from there.
 
 ---
 
-### **Phase 4: Making Your Server Public (Port Forwarding)**
+### Phase 1: Prepare the Files
 
-To allow your customers' apps to reach your server, you must configure your home router to forward internet traffic to your NAS.
+On your main computer, the **server repo folder** (`nrega-server/`) contains
+everything needed. You do NOT need a separate `license_server.py` — that file
+no longer exists.
 
-#### **Step 1: Find Your NAS's Local IP Address**
+Create/upload this structure on the NAS (paths relative to the compose file):
 
-1.  On your Synology NAS, go to **Control Panel** > **Network** > **Network Interface**.
-2.  You will see your local IP address, which will look something like `192.168.1.50`. Write this down.
+```
+/volume1/docker/Projects/Nrega-Bot/
+├── nrega-server/          ← the server repo folder (contains docker-compose.yml)
+│   ├── docker-compose.yml
+│   ├── deploy.sh
+│   ├── .env               ← created from .env.example (Phase 3)
+│   └── app/ web/ migrations/ ...
+├── config/version.json    ← update manifest (mounts read-only into container)
+├── assets/                ← shared assets (icons/fonts, read-only mount)
+└── website/updates/       ← UPDATE files folder (must exist; read-write)
+```
 
-#### **Step 2: Configure Your Router**
-
-1.  Log in to your home router's administration page (e.g., by typing `192.168.1.1` into your browser).
-2.  Find the section named **"Port Forwarding"** or "Virtual Server".
-3.  Create a new rule:
-    * **Application Name:** `NREGA Server` (or any name)
-    * **External Port:** `5000`
-    * **Internal Port:** `5000`
-    * **Device IP / Internal IP:** Enter your NAS's local IP address (e.g., `192.168.1.50`).
-    * **Protocol:** `TCP`
-4.  Save the rule.
-
-#### **Step 3: Find Your Public IP Address**
-
-1.  On any computer on your network, search Google for **"what is my ip"**.
-2.  Google will display your public IP address (e.g., `103.27.10.150`). This is your home's address on the internet.
-
----
-
-### **Phase 5: Finalize and Distribute Your App**
-
-This is the final and most important step to connect your desktop app to your live server.
-
-#### **Step 1: Update the Server URL in `main_app.py`**
-
-1.  On your **local computer**, open your `main_app.py` file in your code editor.
-2.  Find the `validate_on_server` method.
-3.  Change the `server_url` variable to use your **Public IP Address** that you found in the previous step.
-
-    ```python
-    # In main_app.py
-    def validate_on_server(self, key, is_startup_check=False):
-        # --- CHANGE THIS LINE ---
-        # Replace YOUR_PUBLIC_IP with the address you found on Google.
-        # This tells the app to connect to your NAS over the internet.
-        server_url = "http://YOUR_PUBLIC_IP:5000/validate"
-        
-        try:
-            # ... (the rest of the function remains the same)
-    ```
-
-#### **Step 2: Run Your App Again**
-
-**You do not need to re-package with PyInstaller yet.** First, test it locally:
-1.  Save the change to `main_app.py`.
-2.  Delete the `license.dat` file from your project folder to trigger the activation window.
-3.  Run the app from your terminal: `python3 main_app.py`.
-4.  When the activation window appears, enter a valid key from your admin panel. It should now connect to your NAS and activate successfully.
-
-Once this works, you can re-package the final application with PyInstaller to send to customers.
+1. Copy the **whole `nrega-server/` folder** (not just three files).
+2. Make sure `config/version.json` exists (kept in sync with the desktop app
+   release).
+3. Create the `website/updates/` folder on the NAS — the server's
+   `release_sync` automatically downloads new GitHub releases into it.
 
 ---
 
-### **Troubleshooting**
+### Phase 2: Set Up Your Synology NAS
 
-**Error: "Connection refused" or `host='127.0.0.1'`**
-* **Cause:** You have not completed Phase 5, Step 1. Your `main_app.py` is still trying to connect to your local machine instead of your NAS.
-* **Solution:** Open `main_app.py` and change the `server_url` to your public IP address or DDNS hostname.
+#### Step 1: Install Container Manager
 
-**Important Consideration: Dynamic IP Address**
-* Most home internet connections have a **dynamic public IP**. If your IP changes, your app will stop working.
-* **Permanent Solution (Recommended):** Use Synology's built-in **DDNS** service. Go to **Control Panel** > **External Access** > **DDNS** and set up a free hostname (e.g., `rajat.synology.me`). Then, use this permanent address in your `main_app.py` file: `http://rajat.synology.me:5000/validate`. It will always point to your NAS, even if the IP changes.
+1. Log in to your Synology DSM (the web interface for your NAS).
+2. Open the **Package Center**.
+3. Search for **"Container Manager"** (on older DSM versions this is called
+   "Docker").
+4. Click **Install**.
 
+#### Step 2: Upload Your Project Files
 
+1. Open **File Station** on your NAS.
+2. Create a shared folder (e.g. `docker`) and inside it the project path
+   `Projects/Nrega-Bot/`.
+3. Upload the `nrega-server/` folder, `config/version.json` and `assets/`
+   folder into it, and create the empty `website/updates/` folder.
+4. In the `nrega-server/` folder, copy `.env.example` to `.env` (see Phase 3).
 
+---
 
+### Phase 3: Configure the `.env` File
 
+The server reads all configuration from `.env`. Copy `nrega-server/.env.example`
+to `.env` and fill in at least:
 
+```ini
+# --- PostgreSQL ---
+POSTGRES_DB=nregabot
+POSTGRES_USER=nregabot_user
+POSTGRES_PASSWORD=CHANGE-ME-STRONG-PASSWORD
+DATABASE_HOST=postgres-new            # Docker service name — do not change
 
+# --- Admin Panel ---
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=                  # bcrypt hash of your admin password
+
+# --- Payments (optional until enabled) ---
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_WEBHOOK_SECRET=
+
+# --- Cloud storage (optional) ---
+R2_ENDPOINT_URL=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+
+# --- WhatsApp / AI (optional) ---
+WHATSAPP_SEND_INTERVAL=3
+AI_BOT_ENABLED=false
+```
+
+Optional overrides used by `run.py`:
+- `WEBHOOK_HOST` / `WEBHOOK_PORT` — NAS LAN IP + 4991 for the Evolution API
+  WhatsApp webhook (default `192.168.29.101:4991`).
+- `GUNICORN_WORKERS` — keep at 1–2 on a low-RAM NAS (each worker loads the AI
+  model).
+- `AI_WARMUP_ENABLED=false` — disable AI warm-up on small NAS models.
+
+> **Never commit `.env` to version control.**
+
+---
+
+### Phase 4: Build and Run the Server
+
+There are two equivalent ways:
+
+#### Option A — Using `deploy.sh` (recommended)
+
+SSH into the NAS, then from the `nrega-server/` folder run:
+
+```bash
+cd /volume1/docker/Projects/Nrega-Bot/nrega-server
+chmod +x deploy.sh
+./deploy.sh
+```
+
+`deploy.sh` will:
+1. Check that `.env` exists and Docker is running.
+2. Build the images.
+3. Run migrations.
+4. Restart all containers and wait for the health check
+   (`GET /api/health` → 200).
+5. Print a summary and the admin/health/WebDAV URLs.
+
+#### Option B — Using Container Manager (GUI)
+
+1. Open **Container Manager** → **Project** → **Create**.
+2. **Project Name:** `nrega-server`
+3. **Source:** "Create from docker-compose.yml", browse to the
+   `nrega-server` folder.
+4. Click **Next** — it reads the compose file, then click **Done**.
+5. Wait a minute or two for the images to build and containers to start.
+
+> First build downloads the base images and can take several minutes.
+
+---
+
+### Phase 5: Making Your Server Public (Port Forwarding)
+
+For customers' apps (and the web dashboard) to reach the server from the
+internet, forward these ports on your router:
+
+| External Port | Internal Port | Device | Purpose |
+|---|---|---|---|
+| **4991** | 4991 | NAS | Main server — API, admin panel, website (required) |
+| **8080** | 8080 | NAS | WebDAV cloud file access (optional) |
+| **9876** | 9876 | NAS | GitHub auto-deploy webhook (optional) |
+
+`5436` (Postgres) and `6380` (Redis) are for NAS-internal use only — do **not**
+forward them.
+
+#### Step 1: Find Your NAS's Local IP Address
+
+**Control Panel** → **Network** → **Network Interface** — note the IP, e.g.
+`192.168.1.50`.
+
+#### Step 2: Configure Your Router
+
+1. Log in to your router's admin page (e.g. `192.168.1.1`).
+2. Open **"Port Forwarding"** / **"Virtual Server"**.
+3. For each row above, create a TCP rule pointing the external port to the
+   NAS's local IP.
+4. Save the rules.
+
+#### Step 3: Find / Choose Your Public Address
+
+- Search Google for **"what is my ip"** for the current public IP.
+- **Better:** set up Synology **DDNS** (Control Panel → External Access → DDNS)
+  to get a permanent hostname (e.g. `rajat.synology.me`) that keeps working
+  when the dynamic public IP changes. Use that hostname everywhere below.
+
+---
+
+### Phase 6: Connect the Desktop App (no code edits!)
+
+In the old version you had to edit `main_app.py` and hardcode the server URL.
+That is no longer needed — the app reads **`LICENSE_SERVER_URL`** at startup
+(`src/config.py`, default `https://nregabot.com`).
+
+1. On the machine running the desktop app, set the environment variable:
+
+   ```bash
+   # macOS / Linux
+   export LICENSE_SERVER_URL="http://rajat.synology.me:4991"
+
+   # Windows (PowerShell)
+   $env:LICENSE_SERVER_URL = "http://rajat.synology.me:4991"
+   ```
+
+   Or pass it inline: `LICENSE_SERVER_URL=http://localhost:4991 python main_app.py`
+
+2. Delete the `license.dat` file from the app's data folder (see Help → About
+   for the location) to trigger the activation window again.
+3. Run the app and activate with a valid key — it now talks to your NAS server.
+
+> The app also uses `LICENSE_SERVER_URL` for activity-log sync, cloud backup,
+> file manager and WhatsApp chat — one variable covers everything.
+
+---
+
+### Phase 7: Verify Everything
+
+From any computer on your network (or the public internet):
+
+| What | URL |
+|---|---|
+| Admin panel | `http://<host>:4991/admin/` |
+| Health check | `http://<host>:4991/api/health` (should return 200) |
+| Marketing website | `http://<host>:4991/` |
+| WebDAV | `http://<host>:8080` |
+
+In the admin panel you can manage licenses, users, transactions, broadcast
+messages, rate limits and view the live dashboard.
+
+---
+
+### Troubleshooting
+
+**Error: app says "Connection refused" / tries `127.0.0.1`**
+- The client's `LICENSE_SERVER_URL` is still the default or points to
+  `localhost`. Set it to your public hostname (Phase 6) and restart the app.
+
+**`docker-compose` health check never returns 200**
+- View logs: `docker-compose logs nrega-server-new --tail=50`
+- Common causes: missing `.env` values, wrong `DATABASE_HOST`, Postgres
+  container still initializing on first boot.
+
+**Update downloads from the app fail / old version reported**
+- Confirm `config/version.json` is mounted (`../config:/config:ro` in the
+  compose file) and `website/updates/` exists and is writable.
+
+**WhatsApp webhook events never reach the server**
+- Set `WEBHOOK_HOST` to the NAS LAN IP and `WEBHOOK_PORT=4991` in `.env`,
+  then restart the server container.
+
+**Important: Dynamic public IP**
+- Home internet IPs change. Use Synology **DDNS** so your hostname always
+  resolves to the NAS — otherwise every IP change breaks customer connections.
+
+---
+
+### Optional: Automatic Deploys from GitHub
+
+The `webhook` service (port 9876, config `hooks.json`) can trigger
+`./deploy.sh` when you push to the repo. Configure the webhook URL
+`http://<public-host>:9876/hooks/deploy` in your GitHub repository settings and
+forward port 9876 on the router.

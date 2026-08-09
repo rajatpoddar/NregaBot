@@ -438,6 +438,41 @@ _ERROR_TRANSLATIONS = [
 # ── Crash reporter (uncaught exceptions → crash files) ───────────
 _CRASH_REPORTER_INSTALLED: bool = False
 
+
+def _read_license_key() -> str:
+    """license.dat se license key read karo (crash upload payload ke liye).
+
+    Kabhi raise nahi karta — crash path me bhi 100% safe.
+    """
+    try:
+        with open(get_data_path("license.dat"), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return str(data.get("key") or "").strip()
+    except Exception:
+        return ""
+
+
+def _upload_crash_report(payload: dict) -> None:
+    """Crash report server par bhejo (daemon thread me — kabhi raise nahi).
+
+    POST /api/crash-report — server-side bhi PII masking + rate limiting hai
+    (defense-in-depth). Fail hone par silently ignore — crash path me koi
+    network wait ya exception UI ko nahi rok sakta.
+    """
+    try:
+        from src import config
+        server_url = (config.LICENSE_SERVER_URL or "").strip().rstrip("/")
+        if not server_url.startswith("http"):
+            return
+        import requests
+        requests.post(
+            f"{server_url}/api/crash-report",
+            json=payload,
+            timeout=8,
+        )
+    except Exception:
+        pass
+
 def install_crash_reporter() -> None:
     """
     Global uncaught-exception handler — app crash hone par bhi details save.
@@ -478,13 +513,16 @@ def install_crash_reporter() -> None:
             ]
 
             # App log ke last ~30 lines — crash se pehle kya ho raha tha
+            # (ek baar hi read karo — file-write aur server upload dono isi se)
+            tail_lines: list = []
             try:
                 log_path = get_log_path()
                 if os.path.exists(log_path):
                     with open(log_path, "r", encoding="utf-8", errors="replace") as f:
-                        tail = f.readlines()[-30:]
+                        tail_lines = [mask_pii_text(line.rstrip("\n"))
+                                      for line in f.readlines()[-30:]]
                     lines.append("--- Last log lines ---")
-                    lines.extend(mask_pii_text(line.rstrip("\n")) for line in tail)
+                    lines.extend(tail_lines)
             except Exception:
                 pass
 
@@ -493,6 +531,27 @@ def install_crash_reporter() -> None:
             with open(path, "w", encoding="utf-8") as f:
                 f.write("\n".join(lines))
             get_logger().error("🚨 App crash recorded: %s (%s)", path, exc_type.__name__)
+
+            # ── Server upload (background daemon thread, kabhi raise nahi) ──
+            try:
+                import threading
+                payload = {
+                    "license_key": _read_license_key(),
+                    "app_version": getattr(config, "APP_VERSION", ""),
+                    "os_platform": getattr(config, "OS_SYSTEM", ""),
+                    "error_type": getattr(exc_type, "__name__", ""),
+                    "error_message": mask_pii_text(str(exc_value)),
+                    "error_traceback": mask_pii_text(
+                        "".join(_tb.format_exception(exc_type, exc_value, exc_tb))
+                    ),
+                    "last_log_lines": "\n".join(tail_lines),
+                    "crash_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                threading.Thread(
+                    target=_upload_crash_report, args=(payload,), daemon=True
+                ).start()
+            except Exception:
+                pass
         except Exception:
             pass
 

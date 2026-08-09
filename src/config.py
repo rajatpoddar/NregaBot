@@ -9,7 +9,7 @@ APP_TAGLINE: str = "Your NREGA Task Management Companion"
 APP_DESCRIPTION: str = "A comprehensive tool for managing NREGA tasks efficiently."
 APP_AUTHOR: str = "Rajat Poddar"
 APP_AUTHOR_EMAIL: str = "Rajatpoddar@outlook.com"
-APP_VERSION: str = "3.2.0"
+APP_VERSION: str = "3.2.1"
 import os
 LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://nregabot.com')
 

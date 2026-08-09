@@ -1,19 +1,28 @@
 {
-  "latest_version": "3.2.0",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.0-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.0-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.0-Linux.tar.gz",
+  "latest_version": "3.2.1",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.1-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.1-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.1-Linux.tar.gz",
   "core_update": {
-    "version": "3.2.0",
-    "url": "https://nregabot.com/updates/core_v3.2.0.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.2.0.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.0.zip",
+    "version": "3.2.1",
+    "url": "https://nregabot.com/updates/core_v3.2.1.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.1.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.1.zip",
     "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "897ee49d5f627696c2f79c14aa41a25b53c4d66c5ff670d16b4d4b9e892e0e27",
-    "hash_macos": "3215df9a990d9afcc4149f4693c04dae9bc2caf5ea298cf7fad92f4757dde94f"
+    "hash_windows": "",
+    "hash_macos": ""
   },
   "changelog": {
+    "3.2.1": [
+      "💥 **Crash Reporting:** Agar app crash ho jaye, to poori details (app version, tab/function, error, last 30 log lines) automatically server par bheji jati hain — admin panel ke naye Crashes tab me dikhti hain, filters + CSV export ke saath. Ab koi bhi error chhupa nahi rahega.",
+      "📡 **Uptime Monitoring:** Server ab har 5 minute me khud ko check karta hai (Database, Redis, WhatsApp, WebDAV) — koi bhi service down ho to admin ko turant WhatsApp alert milta hai. UptimeRobot ke saath 24x7 external monitoring bhi.",
+      "🔐 **DPDP Compliance (Data Privacy):** Aadhaar aur sensitive PII ab reports, logs aur server data me mask hote hain — koi bhi sensitive data store nahi hota. India data-privacy rules ke hisaab se safe.",
+      "🚦 **API Rate Limiting:** Sync endpoints par per-key aur per-IP rate limits + entry validation — spoof/abuse protection. Admin panel me har key ka live usage stats + configurable limits (env vars se).",
+      "📋 **Better Error Logs:** Admin Activity page ke error logs me ab full context (version, tab, function, time) + export — error report dekhkar turant samajh aata hai kya problem hai aur kaise fix kare.",
+      "⚖️ **License & Terms:** App me naya License & Terms window (EULA + disclaimer) + web pages updated (privacy, terms, disclaimer) — sab kuch legally clear.",
+      "🐞 **Bug Fixes:** Admin error summary 500 fix, local dev issues (WebDAV check, AI knowledge base path, updates folder), aur stability improvements."
+    ],
     "3.2.0": [
       "📍 **Panchayat Column in Results:** Har automation ke results table me ab Panchayat column dikhta hai — 'My Saved Panchayats' mode me bhi clearly pata chalta hai kaunsa row kis panchayat ka hai (16 tabs updated).",
       "🔢 **Serial Number (Sr. No.):** Har results table ka pehla column ab apna local serial number (1, 2, 3...) hota hai — website ka serial ignore hota hai. Excel/CSV/PDF/WhatsApp reports me bhi serial pehle column me.",

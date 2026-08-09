@@ -4,9 +4,9 @@
 
 # 🚜 NREGA Bot
 
-**v3.2.0** — Powerful NREGA Automation for Windows, macOS & Linux
+**v3.2.1** — Powerful NREGA Automation for Windows, macOS & Linux
 
-[![Version](https://img.shields.io/badge/version-3.2.0-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
+[![Version](https://img.shields.io/badge/version-3.2.1-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f?style=flat-square)](https://nregabot.com/#downloads)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)]()
 [![Updates](https://img.shields.io/badge/updates-Smart%20SHA--256%20Verified-4c1?style=flat-square)]()
@@ -185,9 +185,9 @@ Only a supported web browser is needed:
 ### Installation
 
 1. **Download** the installer for your platform:
-   - **Windows**: `NREGABot-v3.2.0-Setup.exe`
-   - **macOS**: `NREGABot-v3.2.0-macOS.dmg`
-   - **Lite (low-end PCs)**: `NREGABot-Lite-v3.2.0-Setup.exe` or portable ZIP
+   - **Windows**: `NREGABot-v3.2.1-Setup.exe`
+   - **macOS**: `NREGABot-v3.2.1-macOS.dmg`
+   - **Lite (low-end PCs)**: `NREGABot-Lite-v3.2.1-Setup.exe` or portable ZIP
 2. Run the installer and launch **NREGA Bot**.
 
 ### Quick Start
@@ -266,8 +266,20 @@ Yes — a special **Lite build** is available for low-end PCs with a reduced fea
 
 ## 📜 Changelog
 
-### 🆕 What's New in v3.2.0
+### 🆕 What's New in v3.2.1
 
+- 💥 **Crash Reporting** — crashes now upload full context (app version, tab/function, error, last 30 log lines) to the server; new admin Crashes tab with filters & CSV export.
+- 📡 **Uptime Monitoring** — the server self-checks every 5 min (Database, Redis, WhatsApp, WebDAV) and alerts the admin on WhatsApp the moment anything goes down.
+- 🔐 **DPDP Compliance** — Aadhaar & sensitive PII are masked everywhere; no sensitive data is stored.
+- 🚦 **API Rate Limiting** — per-key & per-IP rate limits + validation on sync endpoints; live per-key usage stats in the admin panel.
+- 📋 **Better Error Logs** — admin error logs now carry full context (version, tab, function, time) with export.
+- ⚖️ **License & Terms** — new in-app License & Terms window (EULA + disclaimer); web privacy/terms/disclaimer pages updated.
+- 🐞 **Bug Fixes** — admin error summary 500 fix, local-dev fixes, stability improvements.
+
+<details>
+<summary><b>Previous versions</b></summary>
+
+#### v3.2.0
 - 📍 **Panchayat Column in Results** — every results table now shows which row belongs to which Panchayat, even in *My Saved Panchayats* mode.
 - 🔢 **Serial Number (Sr. No.)** — a local serial number is now the first column of every results table and export (website serial is ignored).
 - 📅 **Smart File Names** — exported reports now include date & time in the filename — no more overwrites or manual renaming.
@@ -276,9 +288,6 @@ Yes — a special **Lite build** is available for low-end PCs with a reduced fea
 - 💬 **WhatsApp Report Toggle** — a dedicated toggle for WhatsApp report notifications.
 - 🖨️ **Print-Ready Excel Reports** — A4 landscape, fit-to-width, repeating headers & page numbers — print and submit straight to the office.
 - 🧩 **Windows Update Fix** — core zip version detection now works correctly.
-
-<details>
-<summary><b>Previous versions</b></summary>
 
 #### v3.1.7
 - 🔐 Google Login, 🪪 Passkey (WebAuthn) login, 📧 OTP Login on web
