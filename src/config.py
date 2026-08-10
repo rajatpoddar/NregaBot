@@ -52,7 +52,6 @@ MAIN_WEBSITE_URL: str = "https://nregabot.com"
 # tab, the rest open as additional tabs.
 DEFAULT_LAUNCH_URLS: List[str] = [
     MAIN_WEBSITE_URL,
-    "https://bookmark.nregabot.com/",
     "https://vbgramg.nregabot.com/",
 ]
 SUPPORT_EMAIL: str = "nregabot@gmail.com"
@@ -568,6 +567,14 @@ STATE_DEMAND_CONFIG: Dict[str, Dict[str, str]] = {
     }
     # Add more states here
     # You can add more states here
+}
+
+# Job-card prefix -> state key (STATE_DEMAND_CONFIG). Used to auto-detect the
+# user's state from an uploaded eKYC report so the Demand tab pre-selects it.
+STATE_JOB_CARD_PREFIXES: Dict[str, str] = {
+    "JH-": "Jharkhand",
+    "RJ-": "Rajasthan",
+    "KA-": "Karnataka",
 }
 
 

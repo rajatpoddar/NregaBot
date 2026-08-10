@@ -61,6 +61,7 @@ docs/ARCHITECTURE_ANALYSIS.md
 docs/PERFORMANCE_ANALYSIS.md
 docs/PROJECT_ANALYSIS.md
 docs/OPTIMIZATION_PLAN.md
+docs/data/
 
 # Python egg info
 *.egg-info/

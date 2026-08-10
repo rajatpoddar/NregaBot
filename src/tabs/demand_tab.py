@@ -92,8 +92,8 @@ class CloudFilePicker(ctk.CTkToplevel):
             data = resp.json()
             if data.get('status') == 'success':
                 files = data.get('files', [])
-                # Filter for folders and CSV files
-                display_items = [f for f in files if f['is_folder'] or f['filename'].lower().endswith('.csv')]
+                # Filter for folders and report files (CSV / Excel)
+                display_items = [f for f in files if f['is_folder'] or f['filename'].lower().endswith(('.csv', '.xlsx'))]
                 self.after(0, self._populate_list, display_items)
             else:
                 raise Exception(data.get('reason', 'Failed to list files.'))
@@ -108,7 +108,7 @@ class CloudFilePicker(ctk.CTkToplevel):
         self.status_label.configure(text="Select a file or folder:")
         
         if not files:
-            ctk.CTkLabel(self.file_frame, text="No .csv files or folders found.", text_color="gray").pack(pady=10)
+            ctk.CTkLabel(self.file_frame, text="No .csv / .xlsx files or folders found.", text_color="gray").pack(pady=10)
             return
 
         # Sort: Folders first, then by name
@@ -194,6 +194,16 @@ class DemandTab(BaseAutomationTab):
     """
     The main class for the "Demand" automation tab.
     """
+    # Portal messages that mean the demand for this period ALREADY exists
+    # (e.g. 'Demand of ARMAN ANSARI for period 10/08/2026-23/08/2026 is
+    # already there and work is allotted'). These are NOT a new success —
+    # they get their own 'Already' status (warning colour) and are excluded
+    # from auto-allocation. The bare 'already' is a catch-all for other
+    # states' wordings ('already done', 'already allotted for this period',
+    # ...) — a genuine success message never contains it.
+    ALREADY_PHRASES = ("already there", "already exists", "is already",
+                       "already been", "already")
+
     def __init__(self, parent: Any, app_instance: Any) -> None:
         """
         Initializes the Demand automation tab.
@@ -204,8 +214,11 @@ class DemandTab(BaseAutomationTab):
         self.config_file = self.app.get_data_path("demand_inputs.json")
 
         self.all_applicants_data = [] # Holds all data from CSV
-        
-        self.work_key_list = [] # Store work keys for autocomplete
+
+        self._suppress_search_refresh = False  # keeps the result list stable while ticking
+
+        self._current_panchayat = ""  # active group while automation runs (results display)
+        self._current_village = ""
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -222,15 +235,25 @@ class DemandTab(BaseAutomationTab):
         notebook.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         settings_tab = notebook.add("Settings")
+        select_tab = notebook.add("Select Jobcard")
         results_tab = notebook.add("Results")
         self._create_log_and_status_area(notebook)
 
+        # Open on the 'Select Jobcard' tab by default — otherwise the user
+        # lands on 'Settings' and the job-card list is never visible until
+        # they click the second tab (this is why the list 'did not show' in
+        # the UI even though search was working).
+        notebook.set("Select Jobcard")
+
         settings_tab.grid_columnconfigure(0, weight=1)
-        settings_tab.grid_rowconfigure(1, weight=1)
+
+        # Jobcard selection gets its own tab — full width & height for the panels
+        select_tab.grid_columnconfigure(0, weight=1)
+        select_tab.grid_rowconfigure(0, weight=1)
 
         # ── Header card ──
         self._create_header_card(settings_tab, "📥", "Demand",
-                                 "Create work demands for the selected applicants on the portal.",
+                                 "Upload the eKYC & ABPS report, select job cards and create work demands on the portal.",
                                  icon_key="emoji_demand")
 
         # Wrap ALL settings content in a bordered scrollable card
@@ -239,7 +262,8 @@ class DemandTab(BaseAutomationTab):
         settings_scroll.grid(row=1, column=0, sticky="nsew", padx=12, pady=6)
         settings_scroll.grid_columnconfigure(0, weight=1)
 
-        # All content goes into settings_scroll, not settings_tab directly
+        # Only the run-settings controls live in Settings; job card selection
+        # has its own 'Select Jobcard' tab.
         content = settings_scroll  # alias for clarity
 
         # --- Settings Tab Widgets ---
@@ -252,11 +276,17 @@ class DemandTab(BaseAutomationTab):
         # --- Row 0: State and Panchayat ---
         ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, padx=(10, 5), pady=5, sticky="w")
         self.state_var = ctk.StringVar()
-        self.state_combobox = ctk.CTkOptionMenu(controls_frame, variable=self.state_var, values=list(config.STATE_DEMAND_CONFIG.keys()))
+        # Only the user's own state(s) — saved from license/settings — are shown,
+        # like the panchayat dropdowns in the other automations. Falls back to
+        # all configured states when nothing is saved yet.
+        self.state_options = self._get_state_options()
+        self.state_combobox = ctk.CTkOptionMenu(controls_frame, variable=self.state_var, values=self.state_options)
         self.state_combobox.grid(row=0, column=1, padx=(0, 10), pady=5, sticky="ew")
 
         ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=2, padx=(0, 5), pady=5, sticky="w")
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        # ALL panchayats saved in Settings > Location Data (merged across keys),
+        # like every other tab — NOT just the 'location_panchayat' key.
+        p_vals = self._get_saved_panchayats() or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
@@ -294,30 +324,28 @@ class DemandTab(BaseAutomationTab):
         self.custom_select_button = ctk.CTkButton(custom_select_frame, text="Select", command=self._select_custom_number, width=70)
         self.custom_select_button.grid(row=0, column=1, sticky="e")
         
-        # --- Row 3: Work Key ---
+        # --- Row 3: Work Key (typeable input) ---
+        # User types ONE work key here — selected workers are allocated to it
+        # automatically after the demand is submitted. If the report CSV has a
+        # per-worker 'Allocation Work Code' column, those codes take priority.
         ctk.CTkLabel(controls_frame, text="Work Key:").grid(row=3, column=0, padx=(10, 5), pady=5, sticky="w")
         
         work_key_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         work_key_frame.grid(row=3, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
-        work_key_frame.grid_columnconfigure(0, weight=1) 
+        work_key_frame.grid_columnconfigure(0, weight=1)
         
         self.allocation_work_key_var = ctk.StringVar()
-        self.allocation_work_key_menu = ctk.CTkOptionMenu(work_key_frame, variable=self.allocation_work_key_var, values=self.work_key_list if self.work_key_list else [""])
-        self.allocation_work_key_menu.grid(row=0, column=0, sticky="ew")
-
-        self.load_work_key_button = ctk.CTkButton(
-            work_key_frame, 
-            text="Load", 
-            width=60, 
-            command=self._load_work_key_list_from_cloud
-        )
-        self.load_work_key_button.grid(row=0, column=1, padx=(5, 0))
+        self.allocation_work_key_entry = ctk.CTkEntry(
+            work_key_frame,
+            textvariable=self.allocation_work_key_var,
+            placeholder_text="Type work key (optional) — demand ke baad selected workers is par allocate honge")
+        self.allocation_work_key_entry.grid(row=0, column=0, sticky="ew")
         
         # --- END Row 3 ---
 
-        # Applicant selection frame
-        applicant_frame = ctk.CTkFrame(content)
-        applicant_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+        # Applicant selection frame — lives in the dedicated 'Select Jobcard' tab
+        applicant_frame = ctk.CTkFrame(select_tab)
+        applicant_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         applicant_frame.grid_columnconfigure(0, weight=1)
         applicant_frame.grid_rowconfigure(2, weight=1)
 
@@ -326,11 +354,16 @@ class DemandTab(BaseAutomationTab):
         file_row.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 2))
         file_row.grid_columnconfigure(4, weight=1)
 
-        self.select_csv_button = ctk.CTkButton(file_row, text="Upload from Computer", command=self._select_csv_from_computer)
+        self.select_csv_button = ctk.CTkButton(file_row, text="📄 Upload Report", command=self._select_csv_from_computer)
         self.select_csv_button.grid(row=0, column=0, padx=(0, 6))
 
-        self.cloud_csv_button = ctk.CTkButton(file_row, text="Select from Cloud", command=self._select_csv_from_cloud, fg_color=config.COLORS["teal_named"], hover_color=config.COLORS["teal_hover"])
-        self.cloud_csv_button.grid(row=0, column=1, padx=(0, 6))
+        # Load a previously-uploaded eKYC report for the same panchayat (stored
+        # locally by panchayat — no need to re-upload every time).
+        self.previous_reports_button = ctk.CTkButton(
+            file_row, text="🕘 Previous", width=100,
+            command=self._select_report_from_history,
+            fg_color=config.COLORS["teal_named"], hover_color=config.COLORS["teal_hover"])
+        self.previous_reports_button.grid(row=0, column=1, padx=(0, 6))
 
         self.demo_csv_button = ctk.CTkButton(file_row, text="Demo CSV", command=lambda: self.app.save_demo_csv("demand"), fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["green_button_hover"], width=90)
         self.demo_csv_button.grid(row=0, column=2, padx=(0, 6))
@@ -365,26 +398,32 @@ class DemandTab(BaseAutomationTab):
             row=0, column=2, padx=(0, 6), pady=6)
 
         # Search row (below quick-select)
-        self.search_entry = ctk.CTkEntry(qs_frame, placeholder_text="🔍  Search by name or JC number to find & tick individually...")
+        # StringVar-trace based (like home_tab) — fires on EVERY text change,
+        # far more reliable than a <KeyRelease> binding in packaged builds.
+        self.search_var = ctk.StringVar()
+        self.search_var.trace_add("write", lambda *_: self._refresh_search_results())
+        self.search_entry = ctk.CTkEntry(qs_frame, textvariable=self.search_var,
+                                         placeholder_text="🔍  Search by name or JC number to find & tick individually...")
         self.search_entry.grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 6), sticky="ew")
-        self.search_entry.bind("<KeyRelease>", self._on_search_change)
 
         # --- Row 2: Selected-JC summary table + search results panel ---
+        # Panels stretch to fill the tab's full height for easier browsing
         bottom_frame = ctk.CTkFrame(applicant_frame, fg_color="transparent")
-        bottom_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 8))
+        bottom_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 8))
         bottom_frame.grid_columnconfigure(0, weight=1)
         bottom_frame.grid_columnconfigure(1, weight=1)
+        bottom_frame.grid_rowconfigure(0, weight=1)
 
-        # Left: selected JCs summary (fixed height, scrollable internally)
+        # Left: selected JCs summary (scrollable internally)
         self.selected_jc_frame = ctk.CTkScrollableFrame(
-            bottom_frame, label_text="✅ Selected Job Cards", height=220)
-        self.selected_jc_frame.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+            bottom_frame, label_text="✅ Selected Job Cards")
+        self.selected_jc_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
         self.selected_jc_frame.grid_columnconfigure(0, weight=1)
 
-        # Right: search results (fixed height, scrollable internally)
+        # Right: search results (scrollable internally)
         self.search_results_frame = ctk.CTkScrollableFrame(
-            bottom_frame, label_text="🔍 Search Results", height=220)
-        self.search_results_frame.grid(row=0, column=1, sticky="ew", padx=(4, 0))
+            bottom_frame, label_text="🔍 Search Results")
+        self.search_results_frame.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
         self.search_results_frame.grid_columnconfigure(0, weight=1)
 
         # --- Results Tab Widgets ---
@@ -397,7 +436,7 @@ class DemandTab(BaseAutomationTab):
         results_tab.grid_columnconfigure(1, weight=0) # Scrollbar
 
         # Treeview
-        cols = ("#", "Panchayat", "Job Card No", "Applicant Name", "Status")
+        cols = ("#", "Panchayat", "Village", "Job Card No", "Applicant Name", "Status")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
         self.results_tree.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         
@@ -430,20 +469,27 @@ class DemandTab(BaseAutomationTab):
         self._setup_results_treeview()
 
     def _select_all_applicants(self):
-        """Selects all valid (no *) applicants, up to 400."""
+        """Selects all valid (no *) applicants, up to a safe batch limit (400).
+
+        eKYC reports can hold 1000+ rows, so instead of blocking, the first
+        400 valid applicants are selected and the rest can be added via
+        Quick Select / Search.
+        """
         if not self.all_applicants_data:
-            return
-        if len(self.all_applicants_data) > 400:
-            messagebox.showinfo("Limit Exceeded", f"Cannot Select All — {len(self.all_applicants_data)} applicants loaded (limit 400).")
             return
         selected_count = 0
         for app_data in self.all_applicants_data:
+            if selected_count >= 400:
+                break
             if "*" not in app_data.get('Name of Applicant', ''):
                 app_data['_selected'] = True
                 selected_count += 1
+        if len(self.all_applicants_data) > 400:
+            self.log_warning(f"Selected first {selected_count} applicants (report has {len(self.all_applicants_data)}). Use Quick Select/Search for more.")
+            messagebox.showinfo("Batch Limit", f"Selected first {selected_count} applicants (report has {len(self.all_applicants_data)}).\nUse Quick Select or Search to add more.")
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
-        self.log_info(f"Selected all {selected_count} valid applicants.")
+        self.log_info(f"Selected {selected_count} valid applicants.")
     def _select_custom_number(self):
         """
         Selects a custom number of applicants from the top of the list.
@@ -495,11 +541,11 @@ class DemandTab(BaseAutomationTab):
         successful_pairs = set()
         for item in self.results_tree.get_children():
             values = self.results_tree.item(item)['values']
-            # values = (RowID, Panchayat, JC, Name, Status)
-            if len(values) >= 5:
-                jc = str(values[2]).strip()
-                name = str(values[3]).strip()
-                status = str(values[4]).lower()
+            # values = (RowID, Panchayat, Village, JC, Name, Status)
+            if len(values) >= 6:
+                jc = str(values[3]).strip()
+                name = str(values[4]).strip()
+                status = str(values[5]).lower()
                 
                 # Agar status me Success ya Already hai, tabhi uncheck karein
                 if "success" in status or "already" in status:
@@ -525,236 +571,284 @@ class DemandTab(BaseAutomationTab):
         self._update_jc_header_counters()
 
     def _select_csv_from_computer(self):
-        """Opens a file dialog to select a local CSV and processes it."""
-        path = filedialog.askopenfilename(title="Select Demand CSV", filetypes=[("CSV", "*.csv")])
+        """Opens a file dialog to select an eKYC report (Excel/CSV) and processes it."""
+        path = filedialog.askopenfilename(
+            title="Select eKYC Report (Excel/CSV)",
+            filetypes=[("eKYC Report / Excel", "*.xlsx *.csv"),
+                       ("Excel Workbook", "*.xlsx"),
+                       ("CSV", "*.csv")]
+        )
         if not path:
             return
-        self._process_csv_data(path)
+        self._process_input_file(path)
 
-    def _process_csv_data(self, path):
+    def _process_input_file(self, path):
         """
-        Reads a CSV file and populates the self.all_applicants_data list.
-        Updated to read 'Allocation Work Code' column.
+        Reads an eKYC & ABPS report (Excel/CSV) exported by the eKYC Report tab
+        and populates self.all_applicants_data.
+
+        eKYC report columns:  sno, panchayat, village, jobcard, name,
+        abps_status, ekyc_status  (4 title/summary rows before the header row).
+
+        Legacy demand CSVs (Job Card Number / Name of Applicant / Allocation
+        Work Code) are still accepted for backward compatibility.
         """
-        self.csv_path = path 
+        self.csv_path = path
         self.file_label.configure(text=os.path.basename(path))
         self.all_applicants_data = []
 
         try:
-            with open(path, mode='r', encoding='utf-8-sig') as csvfile:
-                reader = csv.reader(csvfile)
-                try: 
-                    header = next(reader)
-                except StopIteration: 
-                    raise ValueError("CSV file is empty.")
-                
-                norm_headers = [h.lower().replace(" ", "").replace("_", "") for h in header]
-                
-                try: 
-                    name_idx = norm_headers.index("nameofapplicant")
-                    jc_idx = norm_headers.index("jobcardnumber")
-                except ValueError: 
-                    raise ValueError("CSV Headers missing 'Name of Applicant' or 'Job card number'.")
+            rows, headers = self._read_table_file(path)
+            if not headers:
+                raise ValueError("File is empty or could not be read.")
 
-                # --- NEW FEATURE: Check for Allocation Work Code column ---
-                alloc_code_idx = -1
-                if "allocationworkcode" in norm_headers:
-                    alloc_code_idx = norm_headers.index("allocationworkcode")
-                elif "workcode" in norm_headers: # Fallback
-                     alloc_code_idx = norm_headers.index("workcode")
+            norm_headers = [str(h).lower().replace(" ", "").replace("_", "").replace(".", "") for h in headers]
 
-                for row_num, row in enumerate(reader, 1):
-                     if not row or len(row) <= max(name_idx, jc_idx): 
-                         continue
-                     name, job_card = row[name_idx].strip(), row[jc_idx].strip()
-                     
-                     # Extract specific allocation code if present
-                     alloc_code = ""
-                     if alloc_code_idx != -1 and len(row) > alloc_code_idx:
-                         alloc_code = row[alloc_code_idx].strip()
+            def find_col(*names: str) -> int:
+                for n in names:
+                    if n in norm_headers:
+                        return norm_headers.index(n)
+                return -1
 
-                     if name and job_card:
-                        self.all_applicants_data.append({
-                            'original_index': row_num, 
-                            'Name of Applicant': name, 
-                            'Job card number': job_card, 
-                            'allocation_work_code': alloc_code, # Store the specific code
-                            '_selected': False
-                        })
+            jc_idx    = find_col("jobcard", "jobcardnumber", "jobcardno", "jccode")
+            name_idx  = find_col("name", "nameofapplicant", "workername", "applicantname", "nameofworker")
+            pan_idx   = find_col("panchayat", "panchayatname")
+            vill_idx  = find_col("village", "villagename")
+            # Work-Allocation exports carry the work key per labourer — reuse it
+            # as the auto-allocation code for the next demand.
+            alloc_idx = find_col("allocationworkcode", "workcode", "workkey",
+                                 "selectedworkcode", "workname")
+            status_idx = find_col("status")
+
+            if jc_idx == -1 or name_idx == -1:
+                raise ValueError(
+                    "Headers not recognized. Expected eKYC report columns "
+                    "('jobcard', 'name') or legacy 'Job Card Number' + 'Name of Applicant'."
+                )
+
+            def cell(i: int) -> str:
+                if i == -1 or i >= len(row):
+                    return ""
+                v = row[i]
+                return str(v).strip() if v is not None else ""
+
+            for row_num, row in enumerate(rows, 1):
+                if not row:
+                    continue
+                name, job_card = cell(name_idx), cell(jc_idx)
+                if not name or not job_card:
+                    continue
+                # Work-Allocation exports: only keep rows that were allocated
+                # (a 'Status' column exists only in that format).
+                if status_idx != -1:
+                    st = cell(status_idx).strip().lower()
+                    if st and not any(k in st for k in ("success", "done", "allocated", "already")):
+                        continue
+                self.all_applicants_data.append({
+                    'original_index': row_num,
+                    'Name of Applicant': name,
+                    'Job card number': job_card,
+                    'panchayat': cell(pan_idx),
+                    'village': cell(vill_idx),
+                    'allocation_work_code': cell(alloc_idx),
+                    '_selected': False,
+                })
 
             loaded_count = len(self.all_applicants_data)
-            self.log_info(f"Loaded {loaded_count} applicants from '{os.path.basename(path)}'.")            
+            self.log_info(f"Loaded {loaded_count} applicants from '{os.path.basename(path)}'.")
+
+            # Legacy demand CSVs carry a per-worker 'Allocation Work Code' column —
+            # when present, auto-allocation after demand uses those specific codes.
+            try:
+                with_work_code = sum(1 for a in self.all_applicants_data
+                                     if (a.get('allocation_work_code') or '').strip())
+                if with_work_code:
+                    self.log_info(f"{with_work_code} workers have their own work codes in the report — "
+                                  "auto-allocation will use them after demand.")
+            except Exception:
+                pass
+
+            # Auto-suggest panchayats present in the report — MERGED with the
+            # user's saved panchayats so the dropdown never loses entries.
+            pans = sorted({a['panchayat'] for a in self.all_applicants_data if a.get('panchayat')})
+            if pans:
+                try:
+                    cur = self.panchayat_var.get().strip()
+                    merged = list(dict.fromkeys([p for p in pans + self._get_saved_panchayats() if p]))
+                    self.panchayat_menu.configure(values=merged or pans)
+                    # Report ka panchayat auto-select karo — purana saved value
+                    # (jaise MATIYARA) ko override karo jab report dusre panchayat
+                    # ka ho. Agar user ka current value report ke panchayat se
+                    # milta hai, use wahi rehne do.
+                    if not cur or not any(str(p).strip().upper() == cur.upper()
+                                          for p in pans if str(p).strip()):
+                        self.panchayat_var.set(pans[0])
+                except Exception:
+                    pass
+
+            # Auto-detect the state from the report's job card prefixes, so the
+            # dropdown shows (and pre-selects) the user's own state only.
+            try:
+                detected = self._detect_state_from_report()
+                if detected and detected in getattr(self, 'state_options', []):
+                    if self.state_var.get().strip() != detected:
+                        self.state_var.set(detected)
+                        self.log_info(f"State auto-detected from report: {detected}")
+                elif detected:
+                    # Detected state is not in the dropdown yet — offer it
+                    opts = list(getattr(self, 'state_options', []))
+                    if detected not in opts:
+                        opts.append(detected)
+                    self.state_options = opts
+                    self.state_combobox.configure(values=opts)
+                    self.state_var.set(detected)
+                    self.log_info(f"State auto-detected from report: {detected}")
+            except Exception:
+                pass
+
+            self._store_report_in_history(path)
             self._update_applicant_display()
 
         except Exception as e:
-            messagebox.showerror("Error Reading CSV", f"Could not read CSV.\nError: {e}")
+            messagebox.showerror("Error Reading Report", f"Could not read the report.\nError: {e}")
             self.csv_path = None
             self.all_applicants_data = []
             self.file_label.configure(text="No file")
-            self._update_applicant_display() 
+            self._update_applicant_display()
             self._update_selection_summary()
 
-    def _select_csv_from_cloud(self):
+    def _read_table_file(self, path: str):
+        """Reads an xlsx or csv file, returning (data_rows, header_row)."""
+        ext = os.path.splitext(path)[1].lower()
+        if ext == ".xlsx":
+            try:
+                from openpyxl import load_workbook
+                wb = load_workbook(path, read_only=True, data_only=True)
+                ws = wb.active
+                raw_rows = []
+                for r in ws.iter_rows(values_only=True):
+                    if any(v is not None and str(v).strip() for v in r):
+                        raw_rows.append(["" if v is None else str(v) for v in r])
+                wb.close()
+            except Exception as e:
+                raise ValueError(f"Excel file could not be opened ({e}).")
+        else:
+            raw_rows = []
+            for enc in ("utf-8-sig", "utf-8", "latin-1"):
+                try:
+                    with open(path, mode="r", encoding=enc, newline="") as f:
+                        reader = csv.reader(f)
+                        raw_rows = [r for r in reader if any(c.strip() for c in r)]
+                    break
+                except (UnicodeDecodeError, UnicodeError):
+                    continue
+        return self._extract_table(raw_rows)
+
+    @staticmethod
+    def _extract_table(raw_rows: List[List[str]]):
         """
-        Opens the CloudFilePicker to select a CSV file from cloud storage.
-        If a file is selected, it's downloaded and processed.
+        Finds the header row (the first row that has jobcard + name columns)
+        and returns (data_rows, header_row). Handles the eKYC report's leading
+        title/summary rows automatically.
         """
-        token = self.app.license_info.get('key')
-        if not token:
-            messagebox.showerror("Error", "You must be licensed to use cloud storage.")
+        for i, row in enumerate(raw_rows):
+            norm = [str(c).lower().replace(" ", "").replace("_", "").replace(".", "") for c in row]
+            has_jc = any(n in ("jobcard", "jobcardnumber", "jobcardno", "jccode") for n in norm)
+            has_name = any(n in ("name", "nameofapplicant", "workername", "applicantname", "nameofworker") for n in norm)
+            if has_jc and has_name:
+                return raw_rows[i + 1:], row
+        return [], (raw_rows[0] if raw_rows else [])
+
+    # ------------------------------------------------------------------
+    # Report history — upload once, reload anytime (per panchayat)
+    # ------------------------------------------------------------------
+    def _report_history_path(self) -> str:
+        return self.app.get_data_path("demand_reports.json")
+
+    def _load_report_history(self) -> Dict[str, Dict[str, str]]:
+        try:
+            with open(self._report_history_path(), "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _store_report_in_history(self, path: str) -> None:
+        """Remembers the uploaded eKYC report for its panchayat, so the user can
+        reload it next time via the 'Previous' button. A new upload for the
+        same panchayat replaces the old entry (job-card list updates)."""
+        try:
+            pans = [a.get('panchayat') for a in self.all_applicants_data if a.get('panchayat')]
+            if not pans:
+                return
+            panchayat = max(set(pans), key=pans.count)
+            try:
+                date_str = datetime.fromtimestamp(os.path.getmtime(path)).strftime("%d-%m-%Y")
+            except Exception:
+                date_str = datetime.now().strftime("%d-%m-%Y")
+            data = self._load_report_history()
+            data[panchayat] = {
+                "path": os.path.abspath(path),
+                "date": date_str,
+                "label": os.path.basename(path),
+            }
+            db_path = self._report_history_path()
+            os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
+            tmp_path = db_path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp_path, db_path)
+            self.log_info(f"Report saved in history for panchayat: {panchayat} ({date_str})")
+        except Exception as e:
+            self.log_info(f"Could not save report history: {e}")
+
+    def _select_report_from_history(self) -> None:
+        """Shows a picker of previously-uploaded reports (by panchayat)."""
+        data = self._load_report_history()
+        if not data:
+            messagebox.showinfo("No History",
+                                "Koi previous report nahi mila.\nPehle ek eKYC & ABPS report upload karo.")
             return
 
-        picker = CloudFilePicker(parent=self, app_instance=self.app)
-        self.wait_window(picker) # Wait for user to select a file
-        
-        selected_file = picker.selected_file
-        
-        if selected_file:
-            file_id = selected_file['id']
-            filename = selected_file['filename']
-            
-            self.log_info(f"Downloading '{filename}' from cloud...")
-            temp_path = self._download_file_from_cloud(file_id, filename)
-            
-            if temp_path:
-                self._process_csv_data(temp_path)
+        win = ctk.CTkToplevel(self)
+        win.title("Select Previous Report")
+        win.geometry("520x400")
+        win.transient(self)
+        win.grab_set()
+        win.grid_columnconfigure(0, weight=1)
+        win.grid_rowconfigure(1, weight=1)
 
-    def _download_file_from_cloud(self, file_id, filename):
-        """
-        Downloads a specific file from cloud storage to a temporary local path.
-        Returns the path to the downloaded file, or None on failure.
-        """
-        token = self.app.license_info.get('key')
-        if not token:
-            self.log_error("Cloud Download Failed: Not licensed.")
-            return None
+        ctk.CTkLabel(win, text="🕘 Previously uploaded eKYC reports",
+                     font=ctk.CTkFont(size=15, weight="bold")).grid(
+            row=0, column=0, padx=12, pady=(12, 4), sticky="w")
 
-        headers = {'Authorization': f'Bearer {token}'}
-        url = f"{config.LICENSE_SERVER_URL}/files/api/download/{file_id}"
-        
-        # Save to a temp location in the app's data folder
-        temp_path = self.app.get_data_path(f"cloud_download_{filename}")
-        
-        try:
-            with self.app.http_session.get(url, headers=headers, stream=True, timeout=30) as r:
-                r.raise_for_status() # Check for HTTP errors
-                with open(temp_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192): 
-                        f.write(chunk)
-            
-            self.log_info(f"Successfully downloaded '{filename}'.")
-            return temp_path
-        except Exception as e:
-            self.log_error(f"Cloud download failed: {e}")
-            messagebox.showerror("Download Failed", f"Could not download file: {e}")
-            return None
+        scroll = ctk.CTkScrollableFrame(win)
+        scroll.grid(row=1, column=0, sticky="nsew", padx=12, pady=6)
+        scroll.grid_columnconfigure(0, weight=1)
 
-    def _load_work_key_list_from_cloud(self):
-        """
-        Opens the CloudFilePicker to select a work key CSV.
-        """
-        token = self.app.license_info.get('key')
-        if not token:
-            messagebox.showerror("Error", "You must be licensed to use cloud storage.")
-            return
+        def _load(pan: str) -> None:
+            entry = data.get(pan, {})
+            win.destroy()
+            if entry.get('path') and os.path.exists(entry['path']):
+                self._process_input_file(entry['path'])
+            else:
+                messagebox.showerror("File Missing",
+                                     f"Report file ab exist nahi karta:\n{entry.get('path', '?')}\n\nDobara upload karo.")
 
-        picker = CloudFilePicker(parent=self, app_instance=self.app)
-        self.wait_window(picker) # Wait for user to select a file
-        
-        selected_file = picker.selected_file
-        
-        if selected_file:
-            # Run download and processing in a thread
-            file_id = selected_file['id']
-            filename = selected_file['filename']
-            self.log_info(f"Downloading work list '{filename}' from cloud...")            
-            # Disable button to prevent double-click
-            self.load_work_key_button.configure(state="disabled") 
-            
-            threading.Thread(
-                target=self._download_and_process_work_key_csv_thread,
-                args=(file_id, filename),
-                daemon=True
-            ).start()
+        for pan, entry in sorted(data.items()):
+            label = entry.get('label', '') or ''
+            date_str = entry.get('date', '') or ''
+            btn = ctk.CTkButton(
+                scroll,
+                text=f"🏘️ {pan}   ({date_str})\n{label}",
+                anchor="w",
+                fg_color="transparent", text_color=("gray10", "gray90"),
+                hover_color=ctk.ThemeManager.theme["CTkButton"]["fg_color"],
+                command=lambda p=pan: _load(p))
+            btn.grid(row=len(scroll.winfo_children()), column=0, sticky="ew", padx=4, pady=3)
 
-    def _download_and_process_work_key_csv_thread(self, file_id, filename):
-        """
-        Handles the download and processing of the work key CSV in a background thread.
-        """
-        try:
-            # Re-use the existing download function
-            temp_path = self._download_file_from_cloud(file_id, filename)
-            
-            if temp_path:
-                # Process the file
-                self._process_work_key_csv(temp_path)
-            
-        except Exception as e:
-            # Log error
-            self.app.after(0, self.app.log_message, self.log_display, f"Failed to load work keys: {e}", "error")
-            self.app.after(0, messagebox.showerror, "Error Loading Work Keys", f"An error occurred: {e}")
-        finally:
-            # Re-enable the button from the main thread
-            self.app.after(0, self.load_work_key_button.configure, {"state": "normal"})
-
-    def _process_work_key_csv(self, path):
-        """
-        Reads the downloaded work key CSV and populates the autocomplete list.
-        This function is called from a background thread.
-        """
-        temp_key_list = []
-        
-        try:
-            with open(path, mode='r', encoding='utf-8-sig') as csvfile:
-                reader = csv.reader(csvfile)
-                try: 
-                    header = next(reader)
-                except StopIteration: 
-                    self.app.after(0, self.app.log_message, self.log_display, "Work key file is empty.", "warning")
-                    return
-                
-                norm_headers = [h.lower().replace(" ", "").replace("_", "") for h in header]
-                
-                key_idx = -1
-                # Look for common headers for work codes
-                possible_headers = ['workcode', 'workkey', 'fullworkcode', 'work_code', 'work_key', 'work']
-                for i, h in enumerate(norm_headers):
-                    if h in possible_headers:
-                        key_idx = i
-                        break
-                
-                rows_to_read = []
-                if key_idx == -1: 
-                    key_idx = 0 # Assume first column
-                    self.app.after(0, self.app.log_message, self.log_display, "Work Key header not found, assuming column 0.", "info")
-                    # Add header back to be processed as a row
-                    rows_to_read = [header] + list(reader)
-                else: 
-                    self.app.after(0, self.app.log_message, self.log_display, f"Found Work Key header: '{header[key_idx]}'", "info")
-                    rows_to_read = reader
-
-                for row in rows_to_read:
-                     if row and len(row) > key_idx: 
-                         work_key = row[key_idx].strip()
-                         # Add if it's a valid-looking work key (contains a number)
-                         if work_key and any(char.isdigit() for char in work_key): 
-                             temp_key_list.append(work_key)
-
-            # Update AutocompleteEntry's suggestion list from main thread
-            def update_ui_with_keys():
-                self.work_key_list.clear()
-                self.work_key_list.extend(temp_key_list)
-                self.allocation_work_key_menu.configure(values=self.work_key_list if self.work_key_list else [""])
-                self.log_info(f"Loaded {len(self.work_key_list)} work keys for autocomplete.")                
-            self.app.after(0, update_ui_with_keys)
-
-        except Exception as e:
-            self.app.after(0, messagebox.showerror, "Error Reading Work Key CSV", f"Could not read CSV.\nError: {e}")
-            
-            def clear_ui_keys():
-                self.work_key_list.clear()
-                self.allocation_work_key_menu.configure(values=self.work_key_list if self.work_key_list else [""])
-            self.app.after(0, clear_ui_keys)
+        ctk.CTkButton(win, text="Cancel", width=90,
+                      command=win.destroy).grid(row=2, column=0, padx=12, pady=(4, 10))
 
     # APPLICANT SELECTION — new fast approach
 
@@ -799,51 +893,184 @@ class DemandTab(BaseAutomationTab):
         self._update_selection_summary()
         self.log_info(f"Quick-selected {added} applicants from {len(matched_jcs)} JC(s).")
 
-    def _on_search_change(self, event=None):
-        """Triggered on every keystroke in the search box."""
+    # Distinct pastel tints per village so results from different villages are
+    # easy to tell apart (light-mode colour, dark-mode colour).
+    VILLAGE_TINTS = [
+        ("#DCE9F7", "#1C2A3A"),   # blue
+        ("#DDF0DD", "#1D331D"),   # green
+        ("#FDEBD2", "#3A2F1A"),   # orange
+        ("#EDE3F6", "#2E2338"),   # purple
+        ("#FBE3E8", "#3A2026"),   # pink
+        ("#D9F0F0", "#173332"),   # teal
+    ]
+    VILLAGE_ACCENTS = [
+        ("#1F6FBF", "#6FB7FF"),   # blue
+        ("#2E7D32", "#8BC48F"),   # green
+        ("#C45A00", "#FFB74D"),   # orange
+        ("#7B1FA2", "#CE93D8"),   # purple
+        ("#C2185B", "#F48FB1"),   # pink
+        ("#00796B", "#4DB6AC"),   # teal
+    ]
+
+    def _village_color(self, village):
+        """Deterministic colour index for a village (stable across refreshes)."""
+        idx = 0
+        if village:
+            idx = sum(ord(c) for c in village) % len(self.VILLAGE_TINTS)
+        return self.VILLAGE_TINTS[idx], self.VILLAGE_ACCENTS[idx]
+
+    def _refresh_panels(self):
+        """Rebuilds both selection panels and the summary label.
+
+        Runs via after() AFTER a checkbox command returns, so the clicked
+        checkbox is never destroyed in the middle of its own callback
+        (avoids 'invalid command name' Tcl errors in the app).
+        """
         self._refresh_search_results()
+        self._refresh_selected_jc_panel()
+        self._update_selection_summary()
 
     def _refresh_search_results(self):
         """
         Shows matching applicants in the right-hand search results panel.
-        Only activates when 2+ characters are typed.
+        - Searches by name or job card number (single character is enough,
+          so typing just a suffix digit like "5" or "1" also works).
+        - Each result row is tinted by its village (same village = same colour).
+        - When searching by number/suffix, the 2-3 job cards that follow the match
+          in the report are also listed — people often raise demand for the
+          neighbouring labour cards too.
         """
+        if getattr(self, '_suppress_search_refresh', False):
+            # A checkbox tick is clearing the search box — keep the current list
+            # visible so the user can tick the next nearby job card too.
+            return
         for w in self.search_results_frame.winfo_children():
             w.destroy()
 
         query = self.search_entry.get().strip().lower()
-        if len(query) < 2:
+
+        if not self.all_applicants_data:
+            ctk.CTkLabel(self.search_results_frame,
+                         text="No report loaded.\nUpload the eKYC & ABPS report first.",
+                         text_color="gray", justify="left").pack(padx=10, pady=16)
             return
 
-        matches = [r for r in self.all_applicants_data if
-                   query in r.get('Job card number', '').lower() or
-                   query in r.get('Name of Applicant', '').lower()]
+        # Empty search box → show ALL loaded job cards so the user can see
+        # (and tick) everything right away. Typing filters the list.
+        if len(query) < 1:
+            matches = list(self.all_applicants_data)
+            header = (f"📋 All {len(self.all_applicants_data)} applicant(s) — "
+                      "type to filter")
+            ctk.CTkLabel(self.search_results_frame,
+                         text=header, text_color=("gray20", "gray80"),
+                         font=ctk.CTkFont(size=13, weight="bold"),
+                         justify="left").pack(anchor="w", padx=8, pady=(6, 2))
+        else:
+            matches = [r for r in self.all_applicants_data if
+                       query in r.get('Job card number', '').lower() or
+                       query in r.get('Name of Applicant', '').lower()]
 
-        for row in matches[:80]:
+            if not matches:
+                # Helpful empty-state: show how many applicants are loaded so the
+                # user can tell a bad query from an empty/small report. Demo
+                # files may not contain every job-card number.
+                ctk.CTkLabel(self.search_results_frame,
+                             text=(f"No match for '{query}'.\n"
+                                   f"{len(self.all_applicants_data)} applicant(s) loaded.\n"
+                                   f"Clear the search to see the full list."),
+                             text_color="gray", justify="left").pack(padx=10, pady=16)
+                return
+
+        # When the query matches a JC number/suffix, also pull in the next 2-3
+        # job cards of the SAME village that follow the matched JC in the report
+        # order — people often raise demand for neighbouring labour cards too.
+        # These 'following' cards are shown WITHOUT the village tint (grey) and
+        # with a ↳ marker, so the exact matches stay easy to spot.
+        # (Capped at 30 hits so a broad single-character search on a big report
+        # stays fast — the visible list is capped at 120 rows anyway.)
+        exact_ids = {id(x) for x in matches}
+        jc_hits = ([] if len(query) < 1 else
+                   [r for r in matches if query in r.get('Job card number', '').lower()])
+        if jc_hits:
+            ordered_jcs = []
+            jc_pos = {}
+            for r in self.all_applicants_data:
+                j = r.get('Job card number', '')
+                if j and j not in jc_pos:
+                    jc_pos[j] = len(ordered_jcs)
+                    ordered_jcs.append(j)
+            extra = []
+            for r in jc_hits[:30]:
+                jc = r.get('Job card number', '')
+                vill = (r.get('village') or '').strip()
+                jpos = jc_pos.get(jc)
+                if jpos is None:
+                    continue
+                for njc in ordered_jcs[jpos + 1:jpos + 4]:
+                    for a in self.all_applicants_data:
+                        if (a.get('Job card number') == njc
+                                and (a.get('village') or '').strip() == vill):
+                            extra.append(a)
+            seen_ids = set(exact_ids)
+            for e in extra:
+                if id(e) not in seen_ids:
+                    matches.append(e)
+                    seen_ids.add(id(e))
+
+        for row in matches[:120]:
             name = row.get('Name of Applicant', '')
             jc   = row.get('Job card number', '')
+            vill = row.get('village', '') or ''
             is_disabled = "*" in name
+            is_follow = id(row) not in exact_ids   # 'next 2-3 cards' row
+            if is_follow:
+                # Following cards: neutral grey, no village tint, ↳ marker.
+                tint, accent = ("gray87", "gray23"), ("gray60", "gray45")
+                text = f"↳  {jc}  –  {name}"
+            else:
+                tint, accent = self._village_color(vill)
+                text = f"{jc}  –  {name}"
 
             var = ctk.StringVar(value="on" if row.get('_selected') else "off")
 
             def _toggle(data=row, v=var):
                 data['_selected'] = (v.get() == "on")
-                self._refresh_selected_jc_panel()
-                self._update_selection_summary()
+                # Tick ke baad SIRF input box clean hota hai — search results
+                # list WAISI HI rehti hai (reset nahi hoti) taaki user aas-pados
+                # ka agla jobcard bhi wahi se tick kar sake. Naya number type
+                # karte hi list khud filter ho jati hai.
+                self._suppress_search_refresh = True
+                try:
+                    self.search_entry.delete(0, "end")
+                except Exception:
+                    pass
+                finally:
+                    self._suppress_search_refresh = False
+                self.after(0, self._refresh_selected_jc_panel)
+                self.after(0, self._update_selection_summary)
+                self.after(0, self.search_entry.focus_set)
+
+            row_frame = ctk.CTkFrame(self.search_results_frame,
+                                     fg_color=tint, corner_radius=6)
+            row_frame.pack(anchor="w", padx=4, pady=2, fill="x")
+            row_frame.grid_columnconfigure(0, weight=1)
 
             cb = ctk.CTkCheckBox(
-                self.search_results_frame,
-                text=f"{jc}  –  {name}",
+                row_frame,
+                text=text,
                 variable=var, onvalue="on", offvalue="off",
-                command=_toggle
+                command=_toggle,
+                fg_color=accent, hover_color=accent,
+                text_color=("gray10", "gray90"),
             )
             if is_disabled:
                 cb.configure(state="disabled", text_color="gray50")
-            cb.pack(anchor="w", padx=6, pady=1, fill="x")
+            cb.grid(row=0, column=0, padx=(8, 6), pady=4, sticky="w")
 
-        if len(matches) > 80:
+        if len(matches) > 120:
             ctk.CTkLabel(self.search_results_frame,
-                         text=f"... {len(matches) - 80} more (refine search)",
+                         text=(f"... {len(matches) - 120} more — "
+                               "type to filter or use Select All"),
                          text_color="gray").pack(anchor="w", padx=6, pady=2)
 
     def _refresh_selected_jc_panel(self):
@@ -876,7 +1103,11 @@ class DemandTab(BaseAutomationTab):
 
             suffix = jc.split('/')[-1] if '/' in jc else jc
             names  = ", ".join(m.get('Name of Applicant', '') for m in members)
-            label_text = f"/{suffix}  ({len(members)} person{'s' if len(members)>1 else ''})\n{names}"
+            vill   = next((m.get('village') for m in members if m.get('village')), "")
+            label_text = f"/{suffix}  ({len(members)} person{'s' if len(members)>1 else ''})"
+            if vill:
+                label_text += f"  🏘️ {vill}"
+            label_text += f"\n{names}"
 
             ctk.CTkLabel(row_frame, text=label_text, anchor="w",
                          justify="left", wraplength=200).grid(
@@ -937,18 +1168,49 @@ class DemandTab(BaseAutomationTab):
         self.panchayat_menu.configure(state=state)
         self.days_entry.configure(state=state)
         self.select_csv_button.configure(state=state)
-        self.cloud_csv_button.configure(state=state)
+        self.previous_reports_button.configure(state=state)
         self.search_entry.configure(state=state)
         self.quick_select_entry.configure(state=state)
         self.demand_date_entry.configure(state=state)
         self.select_all_button.configure(state=state)
         self.clear_selection_button.configure(state=state)
-        self.allocation_work_key_menu.configure(state=state)
-        self.load_work_key_button.configure(state=state)
+        self.allocation_work_key_entry.configure(state=state)
         self.retry_failed_button.configure(state=state)
         
         # New Export Controls
         self.export_button.configure(state=state)
+    def _get_state_options(self):
+        """
+        States available for Demand (STATE_DEMAND_CONFIG), filtered to the user's
+        own state(s) saved from license activation / other automations (history
+        key 'location_state', stored UPPERCASE). Falls back to ALL configured
+        states when nothing has been saved yet.
+        """
+        upper_to_key = {k.upper(): k for k in config.STATE_DEMAND_CONFIG.keys()}
+        opts: List[str] = []
+        try:
+            for s in (self.app.history_manager.get_suggestions("location_state") or []):
+                key = upper_to_key.get(str(s).strip().upper())
+                if key and key not in opts:
+                    opts.append(key)
+        except Exception:
+            pass
+        return opts or list(config.STATE_DEMAND_CONFIG.keys())
+
+    def _detect_state_from_report(self):
+        """
+        Detects the state from the job card prefixes in the loaded report
+        (e.g. 'JH-22-003-008-001/1' -> 'Jharkhand'). Returns a STATE_DEMAND_CONFIG
+        key, or None.
+        """
+        prefixes = getattr(config, 'STATE_JOB_CARD_PREFIXES', {})
+        for app_data in self.all_applicants_data:
+            jc = (app_data.get('Job card number') or '').strip().upper()
+            for prefix, state_key in prefixes.items():
+                if jc.startswith(prefix.upper()) and state_key in config.STATE_DEMAND_CONFIG:
+                    return state_key
+        return None
+
     def _get_village_code(self, job_card, state_logic_key):
         """
         Extracts the village code from a job card number based on state-specific logic.
@@ -1018,7 +1280,7 @@ class DemandTab(BaseAutomationTab):
         # 2. File Load & Immediate Selection
         if file_path and os.path.exists(file_path):
             # Step A: Load Data
-            self._process_csv_data(file_path)
+            self._process_input_file(file_path)
             
             # Step B: Select All IMMEDIATELY (Do not use self.after)
             # यह सुनिश्चित करता है कि start_automation चलने से पहले डेटा तैयार है
@@ -1036,8 +1298,12 @@ class DemandTab(BaseAutomationTab):
         # --- 1. Get and Validate Inputs ---
         state = self.state_var.get()
         if not state: messagebox.showerror("Input Error", "Select state."); return
-        try: cfg = config.STATE_DEMAND_CONFIG[state]; logic_key = cfg["village_code_logic"]; url = cfg["base_url"]
-        except KeyError: messagebox.showerror("Config Error", f"Demand config missing for: {state}"); return
+        try:
+            cfg = config.STATE_DEMAND_CONFIG[state]
+            logic_key = cfg.get("village_code_logic", "jh")
+            url = cfg["base_url"]
+        except KeyError:
+            messagebox.showerror("Config Error", f"Demand config missing for: {state}"); return
 
         selected = [r for r in self.all_applicants_data if r.get('_selected', False)]
         panchayat = self.panchayat_var.get().strip(); days_str = self.days_entry.get().strip()
@@ -1056,7 +1322,7 @@ class DemandTab(BaseAutomationTab):
             return
 
         if not days_str: messagebox.showerror("Missing Info", "Days required."); return
-        if not self.csv_path: messagebox.showerror("Missing Info", "Load CSV."); return
+        if not self.csv_path: messagebox.showerror("Missing Info", "Load the eKYC report first."); return
         if not selected: messagebox.showwarning("No Selection", "Select applicants."); return
         try: days_int = int(days_str); assert days_int > 0
         except (ValueError, AssertionError): messagebox.showerror("Invalid Input", "Days must be positive number."); return
@@ -1073,7 +1339,10 @@ class DemandTab(BaseAutomationTab):
         self.set_ui_state(running=True) # Disable UI elements
 
         # --- 3. Save History and Group Data ---
-        self.app.history_manager.save_entry("location_panchayat", panchayat); self.app.history_manager.save_entry("demand_days", days_str)
+        self.app.history_manager.save_entry("location_panchayat", panchayat)
+        if state and state in getattr(self, 'state_options', []):
+            self.app.history_manager.save_entry("location_state", state.upper())
+        self.app.history_manager.save_entry("demand_days", days_str)
         self.save_inputs({
             "state": state, 
             "panchayat": panchayat, 
@@ -1082,22 +1351,26 @@ class DemandTab(BaseAutomationTab):
             "work_key_for_allocation": work_key_for_allocation
         })
 
-        # Group selected applicants by Village Code -> Job Card
+        # Group selected applicants by Panchayat -> Village -> Job Card.
+        # Village names come straight from the eKYC report; legacy CSVs fall
+        # back to the village code parsed from the job card number.
         grouped = {}; skipped_malformed = 0
         for app in selected:
             jc = app.get('Job card number', '').strip()
             if not jc: continue
-            vc = self._get_village_code(jc, logic_key)
-            if not vc: skipped_malformed += 1; continue
-            if vc not in grouped: grouped[vc] = {}
-            if jc not in grouped[vc]: grouped[vc][jc] = []
-            grouped[vc][jc].append(app)
-        if skipped_malformed: self.log_warning(f"Warn: Skipped {skipped_malformed} malformed Job Cards.")
+            pan = (app.get('panchayat') or '').strip() or panchayat
+            vill = (app.get('village') or '').strip()
+            if not vill:
+                vill = self._get_village_code(jc, logic_key) or ""
+            if not vill:
+                skipped_malformed += 1
+                continue
+            grouped.setdefault(pan, {}).setdefault(vill, {}).setdefault(jc, []).append(app)
+        if skipped_malformed: self.log_warning(f"Warn: Skipped {skipped_malformed} Job Cards (no village info).")
         # --- 4. Start Worker Thread using the App's Method ---
         # This will play the sound and manage the thread
         args_tuple = (
-            state, panchayat, days_int, work_start, 
-            work_start, grouped, url, work_key_for_allocation
+            state, grouped, days_int, work_start, url, work_key_for_allocation
         )
         self.app.start_automation_thread(
             key=self.automation_key,
@@ -1117,11 +1390,9 @@ class DemandTab(BaseAutomationTab):
 
         self.csv_path = None
         self.all_applicants_data.clear()
+        self._current_panchayat = ""
+        self._current_village = ""
         self.file_label.configure(text="No file loaded.", text_color="gray")
-
-        # Clear work key list
-        self.work_key_list.clear()
-        self.allocation_work_key_menu.configure(values=self.work_key_list if self.work_key_list else [""])
 
         self._refresh_selected_jc_panel()
         self._refresh_search_results()
@@ -1134,120 +1405,153 @@ class DemandTab(BaseAutomationTab):
         """
         Configures the columns and headings for the results table.
         """
-        cols = ("#", "Panchayat", "Job Card No", "Applicant Name", "Status")
+        cols = ("#", "Panchayat", "Village", "Job Card No", "Applicant Name", "Status")
         self.results_tree["columns"] = cols
         self.results_tree.column("#0", width=0, stretch=tkinter.NO); self.results_tree.column("#", anchor='c', width=40)
-        self.results_tree.column("Panchayat", anchor='w', width=140); self.results_tree.column("Job Card No", anchor='w', width=180); self.results_tree.column("Applicant Name", anchor='w', width=150)
+        self.results_tree.column("Panchayat", anchor='w', width=130); self.results_tree.column("Village", anchor='w', width=110)
+        self.results_tree.column("Job Card No", anchor='w', width=180); self.results_tree.column("Applicant Name", anchor='w', width=150)
         self.results_tree.column("Status", anchor='w', width=250)
         self.results_tree.heading("#0", text=""); self.results_tree.heading("#", text="#")
-        self.results_tree.heading("Panchayat", text="Panchayat"); self.results_tree.heading("Job Card No", text="Job Card No"); self.results_tree.heading("Applicant Name", text="Applicant Name")
+        self.results_tree.heading("Panchayat", text="Panchayat"); self.results_tree.heading("Village", text="Village")
+        self.results_tree.heading("Job Card No", text="Job Card No"); self.results_tree.heading("Applicant Name", text="Applicant Name")
         self.results_tree.heading("Status", text="Status")
         self.style_treeview(self.results_tree)
 
-    def _process_demand(self, state, panchayat, user_days, demand_from, work_start, grouped, base_url, work_key_for_allocation):
+    def _process_demand(self, state, grouped, user_days, demand_from, base_url, work_key_for_allocation):
         """
         The main automation function that runs in a thread.
-        Updated to handle intelligent handoff (Granular Allocation).
+
+        Groups are structured as:  panchayat -> village -> job card -> [applicants].
+        Villages are selected by NAME (from the eKYC report) with a village-code
+        fallback for legacy CSVs. Every dropdown change triggers an ASP.NET
+        postback — we always wait for the dependent list to populate before
+        continuing (see _wait_dropdown_populated).
         """
         driver = None
         try:
-            driver = self.app.get_driver();
-            if not driver: self.app.after(0, self.app.log_message, self.log_display, "ERROR: WebDriver unavailable."); return
-            driver.get(base_url)
-            wait, short_wait = WebDriverWait(driver, 20), WebDriverWait(driver, 5)
+            driver = self.app.get_driver()
+            if not driver:
+                self.app.after(0, self.app.log_message, self.log_display, "ERROR: WebDriver unavailable.", "error")
+                return
+            wait = WebDriverWait(driver, 20)
 
-            # Define potential element IDs for different state portals
+            # Element IDs that vary slightly across state portals
             p_ids = ["ctl00_ContentPlaceHolder1_DDL_panchayat", "ctl00_ContentPlaceHolder1_ddlPanchayat"]
             v_ids = ["ctl00_ContentPlaceHolder1_DDL_Village", "ctl00_ContentPlaceHolder1_ddlvillage"]
             j_ids = ["ctl00_ContentPlaceHolder1_DDL_Registration", "ctl00_ContentPlaceHolder1_ddlJobcard"]
             days_worked_ids = ["ctl00_ContentPlaceHolder1_Lbldays"]
             grid_ids = ["ctl00_ContentPlaceHolder1_gvData", "ctl00_ContentPlaceHolder1_GridView1"]
             btn_ids = ["ctl00_ContentPlaceHolder1_btnProceed", "ctl00_ContentPlaceHolder1_btnSave"]
-            err_msg_ids = ["ctl00_ContentPlaceHolder1_Lblmsgerr"]
 
-            # --- Detect Login Mode (Block vs GP) ---
-            self.app.after(0, self.app.set_status, "Detecting login mode...") 
-            is_gp = False
-            panchayat_selector = ", ".join([f"#{pid}" for pid in p_ids])
-            
-            try:
-                WebDriverWait(driver, 3).until(EC.element_to_be_clickable((By.CSS_SELECTOR, panchayat_selector)))
-                is_gp = False
-                self.app.after(0, self.app.log_message, self.log_display, "Block Login Mode assumed (Panchayat found).", "info")
-            except TimeoutException:
-                is_gp = True
-                self.app.after(0, self.app.log_message, self.log_display, "GP Login Mode assumed (Panchayat dropdown not found).", "info")
-            
-            # --- Handle Block Login (Select Panchayat) ---
-            if not is_gp:
-                if not panchayat:
-                    self.app.after(0, self.app.log_message, self.log_display, "ERROR: Panchayat name required for Block Login.", "error")
-                    # Log errors (truncated for brevity)...
-                    return 
-                
+            total_p, p_idx = len(grouped), 0
+            for panchayat, villages in grouped.items():
+                p_idx += 1
+                if self.is_stopped():
+                    break
                 try:
-                    self.app.after(0, self.app.set_status, f"Selecting Panchayat: {panchayat}")
-                    panchayat_dropdown = driver.find_element(By.CSS_SELECTOR, panchayat_selector)
-                    self._select_by_text_case_insensitive(Select(panchayat_dropdown), panchayat)
-                    self.app.after(0, self.app.log_message, self.log_display, "Waiting for villages to load after P selection...")
-                    wait.until(EC.any_of(EC.presence_of_element_located((By.XPATH, f"//select[@id='{v_ids[0]}']/option[position()>1]")), EC.presence_of_element_located((By.XPATH, f"//select[@id='{v_ids[1]}']/option[position()>1]"))))
-                except NoSuchElementException as e_select:
-                    self.app.after(0, self.app.log_message, self.log_display, f"ERROR: Panchayat '{panchayat}' not found in dropdown. Stopping.", "error")
-                    raise e_select
-            else: # GP Login
-                self.app.after(0, self.app.set_status, "Waiting for villages (GP Mode)...") 
-                self.app.after(0, self.app.log_message, self.log_display, "Waiting for villages (GP Mode)...")
-                wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f"#{v_ids[0]}, #{v_ids[1]}")))
-                wait.until(EC.any_of(EC.presence_of_element_located((By.XPATH, f"//select[@id='{v_ids[0]}']/option[position()>1]")), EC.presence_of_element_located((By.XPATH, f"//select[@id='{v_ids[1]}']/option[position()>1]"))))
+                    # Fresh page load per panchayat keeps dropdown state clean
+                    driver.get(base_url)
+                    self._current_panchayat = panchayat
+                    self.app.after(0, self.app.log_message, self.log_display,
+                                   f"State: {state} — Panchayat {p_idx}/{total_p}: {panchayat}")
+                    self.app.after(0, self.app.set_status, f"P {p_idx}/{total_p}: {panchayat}")
 
-            # --- Loop Through Villages ---
-            total_v, proc_v = len(grouped), 0
-            for vc, jcs_in_v in grouped.items():
-                proc_v += 1
-                if self.is_stopped(): break
-                try:
-                    self.app.after(0, self.app.set_status, f"V {proc_v}/{total_v}: Selecting Village {vc}...")
-                    self.app.after(0, self.app.log_message, self.log_display, f"--- Village {proc_v}/{total_v} (Code: {vc}) ---")
-                    v_el = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f"#{v_ids[0]}, #{v_ids[1]}"))); v_sel = Select(v_el); found_v = False
-                    for opt in v_sel.options:
-                        if opt.get_attribute('value').endswith(vc): v_sel.select_by_value(opt.get_attribute('value')); self.app.after(0, self.app.log_message, self.log_display, f"Selected Village '{opt.text}' (...{vc})."); found_v = True; break
-                    if not found_v: raise NoSuchElementException(f"Village code {vc} not found.")
+                    # --- Detect login mode: Block (panchayat dropdown) vs GP ---
+                    is_gp = False
+                    try:
+                        WebDriverWait(driver, 3).until(EC.element_to_be_clickable(
+                            (By.CSS_SELECTOR, ", ".join(f"#{x}" for x in p_ids))))
+                    except TimeoutException:
+                        is_gp = True
 
-                    self.app.after(0, self.app.set_status, f"V {proc_v}/{total_v}: Loading job cards...") 
-                    self.app.after(0, self.app.log_message, self.log_display, "Waiting for job cards..."); time.sleep(0.5)
-                    wait.until(EC.any_of(EC.presence_of_element_located((By.XPATH, f"//select[@id='{j_ids[0]}']/option[position()>1]")), EC.presence_of_element_located((By.XPATH, f"//select[@id='{j_ids[1]}']/option[position()>1]"))))
+                    if not is_gp:
+                        if not panchayat:
+                            self.app.after(0, self.app.log_message, self.log_display,
+                                           "ERROR: Panchayat name required for Block Login.", "error")
+                            continue
+                        try:
+                            self.app.after(0, self.app.set_status, f"Selecting Panchayat: {panchayat}")
+                            pd = wait.until(EC.element_to_be_clickable(
+                                (By.CSS_SELECTOR, ", ".join(f"#{x}" for x in p_ids))))
+                            if not self._select_by_text_case_insensitive(Select(pd), panchayat):
+                                raise NoSuchElementException(f"Panchayat '{panchayat}' not found in dropdown.")
+                            self._wait_dropdown_populated(driver, wait, v_ids, "villages after panchayat selection")
+                        except NoSuchElementException as e_select:
+                            self.app.after(0, self.app.log_message, self.log_display,
+                                           f"ERROR: {e_select}. Skipping this panchayat.", "error")
+                            for vill, jcs in villages.items():
+                                for jc, apps in jcs.items():
+                                    for a in apps:
+                                        self.app.after(0, self._update_results_tree,
+                                                       (jc, a.get('Name of Applicant'), "FAIL: Panchayat Not Found", panchayat, vill))
+                            continue
+                    else:  # GP Login
+                        self.app.after(0, self.app.log_message, self.log_display,
+                                       "GP Login Mode (no panchayat dropdown).", "info")
+                        self._wait_dropdown_populated(driver, wait, v_ids, "villages (GP mode)")
 
-                    # --- Loop Through Job Cards in Village ---
-                    total_jc, proc_jc = len(jcs_in_v), 0
-                    for jc, apps in jcs_in_v.items():
-                        proc_jc += 1
-                        if self.is_stopped(): break
-                        
-                        # This updates the *internal* tab status
-                        self.app.after(0, self.update_status, f"V {proc_v}/{total_v}, JC {proc_jc}/{total_jc}", (proc_v-1 + proc_jc/total_jc)/total_v)
-                        # This updates the *main app* status
-                        self.app.after(0, self.app.set_status, f"V {proc_v}/{total_v}, JC {proc_jc}/{total_jc}: {jc.split('/')[-1]}") 
-                        
-                        self._process_single_job_card(driver, wait, short_wait, jc, apps, user_days, demand_from, work_start, days_worked_ids, j_ids, grid_ids, btn_ids, err_msg_ids, base_url, state)
+                    # --- Loop through villages ---
+                    total_v, v_idx = len(villages), 0
+                    for village, jcs_in_v in villages.items():
+                        v_idx += 1
+                        if self.is_stopped():
+                            break
+                        self._current_village = village
+                        try:
+                            self.app.after(0, self.app.set_status,
+                                           f"P {p_idx}/{total_p}, V {v_idx}/{total_v}: {village}")
+                            self.app.after(0, self.app.log_message, self.log_display,
+                                           f"--- Village {v_idx}/{total_v}: {village} ---")
+                            if not self._select_village(driver, wait, village, v_ids):
+                                raise NoSuchElementException(f"Village '{village}' not found in dropdown.")
+                            self._wait_dropdown_populated(driver, wait, j_ids, "job cards after village selection")
 
-                except Exception as e: 
-                    self.app.after(0, self.app.log_message, self.log_display, f"ERROR Village {vc}: {type(e).__name__} - {e}. Skipping.", "error")
-                    for jc_err, apps_err in jcs_in_v.items():
-                         for app_data_err in apps_err: self.app.after(0, self._update_results_tree, (jc_err, app_data_err.get('Name of Applicant'), f"Skipped (Village Error)"))
-                    continue 
+                            # --- Loop through job cards in the village ---
+                            total_jc, jc_idx = len(jcs_in_v), 0
+                            for jc, apps in jcs_in_v.items():
+                                jc_idx += 1
+                                if self.is_stopped():
+                                    break
+                                progress = (p_idx - 1 + (v_idx - 1 + jc_idx / total_jc) / total_v) / total_p
+                                self.app.after(0, self.update_status,
+                                               f"P{p_idx}/{total_p} V{v_idx}/{total_v} JC{jc_idx}/{total_jc}", progress)
+                                self.app.after(0, self.app.set_status,
+                                               f"P{p_idx}/{total_p} V{v_idx}/{total_v} JC{jc_idx}/{total_jc}: {jc.split('/')[-1]}")
+                                self._process_single_job_card(driver, wait, jc, apps,
+                                                              user_days, demand_from, days_worked_ids,
+                                                              j_ids, grid_ids, btn_ids,
+                                                              p_ids, v_ids, base_url)
+                        except Exception as e:
+                            self.app.after(0, self.app.log_message, self.log_display,
+                                           f"ERROR Village {village}: {type(e).__name__} - {e}. Skipping.", "error")
+                            for jc_err, apps_err in jcs_in_v.items():
+                                for app_data_err in apps_err:
+                                    self.app.after(0, self._update_results_tree,
+                                                   (jc_err, app_data_err.get('Name of Applicant'), "Skipped (Village Error)", panchayat, village))
+                            continue
+
+                except Exception as e:
+                    self.app.after(0, self.app.log_message, self.log_display,
+                                   f"ERROR Panchayat {panchayat}: {type(e).__name__} - {e}. Skipping.", "error")
+                    for vill, jcs in villages.items():
+                        for jc, apps in jcs.items():
+                            for a in apps:
+                                self.app.after(0, self._update_results_tree,
+                                               (jc, a.get('Name of Applicant'), "Skipped (Panchayat Error)", panchayat, vill))
+                    continue
 
             if not self.is_stopped():
                 self.app.after(0, self.app.log_message, self.log_display, "✅ All processed.")
 
         except Exception as e:
             self.app.after(0, self.app.log_message, self.log_display, f"CRITICAL ERROR: {type(e).__name__} - {e}", "error")
-            self.app.after(0, self.update_status, f"Error: {type(e).__name__}", 0.0) 
+            self.app.after(0, self.update_status, f"Error: {type(e).__name__}", 0.0)
             self.app.after(0, lambda: messagebox.showerror("Error", f"Automation stopped: {e}"))
         finally:
             final_status_text = "Finished"
-            final_tab_status = "Finished" 
+            final_tab_status = "Finished"
             final_progress = 1.0
-            
+
             if self.is_stopped():
                 self.app.after(0, self.app.log_message, self.log_display, "Stopped by user.", "warning")
                 final_status_text = "Stopped"
@@ -1257,393 +1561,737 @@ class DemandTab(BaseAutomationTab):
                 final_tab_status = f"Error: {type(e).__name__}"
                 final_progress = 0.0
             else:
-                # --- INTELLIGENT HANDOFF LOGIC ---
+                # --- INTELLIGENT HANDOFF LOGIC (auto work allocation) ---
                 if not self.is_stopped():
-                    
-                    # 1. Identify successful applicants
-                    successful_names = set()
+                    success_names, failed_names = set(), set()
                     for item_id in self.results_tree.get_children():
                         values = self.results_tree.item(item_id)['values']
-                        status = str(values[4]).lower()
-                        if "success" in status or "already" in status:
-                            successful_names.add(str(values[3]).strip())
-                    
-                    # 2. Map Successful applicants to their Allocation Work Codes
-                    allocation_map = {} 
-                    count_for_allocation = 0
-                    
+                        status = str(values[5]).lower() if len(values) > 5 else ""
+                        name = str(values[4]).strip() if len(values) > 4 else ""
+                        if not name:
+                            continue
+                        if "success" in status:
+                            success_names.add(name)
+                        elif "fail" in status or "error" in status:
+                            failed_names.add(name)
+
+                    panchayat = getattr(self, '_current_panchayat', '') or ""
+
+                    # Per-worker work codes (legacy CSV 'Allocation Work Code')
+                    # take priority; workers without their own code go to the
+                    # typed work key.
+                    allocation_map = {}
+                    has_specific_codes = False
                     for app_data in self.all_applicants_data:
                         name = app_data.get('Name of Applicant', '').strip()
-                        if name in successful_names:
-                            # Prioritize specific code, fallback to global key
+                        if name in success_names:
                             specific_code = app_data.get('allocation_work_code', '').strip()
-                            final_code = specific_code if specific_code else work_key_for_allocation
-                            
-                            if final_code:
-                                if final_code not in allocation_map: allocation_map[final_code] = []
-                                allocation_map[final_code].append(name)
-                                count_for_allocation += 1
+                            if specific_code:
+                                has_specific_codes = True
+                                allocation_map.setdefault(specific_code, []).append(name)
+                            elif work_key_for_allocation:
+                                allocation_map.setdefault(work_key_for_allocation, []).append(name)
 
-                    # 3. Trigger Allocation
-                    if allocation_map:
-                        self.app.after(0, self.app.log_message, self.log_display, f"✅ Triggering Auto-Allocation for {count_for_allocation} laborers across {len(allocation_map)} work codes.")
-                        self.app.after(500, self.app.run_work_allocation_from_demand, panchayat, allocation_map)
-                    elif work_key_for_allocation:
-                        # Fallback to bulk if map failed but global key exists
-                        self.app.after(0, self.app.log_message, self.log_display, f"✅ Triggering Bulk Allocation (Global Key).")
-                        self.app.after(500, self.app.run_work_allocation_from_demand, panchayat, work_key_for_allocation)
+                    # A typed global work key (no per-worker codes) gets its
+                    # successful labourers listed under that key too, so the
+                    # handoff ALWAYS passes the labourer names — Work Allocation
+                    # selects ONLY those workers, never 'Allocate All'.
+                    if not allocation_map:
+                        self.log_info("📊 Demand automation finished (no successful labourers to allocate).")
                     else:
-                        self.log_info("📊 Demand automation finished.")
+                        self._handoff_allocation(panchayat, failed_names, allocation_map)
 
                 self.app.after(0, self._clear_processed_selection)
-            
-            # Unlock the UI
+
             self.app.after(0, self.set_ui_state, False)
-            
             self.app.after(0, self.app.set_status, final_status_text)
             self.app.after(0, self.update_status, final_tab_status, final_progress)
-            
+
             if not self.is_stopped() and 'e' not in locals():
-                 self.app.after(5000, lambda: self.app.set_status("Ready")) 
-                 self.app.after(5000, lambda: self.update_status("Ready", 0.0))
+                self.app.after(5000, lambda: self.app.set_status("Ready"))
+                self.app.after(5000, lambda: self.update_status("Ready", 0.0))
 
-    # --- Helper Function for Background Execution (Add this above _process_single_job_card) ---
-    def safe_js_fill(self, driver, element, value):
+    def _handoff_allocation(self, panchayat: str, failed_names: set,
+                            allocation_map: Dict) -> None:
+        """Triggers auto-allocation after demand. If any labourer's demand
+        failed, asks the user first (retry vs proceed) before allocating.
+        allocation_map (work_code -> labourer names) contains ONLY the workers
+        whose demand succeeded, so Work Allocation selects exactly those —
+        never 'Allocate All'. An empty map means nothing succeeded, so no
+        allocation happens."""
+        def _proceed() -> None:
+            if allocation_map:
+                count = sum(len(v) for v in allocation_map.values())
+                self.app.after(0, self.app.log_message, self.log_display,
+                               f"✅ Triggering Auto-Allocation for {count} laborers across {len(allocation_map)} work codes.")
+                self.app.after(500, self.app.run_work_allocation_from_demand,
+                               panchayat, allocation_map)
+            else:
+                # No labourer names are known (nothing succeeded) — never fall
+                # back to 'Allocate All', which would allocate EVERY worker of
+                # the panchayat even though none of the demands succeeded.
+                self.app.after(0, self.app.log_message, self.log_display,
+                               "ℹ️ No successful labourers to allocate — skipping allocation.")
+
+        if failed_names:
+            sample = "\n".join(sorted(failed_names)[:6])
+            more = "\n..." if len(failed_names) > 6 else ""
+            msg = (f"{len(failed_names)} labourer(s) ki demand fail hui:\n"
+                   f"{sample}{more}\n\n"
+                   f"Unhe pehle Retry karna hai, ya bina unke allocation continue karein?")
+            self.app.after(0, lambda: self._ask_failed_handoff(msg, _proceed))
+        else:
+            _proceed()
+
+    def _ask_failed_handoff(self, msg: str, proceed: Callable) -> None:
+        """Main-thread dialog: Yes = retry failed (skip allocation), No = allocate."""
+        do_retry = messagebox.askyesno(
+            "Demand me failures hain",
+            msg + "\n\n(Yes = Failed labourers ka retry | No = Allocation karo)")
+        if do_retry:
+            self.log_warning("Allocation skipped — failed labourers ka retry shuru...")
+            # Demand thread ko finish hone de, phir failed applicants ka turant retry
+            self.app.after(800, self._retry_failed_applicants)
+        else:
+            proceed()
+
+    def _process_single_job_card(self, driver, wait, jc, apps_in_jc,
+                                 user_days, demand_from, days_worked_ids, jc_ids,
+                                 grid_ids, btn_ids, p_ids, v_ids, base_url):
         """
-        Fills an input using JavaScript and triggers all necessary events 
-        (input, change, blur) to simulate real user interaction.
-        Works in background/minimized mode.
-        """
-        try:
-            driver.execute_script(
-                """
-                arguments[0].value = arguments[1];
-                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
-                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
-                arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
-                """,
-                element, value
-            )
-        except Exception:
-            # Fallback if JS fails
-            try:
-                element.clear()
-                element.send_keys(value + Keys.TAB)
-            except Exception as e:
-                logger.debug("Demand: Failed to set element value: %s", e)
-
-    def _process_single_job_card(self, driver, wait, short_wait, jc, apps_in_jc,
-                                 user_days, demand_from, work_start,
-                                 days_worked_ids, jc_ids, grid_ids, btn_ids,
-                                 err_msg_ids,
-                                 base_url, state): 
-        """
-        Handles the selenium logic for processing a single job card.
+        Selects the job card, fills the demand grid rows for the target members
+        and submits. Handles the ASP.NET postbacks:
+          - JC dropdown change  -> async postback renders the grid (gvData)
+          - grid date-field change (d3) -> async postback auto-fills dt_to
+          - Proceed click -> full postback that saves the demand
         """
 
-        def get_worked_days_ultra_fast():
-            try:
-                days_el = WebDriverWait(driver, 1.0).until(EC.presence_of_element_located((By.ID, days_worked_ids[0])))
-                worked_str = days_el.get_attribute("innerText").strip()
-                if not worked_str: return 0
-                return int(worked_str) if worked_str.isdigit() else 0
-            except Exception: return 0
+        def mark(jc_, name_, status_):
+            # Snapshot the location NOW — the after() callback runs later on the
+            # main thread, by which time the worker may have moved on.
+            self.app.after(0, self._update_results_tree,
+                           (jc_, name_, status_,
+                            getattr(self, '_current_panchayat', ''),
+                            getattr(self, '_current_village', '')))
 
-        def fill_demand_data(days_distribution): 
-            nonlocal filled, processed
-            applicants_not_found = set(targets) 
-            fill_success = False
-            
-            try:
-                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")))
-            except Exception: 
-                self.app.after(0, self.app.log_message, self.log_display, f"   ERROR: Grid not found.", "error")
-                return False
+        def grid_id_of():
+            return driver.find_element(
+                By.CSS_SELECTOR, ", ".join(f"table[id='{x}']" for x in grid_ids)
+            ).get_attribute("id")
 
-            # --- PASS 1: CLEANING (clear dates for non-target rows) ---
+        def find_row_index(name_target):
+            """Returns the grid row index (1-based) whose _job name matches, else -1."""
             try:
                 rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
-                for i, r in enumerate(rows):
-                    if i == 0: continue
-                    try:
-                        name_span = r.find_element(By.CSS_SELECTOR, f"span[id*='_job']")
-                        name_web = name_span.get_attribute("innerText").strip()
-                        is_target = any("".join(tn.lower().split()) in "".join(name_web.lower().split()) for tn in targets)
-                        if not is_target:
-                            pfx = f"{grid_id}_ctl{i+1:02d}_"
-                            try:
-                                date_fld = driver.find_element(By.ID, f"{pfx}dt_app")
-                                if date_fld.get_attribute('value'):
-                                    date_fld.clear()
-                            except Exception:
-                                pass
-                    except StaleElementReferenceException:
-                        pass  # row went stale, skip cleaning for it
-                    except Exception:
-                        pass
+            except Exception:
+                return -1
+            for i, r in enumerate(rows):
+                if i == 0:
+                    continue
+                try:
+                    span = r.find_element(By.CSS_SELECTOR, "span[id*='_job']")
+                    if self._names_equal(span.get_attribute("innerText"), name_target):
+                        return i
+                except (StaleElementReferenceException, NoSuchElementException):
+                    continue
+                except Exception:
+                    continue
+            return -1
+
+        try:
+            jc_suffix = jc.split('/')[-1]
+            self.app.after(0, self.app.log_message, self.log_display, f"Processing JC: {jc}")
+
+            # ── 1. Select the job card in the Registration dropdown (POSTBACK) ──
+            # First wait for the *target* JC to appear in the list — this guarantees
+            # the village -> registration async postback has finished, so we never
+            # match against the previous village's stale options. Then select it
+            # (option values are composite: '{JC}:{reg_date}:{days}:...').
+            if not self._wait_jc_option(driver, jc, jc_ids):
+                self.app.after(0, self.app.log_message, self.log_display,
+                               f"   FAIL: JC '{jc}' not found in the village list.", "error")
+                for a in apps_in_jc:
+                    mark(jc, a.get('Name of Applicant'), "FAIL: JC Not Found")
+                return
+
+            # Snapshot the grid BEFORE the JC postback. After a submit the page keeps
+            # showing the previous JC's already-filled grid — if we read it before the
+            # async postback replaces it, overlapping worker names across job cards
+            # make every later JC wrongly report 'Already Correct' (nothing saved).
+            old_grid = None
+            try:
+                old_grid = driver.find_element(
+                    By.CSS_SELECTOR, ", ".join(f"table[id='{x}']" for x in grid_ids))
             except Exception:
                 pass
 
-            # --- PASS 2: FILLING ---
-            for target_name, days_to_fill in days_distribution.items():
-                if self.is_stopped(): return False
-                
-                if days_to_fill == 0:
-                    processed.add(target_name); applicants_not_found.discard(target_name); fill_success = True; continue
-                
-                found = False
-                # Always re-fetch rows fresh — page may have refreshed
+            jc_selected = False
+            for _attempt in range(3):
+                if self.is_stopped():
+                    return
                 try:
-                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")))
-                    rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
+                    jc_el = wait.until(EC.presence_of_element_located(
+                        (By.CSS_SELECTOR, ", ".join(f"#{x}" for x in jc_ids))))
+                    if self._select_jc_option(driver, Select(jc_el), jc):
+                        jc_selected = True
+                        break
+                except (StaleElementReferenceException, NoSuchElementException):
+                    time.sleep(0.5)
+                time.sleep(0.15)
+            if not jc_selected:
+                self.app.after(0, self.app.log_message, self.log_display,
+                               f"   FAIL: JC '{jc}' not found in the village list.", "error")
+                for a in apps_in_jc:
+                    mark(jc, a.get('Name of Applicant'), "FAIL: JC Not Found")
+                return
+            self.app.after(0, self.app.log_message, self.log_display,
+                           f"   Selected JC '{jc}' from the list.")
+
+            # Wait for the grid to refresh after the JC postback: the OLD grid (from
+            # the previous JC) must go stale first — only then is the new JC's grid in
+            # place. Without this, the still-visible filled rows of the previous JC get
+            # misread and every later JC is wrongly reported as 'Already Correct'.
+            grid_ready = old_grid is None
+            if old_grid is not None:
+                try:
+                    WebDriverWait(driver, 8, poll_frequency=0.2).until(EC.staleness_of(old_grid))
+                    grid_ready = True
+                except TimeoutException:
+                    grid_ready = False
+            if not grid_ready:
+                # Grid never replaced — re-fire the change event once.
+                try:
+                    jc_el = driver.find_element(By.CSS_SELECTOR, ", ".join(f"#{x}" for x in jc_ids))
+                    self._select_jc_option(driver, Select(jc_el), jc)
+                    WebDriverWait(driver, 10, poll_frequency=0.2).until(EC.staleness_of(old_grid))
+                    grid_ready = True
+                except Exception:
+                    grid_ready = False
+            if not grid_ready:
+                # Might be a genuine re-run (same JC, grid already correct). Only fail
+                # when none of this JC's workers are present in the grid at all.
+                if not self._grid_has_any_worker(driver, grid_ids, apps_in_jc):
+                    for a in apps_in_jc:
+                        mark(jc, a.get('Name of Applicant'), "Failed (Grid did not refresh)")
+                    return
+
+            try:
+                wait.until(EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, ", ".join(f"table[id='{x}']" for x in grid_ids))))
+            except TimeoutException:
+                msg = self._read_result_message(driver, attempts=2)
+                status = "Skipped (JC Not Issued)" if "not yet issued" in msg.lower() else "Skipped (No grid)"
+                for a in apps_in_jc:
+                    mark(jc, a.get('Name of Applicant'), status)
+                return
+            grid_id = grid_id_of()
+
+            # ── 2. "Not yet issued" check ──
+            try:
+                WebDriverWait(driver, 1.0).until(EC.presence_of_element_located(
+                    (By.XPATH, "//font[contains(text(), 'not yet issued')]")))
+                for a in apps_in_jc:
+                    mark(jc, a.get('Name of Applicant'), "Skipped (JC Not Issued)")
+                return
+            except TimeoutException:
+                pass
+
+            # ── 3. Days availability (100-day rule) ──
+            worked = self._get_worked_days(driver, days_worked_ids)
+            avail = 100 - worked
+            if avail <= 0:
+                for a in apps_in_jc:
+                    mark(jc, a.get('Name of Applicant'), "Skipped (100 days)")
+                return
+
+            adj_days = user_days
+            total_needed = user_days * len(apps_in_jc)
+            if total_needed > avail:
+                adj_days = avail // len(apps_in_jc) if len(apps_in_jc) else avail
+            elif user_days > avail:
+                adj_days = avail
+
+            today = datetime.now().strftime('%d/%m/%Y')
+
+            # ── 3b. Clear stale dates/days on rows that are NOT selected ──
+            # The portal (ASP.NET) carries previously-entered values into the
+            # grid across postbacks. A row we are NOT filling can therefore
+            # still hold old dates — submitting would create demand for that
+            # labourer too (e.g. both members of a job card get demand even
+            # though only one was selected).
+            self._clear_stale_grid_rows(
+                driver, grid_id,
+                [a.get('Name of Applicant', '').strip() for a in apps_in_jc])
+
+            # ── 4. Fill rows (single postback per row via d3) ──
+            status_map = {}  # name -> 'filled' | 'noday' | 'error' | 'notfound'
+            for i, a in enumerate(apps_in_jc):
+                if self.is_stopped():
+                    return
+                name = a.get('Name of Applicant', '').strip()
+                if not name:
+                    continue
+                days_val = adj_days if adj_days > 0 else (avail if i == 0 else 0)
+                if days_val <= 0:
+                    status_map[name] = "noday"
+                    continue
+                row_i = find_row_index(name)
+                if row_i == -1:
+                    status_map[name] = "notfound"
+                    continue
+                pfx = f"{grid_id}_ctl{row_i + 1:02d}_"
+                status_map[name] = self._fill_grid_row(driver, wait, pfx, today, demand_from, days_val)
+
+            for name, s in status_map.items():
+                if s == "noday":
+                    mark(jc, name, "Skipped (No days left)")
+                elif s == "notfound":
+                    mark(jc, name, "Failed (Not found in Table)")
+                elif s == "error":
+                    mark(jc, name, "Failed (Grid Error)")
+
+            filled_names = [n for n, s in status_map.items() if s == "filled"]
+            if not filled_names:
+                return
+
+            # The fill postbacks re-render the grid — clear once more so no
+            # stale row can slip into the final submit.
+            self._clear_stale_grid_rows(
+                driver, grid_id,
+                [a.get('Name of Applicant', '').strip() for a in apps_in_jc])
+
+            # ── 5. Submit (POSTBACK) ──
+            self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Submitting...")
+            try:
+                btn = wait.until(EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, ", ".join(f"#{x}" for x in btn_ids))))
+                driver.execute_script("arguments[0].click();", btn)
+            except Exception:
+                for n in filled_names:
+                    mark(jc, n, "FAIL: Submit button missing")
+                return
+
+            res, ok = self._collect_submit_result(driver, btn)
+            for n in filled_names:
+                if ok:
+                    mark(jc, n, "Success")
+                elif any(p in (res or "").lower() for p in self.ALREADY_PHRASES):
+                    # Demand already exists for this period — not a new success.
+                    mark(jc, n, f"Already: {res}")
+                else:
+                    mark(jc, n, f"FAIL: {res}")
+
+        except Exception as e:
+            self.app.after(0, self.app.log_message, self.log_display,
+                           f"CRITICAL ERROR processing {jc}: {e}", "error")
+            for a in apps_in_jc:
+                mark(jc, a.get('Name of Applicant'), f"FAIL: {type(e).__name__}")
+            # Restore the page (panchayat + current village) so the remaining
+            # job cards of the run can still be processed. The old behaviour —
+            # just driver.get(base_url) — left the browser at its default state,
+            # so every later JC failed with 'JC not found in the village list'.
+            self._recover_to_village(driver, wait, base_url, p_ids, v_ids, jc_ids)
+
+    def _recover_to_village(self, driver, wait, base_url, p_ids, v_ids, j_ids):
+        """Reloads the demand page and re-selects the current panchayat and
+        village.
+
+        Called after an unexpected error on a job card. Restoring the dropdown
+        state lets the remaining job cards of the run continue normally.
+        """
+        try:
+            driver.get(base_url)
+            time.sleep(1.0)
+            if self.is_stopped():
+                return
+            panchayat = getattr(self, '_current_panchayat', '') or ''
+            # Block-login portals show a panchayat dropdown; GP login does not.
+            try:
+                pd = WebDriverWait(driver, 4).until(EC.element_to_be_clickable(
+                    (By.CSS_SELECTOR, ", ".join(f"#{x}" for x in p_ids))))
+                if panchayat and self._select_by_text_case_insensitive(Select(pd), panchayat):
+                    self._wait_dropdown_populated(driver, wait, v_ids,
+                                                  "villages (recovery)")
+            except TimeoutException:
+                pass  # GP login mode — no panchayat dropdown
+            village = getattr(self, '_current_village', '') or ''
+            if village:
+                try:
+                    if self._select_village(driver, wait, village, v_ids):
+                        self._wait_dropdown_populated(driver, wait, j_ids,
+                                                      "job cards (recovery)")
+                except Exception:
+                    pass
+        except Exception as e:
+            self.app.after(0, self.app.log_message, self.log_display,
+                           f"   Recovery to village '{getattr(self, '_current_village', '')}' failed: {e}",
+                           "warning")
+
+    # ------------------------------------------------------------------
+    # Postback-aware helpers for the Demand page
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _names_equal(a, b):
+        """Compares two names ignoring case and whitespace."""
+        return "".join((a or "").lower().split()) == "".join((b or "").lower().split())
+
+    def _clear_stale_grid_rows(self, driver, grid_id, keep_names):
+        """Clears dates/days on every grid row whose worker is NOT one of the
+        target applicants.
+
+        The ASP.NET portal carries previously-entered values (dt_app, dt_from,
+        d3, dt_to) into grid rows across postbacks. If a row we are not filling
+        still holds dates, the final submit would create demand for that
+        labourer too — e.g. both members of a job card get demand even though
+        only one was selected. Values are cleared via JS (no change event), so
+        no extra postback fires here; the next real postback (d3 change / the
+        submit itself) carries the cleared state.
+        """
+        keep = {self._names_key(n) for n in keep_names if n}
+        if not keep:
+            return
+        try:
+            rows = driver.find_elements(By.CSS_SELECTOR,
+                                        f"table[id='{grid_id}'] > tbody > tr")
+        except Exception:
+            return
+        for i, r in enumerate(rows):
+            if i == 0:
+                continue  # header row
+            try:
+                span = r.find_element(By.CSS_SELECTOR, "span[id*='_job']")
+                nm = (span.get_attribute("innerText") or "").strip()
+            except (StaleElementReferenceException, NoSuchElementException):
+                continue
+            except Exception:
+                continue
+            if nm and self._names_key(nm) in keep:
+                continue  # target worker — will be filled below
+            pfx = f"{grid_id}_ctl{i + 1:02d}_"
+            for fld in ("dt_app", "dt_from", "d3", "dt_to"):
+                try:
+                    el = r.find_element(By.ID, f"{pfx}{fld}")
+                    if (el.get_attribute("value") or "").strip():
+                        self._set_js_value(driver, el, "", fire_change=False)
+                except (StaleElementReferenceException, NoSuchElementException):
+                    continue
                 except Exception:
                     continue
 
-                for i, r in enumerate(rows):
-                    if i == 0: continue
-                    try:
-                        name_span = short_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"#{grid_id}_ctl{i+1:02d}_job")))
-                        name_web = name_span.get_attribute("innerText").strip()
-                        
-                        if "".join(target_name.lower().split()) in "".join(name_web.lower().split()):
-                            applicants_not_found.discard(target_name)
-                            pfx = f"{grid_id}_ctl{i+1:02d}_"
-                            ids = {k: pfx+v for k, v in {
-                                'from': 'dt_app', 'start': 'dt_from',
-                                'days': 'd3', 'till': 'dt_to'
-                            }.items()}
+    @staticmethod
+    def _names_key(name):
+        return "".join((name or "").lower().split())
 
-                            # today's date for dt_app (Date of Application — always current date)
-                            today_date = datetime.now().strftime('%d/%m/%Y')
-
-                            # Read current values to check if update needed
-                            try:
-                                cur_from  = driver.find_element(By.ID, ids['from']).get_attribute('value')
-                                cur_start = driver.find_element(By.ID, ids['start']).get_attribute('value')
-                                cur_days  = driver.find_element(By.ID, ids['days']).get_attribute('value')
-                            except Exception:
-                                cur_from = cur_start = cur_days = ""
-
-                            needs_upd = (
-                                cur_from  != today_date or
-                                cur_start != demand_from or
-                                cur_days  != str(days_to_fill)
-                            )
-
-                            if needs_upd:
-                                self.app.after(0, self.app.log_message, self.log_display,
-                                               f"   -> Updating: '{name_web}' ({days_to_fill}d)...")
-
-                                # ── STEP 1: Date of Application (dt_app) — always today ───
-                                # Click first to focus, then fill, then TAB to trigger postback
-                                from_el = wait.until(EC.element_to_be_clickable((By.ID, ids['from'])))
-                                if from_el.get_attribute('value') != today_date:
-                                    from_el.click()
-                                    time.sleep(0.1)
-                                    from_el.clear()
-                                    from_el.send_keys(today_date)
-                                    time.sleep(0.1)
-                                    from_el.send_keys(Keys.TAB)
-                                    # Page now does a postback — wait for grid to re-render
-                                    time.sleep(0.8)
-                                    wait.until(EC.presence_of_element_located(
-                                        (By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")))
-                                    time.sleep(0.3)
-
-                                # ── STEP 2: Work Demand From (dt_from) — user's demand date
-                                # Must click to focus — cursor may have moved after postback
-                                start_el = wait.until(EC.element_to_be_clickable((By.ID, ids['start'])))
-                                if start_el.get_attribute('value') != demand_from:
-                                    start_el.click()
-                                    time.sleep(0.1)
-                                    start_el.clear()
-                                    start_el.send_keys(demand_from)
-                                    time.sleep(0.1)
-                                    start_el.send_keys(Keys.TAB)
-                                    # May also trigger a postback
-                                    time.sleep(0.6)
-                                    wait.until(EC.presence_of_element_located(
-                                        (By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")))
-                                    time.sleep(0.2)
-                                else:
-                                    # Still need to TAB through to days field
-                                    start_el.click()
-                                    time.sleep(0.1)
-                                    start_el.send_keys(Keys.TAB)
-                                    time.sleep(0.2)
-
-                                # ── STEP 3: Days (d3) ────────────────────────────────────
-                                # Click to focus, clear old value, type new value, TAB
-                                # TAB triggers website to auto-fill dt_to
-                                days_el = wait.until(EC.element_to_be_clickable((By.ID, ids['days'])))
-                                days_el.click()
-                                time.sleep(0.1)
-                                cur_d = days_el.get_attribute('value') or ""
-                                # Clear char by char then type
-                                for _ in range(len(cur_d) + 2):
-                                    days_el.send_keys(Keys.BACKSPACE)
-                                days_el.send_keys(str(days_to_fill))
-                                time.sleep(0.1)
-                                days_el.send_keys(Keys.TAB)
-
-                                # ── STEP 4: Wait for dt_to to be auto-filled ─────────────
-                                try:
-                                    wait.until(lambda d: (
-                                        d.find_element(By.ID, ids['till']).get_attribute("value") or ""
-                                    ) != "")
-                                except Exception:
-                                    time.sleep(0.5)
-
-                            filled = True
-                            processed.add(target_name)
-                            found = True
-                            fill_success = True
-                            break
-
-                    except StaleElementReferenceException:
-                        self.app.after(0, self.app.log_message, self.log_display,
-                                       f"   Stale row for '{target_name}', retrying...", "warning")
-                        time.sleep(0.6)
-                        break
-                    except Exception:
-                        continue
-
-                if not found: time.sleep(0.1); continue
-
-            for nf in applicants_not_found: 
-                processed.add(nf) 
-                self.app.after(0, self._update_results_tree, (jc, nf, "Failed (Not found in Table)"))
-            
-            return fill_success
-
-        # --- Main logic ---
+    def _grid_has_any_worker(self, driver, grid_ids, apps_in_jc):
+        """True if any of the JC's workers appears in the current grid rows.
+        Used to distinguish a stale grid (previous JC still shown) from a genuine
+        re-run where the grid already shows this JC's data."""
         try:
-            jc_suffix = jc.split('/')[-1]
-            self.app.after(0, self.app.log_message, self.log_display, f"Processing JC Suffix: {jc_suffix}")
-            old_days_label = None
-            try: old_days_label = driver.find_element(By.ID, days_worked_ids[0])
-            except Exception: old_days_label = None
-            
+            gid = driver.find_element(
+                By.CSS_SELECTOR, ", ".join(f"table[id='{x}']" for x in grid_ids)
+            ).get_attribute("id")
+            rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{gid}'] > tbody > tr")
+            for r in rows[1:]:
+                try:
+                    span = r.find_element(By.CSS_SELECTOR, "span[id*='_job']")
+                    t = (span.get_attribute("innerText") or "").strip()
+                    for a in apps_in_jc:
+                        nm = (a.get('Name of Applicant', '') or '').replace('*', '').strip()
+                        if nm and self._names_equal(t, nm):
+                            return True
+                except (StaleElementReferenceException, NoSuchElementException):
+                    continue
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return False
+
+    @staticmethod
+    def _jc_value_matches(val, jc):
+        """True if a Registration option value matches the full job card number.
+
+        Website values embed extra fields after the JC, e.g.
+        'JH-22-003-008-005/127:10/20/2006:53:N:OT:Y' — the JC is everything
+        before the first separator (':', '|' or ';').
+        """
+        v = (val or '').strip()
+        if not v or not jc:
+            return False
+        if v == jc:
+            return True
+        for sep in (':', '|', ';'):
+            if sep in v and v.split(sep)[0].strip() == jc:
+                return True
+        return False
+
+    @staticmethod
+    def _set_dropdown_value(driver, select_el, value):
+        """Sets a <select> value via JS and fires 'change' (which triggers the
+        ASP.NET onchange postback). Bypasses Selenium's XPath-based value
+        selection, which can fail on composite values containing '/' and ':'."""
+        driver.execute_script(
+            "var s = arguments[0]; s.value = arguments[1];"
+            " s.dispatchEvent(new Event('change', { bubbles: true }));",
+            select_el, value)
+
+    @staticmethod
+    def _wait_jc_option(driver, jc, jc_ids, timeout=12):
+        """Waits until the Registration dropdown contains the target job card
+        (value match). Confirms the village postback has finished.
+
+        Tolerates StaleElementReferenceException: an ASP.NET postback can
+        replace the <option> elements WHILE we scan them, and reading a
+        replaced option raises 'stale element reference'. That is treated as
+        'not ready yet' and the wait keeps polling until the dropdown settles —
+        instead of the exception aborting the whole job card.
+        """
+        jc = jc.strip()
+        try:
+            def _found(d):
+                try:
+                    for sel_id in jc_ids:
+                        for opt in d.find_elements(By.XPATH, f"//select[@id='{sel_id}']/option"):
+                            if DemandTab._jc_value_matches(opt.get_attribute('value'), jc):
+                                return True
+                except (StaleElementReferenceException, NoSuchElementException):
+                    return False  # dropdown is mid-refresh — keep waiting
+                return False
+            WebDriverWait(driver, timeout).until(_found)
+            return True
+        except TimeoutException:
+            return False
+
+    @staticmethod
+    def _select_jc_option(driver, sel, jc):
+        """Selects the Registration option matching the full job card number.
+
+        Option value format:  '{JC}:{reg_date}:{days}:{...}'
+        Option text format:   '{serial}-{NAME}'
+        Works for any state's job card format since the full JC is matched.
+        """
+        jc = jc.strip()
+        if not jc:
+            return False
+        for opt in sel.options:
+            if DemandTab._jc_value_matches(opt.get_attribute('value'), jc):
+                DemandTab._set_dropdown_value(driver, sel._el, opt.get_attribute('value'))
+                return True
+        # Fallback: text prefix match on the serial suffix (covers any JC format)
+        suffix = jc.split('/')[-1]
+        for opt in sel.options:
+            t = (opt.text or "").strip()
+            if t.startswith(suffix + "-"):
+                DemandTab._set_dropdown_value(driver, sel._el, opt.get_attribute('value'))
+                return True
+        return False
+
+    @staticmethod
+    def _set_js_value(driver, el, value, fire_change=False):
+        """Sets an input's value via JS; optionally fires 'change' to trigger the
+        ASP.NET onchange postback."""
+        js = "arguments[0].focus(); arguments[0].value = arguments[1];"
+        if fire_change:
+            js += " arguments[0].dispatchEvent(new Event('change', { bubbles: true }));"
+        driver.execute_script(js, el, value)
+
+    def _fill_grid_row(self, driver, wait, pfx, today, demand_from, days_val):
+        """
+        Fills dt_app (today), dt_from (demand date) and d3 (days) on one grid row.
+
+        dt_app / dt_from are set via JS WITHOUT firing events (no postback), then a
+        single 'change' event is fired on d3 — that triggers the one async postback
+        the server needs to auto-compute dt_to. Returns 'filled' | 'error'.
+
+        NOTE: We never 'skip' a row whose fields already look correct. This portal
+        (ASP.NET) carries the PREVIOUS job card's entered values into the new JC's
+        grid rows across postbacks, so a freshly-selected JC can already show
+        today / demand-from / days that were actually typed for the previous JC.
+        Skipping on that made every JC after the first report 'Already Correct'
+        without filling or submitting anything. We always force-set the values and
+        fire the days postback so each JC is genuinely filled and submitted.
+        """
+        try:
+            ids = {'app': f"{pfx}dt_app", 'from': f"{pfx}dt_from",
+                   'days': f"{pfx}d3", 'till': f"{pfx}dt_to"}
+            app_el = wait.until(EC.presence_of_element_located((By.ID, ids['app'])))
+            from_el = driver.find_element(By.ID, ids['from'])
+            days_el = driver.find_element(By.ID, ids['days'])
+            till_el = driver.find_element(By.ID, ids['till'])
+
+            cur_app = (app_el.get_attribute('value') or "").strip()
+            cur_from = (from_el.get_attribute('value') or "").strip()
+            cur_days = (days_el.get_attribute('value') or "").strip()
+
+            if cur_app != today:
+                self._set_js_value(driver, app_el, today, fire_change=False)
+            if cur_from != demand_from:
+                self._set_js_value(driver, from_el, demand_from, fire_change=False)
+            # Always fire the d3 change postback — even when the value already
+            # matches — so the server recomputes dt_to for THIS JC's rows.
+            self._set_js_value(driver, days_el, str(days_val), fire_change=True)
+
+            # Let the async postback replace the grid before reading dt_to back —
+            # a carried-over value could otherwise make the wait below return
+            # immediately on stale data and let us race the postback.
+            time.sleep(0.2)
+
+            # Wait for the server postback to auto-fill dt_to — this is also the
+            # proof that the server received the JS-set dt_app/dt_from/d3 values.
             try:
-                jc_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"#{jc_ids[0]}, #{jc_ids[1]}")))
-                jc_val = jc.split('/')[0]
-                try: Select(jc_el).select_by_value(jc_val)
-                except NoSuchElementException:
-                    possible_prefixes = [f"{jc_suffix}-", f"{jc_suffix.zfill(2)}-", f"{jc_suffix.zfill(3)}-"]
-                    found_by_text = False
-                    for prefix in possible_prefixes:
-                        try:
-                            xpath = f".//option[starts-with(normalize-space(.), '{prefix}')]"
-                            opt = jc_el.find_element(By.XPATH, xpath)
-                            Select(jc_el).select_by_visible_text(opt.text)
-                            found_by_text = True; break
-                        except NoSuchElementException: continue
-                    if not found_by_text: raise NoSuchElementException(f"Couldn't find JC '{jc_suffix}'.")
-            
-                if old_days_label:
-                    try: wait.until(EC.staleness_of(old_days_label))
-                    except TimeoutException: pass
-
-            except NoSuchElementException:
-                [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), "FAIL: JC Not Found")) for a in apps_in_jc]; return
-
-            targets = [a.get('Name of Applicant', '').strip() for a in apps_in_jc]
-            if not targets: return
-
-            err_found = False; msg = ""
-            try:
-                WebDriverWait(driver, 1.0).until(EC.presence_of_element_located((By.XPATH, "//font[contains(text(), 'not yet issued')]")))
-                msg = "Skipped (JC Not Issued)"; err_found = True
-            except Exception: err_found = False
-
-            if err_found:
-                 [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), msg)) for a in apps_in_jc]; return
-
-            worked = get_worked_days_ultra_fast()
-            avail = 100 - worked 
-            days_distribution = {} 
-            
-            if avail <= 0: 
-                [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), "Skipped (100 days)")) for a in apps_in_jc]; return
-
-            adj_days_per_app = user_days 
-            total_needed = user_days * len(targets)
-            if total_needed > avail: adj_days_per_app = avail // len(targets) 
-            elif user_days > avail: adj_days_per_app = avail
-            
-            for target_name in targets:
-                days_distribution[target_name] = adj_days_per_app if adj_days_per_app > 0 else (avail if targets.index(target_name)==0 else 0)
-
-            grid_id = "";
-            try: 
-                grid_el = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"#{grid_ids[0]}, #{grid_ids[1]}"))); 
-                grid_id = grid_el.get_attribute("id")
+                wait.until(lambda d: (d.find_element(By.ID, ids['till']).get_attribute("value") or "").strip() != "")
             except TimeoutException:
-                [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), "Skipped (Table fail)")) for a in apps_in_jc]; return
+                return "error"
+            return "filled"
+        except Exception:
+            return "error"
 
-            self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Filling data...") 
-            processed = set(); filled = False;
-            
-            filled = fill_demand_data(days_distribution) 
+    def _get_worked_days(self, driver, days_worked_ids):
+        try:
+            el = WebDriverWait(driver, 1.0).until(EC.presence_of_element_located((By.ID, days_worked_ids[0])))
+            t = (el.get_attribute("innerText") or "").strip()
+            return int(t) if t.isdigit() else 0
+        except Exception:
+            return 0
 
-            if filled:
-                self.app.after(0, self.app.set_status, f"JC {jc_suffix}: Submitting...")
-                btn = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, f"#{btn_ids[0]}, #{btn_ids[1]}")))
-                driver.execute_script("arguments[0].click();", btn)
-                
-                res = ""; alert_ok = False; 
-                try: 
-                    alert = WebDriverWait(driver, 3).until(EC.alert_is_present())
-                    res = alert.text.strip()
-                    self.app.after(0, self.app.log_message, self.log_display, f"   RESULT (Alert): {res}")
-                    alert.accept()
-                    alert_ok = True
-                except TimeoutException: 
-                    try:
-                        potential_messages = short_wait.until(EC.presence_of_all_elements_located((By.XPATH, "//font[@color='red'] | //span[contains(@id, '_lblmsg')]")))
-                        res = " ".join([el.get_attribute("innerText").strip() for el in potential_messages if el.get_attribute("innerText").strip()]) 
-                        if not res: res = "Unknown (No Alert/Msg)"
-                        self.app.after(0, self.app.log_message, self.log_display, f"   RESULT: {res}", "warning")
-                    except: 
-                        res = "Unknown (Timeout)"
+    def _select_village(self, driver, wait, token, v_ids):
+        """Selects the village dropdown option by name (case-insensitive), falling
+        back to a value-suffix (village code) match for legacy inputs.
 
-                for app_data in apps_in_jc:
-                    name = app_data.get('Name of Applicant', 'N/A')
-                    if name not in processed: 
-                        self.app.after(0, self._update_results_tree, (jc, name, "Failed (Skipped/Not Processed)"))
-                        continue
-                    
-                    status_text = res.lower()
-                    is_failure = any(x in status_text for x in ['error', 'fail', 'not saved', 'problem', 'contact', 'select'])
-                    
-                    if alert_ok and not is_failure: 
-                        final_status = f"Success"
-                    else:
-                        final_status = f"FAIL: {res}"
-                        
-                    self.app.after(0, self._update_results_tree, (jc, name, final_status))
-            
-            else:
-                 for app_data in apps_in_jc:
-                     name = app_data.get('Name of Applicant', 'N/A')
-                     if name in processed: 
-                         self.app.after(0, self._update_results_tree, (jc, name, "Already Correct"))
-                     else:
-                         self.app.after(0, self._update_results_tree, (jc, name, "Failed (Grid Error)"))
+        Tolerates stale elements: an ASP.NET postback can refresh the dropdown's
+        <option> elements WHILE we scan them, so the scan retries instead of
+        aborting the whole village."""
+        v_el = wait.until(EC.element_to_be_clickable(
+            (By.CSS_SELECTOR, ", ".join(f"#{x}" for x in v_ids))))
+        for _attempt in range(3):
+            if self.is_stopped():
+                return False
+            try:
+                v_sel = Select(v_el)
+                if self._select_by_text_case_insensitive(v_sel, token):
+                    self.app.after(0, self.app.log_message, self.log_display,
+                                   f"Selected Village '{token}'.")
+                    return True
+                for opt in v_sel.options:
+                    val = (opt.get_attribute('value') or "").strip()
+                    if val not in ("00", "99") and token and val.endswith(str(token)):
+                        v_sel.select_by_value(val)
+                        self.app.after(0, self.app.log_message, self.log_display,
+                                       f"Selected Village '{opt.text}' (code ...{token}).")
+                        return True
+                break  # scan finished cleanly — option genuinely absent
+            except (StaleElementReferenceException, NoSuchElementException):
+                # Dropdown was mid-refresh — re-find it and retry.
+                time.sleep(0.5)
+                try:
+                    v_el = wait.until(EC.element_to_be_clickable(
+                        (By.CSS_SELECTOR, ", ".join(f"#{x}" for x in v_ids))))
+                except TimeoutException:
+                    return False
+        try:
+            avail = [o.text.strip() for o in v_sel.options
+                     if o.text.strip() and o.text.strip() not in ("---Select---", "--All Villages--", "")]
+            self.app.after(0, self.app.log_message, self.log_display,
+                           f"   Available villages: {avail[:15]}{'...' if len(avail) > 15 else ''}", "warning")
+        except Exception:
+            pass
+        return False
 
-        except Exception as e:
-            self.app.after(0, self.app.log_message, self.log_display, f"CRITICAL ERROR processing {jc}: {e}", "error")
-            [self.app.after(0, self._update_results_tree, (jc, a.get('Name of Applicant'), f"FAIL: {type(e).__name__}")) for a in apps_in_jc]
-            try: driver.get(base_url); time.sleep(1)
-            except Exception as e: logger.debug("Demand: Failed to navigate back after error: %s", e)
-            
-                          
+    def _wait_dropdown_populated(self, driver, wait, ids, label):
+        """Waits for a dependent dropdown to gain options after an ASP.NET postback."""
+        self.app.after(0, self.app.log_message, self.log_display, f"Waiting for {label}...")
+        wait.until(EC.any_of(*[
+            EC.presence_of_element_located((By.XPATH, f"//select[@id='{i}']/option[position()>1]"))
+            for i in ids
+        ]))
+        time.sleep(0.4)  # let the partial postback settle
+
+    def _read_result_message(self, driver, attempts=1):
+        """Reads the post-submit message from the page (red fonts / message spans)."""
+        xpaths = [
+            "//font[@color='red']",
+            "//span[contains(@id, '_lblmsg')]",
+            "//span[@id='ctl00_ContentPlaceHolder1_Up_lit']",
+            "//div[@id='divMesssge']",
+        ]
+        for _ in range(attempts):
+            for xp in xpaths:
+                try:
+                    els = driver.find_elements(By.XPATH, xp)
+                    for el in els:
+                        t = (el.get_attribute("innerText") or "").strip()
+                        if t and t.lower() != "updating msg..":
+                            return t
+                except Exception:
+                    continue
+            time.sleep(0.8)
+        return ""
+
+    def _collect_submit_result(self, driver, btn):
+        """
+        After clicking Proceed: handles the client-side confirm alert (older page
+        versions), waits for the submit postback and returns (message, ok).
+        """
+        # 1. Client-side confirm alert?
+        try:
+            alert = WebDriverWait(driver, 3).until(EC.alert_is_present())
+            text = (alert.text or "").strip()
+            self.app.after(0, self.app.log_message, self.log_display, f"   ALERT: {text}")
+            alert.accept()
+            low = text.lower()
+            if "please enter work demand" in low or "enter work demand for any one" in low:
+                return text, False  # nothing was filled correctly
+            if "do you want to submit" in low or "confirm" in low:
+                time.sleep(0.8)
+                # Some portals show a second alert after the confirm
+                try:
+                    a2 = WebDriverWait(driver, 4).until(EC.alert_is_present())
+                    t2 = (a2.text or "").strip()
+                    self.app.after(0, self.app.log_message, self.log_display, f"   ALERT 2: {t2}")
+                    a2.accept()
+                    low2 = t2.lower()
+                    if any(x in low2 for x in ["error", "fail", "not saved", "problem", "please select"] + list(self.ALREADY_PHRASES)):
+                        return t2, False
+                    return t2, True
+                except TimeoutException:
+                    pass
+                return "", True
+            if any(x in low for x in ["error", "fail", "not saved", "problem", "please select"] + list(self.ALREADY_PHRASES)):
+                return text, False
+            return text, True
+        except TimeoutException:
+            pass
+
+        # 2. No confirm alert — modern page: submit postback happened immediately.
+        settled = False
+        try:
+            submit_wait = WebDriverWait(driver, 6)
+            submit_wait.until(EC.staleness_of(btn))
+            settled = True
+        except TimeoutException:
+            settled = False
+        time.sleep(0.5)
+        msg = self._read_result_message(driver, attempts=3)
+        if msg:
+            low = msg.lower()
+            if any(x in low for x in ["error", "fail", "not saved", "problem", "please select", "enter work demand"] + list(self.ALREADY_PHRASES)):
+                return msg, False
+            return msg, True
+        if settled:
+            return "Submitted", True
+        return "No response after submit", False
     def _update_results_tree(self, data):
         """
         Adds a new row to the results treeview with correct color tags.
         """
-        jc, name, status = data
-        panchayat = self.panchayat_var.get().strip() or "-"
+        jc, name, status = data[0], data[1], data[2]
+        if len(data) >= 5:
+            panchayat = data[3] or self.panchayat_var.get().strip() or "-"
+            village = data[4] or "-"
+        else:
+            panchayat = getattr(self, '_current_panchayat', '') or self.panchayat_var.get().strip() or "-"
+            village = getattr(self, '_current_village', '') or "-"
         row_id = len(self.results_tree.get_children()) + 1
         
         status_str = str(status)
@@ -1654,68 +2302,65 @@ class DemandTab(BaseAutomationTab):
         if any(e in status_low for e in ['fail', 'error', 'crash', 'not found', 'invalid', 'aadhaar', 'not saved', 'not issued']):
             tags = ('failed',)
             
-        # 2. Warning Logic (Yellow) - 'skipped' is also mapped to warning color now
-        elif any(w in status_low for w in ['skip', 'adjust', 'limit', '100 days']):
+        # 2. Warning Logic (Yellow) - 'already' (demand pehle se hai) + 'skipped' etc.
+        elif any(w in status_low for w in ['already', 'skip', 'adjust', 'limit', '100 days']):
             tags = ('warning',)
             
-        # 3. Success Logic (Green) - YE MISSING THA
-        elif any(s in status_low for s in ['success', 'saved', 'already', 'done']):
+        # 3. Success Logic (Green)
+        elif any(s in status_low for s in ['success', 'saved', 'done']):
             tags = ('success',)
 
         # Display Text Truncation
         disp_status = (status_str[:100] + '...') if len(status_str) > 100 else status_str
         
-        self.results_tree.insert("", "end", iid=row_id, values=(row_id, panchayat, jc, name, disp_status), tags=tags)
+        self.results_tree.insert("", "end", iid=row_id, values=(row_id, panchayat, village, jc, name, disp_status), tags=tags)
         self.results_tree.yview_moveto(1)
 
     def _retry_failed_applicants(self):
         """
-        Re-selects all applicants who are marked as 'failed' in the
-        results table, so the user can run the automation again for them.
+        Simple retry: re-selects only the applicants whose demand FAILED and
+        immediately re-runs the automation for them. No manual re-ticking,
+        no waiting for the user to click Start again.
         """
-        self.log_info("Re-selecting failed applicants...")
         failed_items = self.results_tree.tag_has('failed')
-        
         if not failed_items:
-            self.log_info("No failed applicants found in results.")
-            messagebox.showinfo("Retry Failed", "No failed applicants found in the results table.")
+            messagebox.showinfo("Retry Failed", "Results me koi failed applicant nahi hai.")
             return
 
-        re_selected_count = 0
-        
-        # Clear current selection in the main data
+        # Clear all selections, then re-select ONLY the failed ones
         for app_data in self.all_applicants_data:
             app_data['_selected'] = False
 
-        # Iterate through failed items in the tree
+        re_selected_count = 0
         for item_id in failed_items:
             try:
                 values = self.results_tree.item(item_id, 'values')
-                if not values: continue
-                
-                jc_no = values[2]
-                name = values[3]
-
-                # Find this applicant in the master data list and mark for re-selection
-                found = False
+                if not values:
+                    continue
+                jc_no, name = values[3], values[4]
                 for app_data in self.all_applicants_data:
-                    if app_data['Job card number'] == jc_no and app_data['Name of Applicant'] == name:
+                    if (app_data.get('Job card number') == jc_no
+                            and app_data.get('Name of Applicant') == name):
                         app_data['_selected'] = True
                         re_selected_count += 1
-                        found = True
                         break
-                
-                if not found:
-                    self.log_warning(f"Could not find {name} ({jc_no}) in original CSV.")                        
-            except Exception as e:
-                self.log_error(f"Error processing item {item_id}: {e}")
-        # Refresh panels
+            except Exception:
+                continue
+
+        if not re_selected_count:
+            messagebox.showwarning(
+                "Retry Failed",
+                "Failed applicants CSV list me nahi mile.\n"
+                "Kya report abhi bhi loaded hai? Agar nahi, to report dobara load karo.")
+            return
+
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
-        self.log_info(f"Re-selected {re_selected_count} failed applicants.")
         self._update_jc_header_counters()
-        messagebox.showinfo("Retry Failed", f"Re-selected {re_selected_count} failed applicants.\n\n"
-                                             "Please fix any issues (like un-issued job cards) and then click 'Start Automation' to retry.")
+        self.log_info(f"Re-selected {re_selected_count} failed applicants. Restarting demand automation...")
+
+        # Turant automation re-run for just the failed applicants
+        self.start_automation()
 
     def export_results(self):
         """
@@ -1740,7 +2385,12 @@ class DemandTab(BaseAutomationTab):
         
         data = self.app.history_manager.get_tab_inputs("demand")
         if data:
-            self.state_var.set(data.get('state', '')); self.panchayat_var.set(data.get('panchayat', ''))
+            saved_state = data.get('state', '')
+            if saved_state and saved_state in getattr(self, 'state_options', []):
+                self.state_var.set(saved_state)
+            elif getattr(self, 'state_options', []):
+                self.state_var.set(self.state_options[0])
+            self.panchayat_var.set(data.get('panchayat', ''))
             days_to_set = data.get('days', days_to_set)
             work_key_to_set = data.get('work_key_for_allocation', '')
             loaded = data.get('demand_date', '');

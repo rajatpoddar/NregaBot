@@ -2,135 +2,181 @@
 import tkinter
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
-import json
 import csv
-import os, sys, subprocess, time
+import os
+import re
+import time
 from datetime import datetime
 
 from src import config
 from src.utils import truncate_workcode
 from .base_tab import BaseAutomationTab
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
-from ._imports import By, Select, WebDriverWait, EC, NoAlertPresentException, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
+from typing import Any, Dict, List, Optional
+from ._imports import (By, Select, WebDriverWait, EC, NoAlertPresentException,
+                       NoSuchElementException, StaleElementReferenceException,
+                       TimeoutException)  # noqa: F401
 
 
 class WorkAllocationTab(BaseAutomationTab):
+    """
+    Work Allocation automation — allocates labourers to work codes on the portal.
+
+    Two input modes:
+      * Bulk      — work keys typed in the text box -> 'Allocate All' checkbox.
+      * Granular  — a Demand CSV is loaded (worker name + work code) and only the
+                    matching labourers get checked for each work code.
+    The Demand tab hands over automatically after demand creation (per-worker
+    work codes from the report CSV take priority over a single typed work key).
+    """
+
+    # --- Portal element IDs (verified against the live saved page) ---
+    SUCCESS_MARKERS = ("allocation has been done", "allocated successfully",
+                       "allocation done", "record saved", "data saved successfully")
+    PANCHAYAT_IDS = ["ctl00_ContentPlaceHolder1_ddlpanchayat_code"]
+    CATEGORY_ID = "ctl00_ContentPlaceHolder1_ddlworkcategory"
+    SEARCH_KEY_ID = "ctl00_ContentPlaceHolder1_txtwrksearchkey"
+    WORK_CODE_ID = "ctl00_ContentPlaceHolder1_ddlWork_code"
+    GRID_ID = "ctl00_ContentPlaceHolder1_GridView1"
+    ALLOCATE_ALL_ID = "ctl00_ContentPlaceHolder1_GridView1_ctl01_chkHAllocate"
+    SAVE_IDS = ["ctl00_ContentPlaceHolder1_cmdSave"]
+    OVERLAY_ID = "ctl00_ContentPlaceHolder1_PageUpdateProgress"
+    REG_COL_INDEX = 1   # 'Registration No.*' column = the job card number
+    NAME_COL_INDEX = 3  # 'Job seeker name*' column in the workers grid
+    ROW_CHECKBOX_CSS = "input[type='checkbox'][id*='chkAllocate']"
+
+    WORK_CATEGORY_OPTIONS = [
+        "Anganwadi/Other Rural Infrastructure", "Coastal Areas", "Drought Proofing",
+        "Rural Drinking Water", "Food Grain", "Flood Control and Protection",
+        "Fisheries", "Micro Irrigation Works",
+        "Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers",
+        "Land Development", "Other Works", "Play Ground", "Rural Connectivity",
+        "Rural Sanitation", "Bharat Nirman Sewa Kendra",
+        "Water Conservation and Water Harvesting", "Renovation of traditional water bodies",
+    ]
+
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="work_allocation")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(3, weight=1)
 
-        # ID for the "Please Wait..." overlay
-        self.wait_overlay_id = "ctl00_ContentPlaceHolder1_PageUpdateProgress"
-        self.has_failures = False # Flag to track errors
-        
-        # Data holder for CSV based allocation
-        self.csv_allocation_data = {} 
+        self.has_failures = False          # tracks errors for the final summary
+        self.csv_allocation_data: Dict[str, List[str]] = {}  # work_code -> [names]
+        # Structured rows of every successfully allocated labourer — powers the
+        # 'Export for Demand' CSV (job card + name + work key) so the Demand tab
+        # can re-load the same workers next week.
+        self.allocated_workers_data: List[Dict] = []
 
         self._create_widgets()
         self.load_inputs()
-    def _create_widgets(self) -> None:
 
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
+    def _create_widgets(self) -> None:
         # ── Header card ──
         self._create_header_card(self, "📌", "Work Allocation",
                                  "Allocate selected work keys to job cards on the portal.",
                                  icon_key="emoji_work_allocation")
 
-        # Frame for all user input controls (bordered card)
+        # ── Input controls (bordered card) ──
         controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
                                       border_color=("gray85", "gray30"))
         controls_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
         controls_frame.grid_columnconfigure(1, weight=1)
 
-        # --- Row 0: Panchayat Name ---
-        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
+        # Row 0: Panchayat
+        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(
+            row=0, column=0, sticky='w', padx=15, pady=(15, 5))
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
 
-        # --- Row 1: Work Category ---
-        ctk.CTkLabel(controls_frame, text="Work Category:").grid(row=1, column=0, padx=15, pady=5, sticky="w")
-        # Options extracted from your provided 'Work Allocation.htm'
-        work_category_options = [
-            "Anganwadi/Other Rural Infrastructure", "Coastal Areas", "Drought Proofing", "Rural Drinking Water",
-            "Food Grain", "Flood Control and Protection", "Fisheries", "Micro Irrigation Works",
-            "Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers",
-            "Land Development", "Other Works", "Play Ground", "Rural Connectivity", "Rural Sanitation",
-            "Bharat Nirman Sewa Kendra", "Water Conservation and Water Harvesting", "Renovation of traditional water bodies"
-        ]
-        self.work_category_var = ctk.StringVar(value=work_category_options[8]) # Default to 'Provision of Irrigation...'
-        self.work_category_menu = ctk.CTkOptionMenu(controls_frame, variable=self.work_category_var, values=work_category_options)
+        # Row 1: Work Category
+        ctk.CTkLabel(controls_frame, text="Work Category:").grid(
+            row=1, column=0, padx=15, pady=5, sticky="w")
+        self.work_category_var = ctk.StringVar(value=self.WORK_CATEGORY_OPTIONS[8])
+        self.work_category_menu = ctk.CTkOptionMenu(
+            controls_frame, variable=self.work_category_var, values=self.WORK_CATEGORY_OPTIONS)
         self.work_category_menu.grid(row=1, column=1, sticky="ew", padx=15, pady=5)
 
-        # --- Row 2: CSV Upload (NEW) ---
-        ctk.CTkLabel(controls_frame, text="Use Demand CSV:").grid(row=2, column=0, padx=15, pady=5, sticky="w")
-        
+        # Row 2: Demand CSV upload (granular mode)
+        ctk.CTkLabel(controls_frame, text="Use Demand CSV:").grid(
+            row=2, column=0, padx=15, pady=5, sticky="w")
+
         csv_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         csv_frame.grid(row=2, column=1, sticky="ew", padx=15, pady=5)
-        
-        self.load_csv_btn = ctk.CTkButton(csv_frame, text="Load Demand CSV", command=self._load_demand_csv, fg_color="#D35400", hover_color="#A04000", width=150)
+
+        self.load_csv_btn = ctk.CTkButton(csv_frame, text="Load Demand CSV",
+                                          command=self._load_demand_csv,
+                                          fg_color="#D35400", hover_color="#A04000", width=150)
         self.load_csv_btn.pack(side="left", padx=(0, 10))
-        
+
         self.file_label = ctk.CTkLabel(csv_frame, text="No file selected", text_color="gray")
         self.file_label.pack(side="left")
 
-        # --- Action buttons (OUTSIDE the card) ---
+        # ── Action buttons (Start / Stop / Reset / Retry) ──
         action_frame = self._create_action_buttons(parent_frame=self)
         action_frame.grid(row=2, column=0, sticky='ew', padx=12, pady=6)
 
-        # --- Data Tabs (Work List, Results, Logs) ---
+        # ── Data tabs (Work Key List, Results, Logs) ──
         data_notebook = ctk.CTkTabview(self)
         data_notebook.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
         work_list_tab = data_notebook.add("Work Key List")
         results_tab = data_notebook.add("Results")
         self._create_log_and_status_area(parent_notebook=data_notebook)
 
-        # --- 1. Work Key List Tab ---
+        # Work Key List tab
         work_list_tab.grid_columnconfigure(0, weight=1)
         work_list_tab.grid_rowconfigure(1, weight=1)
-        
+
         wc_controls_frame = ctk.CTkFrame(work_list_tab, fg_color="transparent")
-        wc_controls_frame.grid(row=0, column=0, sticky='ew', padx=5, pady=(5,0))
-        
+        wc_controls_frame.grid(row=0, column=0, sticky='ew', padx=5, pady=(5, 0))
+
         ctk.CTkLabel(wc_controls_frame, text="Enter one Work Key (Search Key) per line.").pack(side='left', padx=5)
-        clear_button = ctk.CTkButton(wc_controls_frame, text="Clear", width=80, command=lambda: self.work_list_text.delete("1.0", tkinter.END))
-        clear_button.pack(side='right', padx=5)
+        ctk.CTkButton(wc_controls_frame, text="Clear", width=80,
+                      command=lambda: self.work_list_text.delete("1.0", tkinter.END)).pack(side='right', padx=5)
 
         self.work_list_text = ctk.CTkTextbox(work_list_tab)
         self.work_list_text.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)
 
-        # --- 2. Results Tab ---
+        # Results tab
         results_tab.grid_columnconfigure(0, weight=1)
         results_tab.grid_rowconfigure(1, weight=1)
-        
+
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, sticky='ew', pady=(5, 10))
-        
+
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_demand_button = ctk.CTkButton(export_controls_frame, text="📤 Export for Demand",
+                                                  command=self.export_for_demand,
+                                                  fg_color="#2E7D32", hover_color="#1B5E20")
+        self.export_demand_button.pack(side='left', padx=(0, 10))
+        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel",
+                                           command=self.export_report)
         self.export_button.pack(side='left')
 
-        # --- Results Treeview ---
-        cols = ("Panchayat", "Work Key", "Selected Work Code", "Status", "Details", "Timestamp")
+        cols = ("Panchayat", "Work Key", "Work Name", "Status", "Details", "Timestamp")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show='headings')
-        for col in cols: self.results_tree.heading(col, text=col)
+        for col in cols:
+            self.results_tree.heading(col, text=col)
         self.results_tree.column("Work Key", anchor='center', width=100)
-        self.results_tree.column("Selected Work Code", width=250)
+        self.results_tree.column("Work Name", width=250)
         self.results_tree.column("Status", anchor='center', width=100)
         self.results_tree.column("Details", width=250)
         self.results_tree.column("Timestamp", anchor='center', width=100)
         self.results_tree.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)
+
         scrollbar = ctk.CTkScrollbar(results_tab, command=self.results_tree.yview)
-        self.results_tree.configure(yscroll=scrollbar.set); scrollbar.grid(row=1, column=1, sticky='ns')
+        self.results_tree.configure(yscroll=scrollbar.set)
+        scrollbar.grid(row=1, column=1, sticky='ns')
+
         self.style_treeview(self.results_tree)
         self._setup_treeview_sorting(self.results_tree)
 
-
-
-    def set_ui_state(self, running: bool):
+    def set_ui_state(self, running: bool) -> None:
         if not self._is_alive():
             return
         self.set_common_ui_state(running)
@@ -138,92 +184,91 @@ class WorkAllocationTab(BaseAutomationTab):
         self.panchayat_menu.configure(state=state)
         self.work_category_menu.configure(state=state)
         self.work_list_text.configure(state=state)
+        self.load_csv_btn.configure(state=state)
         self.export_button.configure(state=state)
+        self.export_demand_button.configure(state=state)
+
     def reset_ui(self) -> None:
         self.panchayat_var.set("")
+        self.csv_allocation_data = {}
+        self.allocated_workers_data = []
+        self.file_label.configure(text="No file selected", text_color="gray")
+        self.work_list_text.configure(state="normal")
         self.work_list_text.delete("1.0", tkinter.END)
-        for item in self.results_tree.get_children(): self.results_tree.delete(item)
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
         self.app.clear_log(self.log_display)
         self.update_status("Ready", 0.0)
         self.log_info("Form has been reset.")
         self.app.after(0, self.app.set_status, "Ready")
 
-    def run_automation_from_demand(self, panchayat_name, allocation_data):
+    # ------------------------------------------------------------------
+    # Entry points
+    # ------------------------------------------------------------------
+    def run_automation_from_demand(self, panchayat_name: str, allocation_data: Any) -> None:
         """
-        Starts the Work Allocation automation externally.
-        'allocation_data' can be:
-        1. A single String (Global Work Key for all successful laborers) - OLD Way
-        2. A Dictionary { 'WorkKey': ['LaborerName1', 'LaborerName2'] } - NEW Way
+        Starts Work Allocation automatically from the Demand tab.
+
+        'allocation_data' is either:
+          1. A string  — a single global work key for all successful labourers.
+          2. A dict    — { work_code: [labourer_name, ...] } (per-worker codes).
         """
-        self.log_info("--- Starting Auto-Allocation from Demand Tab ---")        
-        # 1. Clear/Reset UI
-        for item in self.results_tree.get_children(): self.results_tree.delete(item)
+        self.log_info("--- Starting Auto-Allocation from Demand Tab ---")
+        self.allocated_workers_data = []
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
         self.app.clear_log(self.log_display)
-        self.panchayat_var.set("")
         self.work_list_text.delete("1.0", tkinter.END)
 
-        # 2. Set Inputs
-        self.panchayat_var.set(panchayat_name)
-        
-        # Use the currently selected work category from the UI
-        work_category = self.work_category_var.get()
-        
-        inputs = {
+        inputs: Dict[str, Any] = {
             'panchayat_name': panchayat_name,
-            'work_category': work_category,
+            'work_category': self.work_category_var.get(),
         }
 
-        # 3. Process the Data Format
         if isinstance(allocation_data, str):
-            # OLD/SIMPLE MODE: Bulk allocation to one key
             self.log_info(f"Mode: Bulk Allocation (Single Key: {allocation_data})")
             self.work_list_text.insert("1.0", allocation_data)
             inputs['work_keys'] = [allocation_data]
-            inputs['allocation_map'] = None # No specific mapping, assume 'Allocate All'
-            
+            inputs['allocation_map'] = None
         elif isinstance(allocation_data, dict):
-            # NEW/GRANULAR MODE: Specific laborers for specific keys
-            self.log_info(f"Mode: Granular Allocation ({len(allocation_data)} work codes)")            
-            # Display keys in text box for visual reference
-            display_text = "\n".join(allocation_data.keys())
-            self.work_list_text.insert("1.0", display_text)
-            
+            self.log_info(f"Mode: Granular Allocation ({len(allocation_data)} work codes)")
+            self.work_list_text.insert("1.0", "\n".join(allocation_data.keys()))
             inputs['work_keys'] = list(allocation_data.keys())
-            inputs['allocation_map'] = allocation_data # Pass the mapping to logic
-            
+            inputs['allocation_map'] = allocation_data
         else:
             messagebox.showerror("Error", "Invalid data format received from Demand tab.")
             return
 
+        self.panchayat_var.set(panchayat_name)
         self.log_info(f"Panchayat: {panchayat_name}")
-        self.log_info(f"Work Category: {work_category}")
-        # 4. Save and Start
+        self.log_info(f"Work Category: {inputs['work_category']}")
+
         self._save_inputs(inputs)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
+
     def start_automation(self) -> None:
-        # Default start from UI (Bulk Mode or CSV Mode)
-        for item in self.results_tree.get_children(): self.results_tree.delete(item)
+        self.allocated_workers_data = []
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
         self.app.clear_log(self.log_display)
 
-        inputs = {
+        inputs: Dict[str, Any] = {
             'panchayat_name': self.panchayat_var.get().strip(),
             'work_category': self.work_category_var.get(),
-            'work_list_raw': self.work_list_text.get("1.0", tkinter.END).strip()
+            'work_list_raw': self.work_list_text.get("1.0", tkinter.END).strip(),
         }
 
         if not inputs['work_category']:
             messagebox.showwarning("Input Error", "Work Category is required.")
             return
 
-        # --- LOGIC SWITCH: CSV vs Text Box ---
         if self.csv_allocation_data:
-            # Mode 1: Use Loaded CSV Data
-            work_keys = list(self.csv_allocation_data.keys())
-            inputs['work_keys'] = work_keys
+            # Granular mode: CSV drives the work codes + labourers
+            inputs['work_keys'] = list(self.csv_allocation_data.keys())
             inputs['allocation_map'] = self.csv_allocation_data
-            self.log_info(f"Mode: CSV Allocation ({len(work_keys)} works loaded)")
+            self.log_info(f"Mode: CSV Allocation ({len(inputs['work_keys'])} works loaded)")
         else:
-            # Mode 2: Use Text Box (Original)
+            # Bulk mode: work keys typed in the text box
             if not inputs['work_list_raw']:
                 messagebox.showwarning("Input Error", "Please enter Work Keys or Load a CSV.")
                 return
@@ -232,347 +277,639 @@ class WorkAllocationTab(BaseAutomationTab):
                 messagebox.showwarning("Input Error", "No valid items found in the Work Key List.")
                 return
             inputs['work_keys'] = work_keys
-            inputs['allocation_map'] = None 
+            inputs['allocation_map'] = None
 
         if inputs['panchayat_name']:
             self.app.update_history("location_panchayat", inputs['panchayat_name'])
         self._save_inputs(inputs)
-        
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
-    def _wait_for_settle(self, driver, long_wait, action_name=""):
-        """
-        Waits for the 'Please Wait...' overlay to disappear.
-        Handles cases where the overlay is very fast or doesn't appear at all.
-        """
-        self.log_info(f"   - Waiting for page to settle after '{action_name}'...")
+    # ------------------------------------------------------------------
+    # Automation
+    # ------------------------------------------------------------------
+    def _settle(self, driver, reason: str = "") -> None:
+        """Short pause after an ASP.NET postback. Silently waits for the
+        'Please Wait...' overlay (if it appears) to clear, then a small fixed
+        delay. No log spam — the element waits that follow are the real signal
+        that a postback finished."""
         try:
-            # 1. Check if overlay is visible (with a very short timeout)
-            short_wait = WebDriverWait(driver, 0.5) # 0.5 second check
-            overlay_visible = short_wait.until(EC.visibility_of_element_located((By.ID, self.wait_overlay_id)))
-            
-            # 2. If it was visible, wait for it to disappear (with the long timeout)
-            if overlay_visible:
-                self.log_info("   - Overlay detected, waiting for it to disappear...")
-                long_wait.until(EC.invisibility_of_element_located((By.ID, self.wait_overlay_id)))
-                self.log_info("   - Page settled.")            
-        except TimeoutException:
-            # This is the normal, fast path. The overlay was not visible (or gone in < 0.5s).
-            self.log_info("   - (No overlay) Page is settled.")        
-        # Add a small fixed delay for extra safety after any postback
+            WebDriverWait(driver, 15).until(
+                EC.invisibility_of_element_located((By.ID, self.OVERLAY_ID)))
+        except Exception:
+            pass
         time.sleep(0.5)
 
-    def run_automation_logic(self, inputs):
+    def run_automation_logic(self, inputs: Dict[str, Any]) -> None:
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, self.app.set_status, "Starting Work Allocation...")
         self.log_info("Starting Work Allocation automation...")
-        self.has_failures = False 
-        
+        self.has_failures = False
+
+        driver = None
+        had_error = False
         try:
             driver = self.app.get_driver()
             if not driver:
                 self.app.after(0, self.set_ui_state, False)
                 return
-                
+
             wait = WebDriverWait(driver, 20)
-            # --- NEW: Long wait specifically for Save operation (5 Minutes) ---
-            save_wait = WebDriverWait(driver, 300) 
-            
-            self.log_info(f"Navigating to Work Allocation page...")
+            save_wait = WebDriverWait(driver, 90)  # long wait for the Save confirmation
+
+            self.log_info("Navigating to Work Allocation page...")
             driver.get(config.WORK_ALLOCATION_CONFIG["url"])
 
-            # --- START: Standard Setup (Panchayat/Category) ---
-            self.log_info("Checking for Panchayat dropdown...")
-            try:
-                short_wait = WebDriverWait(driver, 3)
-                panchayat_select_element = short_wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
-                
-                self.log_info("Panchayat dropdown found. Selecting...")
-                if not inputs['panchayat_name']: raise ValueError("Panchayat Name is required for PO login.")
-                panchayat_select = Select(panchayat_select_element)
-                if panchayat_select.first_selected_option.text.strip() != inputs['panchayat_name'].strip():
-                    self._select_by_text_case_insensitive(panchayat_select, inputs['panchayat_name'])
-                    self._wait_for_settle(driver, wait, "Panchayat Selection")
-            except (TimeoutException, NoSuchElementException):
-                self.log_info("Panchayat dropdown not found. Assuming GP Login.")
-            except ValueError as e:
-                self.log_error(str(e)); messagebox.showerror("Input Error", str(e)); self.app.after(0, self.set_ui_state, False); return
+            self._setup_page(driver, wait, inputs)
 
-            self.app.after(0, self.app.set_status, "Setting Work Category...")
-            category_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
-            category_select = Select(category_select_element)
-            if category_select.first_selected_option.text.strip() != inputs['work_category'].strip():
-                category_select.select_by_visible_text(inputs['work_category'])
-                self._wait_for_settle(driver, wait, "Category Selection")
-            # --- END: Standard Setup ---
-
-            self.log_success("Setup complete. Starting item processing...")            
-            # --- Process each item (Updated Loop) ---
-            work_keys = inputs.get('work_keys', [])
-            allocation_map = inputs.get('allocation_map') # Can be None
-            
+            work_keys: List[str] = inputs.get('work_keys', [])
+            allocation_map = inputs.get('allocation_map')
             total_items = len(work_keys)
+
             for i, work_key in enumerate(work_keys):
                 if self.is_stopped():
                     self.log_warning("Stop signal received.")
                     break
-                
-                status_msg = f"Processing {i+1}/{total_items}: Key={work_key}"
+
+                status_msg = f"Processing {i + 1}/{total_items}: Key={work_key}"
                 self.app.after(0, self.app.set_status, status_msg)
-                self.app.after(0, self.update_status, status_msg, (i+1)/total_items)
-                
-                # Determine specific targets for this key (if any)
+                self.app.after(0, self.update_status, status_msg, (i + 1) / total_items)
+
                 target_applicants = None
                 if allocation_map and work_key in allocation_map:
                     target_applicants = allocation_map[work_key]
-                
-                # Pass save_wait to the processor
-                self._process_single_work_key(driver, wait, work_key, target_applicants, save_wait) 
 
+                self._process_single_work_key(driver, wait, work_key, target_applicants, save_wait)
+
+        except ValueError as e:
+            had_error = True
+            error_msg = str(e)
+            self.log_error(error_msg)
+            messagebox.showerror("Input Error", error_msg)
+            self.app.after(0, self.app.set_status, "Error")
         except Exception as e:
+            had_error = True
             error_msg = f"A critical error occurred: {e}"
             self.log_error(error_msg)
             messagebox.showerror("Critical Error", error_msg)
             self.app.after(0, self.app.set_status, "Error")
         finally:
             self.app.after(0, self.set_ui_state, False)
-            final_status = "Automation Stopped" if self.is_stopped() else ("Finished with Errors" if self.has_failures else "Automation Finished")
+            if self.is_stopped():
+                final_status = "Automation Stopped"
+            elif had_error:
+                final_status = "Automation Finished with Error"
+            elif self.has_failures:
+                final_status = "Finished with Errors"
+            else:
+                final_status = "Automation Finished"
             self.app.after(0, self.app.set_status, final_status)
             self.app.after(0, self.update_status, final_status, 1.0)
-            
-            if "Stopped" not in final_status:
+
+            # Don't show a 'success' dialog when the run actually errored
+            if "Stopped" not in final_status and "Error" not in final_status:
                 kind = "warning" if self.has_failures else "info"
                 self.app.after(100, lambda: getattr(messagebox, f"show{kind}")("Complete", f"{final_status}. Check results."))
 
-    def _process_single_work_key(self, driver, wait, work_key, target_applicants=None, save_wait=None): 
-        """
-        Processing logic. Updated to skip saving if no labourers are found in granular mode.
-        """
-        # Fallback if save_wait is not passed
-        if save_wait is None: save_wait = wait
+    def _setup_page(self, driver, wait, inputs: Dict[str, Any]) -> None:
+        """Selects panchayat (if a dropdown exists) and the work category."""
+        self._disable_smooth_scroll(driver)
+        self.log_info("Checking for Panchayat dropdown...")
+        try:
+            panchayat_select_element = WebDriverWait(driver, 3).until(
+                EC.element_to_be_clickable((By.ID, self.PANCHAYAT_IDS[0])))
+            self.log_info("Panchayat dropdown found. Selecting...")
+            if not inputs.get('panchayat_name'):
+                raise ValueError("Panchayat Name is required for PO login.")
+            panchayat_select = Select(panchayat_select_element)
+            if panchayat_select.first_selected_option.text.strip() != inputs['panchayat_name'].strip():
+                self._select_by_text_case_insensitive(panchayat_select, inputs['panchayat_name'])
+                self._settle(driver, "Panchayat")
+                self.log_info("   - Panchayat selected.")
+        except (TimeoutException, NoSuchElementException):
+            self.log_info("Panchayat dropdown not found. Assuming GP Login.")
+        except ValueError as e:
+            # Surface to the caller (run_automation_logic shows the error dialog)
+            self.log_error(str(e))
+            raise
 
+        self.app.after(0, self.app.set_status, "Setting Work Category...")
+        category_select_element = wait.until(EC.element_to_be_clickable((By.ID, self.CATEGORY_ID)))
+        category_select = Select(category_select_element)
+        if category_select.first_selected_option.text.strip() != inputs['work_category'].strip():
+            category_select.select_by_visible_text(inputs['work_category'])
+            self._settle(driver, "Category")
+            self.log_info("   - Category selected.")
+
+        self.log_success("Setup complete. Starting item processing...")
+
+    def _process_single_work_key(self, driver, wait, work_key: str,
+                                 target_applicants: Optional[List[str]] = None,
+                                 save_wait: Optional[Any] = None) -> None:
+        """Processes one work key: search -> select code -> allocate -> save."""
+        if save_wait is None:
+            save_wait = wait
         selected_work_code_text = "N/A"
-        found_count = 0 # To track how many specific applicants were found
+        found_count = 0
+
+        # A mid-run driver.get() (reload after a page error) resets the CSS
+        # scroll-behavior — re-disable smooth scrolling so checkbox ticks and
+        # the Save click always land correctly.
+        self._disable_smooth_scroll(driver)
 
         try:
             self.log_info(f"   - Processing Key: {work_key}")
             if target_applicants:
                 self.log_info(f"     (Granular Mode: Allocating {len(target_applicants)} specific laborers)")
-            # --- Step 3: Enter Work Key ---
-            search_box = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txtwrksearchkey")))
-            search_box.clear()
-            search_box.send_keys(work_key)
-            
-            driver.find_element(By.TAG_NAME, 'body').click()
-            self._wait_for_settle(driver, wait, f"Work Key Search ({work_key})")
-            
-            # --- Step 4: Select Matching Work Code ---
-            work_code_select_element = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlWork_code")))
-            work_code_select = Select(work_code_select_element)
-            
-            matching_option = None
-            for option in work_code_select.options:
-                # Flexible Match: Check if work_key is contained in option text
-                if work_key in option.text: matching_option = option; break
-            
-            if not matching_option:
-                error_msg = "Workcode not found in dropdown."
-                self.log_error(f"   - FAILED: {error_msg}")
-                self._log_result(self.panchayat_var.get().strip(), work_key, "N/A", "Failed", error_msg)
-                return 
-            
-            selected_work_code_text = matching_option.text
-            work_code_select.select_by_visible_text(selected_work_code_text)
-            self._wait_for_settle(driver, wait, "Work Code Selection")
 
-            # --- Step 5: Allocation Logic (Bulk vs Granular) ---
-            
-            if not target_applicants:
-                # --- BULK MODE (Allocate All) ---
-                self.log_info("   - Clicking 'Allocate All'...")
-                alloc_checkbox = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_GridView1_ctl01_chkHAllocate")))
-                if not alloc_checkbox.is_selected():
-                    alloc_checkbox.click()
-                    self._wait_for_settle(driver, wait, "Allocate All")
-            else:
-                # --- GRANULAR MODE (Specific Checkboxes) ---
-                self.log_info("   - Selecting specific applicants...")
-                grid_id = "ctl00_ContentPlaceHolder1_GridView1"
-                try:
-                    rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
-                    for i, row in enumerate(rows):
-                        if i == 0: continue 
-                        try:
-                            # Column 4 is Name (based on HTML structure)
-                            name_cell = row.find_elements(By.TAG_NAME, "td")[3]
-                            name_text = name_cell.get_attribute("innerText").strip()
-                            
-                            # Match CSV Name/Card with Table Name (Fuzzy Match)
-                            is_target = any("".join(tn.lower().split()) in "".join(name_text.lower().split()) for tn in target_applicants)
-                            
-                            if is_target:
-                                checkbox = row.find_element(By.CSS_SELECTOR, "input[type='checkbox'][id*='chkAllocate']")
-                                if not checkbox.is_selected(): checkbox.click(); found_count += 1
-                        except Exception: continue
-                            
-                    self.log_info(f"   - Selected {found_count}/{len(target_applicants)} applicants found on page.")
-                except Exception as e:
-                    self.log_error(f"   - Error traversing table: {e}")
-                # --- NEW LOGIC: Skip if no labourers found ---
-                if found_count == 0:
-                    msg = "Skipped: Labours not found in table."
-                    self.log_warning(f"   - {msg}")
-                    # Use 'warning' tag (yellow) or 'failed' (red) as preferred. 
-                    # Assuming 'skipped' tag maps to yellow in base_tab.
-                    self._log_result(self.panchayat_var.get().strip(), work_key, selected_work_code_text, "Skipped", msg)
-                    return 
+            # 1. Type the work key into the search box (triggers a postback)
+            self._enter_work_key(driver, wait, work_key)
 
-            # --- Step 6: Click Save (with 5 MIN WAIT) ---
-            self.log_info("   - Clicking 'Save' (Timeout set to 5 mins)...")
-            save_button = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_cmdSave")))
-            save_button.click()
-            
-            # Use save_wait (300s) for the alert
-            self.log_info("   - Waiting for confirmation alert...")
-            alert = save_wait.until(EC.alert_is_present())
-            alert_text = alert.text.strip()
-            alert.accept()
-            
-            self.log_success(f"   - Success: {alert_text}")            
-            # --- Reporting Logic ---
+            # 2. Pick the matching work code from the refreshed dropdown
+            selected_work_code_text = self._select_work_code(driver, wait, work_key)
+            if selected_work_code_text is None:
+                self._log_result(self.panchayat_var.get().strip(), work_key, "N/A",
+                                 "Failed", "Workcode not found in dropdown.")
+                return
+
+            # 3. Wait for the workers grid to populate (postback after code selection)
+            if not self._wait_for_grid(driver, wait):
+                self._log_result(self.panchayat_var.get().strip(), work_key,
+                                 selected_work_code_text, "Failed", "Workers grid did not load.")
+                return
+
+            # 4. Check the target labourers
+            found_count = self._allocate_workers(driver, wait, target_applicants)
+            if target_applicants and found_count == 0:
+                msg = "Skipped: Labours not found in table."
+                self.log_warning(f"   - {msg}")
+                self._log_result(self.panchayat_var.get().strip(), work_key,
+                                 selected_work_code_text, "Skipped", msg)
+                return
+
+            # 4b. Capture which labourers are checked NOW — before Save, because
+            # the save postback re-renders the page and the checkboxes reset.
+            allocated_workers = self._capture_allocated_workers(driver)
+
+            # 5. Save and read the confirmation
+            alert_text = self._save_and_collect(driver, wait, save_wait)
+            if alert_text is None:
+                self._log_result(self.panchayat_var.get().strip(), work_key,
+                                 selected_work_code_text, "Failed", "No confirmation after save.")
+                return
+
+            # The portal may also alert about errors (e.g. 'Please select at
+            # least one worker') — treat those as failures, not success.
+            low = alert_text.lower()
+            if any(x in low for x in ("error", "fail", "please", "invalid",
+                                      "cannot", "could not", "not found",
+                                      "select at least", "not possible")):
+                self.log_error(f"   - FAILED: {alert_text}")
+                self._log_result(self.panchayat_var.get().strip(), work_key,
+                                 selected_work_code_text, "Failed", alert_text)
+                return
+
+            # 6. Which labourers got allocated (captured pre-Save above)
             if target_applicants:
                 detail_msg = f"{alert_text} (Allocated: {found_count}/{len(target_applicants)})"
             else:
                 detail_msg = alert_text
+            if allocated_workers:
+                names = ", ".join(w['name'] for w in allocated_workers[:12])
+                extra = f" (+{len(allocated_workers) - 12})" if len(allocated_workers) > 12 else ""
+                detail_msg = f"{detail_msg} | {len(allocated_workers)} labourers: {names}{extra}"
+                for w in allocated_workers:
+                    self.allocated_workers_data.append({
+                        'panchayat': self.panchayat_var.get().strip(),
+                        'work_key': work_key,
+                        'work_name': selected_work_code_text,
+                        'jc': w['jc'],
+                        'name': w['name'],
+                        'status': 'Success',
+                    })
 
-            self._log_result(self.panchayat_var.get().strip(), work_key, selected_work_code_text, "Success", detail_msg)
-            # Use save_wait for settling after save as well
-            self._wait_for_settle(driver, save_wait, "Save")
+            self.log_success(f"   - Success: {alert_text}")
+            self._log_result(self.panchayat_var.get().strip(), work_key,
+                             selected_work_code_text, "Success", detail_msg)
 
         except (TimeoutException, NoAlertPresentException, StaleElementReferenceException) as e:
             error_msg = f"Page error (Timeout/Alert): {str(e).splitlines()[0]}"
             self.log_error(f"   - FAILED: {error_msg}")
-            self._log_result(self.panchayat_var.get().strip(), work_key, selected_work_code_text, "Failed", error_msg)
-            try: driver.get(config.WORK_ALLOCATION_CONFIG["url"]); self.log_info("   - Refreshing page..."); return
-            except Exception: return
-        
+            self._log_result(self.panchayat_var.get().strip(), work_key,
+                             selected_work_code_text, "Failed", error_msg)
+            try:
+                driver.get(config.WORK_ALLOCATION_CONFIG["url"])
+                self.log_info("   - Refreshing page...")
+            except Exception:
+                pass
+
         except Exception as e:
             error_msg = f"Critical error: {e}"
             self.log_error(f"   - FAILED: {error_msg}")
-            self._log_result(self.panchayat_var.get().strip(), work_key, selected_work_code_text, "Failed", error_msg)
+            self._log_result(self.panchayat_var.get().strip(), work_key,
+                             selected_work_code_text, "Failed", error_msg)
 
-    def _load_demand_csv(self):
-        """Loads the Demand CSV and groups workers by Work Code."""
+    # --- single steps for _process_single_work_key ---------------------
+    def _enter_work_key(self, driver, wait, work_key: str) -> None:
+        search_box = wait.until(EC.element_to_be_clickable((By.ID, self.SEARCH_KEY_ID)))
+        search_box.clear()
+        search_box.send_keys(work_key)
+        driver.find_element(By.TAG_NAME, 'body').click()
+        self._settle(driver, "Work Key Search")
+
+    def _select_work_code(self, driver, wait, work_key: str) -> Optional[str]:
+        """
+        Waits for the work-code dropdown to refresh, then selects the option
+        whose text contains the work key. Returns the selected text, or None.
+        """
+        def _has_options(d):
+            try:
+                return len(d.find_elements(By.XPATH,
+                        f"//select[@id='{self.WORK_CODE_ID}']/option[position()>1]")) > 0
+            except Exception:
+                return False
+        try:
+            WebDriverWait(driver, 10).until(_has_options)
+        except TimeoutException:
+            self.log_info("   - Work code dropdown has no options.")
+            return None
+
+        work_code_select_element = wait.until(EC.element_to_be_clickable((By.ID, self.WORK_CODE_ID)))
+        work_code_select = Select(work_code_select_element)
+
+        matching_option = None
+        for option in work_code_select.options:
+            if work_key in option.text:
+                matching_option = option
+                break
+        if not matching_option:
+            return None
+
+        work_code_select.select_by_visible_text(matching_option.text)
+        self._settle(driver, "Work Code Selection")
+        # The work NAME is the part inside parentheses, e.g. '66859 (Provision
+        # of Irrigation facility ...)'. Fall back to the full option text.
+        return self._extract_work_name(matching_option.text)
+
+    @staticmethod
+    def _extract_work_name(option_text: str) -> str:
+        """Returns the work name from the dropdown option text — the part
+        inside parentheses: '66859 (Provision of Irrigation facility ...)'
+        -> 'Provision of Irrigation facility ...'."""
+        m = re.search(r"\(([^)]*)\)", option_text or "")
+        name = (m.group(1) or "").strip() if m else ""
+        return name or (option_text or "").strip()
+
+    def _wait_for_grid(self, driver, wait) -> bool:
+        """Waits for the workers grid to gain at least one worker checkbox after
+        the work-code selection postback.
+
+        Counts real worker checkboxes (id contains 'chkAllocate') instead of
+        <tr> rows — the empty grid still renders a header row plus the
+        'Allocate All' (chkHAllocate) row, so a row count would always pass.
+        """
+        def _has_workers(d):
+            try:
+                return len(d.find_elements(By.CSS_SELECTOR,
+                        f"table[id='{self.GRID_ID}'] {self.ROW_CHECKBOX_CSS}")) > 0
+            except Exception:
+                return False
+        try:
+            WebDriverWait(driver, 10).until(_has_workers)
+            return True
+        except TimeoutException:
+            return False
+
+    @staticmethod
+    def _names_match(web_name: str, target_name: str) -> bool:
+        """True when the two names match, ignoring case/space (exact first,
+        then substring — covers prefixes and minor spacing differences)."""
+        w = "".join((web_name or "").lower().split())
+        t = "".join((target_name or "").lower().split())
+        return t == w or (t and t in w)
+
+    @staticmethod
+    def _disable_smooth_scroll(driver) -> None:
+        """Turns off the portal's CSS smooth scrolling.
+
+        Bootstrap 5 sets `scroll-behavior: smooth` on :root. WebDriver's native
+        click() scrolls the target into view and then clicks at the computed
+        coordinates — but an ANIMATED scroll keeps the page moving while the
+        click fires, so in a long workers grid only the first few checkboxes
+        get ticked (the rest are silently missed). Making scrollIntoView
+        instant lets every click land on the right row.
+
+        A full page load (driver.get) resets the style, so call this again
+        after any mid-run reload (see _process_single_work_key).
+        """
+        try:
+            driver.execute_script("document.documentElement.style.scrollBehavior='auto';")
+        except Exception:
+            pass
+
+    @staticmethod
+    def _tick_checkbox(driver, checkbox) -> bool:
+        """Ticks a grid checkbox reliably; returns True only when a NEW tick
+        was performed (checkbox was unchecked and is now checked).
+
+        A native checkbox.click() makes the browser scroll the element into
+        view first. With the portal's smooth scrolling the page is still
+        animating when WebDriver computes the click coordinates, so lower
+        checkboxes get silently missed. Instead we scroll via JS (instant) and
+        dispatch the click directly on the element — no hit-testing, no
+        scrolling race, and it cannot be intercepted by the 'Please Wait'
+        overlay. Works for plain row checkboxes and the 'Allocate All' header
+        checkbox (its __doPostBack onclick still fires from the JS click).
+        """
+        try:
+            if checkbox.is_selected():
+                return False  # already ticked — nothing new done
+        except Exception:
+            pass
+        try:
+            driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center', inline: 'center'});", checkbox)
+        except Exception:
+            pass
+        try:
+            driver.execute_script("arguments[0].click();", checkbox)
+        except Exception:
+            return False
+        try:
+            return bool(checkbox.is_selected())
+        except Exception:
+            return False
+
+    def _allocate_workers(self, driver, wait, target_applicants: Optional[List[str]]) -> int:
+        """Checks the right checkboxes. Bulk mode -> 'Allocate All' (returns 1).
+        Granular mode -> checks only matching labourers (returns count found)."""
+        if not target_applicants:
+            self.log_info("   - Clicking 'Allocate All'...")
+            alloc_checkbox = wait.until(EC.element_to_be_clickable((By.ID, self.ALLOCATE_ALL_ID)))
+            was_selected = False
+            try:
+                was_selected = bool(alloc_checkbox.is_selected())
+            except Exception:
+                pass
+            if not was_selected:
+                if not self._tick_checkbox(driver, alloc_checkbox):
+                    # JS click failed (rare) — fall back to the native click
+                    try:
+                        if not alloc_checkbox.is_selected():
+                            alloc_checkbox.click()
+                    except Exception:
+                        pass
+                # 'Allocate All' triggers a __doPostBack — give the grid a
+                # moment to re-render before we capture the checked labourers.
+                self._settle(driver, "Allocate All")
+            return 1
+
+        self.log_info("   - Selecting specific applicants...")
+        found_count = 0
+        try:
+            rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{self.GRID_ID}'] > tbody > tr")
+            for i, row in enumerate(rows):
+                if i == 0:
+                    continue
+                try:
+                    name_cell = row.find_elements(By.TAG_NAME, "td")[self.NAME_COL_INDEX]
+                    name_text = name_cell.get_attribute("innerText").strip()
+
+                    if any(self._names_match(name_text, tn) for tn in target_applicants):
+                        checkbox = row.find_element(By.CSS_SELECTOR, self.ROW_CHECKBOX_CSS)
+                        if self._tick_checkbox(driver, checkbox):
+                            found_count += 1
+                        elif not checkbox.is_selected():
+                            # Matched labourer, but the tick did not stick —
+                            # log it so partial selection is never invisible.
+                            self.log_warning(
+                                f"   - Could not tick '{name_text.strip()}' — checkbox click did not register.")
+                except (StaleElementReferenceException, NoSuchElementException, IndexError):
+                    continue
+                except Exception:
+                    continue
+            self.log_info(f"   - Selected {found_count}/{len(target_applicants)} applicants found on page.")
+        except Exception as e:
+            self.log_error(f"   - Error traversing table: {e}")
+        return found_count
+
+    def _capture_allocated_workers(self, driver) -> List[Dict]:
+        """Reads the workers grid and returns {jc, name} for every CHECKED row.
+
+        The grid columns are: S.No | Registration No.* | Family days |
+        Job seeker name*  — Registration No. is the job card number.
+        """
+        workers: List[Dict] = []
+        try:
+            rows = driver.find_elements(By.CSS_SELECTOR,
+                                        f"table[id='{self.GRID_ID}'] > tbody > tr")
+            for i, row in enumerate(rows):
+                if i == 0:
+                    continue
+                try:
+                    cb = row.find_element(By.CSS_SELECTOR, self.ROW_CHECKBOX_CSS)
+                    if not cb.is_selected():
+                        continue
+                    cells = row.find_elements(By.TAG_NAME, "td")
+                    name = cells[self.NAME_COL_INDEX].get_attribute("innerText").strip()
+                    jc = cells[self.REG_COL_INDEX].get_attribute("innerText").strip() \
+                        if len(cells) > self.REG_COL_INDEX else ""
+                    if name:
+                        workers.append({'jc': jc, 'name': name})
+                except (StaleElementReferenceException, NoSuchElementException, IndexError):
+                    continue
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return workers
+
+    def _save_and_collect(self, driver, wait, save_wait) -> Optional[str]:
+        """Clicks Save and waits for the confirmation alert. Returns alert text
+        (or None if no alert appeared within the long timeout).
+
+        The Save button sits below a long workers grid, so it is scrolled into
+        view and the 'Please wait' overlay is given time to clear before the
+        click — a stale overlay was intercepting the click (ElementClickIntercepted
+        at the bottom of the viewport). A JS click is used as a last resort.
+        """
+        self.log_info("   - Clicking 'Save'...")
+        save_button = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR,
+            ", ".join(f"#{x}" for x in self.SAVE_IDS))))
+
+        try:
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", save_button)
+        except Exception:
+            pass
+        self._settle(driver, "Pre-Save")
+
+        try:
+            wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,
+                ", ".join(f"#{x}" for x in self.SAVE_IDS))))
+            save_button.click()
+        except Exception:
+            # Overlay/footer covering the button -> force the click via JS
+            try:
+                driver.execute_script("arguments[0].click();", save_button)
+            except Exception:
+                # The success alert may already be blocking — accept it if so
+                try:
+                    alert = driver.switch_to.alert
+                    text = (alert.text or "").strip()
+                    try:
+                        alert.accept()
+                    except Exception:
+                        pass
+                    return text or "Allocation has been done"
+                except Exception:
+                    return None
+
+        self.log_info("   - Waiting for allocation confirmation...")
+        # The portal confirms a successful save with the JS alert
+        # 'Allocation has been done' (rendered in the postback response). Poll
+        # for BOTH the live alert and that marker in the page source — the alert
+        # can fire during the postback and be missed by alert_is_present.
+        timeout = getattr(save_wait, '_timeout', 90) or 90
+        deadline = time.time() + timeout
+        last_progress_log = time.time()
+        while time.time() < deadline:
+            if self.is_stopped():
+                return None
+            try:
+                alert = driver.switch_to.alert
+                text = (alert.text or "").strip()
+                try:
+                    alert.accept()
+                except Exception:
+                    pass
+                return text or "Allocation has been done"
+            except NoAlertPresentException:
+                pass
+            except Exception:
+                pass
+            try:
+                src_low = driver.page_source.lower()
+                if any(m in src_low for m in self.SUCCESS_MARKERS):
+                    return "Allocation has been done"
+            except Exception:
+                pass
+            if time.time() - last_progress_log >= 15:
+                last_progress_log = time.time()
+                self.log_info("      ...still waiting for confirmation (allocation saved ho chuki ho sakti hai).")
+            time.sleep(0.7)
+        return None
+
+    # ------------------------------------------------------------------
+    # CSV input (granular mode)
+    # ------------------------------------------------------------------
+    def _load_demand_csv(self) -> None:
+        """Loads a Demand CSV and groups workers by their work code."""
         file_path = filedialog.askopenfilename(
             title="Select Demand CSV",
             filetypes=[("CSV Files", "*.csv")]
         )
-        
-        if not file_path: return
+        if not file_path:
+            return
 
         try:
             self.csv_allocation_data = {}
             count = 0
-            
-            with open(file_path, mode='r', encoding='utf-8') as f:
+
+            with open(file_path, mode='r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
-                
-                # Basic Validation: Check for required columns
-                # 'Allocation Work Code' and 'Name of Applicant' (or Job card) are needed
-                # Based on your previous file, keys are: 'Name of Applicant', 'Job card number', 'Allocation Work Code'
-                
-                if 'Allocation Work Code' not in reader.fieldnames:
+                # Map normalized header names -> the actual header casing, so
+                # legacy CSVs work whatever the exact spelling/case is.
+                header_map = {}
+                for h in (reader.fieldnames or []):
+                    header_map[str(h).strip().lower().replace(' ', '')] = h
+
+                wc_key = next((header_map[k] for k in ('allocationworkcode', 'workcode')
+                               if k in header_map), None)
+                if wc_key is None:
                     messagebox.showerror("Error", "CSV must have 'Allocation Work Code' column.")
                     return
+                name_key = next((header_map[k] for k in
+                                 ('nameofapplicant', 'name', 'applicantname', 'workername')
+                                 if k in header_map), None)
 
                 for row in reader:
-                    work_code = row['Allocation Work Code'].strip()
-                    # We use Name for matching since Job Card in table might differ slightly in format
-                    # But Job Card is better if available. Let's store both or Name.
-                    # Your CSV has 'Name of Applicant'. The table has Name in 4th Col.
-                    person_name = row.get('Name of Applicant', '').strip()
-                    
+                    work_code = (row.get(wc_key) or '').strip()
+                    person_name = (row.get(name_key) or '').strip() if name_key else ''
                     if work_code and person_name:
-                        if work_code not in self.csv_allocation_data:
-                            self.csv_allocation_data[work_code] = []
-                        self.csv_allocation_data[work_code].append(person_name)
+                        self.csv_allocation_data.setdefault(work_code, []).append(person_name)
                         count += 1
-            
+
             filename = os.path.basename(file_path)
             self.file_label.configure(text=f"Loaded: {filename}", text_color="green")
             self.log_info(f"CSV Loaded: {filename}")
-            self.log_info(f"Found {len(self.csv_allocation_data)} works with {count} workers.")            
-            # Disable text box to indicate CSV mode is active
+            self.log_info(f"Found {len(self.csv_allocation_data)} works with {count} workers.")
+
+            self.work_list_text.configure(state="normal")
             self.work_list_text.delete("1.0", tkinter.END)
-            self.work_list_text.insert("1.0", f"[CSV Loaded] {filename}\nContains {len(self.csv_allocation_data)} Work Codes.\n\nClick 'Start' to proceed.")
+            self.work_list_text.insert("1.0",
+                f"[CSV Loaded] {filename}\nContains {len(self.csv_allocation_data)} Work Codes.\n\nClick 'Start' to proceed.")
             self.work_list_text.configure(state="disabled")
-            
+
         except Exception as e:
             self.log_error(f"Error loading CSV: {e}")
             messagebox.showerror("Error", f"Failed to load CSV: {e}")
 
-    def _log_result(self, panchayat, work_key, work_code, status, details):
+    # ------------------------------------------------------------------
+    # Results / retry / persistence
+    # ------------------------------------------------------------------
+    def _log_result(self, panchayat: str, work_key: str, work_code: str,
+                    status: str, details: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
         values = (panchayat, work_key, truncate_workcode(work_code), status, details, timestamp)
-        
-        # --- Update: Color Tags ---
+
         tags = ()
         if 'success' in status.lower():
             tags = ('success',)
         elif 'failed' in status.lower() or 'error' in status.lower() or 'timeout' in status.lower():
             self.has_failures = True
             tags = ('failed',)
-        
+
         self.safe_tree_insert(values, tags)
+
     def retry_logic_handler(self) -> None:
-        """
-        Custom Retry Logic for Work Allocation.
-        Extracts failed Work Keys from the results tree and restarts automation
-        specifically for those keys.
-        """
+        """Retries failed work keys (granular CSV map is cleared so the keys are
+        processed in bulk mode from the text box)."""
         failed_keys = []
         all_items = self.results_tree.get_children()
-        
+
         if not all_items:
             messagebox.showinfo("Retry", "No results found to retry.")
             return
 
         for item_id in all_items:
             values = self.results_tree.item(item_id)['values']
-            # Tree columns: Work Key, Work Code, Status, Details, Timestamp
             work_key = str(values[1])
             status = str(values[3]).lower()
-            
-            if "success" not in status:
-                if work_key not in failed_keys:
-                    failed_keys.append(work_key)
-        
+            if "success" not in status and work_key not in failed_keys:
+                failed_keys.append(work_key)
+
         if not failed_keys:
             messagebox.showinfo("Great!", "No failed items found.")
             return
 
-        # Confirm before action
-        if not messagebox.askyesno("Retry Failed", f"Found {len(failed_keys)} failed work keys.\nDo you want to retry them now?"):
+        if not messagebox.askyesno("Retry Failed",
+                                   f"Found {len(failed_keys)} failed work keys.\nDo you want to retry them now?"):
             return
 
-        # 1. Update Input Widget (Switch to Manual/Bulk Mode for Retry)
         self.work_list_text.configure(state="normal")
         self.work_list_text.delete("1.0", tkinter.END)
         self.work_list_text.insert("1.0", "\n".join(failed_keys))
-        
-        # 2. Reset CSV Data (Crucial: Forces logic to read from text box)
-        self.csv_allocation_data = {} 
+
+        # Force bulk mode for the retry (ignore the loaded CSV)
+        self.csv_allocation_data = {}
         self.file_label.configure(text="Retry Mode (Text)", text_color="orange")
-        
-        # 3. Clear Previous Results
+
         for item in all_items:
             self.results_tree.delete(item)
 
-        # 4. Auto Start
         self.log_info(f"Retrying {len(failed_keys)} failed work keys...")
         self.start_automation()
 
-    def export_report(self):
+    def export_report(self) -> None:
         panchayat_name = self.panchayat_var.get().strip()
         self.export_treeview_to_excel(
             tree=self.results_tree,
@@ -581,8 +918,45 @@ class WorkAllocationTab(BaseAutomationTab):
             title_prefix=f"Work Allocation Report: {panchayat_name or 'N/A'}"
         )
 
-    def _save_inputs(self, inputs):
-        """Saves the panchayat name and work category."""
+    def export_for_demand(self) -> None:
+        """Saves a Demand-ready CSV — one row per allocated labourer with the
+        job card number, applicant name and work key — so the Demand tab can
+        load it next week and re-do demand + allocation for the same workers."""
+        if not self.allocated_workers_data:
+            messagebox.showinfo(
+                "No Data",
+                "Koi allocated labourer nahi mila.\n"
+                "Pehle Work Allocation automation chalao (successful allocation ke baad data save hota hai).")
+            return
+        path = filedialog.asksaveasfilename(
+            title="Export for Demand",
+            defaultextension=".csv",
+            initialfile=f"Work_Allocation_Demand_{datetime.now():%Y%m%d_%H%M}.csv",
+            filetypes=[("CSV", "*.csv")])
+        if not path:
+            return
+        try:
+            fields = ["Job Card Number", "Applicant Name", "Work Key",
+                      "Work Name", "Status", "Panchayat"]
+            with open(path, "w", encoding="utf-8-sig", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=fields)
+                w.writeheader()
+                for r in self.allocated_workers_data:
+                    w.writerow({
+                        "Job Card Number": r.get('jc', ''),
+                        "Applicant Name": r.get('name', ''),
+                        "Work Key": r.get('work_key', ''),
+                        "Work Name": r.get('work_name', ''),
+                        "Status": r.get('status', 'Success'),
+                        "Panchayat": r.get('panchayat', ''),
+                    })
+            self.log_info(f"Demand-ready CSV exported: {path} ({len(self.allocated_workers_data)} labourers)")
+            messagebox.showinfo("Export", f"Demand-ready CSV saved:\n{path}\n\n"
+                                          f"Isse Demand tab me 'Upload Report' se load karo — work key khud set ho jayega.")
+        except Exception as e:
+            messagebox.showerror("Export Error", str(e))
+
+    def _save_inputs(self, inputs: Dict[str, Any]) -> None:
         save_data = {
             'panchayat_name': inputs.get('panchayat_name'),
             'work_category': inputs.get('work_category')
@@ -592,14 +966,13 @@ class WorkAllocationTab(BaseAutomationTab):
         except Exception as e:
             print(f"Error saving Work Allocation inputs: {e}")
 
-    def load_inputs(self):
-        """Loads the saved panchayat name and work category."""
+    def load_inputs(self) -> None:
         data = self.app.history_manager.get_tab_inputs("work_alloc")
         if not data:
             return
-        self.panchayat_var.set("")
-        self.panchayat_entry.insert(0, data.get('panchayat_name', ''))
+        saved_panchayat = data.get('panchayat_name')
+        if saved_panchayat:
+            self.panchayat_var.set(saved_panchayat)
         saved_category = data.get('work_category')
-        if saved_category:
-            if saved_category in self.work_category_menu.cget("values"):
-                self.work_category_var.set(saved_category)
+        if saved_category and saved_category in self.work_category_menu.cget("values"):
+            self.work_category_var.set(saved_category)

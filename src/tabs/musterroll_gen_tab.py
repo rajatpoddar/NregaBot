@@ -429,6 +429,11 @@ class MusterrollGenTab(BaseAutomationTab):
                 return
             wait = WebDriverWait(driver, 20)
 
+            # Tabs are created once and cached, so the mapping loaded in
+            # __init__ can be stale if the user added/edited panchayat→staff
+            # mappings in Settings during this session. Re-read it fresh.
+            self._load_mapping_data()
+
             # Determine which panchayats to process
             panchayats_to_process = []
             if all_mode:
@@ -458,6 +463,19 @@ class MusterrollGenTab(BaseAutomationTab):
                 self.log_info(f"=== Panchayat {p_idx+1}/{total_panchayats}: {p_name} ===")
                 self.app.after(0, self.update_status, f"{p_name}: fetching items...", p_idx / total_panchayats)
                 inputs['panchayat'] = p_name
+                # 'All Panchayats' / 'My Saved Panchayats' runs process MANY
+                # panchayats but the form holds only ONE fixed staff value.
+                # Use the saved panchayat→staff mapping (Settings > Staff
+                # Mapping / previously-run pairs) per panchayat so the correct
+                # technical staff is selected for each. Unmapped panchayats
+                # keep the manually-selected staff.
+                if all_mode:
+                    mapped_staff = self.mapping_data.get(p_name.strip().lower())
+                    if mapped_staff:
+                        self.log_info(f"   → Staff mapped for {p_name}: {mapped_staff}")
+                        inputs['staff'] = mapped_staff
+                    else:
+                        self.log_info(f"   → No staff mapping for {p_name} — using '{inputs.get('staff', '')}'")
                 self.output_dir = self._get_output_dir(p_name)
                 if not self.output_dir:
                     self.log_warning(f"Skipping {p_name}: could not create output directory.")
