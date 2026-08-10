@@ -50,10 +50,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Check missing keys in all locales (en/hi/kn/bn)
+      - name: Check missing keys in all locales (en/hi/kn/bn/hinglish)
         run: python scripts/check_missing_keys.py
 
-      - name: Rebuild kn/bn from part files (detects translation drift)
+      - name: Rebuild kn/bn/hinglish from part files (detects translation drift)
         run: python scripts/build_locales.py
 
       - name: Verify rebuild left no drift in git

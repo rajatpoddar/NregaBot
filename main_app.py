@@ -16,7 +16,6 @@ import socket
 import shutil
 import re
 import gc
-from datetime import datetime
 from urllib.parse import urlencode
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
@@ -43,7 +42,7 @@ if config.OS_SYSTEM == "Windows":
 
 # --- Local Modules / UI Components ---
 from src.ui_components import (
-    CollapsibleFrame, OnboardingStep, SkeletonLoader, MarqueeLabel,
+    CollapsibleFrame, SkeletonLoader, MarqueeLabel,
     ToastNotification, OnboardingGuide, ComingSoonTab, PerformanceMonitor
 )
 from src.managers.browser_manager import BrowserManager
@@ -474,13 +473,13 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
             self.after(1500, _show_delayed)
 
     def run_onboarding_if_needed(self) -> None:
-        """Runs the onboarding tour for first-time users."""
+        """Runs the onboarding tour for first-time users.
+        The guide itself writes the .first_run_complete flag when the user
+        finishes (or skips) the tour — replay from About never rewrites it.
+        """
         flag_path = get_data_path('.first_run_complete')
         if not os.path.exists(flag_path):
             OnboardingGuide(self)
-            try:
-                with open(flag_path, 'w') as f: f.write(datetime.now().isoformat())
-            except Exception as e: logger.warning("Could not write first run flag: %s", e)
 
     def _gc_collection_loop(self) -> None:
         """P6: Periodic garbage collection to prevent memory fragmentation.

@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 # Assuming utils.py has resource_path, get_data_path, get_config, save_config
 from src.utils import resource_path, get_data_path, get_config, save_config, get_logger, format_bytes
 from src.i18n import tr
+from src.ui_components import OnboardingGuide
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
@@ -219,14 +220,26 @@ class AboutTab(ctk.CTkFrame):
 
         welcome_top = ctk.CTkFrame(self.welcome_card, fg_color="transparent")
         welcome_top.pack(fill="x", padx=18, pady=(14, 4))
-        ctk.CTkLabel(welcome_top, text="👋", font=ctk.CTkFont(size=22)).pack(side="left", padx=(0, 8))
+        welcome_top.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(welcome_top, text="👋", font=ctk.CTkFont(size=22)).grid(row=0, column=0, padx=(0, 8))
         
-        self.welcome_prefix_label = ctk.CTkLabel(welcome_top, text=tr("about.welcome"), font=ctk.CTkFont(size=16, weight="bold"))
+        name_row = ctk.CTkFrame(welcome_top, fg_color="transparent")
+        name_row.grid(row=0, column=1, sticky="w")
+        self.welcome_prefix_label = ctk.CTkLabel(name_row, text=tr("about.welcome"), font=ctk.CTkFont(size=16, weight="bold"))
         self.welcome_prefix_label.pack(side="left")
-        self.welcome_name_label = ctk.CTkLabel(welcome_top, text="", font=ctk.CTkFont(size=16, weight="bold"))
+        self.welcome_name_label = ctk.CTkLabel(name_row, text="", font=ctk.CTkFont(size=16, weight="bold"))
         self.welcome_name_label.pack(side="left", padx=(4, 0))
-        self.welcome_suffix_label = ctk.CTkLabel(welcome_top, text="", font=ctk.CTkFont(size=16, weight="bold"))
+        self.welcome_suffix_label = ctk.CTkLabel(name_row, text="", font=ctk.CTkFont(size=16, weight="bold"))
         self.welcome_suffix_label.pack(side="left", padx=(2, 0))
+
+        # Replay the Welcome Tour (never rewrites the first-run flag)
+        ctk.CTkButton(welcome_top, text=tr("about.replay_tour"), width=170, height=30,
+                      font=ctk.CTkFont(size=11, weight="bold"),
+                      fg_color=("#E2E8F0", "#334155"),
+                      text_color=("#1E293B", "#F1F5F9"),
+                      hover_color=("#CBD5E1", "#475569"),
+                      command=lambda: OnboardingGuide(self.app, replay=True),
+                      ).grid(row=0, column=2, padx=(8, 0))
 
         # ── License Status Card ──
         self.status_card = ctk.CTkFrame(sub_tab, corner_radius=10, border_width=2)

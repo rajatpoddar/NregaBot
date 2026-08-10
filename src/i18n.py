@@ -23,6 +23,7 @@ from src.utils import resource_path, get_config, save_config
 LANGUAGES: Dict[str, str] = {
     "en": "English",
     "hi": "हिन्दी (Hindi)",
+    "hinglish": "हिंग्लिश (Hinglish)",
     "mr": "मराठी (Marathi)",
     "ta": "தமிழ் (Tamil)",
     "te": "తెలుగు (Telugu)",
@@ -60,28 +61,28 @@ STATE_LANGUAGE_MAP: Dict[str, str] = {
     "ODISHA": "or",
     "ORISSA": "or",
     "ASSAM": "as",
-    "BIHAR": "hi",
-    "UTTAR PRADESH": "hi",
-    "MADHYA PRADESH": "hi",
-    "RAJASTHAN": "hi",
-    "HARYANA": "hi",
-    "HIMACHAL PRADESH": "hi",
-    "UTTARAKHAND": "hi",
-    "JHARKHAND": "hi",
-    "CHHATTISGARH": "hi",
-    "DELHI": "hi",
+    "BIHAR": "hinglish",
+    "UTTAR PRADESH": "hinglish",
+    "MADHYA PRADESH": "hinglish",
+    "RAJASTHAN": "hinglish",
+    "HARYANA": "hinglish",
+    "HIMACHAL PRADESH": "hinglish",
+    "UTTARAKHAND": "hinglish",
+    "JHARKHAND": "hinglish",
+    "CHHATTISGARH": "hinglish",
+    "DELHI": "hinglish",
     "GOA": "mr",
     "JAMMU AND KASHMIR": "ur",
     "LADAKH": "ur",
     "TRIPURA": "bn",
     "MANIPUR": "mni",
     "SIKKIM": "ne",
-    "ARUNACHAL PRADESH": "hi",
+    "ARUNACHAL PRADESH": "hinglish",
     "MEGHALAYA": "en",
     "MIZORAM": "en",
     "NAGALAND": "en",
-    "ANDAMAN AND NICOBAR ISLANDS": "hi",
-    "CHANDIGARH": "hi",
+    "ANDAMAN AND NICOBAR ISLANDS": "hinglish",
+    "CHANDIGARH": "hinglish",
     "DADRA AND NAGAR HAVELI AND DAMAN AND DIU": "gu",
     "LAKSHADWEEP": "ml",
     "PUDUCHERRY": "ta",
@@ -188,7 +189,8 @@ def tr(key: str, default: Optional[str] = None, **kwargs: Any) -> str:
 def suggest_language_for_state(state: str) -> str:
     """Return the suggested language code for a given state.
 
-    Falls back to 'hi' (Hindi) for states whose language is not yet available.
+    Falls back to 'hinglish' (Romanized Hindi) for states whose language is
+    not yet available — Hindi states prefer Hinglish by default.
     """
     s = (state or "").strip().upper()
-    return STATE_LANGUAGE_MAP.get(s, "hi")
+    return STATE_LANGUAGE_MAP.get(s, "hinglish")

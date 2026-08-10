@@ -1,96 +1,103 @@
 {
+  "3.2.2": [
+    "🎓 **Naya Onboarding (Welcome Tour):** Pehli baar app kholne par ab ek interactive 7-step setup wizard milta hai — language choose karo, browser launch karke login karo, Panchayat & Villages yahin se add karo, Emergency Stop button ka kaam samjho, aur app kaise use karna hai wo bhi. About tab me 'Replay Welcome Tour' button se kabhi bhi dobara dekh sakte hain.",
+    "🌐 **Nayi Language — Hinglish:** Ab app Roman Hindi (Hinglish) me bhi chala sakte hain — Hindi-speaking states ke users ke liye auto-suggest hoti hai. Total 5 languages: English, Hindi, Kannada, Bengali, Hinglish.",
+    "🔄 **Smart Auto-Restart:** Panchayat/Village add karne, language badalne, ya Factory Reset karne ke baad app ab apne aap restart ho jata hai — naye data sabhi tabs me turant dikhte hain. Windows aur macOS dono par reliable.",
+    "🎓 **Factory Reset + Welcome Tour:** Factory reset ke baad Welcome Tour dobara dikhta hai taaki naya user phir se setup kar sake.",
+    "🏘️ **Shared Panchayat Scraper:** Panchayat scrape ab Settings aur onboarding dono se ek hi engine use karta hai — same reliable flow, do jagah."
+  ],
   "3.2.1": [
-      "💥 **Crash Reporting:** Agar app crash ho jaye, to poori details (app version, tab/function, error, last 30 log lines) automatically server par bheji jati hain — admin panel ke naye Crashes tab me dikhti hain, filters + CSV export ke saath. Ab koi bhi error chhupa nahi rahega.",
-      "📡 **Uptime Monitoring:** Server ab har 5 minute me khud ko check karta hai (Database, Redis, WhatsApp, WebDAV) — koi bhi service down ho to admin ko turant WhatsApp alert milta hai. UptimeRobot ke saath 24x7 external monitoring bhi.",
-      "🔐 **DPDP Compliance (Data Privacy):** Aadhaar aur sensitive PII ab reports, logs aur server data me mask hote hain — koi bhi sensitive data store nahi hota. India data-privacy rules ke hisaab se safe.",
-      "🚦 **API Rate Limiting:** Sync endpoints par per-key aur per-IP rate limits + entry validation — spoof/abuse protection. Admin panel me har key ka live usage stats + configurable limits (env vars se).",
-      "📋 **Better Error Logs:** Admin Activity page ke error logs me ab full context (version, tab, function, time) + export — error report dekhkar turant samajh aata hai kya problem hai aur kaise fix kare.",
-      "⚖️ **License & Terms:** App me naya License & Terms window (EULA + disclaimer) + web pages updated (privacy, terms, disclaimer) — sab kuch legally clear.",
-      "🐞 **Bug Fixes:** Admin error summary 500 fix, local dev issues (WebDAV check, AI knowledge base path, updates folder), aur stability improvements."
+    "💥 **Crash Reporting:** Agar app crash ho jaye, to poori details (app version, tab/function, error, last 30 log lines) automatically server par bheji jati hain — admin panel ke naye Crashes tab me dikhti hain, filters + CSV export ke saath. Ab koi bhi error chhupa nahi rahega.",
+    "📡 **Uptime Monitoring:** Server ab har 5 minute me khud ko check karta hai (Database, Redis, WhatsApp, WebDAV) — koi bhi service down ho to admin ko turant WhatsApp alert milta hai. UptimeRobot ke saath 24x7 external monitoring bhi.",
+    "🔐 **DPDP Compliance (Data Privacy):** Aadhaar aur sensitive PII ab reports, logs aur server data me mask hote hain — koi bhi sensitive data store nahi hota. India data-privacy rules ke hisaab se safe.",
+    "🚦 **API Rate Limiting:** Sync endpoints par per-key aur per-IP rate limits + entry validation — spoof/abuse protection. Admin panel me har key ka live usage stats + configurable limits (env vars se).",
+    "📋 **Better Error Logs:** Admin Activity page ke error logs me ab full context (version, tab, function, time) + export — error report dekhkar turant samajh aata hai kya problem hai aur kaise fix kare.",
+    "⚖️ **License & Terms:** App me naya License & Terms window (EULA + disclaimer) + web pages updated (privacy, terms, disclaimer) — sab kuch legally clear.",
+    "🐞 **Bug Fixes:** Admin error summary 500 fix, local dev issues (WebDAV check, AI knowledge base path, updates folder), aur stability improvements."
   ],
   "3.2.0": [
-      "📍 **Panchayat Column in Results:** Har automation ke results table me ab Panchayat column dikhta hai — 'My Saved Panchayats' mode me bhi clearly pata chalta hai kaunsa row kis panchayat ka hai (16 tabs updated).",
-      "🔢 **Serial Number (Sr. No.):** Har results table ka pehla column ab apna local serial number (1, 2, 3...) hota hai — website ka serial ignore hota hai. Excel/CSV/PDF/WhatsApp reports me bhi serial pehle column me.",
-      "📅 **Smart File Names:** Export hone wali har report ke naam me ab date & time (e.g. ABPS_Verify_20260807_143055.xlsx) — din me kitni baar bhi export karo, file overwrite nahi hogi aur rename nahi karni padegi.",
-      "🏘️ **Saved Panchayats:** Saved panchayats ko process karne ka support — ABPS Verify, Muster Roll, eMB Verify aur Wagelist Gen me.",
-      "🔁 **Multi-Panchayat:** MR Tracking, MSR aur Zero MR tabs me enhanced multi-panchayat processing.",
-      "💬 **WhatsApp Report Toggle:** Automation settings me WhatsApp report notification ke liye ab alag toggle.",
-      "🖨️ **Print-Ready Excel Reports:** Excel exports ab A4 landscape, fit-to-width, repeat headers aur page numbers ke saath — print karke office me submit kiya ja sakta hai.",
-      "🧩 **Windows Update Fix:** Windows core zip handling improved — compiled files se version detection ab sahi kaam karta hai."
+    "📍 **Panchayat Column in Results:** Har automation ke results table me ab Panchayat column dikhta hai — 'My Saved Panchayats' mode me bhi clearly pata chalta hai kaunsa row kis panchayat ka hai (16 tabs updated).",
+    "🔢 **Serial Number (Sr. No.):** Har results table ka pehla column ab apna local serial number (1, 2, 3...) hota hai — website ka serial ignore hota hai. Excel/CSV/PDF/WhatsApp reports me bhi serial pehle column me.",
+    "📅 **Smart File Names:** Export hone wali har report ke naam me ab date & time (e.g. ABPS_Verify_20260807_143055.xlsx) — din me kitni baar bhi export karo, file overwrite nahi hogi aur rename nahi karni padegi.",
+    "🏘️ **Saved Panchayats:** Saved panchayats ko process karne ka support — ABPS Verify, Muster Roll, eMB Verify aur Wagelist Gen me.",
+    "🔁 **Multi-Panchayat:** MR Tracking, MSR aur Zero MR tabs me enhanced multi-panchayat processing.",
+    "💬 **WhatsApp Report Toggle:** Automation settings me WhatsApp report notification ke liye ab alag toggle.",
+    "🖨️ **Print-Ready Excel Reports:** Excel exports ab A4 landscape, fit-to-width, repeat headers aur page numbers ke saath — print karke office me submit kiya ja sakta hai.",
+    "🧩 **Windows Update Fix:** Windows core zip handling improved — compiled files se version detection ab sahi kaam karta hai."
   ],
   "3.1.7": [
-      "🔐 **Google Login:** Ab aap apne Google account se directly login kar sakte hain — desktop app ke 'Quick Login' tab aur web portal dono jagah. Nayi registration me Google ka name/email apne aap aa jata hai.",
-      "🪪 **Passkey Login (WebAuthn):** Windows Hello, Touch ID ya apne phone ke passkey se bina password login karein. Passkey ko Account page se add/remove kiya ja sakta hai.",
-      "📝 **Smarter Registration:** Google se login karne par mobile number, state, district aur block bharne ke baad hi registration complete hoti hai — Google data sirf prefill karta hai.",
-      "📧 **OTP Login (Web):** Web portal par ab email ya mobile number se OTP login — OTP email aur WhatsApp dono jagah jata hai.",
-      "📦 **Storage Alert:** Cloud storage full ya nearly-full hone par app ab turant alert dikhata hai — ek click me upgrade ya cleanup page khul jata hai.",
-      "▶️ **Progress Tracking:** Running automations ab UI par clearly dikhte hain live status indicators ke saath.",
-      "🔒 **Web Portal Security:** Web portal access aur cloud report syncing me security enhancements.",
-      "🔧 **Stability & Consistency:** Login OTP messaging improvements, mobile number support, aur logging consistency across all tabs."
+    "🔐 **Google Login:** Ab aap apne Google account se directly login kar sakte hain — desktop app ke 'Quick Login' tab aur web portal dono jagah. Nayi registration me Google ka name/email apne aap aa jata hai.",
+    "🪪 **Passkey Login (WebAuthn):** Windows Hello, Touch ID ya apne phone ke passkey se bina password login karein. Passkey ko Account page se add/remove kiya ja sakta hai.",
+    "📝 **Smarter Registration:** Google se login karne par mobile number, state, district aur block bharne ke baad hi registration complete hoti hai — Google data sirf prefill karta hai.",
+    "📧 **OTP Login (Web):** Web portal par ab email ya mobile number se OTP login — OTP email aur WhatsApp dono jagah jata hai.",
+    "📦 **Storage Alert:** Cloud storage full ya nearly-full hone par app ab turant alert dikhata hai — ek click me upgrade ya cleanup page khul jata hai.",
+    "▶️ **Progress Tracking:** Running automations ab UI par clearly dikhte hain live status indicators ke saath.",
+    "🔒 **Web Portal Security:** Web portal access aur cloud report syncing me security enhancements.",
+    "🔧 **Stability & Consistency:** Login OTP messaging improvements, mobile number support, aur logging consistency across all tabs."
   ],
   "3.1.6": [
-      "🐞 **ABPS Verification Fix:** Village-wise ABPS verification no longer crashes with 'log_info() unexpected keyword level' — every village now verifies properly and results land in the table. The same log crash was also fixed in Update Estimate, Wagelist Gen, IF Edit and Resend Rejected Wagelist.",
-      "⚡ **ABPS Speed:** Fixed a 10-second stall per panchayat caused by a wrong village-dropdown wait selector.",
-      "💬 **WhatsApp Throttle Protection:** All WhatsApp sends now flow through a global queue with automatic pacing (2–6s between messages) — no more bursts, so your WhatsApp number stays safe from blocking even when many automations finish back-to-back.",
-      "📊 **WhatsApp Reports (Single Setting):** Summary message and results Excel are now controlled by ONE setting — when ON, the summary + Excel file arrive together in a single WhatsApp message.",
-      "📁 **Cloud File Manager:** Send your cloud PDFs directly to clients via WhatsApp with automatic blank-page cleanup."
-    ],
+    "🐞 **ABPS Verification Fix:** Village-wise ABPS verification no longer crashes with 'log_info() unexpected keyword level' — every village now verifies properly and results land in the table. The same log crash was also fixed in Update Estimate, Wagelist Gen, IF Edit and Resend Rejected Wagelist.",
+    "⚡ **ABPS Speed:** Fixed a 10-second stall per panchayat caused by a wrong village-dropdown wait selector.",
+    "💬 **WhatsApp Throttle Protection:** All WhatsApp sends now flow through a global queue with automatic pacing (2–6s between messages) — no more bursts, so your WhatsApp number stays safe from blocking even when many automations finish back-to-back.",
+    "📊 **WhatsApp Reports (Single Setting):** Summary message and results Excel are now controlled by ONE setting — when ON, the summary + Excel file arrive together in a single WhatsApp message.",
+    "📁 **Cloud File Manager:** Send your cloud PDFs directly to clients via WhatsApp with automatic blank-page cleanup."
+  ],
   "3.1.5": [
-      "🔄 **Smart Update Fix (Loader):** After an update, the app now shows the correct new version — a stale cached config used to make it keep reporting the old version and re-showing 'update available' popups.",
-      "🚀 **Auto-Restart Fix (macOS):** Updates now automatically restart the app — previously the relaunch silently never happened and you had to open it manually."
-    ],
+    "🔄 **Smart Update Fix (Loader):** After an update, the app now shows the correct new version — a stale cached config used to make it keep reporting the old version and re-showing 'update available' popups.",
+    "🚀 **Auto-Restart Fix (macOS):** Updates now automatically restart the app — previously the relaunch silently never happened and you had to open it manually."
+  ],
   "3.1.4": [
-      "🖥️ **Multi-Tab Workflow:** Automation no longer grabs the browser's focus — keep working on other tabs while a task runs in the background.",
-      "⚙️ **Background Reliability:** Automation tabs now stay 'active + focused' even when hidden, so radio buttons, dropdowns and postbacks no longer fail mid-run while you work elsewhere.",
-      "📑 **Auto Tab Switching:** The moment you start an automation it shows the Logs tab, and when it finishes it jumps straight to the Results tab — plus the eKYC 'Export to Excel' button moved to the Results tab so you never hunt for it.",
-      "🪟 **Browser Minimize:** Running in the background now minimizes the browser reliably on both macOS and Windows.",
-      "🔇 **Sound Toggle Fix:** Muting sounds now actually stops audio playback everywhere."
-    ],
+    "🖥️ **Multi-Tab Workflow:** Automation no longer grabs the browser's focus — keep working on other tabs while a task runs in the background.",
+    "⚙️ **Background Reliability:** Automation tabs now stay 'active + focused' even when hidden, so radio buttons, dropdowns and postbacks no longer fail mid-run while you work elsewhere.",
+    "📑 **Auto Tab Switching:** The moment you start an automation it shows the Logs tab, and when it finishes it jumps straight to the Results tab — plus the eKYC 'Export to Excel' button moved to the Results tab so you never hunt for it.",
+    "🪟 **Browser Minimize:** Running in the background now minimizes the browser reliably on both macOS and Windows.",
+    "🔇 **Sound Toggle Fix:** Muting sounds now actually stops audio playback everywhere."
+  ],
   "3.1.3": [
-      "🌗 **One-Click Theme Switch:** Theme button now switches day↔night in a single click — dead clicks (System mode already matching Light/Dark) are skipped automatically, and System/auto mode stays available.",
-      "🎨 **Complete Theme Coverage:** The window background now changes colour with the theme too — no more dark patches left around the edges in Light mode.",
-      "💬 **Toast Notifications Upgrade:** Notifications now stack neatly (up to 3), stay on top of every window, and are colour-coded — green for success, red for failed, amber for warnings.",
-      "📋 **No More Blank Activity Logs:** Activity entries now always record the task, status and details — previously some logs synced to the admin panel with empty fields.",
-      "❌ **Automation Failure Logging:** If an automation crashes, the app now logs it as 'Failed' with the error message instead of a misleading 'Success'.",
-      "📡 **Online Status:** The app now sends a heartbeat every 20 seconds so admins can see exactly which users are online right now.",
-      "⚡ **Reliable Auto-Updates:** The update check now waits up to 20s for the server (instead of 5s) — no more silently missed updates on slow networks.",
-      "🛠️ **About Tab Install Button:** When an update is available, the About tab now shows a 'Download & Install' button (with the new changelog) — previously it only let you check for updates, never install them.",
-      "🔒 **Verified Downloads:** In-app downloads are now SHA-256 verified before applying — a corrupt download is discarded and automatically retried instead of breaking the install."
-    ],
+    "🌗 **One-Click Theme Switch:** Theme button now switches day↔night in a single click — dead clicks (System mode already matching Light/Dark) are skipped automatically, and System/auto mode stays available.",
+    "🎨 **Complete Theme Coverage:** The window background now changes colour with the theme too — no more dark patches left around the edges in Light mode.",
+    "💬 **Toast Notifications Upgrade:** Notifications now stack neatly (up to 3), stay on top of every window, and are colour-coded — green for success, red for failed, amber for warnings.",
+    "📋 **No More Blank Activity Logs:** Activity entries now always record the task, status and details — previously some logs synced to the admin panel with empty fields.",
+    "❌ **Automation Failure Logging:** If an automation crashes, the app now logs it as 'Failed' with the error message instead of a misleading 'Success'.",
+    "📡 **Online Status:** The app now sends a heartbeat every 20 seconds so admins can see exactly which users are online right now.",
+    "⚡ **Reliable Auto-Updates:** The update check now waits up to 20s for the server (instead of 5s) — no more silently missed updates on slow networks.",
+    "🛠️ **About Tab Install Button:** When an update is available, the About tab now shows a 'Download & Install' button (with the new changelog) — previously it only let you check for updates, never install them.",
+    "🔒 **Verified Downloads:** In-app downloads are now SHA-256 verified before applying — a corrupt download is discarded and automatically retried instead of breaking the install."
+  ],
   "3.1.2": [
-      "🐞 **Fix (About tab crash):** Resolved the 'humanize module missing' error — About tab and File Manager no longer crash if the humanize package isn't bundled; a built-in fallback is used and the package is now included in all builds.",
-      "▶️ **Running Automation Indicator:** The footer now shows exactly which automation is currently running (e.g. '▶ Running: MR Tracking') next to the status, so you always know what's happening.",
-      "🖥️ **Footer Layout:** Status text moved to the right of the running-automation name for a cleaner '© 2025 NREGA Bot | ▶ Running: X | Status: ...' read."
-    ],
+    "🐞 **Fix (About tab crash):** Resolved the 'humanize module missing' error — About tab and File Manager no longer crash if the humanize package isn't bundled; a built-in fallback is used and the package is now included in all builds.",
+    "▶️ **Running Automation Indicator:** The footer now shows exactly which automation is currently running (e.g. '▶ Running: MR Tracking') next to the status, so you always know what's happening.",
+    "🖥️ **Footer Layout:** Status text moved to the right of the running-automation name for a cleaner '© 2025 NREGA Bot | ▶ Running: X | Status: ...' read."
+  ],
   "3.1.1": [
-      "🐞 **Fix (Pending Bills):** Resolved missing 'beautifulsoup4' library — the Pending Bills scraper was failing because bs4 was not bundled with the app. Dependency added to requirements.txt. Full reinstall required (smart updates cannot add new Python libraries)."
-    ],
+    "🐞 **Fix (Pending Bills):** Resolved missing 'beautifulsoup4' library — the Pending Bills scraper was failing because bs4 was not bundled with the app. Dependency added to requirements.txt. Full reinstall required (smart updates cannot add new Python libraries)."
+  ],
   "3.1.0": [
-      "🚀 **New Settings Panel:** Completely redesigned Settings tab with cloud backup & restore, one-time announcement popups, and a Location Fix wizard that validates your State/District against server records.",
-      "🚀 **New Automation (Pending Bills):** Added the Pending Bills automation tab to track and process pending bills efficiently.",
-      "💬 **WhatsApp Integration:** Send files and messages directly to WhatsApp (Evolution API) with a dedicated WhatsApp chat tab.",
-      "📍 **Auto-Fetch Locations:** State/District/Block now auto-fetch from the server with a filtered location hierarchy — no more manual spelling errors.",
-      "☁️ **Cloud Sync:** User data & settings now sync to your account — activate on any PC or restore after factory reset in one click.",
-      "🔐 **Security Fix:** License key is no longer exposed in URLs.",
-      "🏠 **Home Page Fix:** Blocked/premium tabs can no longer be opened from the Home page shortcuts.",
-      "🌐 **Browser Launch:** Default launch URLs are now centralized in config — added vbgramg.nregabot.com at startup.",
-      "🖥️ **UI Overhaul:** Improved layouts across all automation tabs; dashboard & issued-report fixes; standardized logs and status output.",
-      "📊 **Report Fixes:** MIS reports fixed and Excel result output standardized.",
-      "⚡ **All Villages Option:** Added 'All Villages' support in multiple automation tabs for faster bulk processing.",
-      "🔄 **Beta Builds:** Added beta portable build support with auto-update bypass for testing.",
-      "🐞 **Bug Fixes:** Overhaul of the whole app — dozens of stability and reliability fixes."
-    ],
+    "🚀 **New Settings Panel:** Completely redesigned Settings tab with cloud backup & restore, one-time announcement popups, and a Location Fix wizard that validates your State/District against server records.",
+    "🚀 **New Automation (Pending Bills):** Added the Pending Bills automation tab to track and process pending bills efficiently.",
+    "💬 **WhatsApp Integration:** Send files and messages directly to WhatsApp (Evolution API) with a dedicated WhatsApp chat tab.",
+    "📍 **Auto-Fetch Locations:** State/District/Block now auto-fetch from the server with a filtered location hierarchy — no more manual spelling errors.",
+    "☁️ **Cloud Sync:** User data & settings now sync to your account — activate on any PC or restore after factory reset in one click.",
+    "🔐 **Security Fix:** License key is no longer exposed in URLs.",
+    "🏠 **Home Page Fix:** Blocked/premium tabs can no longer be opened from the Home page shortcuts.",
+    "🌐 **Browser Launch:** Default launch URLs are now centralized in config — added vbgramg.nregabot.com at startup.",
+    "🖥️ **UI Overhaul:** Improved layouts across all automation tabs; dashboard & issued-report fixes; standardized logs and status output.",
+    "📊 **Report Fixes:** MIS reports fixed and Excel result output standardized.",
+    "⚡ **All Villages Option:** Added 'All Villages' support in multiple automation tabs for faster bulk processing.",
+    "🔄 **Beta Builds:** Added beta portable build support with auto-update bypass for testing.",
+    "🐞 **Bug Fixes:** Overhaul of the whole app — dozens of stability and reliability fixes."
+  ],
   "3.0.7": [
-      "🧹 **Repository Cleanup:** Removed unnecessary backup files and screenshots from the repository to reduce release size.",
-      "📦 **Optimized Release:** Fixed release pipeline to exclude old backups and screenshots from the build artifacts."
-    ],
+    "🧹 **Repository Cleanup:** Removed unnecessary backup files and screenshots from the repository to reduce release size.",
+    "📦 **Optimized Release:** Fixed release pipeline to exclude old backups and screenshots from the build artifacts."
+  ],
   "3.0.6": [
-      "🚀 **Delete Applicant Overhaul:** Complete rewrite of the Delete Applicant automation. Now accepts eKYC Report Excel files directly — no more CSV uploads.",
-      "🚀 **MB Entry Auto-Process All Works:** When no work codes are provided, MB Entry now processes ALL available works from the 'Select Work' dropdown one by one."
-    ],
+    "🚀 **Delete Applicant Overhaul:** Complete rewrite of the Delete Applicant automation. Now accepts eKYC Report Excel files directly — no more CSV uploads.",
+    "🚀 **MB Entry Auto-Process All Works:** When no work codes are provided, MB Entry now processes ALL available works from the 'Select Work' dropdown one by one."
+  ],
   "3.0.5": [
-      "🐞 **Critical Fix (Physical Complete):** Fixed the Physical Complete automation pointing to the wrong portal URL (nregade4.dord.gov.in). It now correctly uses the VB-G-RAM-G portal (vbgramgde2.dord.gov.in), consistent with all other automations."
-    ],
+    "🐞 **Critical Fix (Physical Complete):** Fixed the Physical Complete automation pointing to the wrong portal URL (nregade4.dord.gov.in). It now correctly uses the VB-G-RAM-G portal (vbgramgde2.dord.gov.in), consistent with all other automations."
+  ],
   "3.0.4": [
     "🐞 **Critical Fix (Mate/Mistri MR Generation):** Fixed the Mate/Mistri MR generation automation that was not working. The portal interaction flow has been corrected for reliable muster roll generation.",
     "🐞 **Critical Fix (NMMS Attendance):** Fixed the NMMS Daily Attendance automation that was failing to complete. Resolved navigation and scraping issues causing the process to stop midway."
@@ -120,12 +127,12 @@
     "🔗 **MR Tracking URL Updated:** MR Tracking report now points to the new VB-G-RAM-G reporting portal (vbgramgrep.dord.gov.in) for up-to-date muster roll status."
   ],
   "3.0.1": [
-      "🚀 **New Automation (Physical Complete):** Added a new 'Physical Complete' tab to automate physical completion marking for work codes.",
-      "⚡ **Auto-Forward to Scheme Closing:** After successful physical completion, work codes are automatically forwarded to the Scheme Closing tab for seamless workflow.",
-      "🔄 **Batch Processing:** Supports bulk processing of multiple work codes with real-time success/failure tracking and detailed logs.",
-      "📊 **Export Results:** Export Physical Complete results to PDF or CSV directly from the Results tab.",
-      "🕵️ **MR Tracking Update:** Updated MR Tracking URL to financial year 2026-2027 with latest digest."
-    ],
+    "🚀 **New Automation (Physical Complete):** Added a new 'Physical Complete' tab to automate physical completion marking for work codes.",
+    "⚡ **Auto-Forward to Scheme Closing:** After successful physical completion, work codes are automatically forwarded to the Scheme Closing tab for seamless workflow.",
+    "🔄 **Batch Processing:** Supports bulk processing of multiple work codes with real-time success/failure tracking and detailed logs.",
+    "📊 **Export Results:** Export Physical Complete results to PDF or CSV directly from the Results tab.",
+    "🕵️ **MR Tracking Update:** Updated MR Tracking URL to financial year 2026-2027 with latest digest."
+  ],
   "3.0.0": [
     "✨ **Material Entry Overhaul:** Dynamic material rows (default 2, up to 15) with Add/Remove buttons. No more fixed 5-row limit.",
     "💾 **Material Profiles:** Save and load material sets (name, rate, qty, GST) as named profiles for instant reuse.",
@@ -147,11 +154,11 @@
     "🐞 **Scheme Closing Fix:** Improved stability and fixed logic errors in the Scheme Closing module."
   ],
   "2.9.7": [
-      "🚀 **New Automation:** Added new 'Delete Demand' automation feature.",
-      "⚡ **Delete Allocation Upgrade:** Improved logic to prevent getting stuck on blank rows and added support for deleting allocations across multiple dates.",
-      "🦊 **Browser Update:** Added support for older Firefox versions in FTO Generation.",
-      "🐞 **Critical Bug Fix:** Resolved the 'ModuleNotFoundError' (Browser Launch) issue when connecting to an already opened Chrome/Edge browser."
-    ],
+    "🚀 **New Automation:** Added new 'Delete Demand' automation feature.",
+    "⚡ **Delete Allocation Upgrade:** Improved logic to prevent getting stuck on blank rows and added support for deleting allocations across multiple dates.",
+    "🦊 **Browser Update:** Added support for older Firefox versions in FTO Generation.",
+    "🐞 **Critical Bug Fix:** Resolved the 'ModuleNotFoundError' (Browser Launch) issue when connecting to an already opened Chrome/Edge browser."
+  ],
   "2.9.6": [
     "🚀 **Url Updated to dord.gov.in** Now all automation will work as before it does.",
     "🐞 **Fix MR Tracking** T0-T8 Reports"
@@ -187,221 +194,221 @@
     "⚡ **MR Generation:** Enhanced logic for smoother processing and reliability."
   ],
   "2.9.1": [
-      "✨ **New Feature (MR Tracking):** Added 'Pendency Report (T0-T8)' generator for Panchayat-wise analysis.",
-      "✨ **New Feature (Zero MR Integration):** Directly forward data from MR Tracking to Zero MR tab.",
-      "✨ **New Feature (Issued MR):** Added 'Pending demand labour for ABPS' scan at block level.",
-      "✨ **New Feature (File Manager):** Added ability to share cloud folders via public links.",
-      "🎨 **Export Improvements:** Reports can now be exported as Professional PDFs and PNG images.",
-      "🚀 **New Automation (eKYC Report):** Now generate Professional ekyc pending Reports.",
-      "🛠 **UI Updates:** Added Footer Copyright and improved Date Picker interaction."
-    ],
-    "2.9.0": [
-      "🚨 **CRITICAL UPDATE:** Fixed the 'White Screen/Crash' issue experienced by some users.",
-      "📦 **New Loader Engine:** Completely rewritten update system that now extracts files correctly to prevent missing assets.",
-      "🛠 **Stability Fixes:** Resolved 'Missing Icon' errors and improved application startup speed.",
-      "⚠️ **Important:** If your application is stuck or not opening, please uninstall and download the new Setup v2.9.0 from the website."
-    ],
+    "✨ **New Feature (MR Tracking):** Added 'Pendency Report (T0-T8)' generator for Panchayat-wise analysis.",
+    "✨ **New Feature (Zero MR Integration):** Directly forward data from MR Tracking to Zero MR tab.",
+    "✨ **New Feature (Issued MR):** Added 'Pending demand labour for ABPS' scan at block level.",
+    "✨ **New Feature (File Manager):** Added ability to share cloud folders via public links.",
+    "🎨 **Export Improvements:** Reports can now be exported as Professional PDFs and PNG images.",
+    "🚀 **New Automation (eKYC Report):** Now generate Professional ekyc pending Reports.",
+    "🛠 **UI Updates:** Added Footer Copyright and improved Date Picker interaction."
+  ],
+  "2.9.0": [
+    "🚨 **CRITICAL UPDATE:** Fixed the 'White Screen/Crash' issue experienced by some users.",
+    "📦 **New Loader Engine:** Completely rewritten update system that now extracts files correctly to prevent missing assets.",
+    "🛠 **Stability Fixes:** Resolved 'Missing Icon' errors and improved application startup speed.",
+    "⚠️ **Important:** If your application is stuck or not opening, please uninstall and download the new Setup v2.9.0 from the website."
+  ],
   "2.8.3.4": [
-      "🎨 **UI Overhaul:** Modernized Sidebar & Floating Footer with interactive status bar.",
-      "🚀 **Performance Boost:** Significant code refactoring (Modular Architecture) for faster startup and stability.",
-      "💾 **Local Database:** Migrated history to SQLite for robust data handling and zero data loss.",
-      "📜 **Activity Log:** New feature to track your daily tasks with timestamps and specific Panchayat/Block details.",
-      "🧠 **Smart Context:** The app now intelligently detects and logs which Panchayat/Agency you are working on."
-    ],
-    "2.8.3.3": [
-      "🔒 **Security Update:** Added OTP support for secure login.",
-      "🛠 **Fix:** Demand Automation added export results as csv and pdf."
-    ],
-    "2.8.3.2": [
-      "🔒 **Security Update:** Added OTP support for secure login.",
-      "🛠 **Fix:** Resolved login issues and enforced version check."
-    ],
+    "🎨 **UI Overhaul:** Modernized Sidebar & Floating Footer with interactive status bar.",
+    "🚀 **Performance Boost:** Significant code refactoring (Modular Architecture) for faster startup and stability.",
+    "💾 **Local Database:** Migrated history to SQLite for robust data handling and zero data loss.",
+    "📜 **Activity Log:** New feature to track your daily tasks with timestamps and specific Panchayat/Block details.",
+    "🧠 **Smart Context:** The app now intelligently detects and logs which Panchayat/Agency you are working on."
+  ],
+  "2.8.3.3": [
+    "🔒 **Security Update:** Added OTP support for secure login.",
+    "🛠 **Fix:** Demand Automation added export results as csv and pdf."
+  ],
+  "2.8.3.2": [
+    "🔒 **Security Update:** Added OTP support for secure login.",
+    "🛠 **Fix:** Resolved login issues and enforced version check."
+  ],
   "2.8.3.1": [
-      "✨ **New Feature (Smart Alerts):** Implemented a 'Smart Kill Switch' for feature management. Instead of just disabling a button, users now receive specific alerts if an update is required or if a feature is under maintenance.",
-      "🐞 **Bug Fix (Verify APBS):** Resolved critical issues in the APBS Verification automation to ensure reliable processing and data validation.",
-      "🐞 **Bug Fix (SAD Update Status):** Fixed bugs preventing successful status updates in the Sarkar Aapke Dwar automation.",
-      "🛠 **Improvement (PDF Export):** Fixed a bug causing silent failures or formatting errors when exporting reports to PDF across various modules."
-    ],
+    "✨ **New Feature (Smart Alerts):** Implemented a 'Smart Kill Switch' for feature management. Instead of just disabling a button, users now receive specific alerts if an update is required or if a feature is under maintenance.",
+    "🐞 **Bug Fix (Verify APBS):** Resolved critical issues in the APBS Verification automation to ensure reliable processing and data validation.",
+    "🐞 **Bug Fix (SAD Update Status):** Fixed bugs preventing successful status updates in the Sarkar Aapke Dwar automation.",
+    "🛠 **Improvement (PDF Export):** Fixed a bug causing silent failures or formatting errors when exporting reports to PDF across various modules."
+  ],
   "2.8.3": [
-      "🛠 **Improvement (MR Fill):** Added auto-fill for 'Work Start Date'. If empty, it now copies the date from 'Date From' field before saving.",
-      "🐞 **Bug Fix (Workcode Extractor):** Removed duplicate filtering. Now extracts all occurrences of work codes, even if they appear multiple times.",
-      "✨ **New Feature (Work Allocation):** Added 'From Date' filter. Users can now select a specific date to delete allocations, instead of deleting everything.",
-      "📅 **UI Update (Global):** Introduced a new, modern **Calendar Popup** across all automations (Muster Roll, Demand, Scheme Closing). Features colored indicators for Sundays and Mondays.",
-      "🛡️ **Stability (Global):** Added 'Friendly Error Handling'. If the browser is closed manually during automation, the app now stops gracefully with a clear message instead of showing code errors.",
-      "🚀 **New Feature (Smart Updates):** Introduced a new Loader Architecture! Future updates will be instant and very small in size (KB instead of MB).",
-      "✨ **Sarkar Aapke Dwar (Update):** Added support for 'Applicant Remarks' and 'Scheme Remarks' columns in CSV/Excel Bulk Upload.",
-      "🛠 **UX Improvement (SAD):** Remarks fields in UI now auto-disable when a file is selected. Added helper note for manual entry.",
-      "📝 **Template Update:** Updated 'Get Template' to include new remarks columns.",
-      "⚡ **Performance:** App launch time improved significantly.",
-      "🛠 **Architecture:** Unified update mechanism for both Windows and macOS to support background updates."
-    ],
+    "🛠 **Improvement (MR Fill):** Added auto-fill for 'Work Start Date'. If empty, it now copies the date from 'Date From' field before saving.",
+    "🐞 **Bug Fix (Workcode Extractor):** Removed duplicate filtering. Now extracts all occurrences of work codes, even if they appear multiple times.",
+    "✨ **New Feature (Work Allocation):** Added 'From Date' filter. Users can now select a specific date to delete allocations, instead of deleting everything.",
+    "📅 **UI Update (Global):** Introduced a new, modern **Calendar Popup** across all automations (Muster Roll, Demand, Scheme Closing). Features colored indicators for Sundays and Mondays.",
+    "🛡️ **Stability (Global):** Added 'Friendly Error Handling'. If the browser is closed manually during automation, the app now stops gracefully with a clear message instead of showing code errors.",
+    "🚀 **New Feature (Smart Updates):** Introduced a new Loader Architecture! Future updates will be instant and very small in size (KB instead of MB).",
+    "✨ **Sarkar Aapke Dwar (Update):** Added support for 'Applicant Remarks' and 'Scheme Remarks' columns in CSV/Excel Bulk Upload.",
+    "🛠 **UX Improvement (SAD):** Remarks fields in UI now auto-disable when a file is selected. Added helper note for manual entry.",
+    "📝 **Template Update:** Updated 'Get Template' to include new remarks columns.",
+    "⚡ **Performance:** App launch time improved significantly.",
+    "🛠 **Architecture:** Unified update mechanism for both Windows and macOS to support background updates."
+  ],
   "2.8.2": [
-      "🐞 **Bug Fix (Data Transfer):** Fixed data transfer failure between tabs (e.g., MR Tracking to MR Payment) caused by Skeleton Loader timing.",
-      "🐞 **Bug Fix (Background Execution):** Fixed automation stopping/timing out when the browser window is minimized.",
-      "🐞 **Bug Fix (Autocomplete):** Resolved issue where the dropdown list would re-open immediately after selecting an item.",
-      "🛠 **Improvement (MR Tracking):** Updated logic to skip records 'Pending since 1 day' (in addition to 0 days) to avoid premature processing.",
-      "🛠 **Improvement (macOS Headless):** Fixed EGL/GPU driver errors in headless mode by disabling GPU hardware acceleration."
-    ],
+    "🐞 **Bug Fix (Data Transfer):** Fixed data transfer failure between tabs (e.g., MR Tracking to MR Payment) caused by Skeleton Loader timing.",
+    "🐞 **Bug Fix (Background Execution):** Fixed automation stopping/timing out when the browser window is minimized.",
+    "🐞 **Bug Fix (Autocomplete):** Resolved issue where the dropdown list would re-open immediately after selecting an item.",
+    "🛠 **Improvement (MR Tracking):** Updated logic to skip records 'Pending since 1 day' (in addition to 0 days) to avoid premature processing.",
+    "🛠 **Improvement (macOS Headless):** Fixed EGL/GPU driver errors in headless mode by disabling GPU hardware acceleration."
+  ],
   "2.8.1": [
-      "✨ **New Browser Support:** Added full support for **Microsoft Edge**! You can now launch Edge directly from the dashboard and use it for all automations alongside Chrome and Firefox.",
-      "🚀 **Performance (Headless Mode):** Reports like 'MR Tracking' now run in the background (Headless Browser). You can continue working on other tasks while the bot processes data invisibly.",
-      "📢 **Upcoming:** 'Sarkar Aapke Dwar' Automation coming soon!",
-      "✨ **UI Enhancements:** Introduced 'Skeleton Loading' animations for smoother tab switching, improved 'Toast Notifications' for alerts, and a real-time Server Status indicator update.",
-      "✨ **New Feature (MR Gen):** Added a 'Merge Saved PDFs' button to combine all MRs generated in the current session into a single PDF file. Added a toggle for 'Save to Cloud'.",
-      "🚀 **Enhancement (Zero MR):** Added a specific filter in MR Tracking for 'T+8 to T+15' cases with a direct 'Forward to Zero MR' button for faster processing.",
-      "🚀 **Enhancement (Demand & Allocation):** Improved the workflow connectivity between Demand entry and Work Allocation for smoother handoffs.",
-      "🐞 **Bug Fixes:** Fixed file path issues in MR Generation and resolved session timeout handling during long report fetches."
-    ],
+    "✨ **New Browser Support:** Added full support for **Microsoft Edge**! You can now launch Edge directly from the dashboard and use it for all automations alongside Chrome and Firefox.",
+    "🚀 **Performance (Headless Mode):** Reports like 'MR Tracking' now run in the background (Headless Browser). You can continue working on other tasks while the bot processes data invisibly.",
+    "📢 **Upcoming:** 'Sarkar Aapke Dwar' Automation coming soon!",
+    "✨ **UI Enhancements:** Introduced 'Skeleton Loading' animations for smoother tab switching, improved 'Toast Notifications' for alerts, and a real-time Server Status indicator update.",
+    "✨ **New Feature (MR Gen):** Added a 'Merge Saved PDFs' button to combine all MRs generated in the current session into a single PDF file. Added a toggle for 'Save to Cloud'.",
+    "🚀 **Enhancement (Zero MR):** Added a specific filter in MR Tracking for 'T+8 to T+15' cases with a direct 'Forward to Zero MR' button for faster processing.",
+    "🚀 **Enhancement (Demand & Allocation):** Improved the workflow connectivity between Demand entry and Work Allocation for smoother handoffs.",
+    "🐞 **Bug Fixes:** Fixed file path issues in MR Generation and resolved session timeout handling during long report fetches."
+  ],
   "2.8.0": [
-      "✨ **Major Feature: Referral Program** - Get 15 days of extra validity when a user you refer purchases their first plan! Find your referral code in the 'My Account' page.",
-      "✨ **New Automation: Work Allocation** - A new tab to automatically handle work allocation for a list of work keys right after demand is placed.",
-      "🚀 **Enhancement (Workflow):** Added an optional 'Work Key (Auto-Allocate)' field to the 'Demand' tab. After demand is completed, the bot will automatically switch to the 'Allocation' tab and run it for that work key.",
-      "💳 **Major Feature: Auto-Renewal (Subscriptions)** - You can now enable auto-renewal when purchasing a plan from the website to ensure your license never expires. Manage it from your 'My Account' page.",
-      "🚀 **Enhancement (Trial Activation):** Updated the trial registration system. The new web-based trial page now supports users from more states, including Rajasthan and West Bengal.",
-      "🚀 **Enhancement (Reseller Panel):** The web-based Reseller Panel now displays user statistics (active, expired, blocked) and includes a new 'Poke' tool to send email reminders to expired users.",
-      "🚀 **Enhancement (Device Renaming):** You can now rename your activated devices from the 'About' tab in the app and from the 'My Account' page on the website. Names will sync across your account.",
-      "🐞 **Bug Fix (Zero MR):** Fixed a stability issue in the Zero MR automation to better handle page refreshes and prevent timeouts."
-    ],
+    "✨ **Major Feature: Referral Program** - Get 15 days of extra validity when a user you refer purchases their first plan! Find your referral code in the 'My Account' page.",
+    "✨ **New Automation: Work Allocation** - A new tab to automatically handle work allocation for a list of work keys right after demand is placed.",
+    "🚀 **Enhancement (Workflow):** Added an optional 'Work Key (Auto-Allocate)' field to the 'Demand' tab. After demand is completed, the bot will automatically switch to the 'Allocation' tab and run it for that work key.",
+    "💳 **Major Feature: Auto-Renewal (Subscriptions)** - You can now enable auto-renewal when purchasing a plan from the website to ensure your license never expires. Manage it from your 'My Account' page.",
+    "🚀 **Enhancement (Trial Activation):** Updated the trial registration system. The new web-based trial page now supports users from more states, including Rajasthan and West Bengal.",
+    "🚀 **Enhancement (Reseller Panel):** The web-based Reseller Panel now displays user statistics (active, expired, blocked) and includes a new 'Poke' tool to send email reminders to expired users.",
+    "🚀 **Enhancement (Device Renaming):** You can now rename your activated devices from the 'About' tab in the app and from the 'My Account' page on the website. Names will sync across your account.",
+    "🐞 **Bug Fix (Zero MR):** Fixed a stability issue in the Zero MR automation to better handle page refreshes and prevent timeouts."
+  ],
   "2.7.10": [
-      "✨ **New Automation: Zero MR** - Added a new tab to submit 'Zero MR' for muster rolls that have not been filled between T+8 and T+15 days.",
-      "🚀 **Enhancement (MR Tracking):** Added a 'Find T+8 to T+15 (for Zero MR)' filter to find muster rolls eligible for Zero MR processing.",
-      "🚀 **Enhancement (Workflow):** After running the 'T+8 to T+15' filter in MR Tracking, a 'Forward to Zero MR' button appears. This sends the work code and MSR no. for all found items directly to the new 'Zero MR' tab.",
-      "🐞 **Bug Fix (Status & Reports):** Fixed detailed status reporting for MSR, Wagelist Gen, and Scheme Closing tabs. Ensured duplicate workcodes are correctly extracted in MR Tracking and Dashboard Report. Fixed Dashboard Report automation to correctly click on links that show a '0' count.",
-      "🐞 **Bug Fix (MR Tracking):** Fixed a bug where the automation would fail if the Block name on the website used different capitalization (e.g., 'Mandro' vs 'MANDRO').",
-      "🐞 **Bug Fix (Extractors):** Fixed the 'Extract from Text' button on the Scheme Closing tab.",
-      "🐞 **Bug Fix (UI):** Added 'Generate CSV Online' helper links to the Demand and WC Gen tabs."
-    ],
+    "✨ **New Automation: Zero MR** - Added a new tab to submit 'Zero MR' for muster rolls that have not been filled between T+8 and T+15 days.",
+    "🚀 **Enhancement (MR Tracking):** Added a 'Find T+8 to T+15 (for Zero MR)' filter to find muster rolls eligible for Zero MR processing.",
+    "🚀 **Enhancement (Workflow):** After running the 'T+8 to T+15' filter in MR Tracking, a 'Forward to Zero MR' button appears. This sends the work code and MSR no. for all found items directly to the new 'Zero MR' tab.",
+    "🐞 **Bug Fix (Status & Reports):** Fixed detailed status reporting for MSR, Wagelist Gen, and Scheme Closing tabs. Ensured duplicate workcodes are correctly extracted in MR Tracking and Dashboard Report. Fixed Dashboard Report automation to correctly click on links that show a '0' count.",
+    "🐞 **Bug Fix (MR Tracking):** Fixed a bug where the automation would fail if the Block name on the website used different capitalization (e.g., 'Mandro' vs 'MANDRO').",
+    "🐞 **Bug Fix (Extractors):** Fixed the 'Extract from Text' button on the Scheme Closing tab.",
+    "🐞 **Bug Fix (UI):** Added 'Generate CSV Online' helper links to the Demand and WC Gen tabs."
+  ],
   "2.7.9": [
-      "✨ **New Feature (Reports): Issued MR Details** - Added a new automation to fetch the 'MGNREGS daily status as per e-muster issued' report. It drills down into the 'No. Of Ongoing Works' for a specific panchayat and extracts all work codes.",
-      "✨ **New Feature (Utility): PDF Merger** - Added a new standalone utility tab to merge multiple PDF files into a single document.",
-      "🚀 **Enhancement (Workflow):** Added a new workflow. After running FTO Generation, a 'Check Pending ABPS Labour' button appears, directing you to the MR Tracking tab, pre-configured to find ABPS pendency.",
-      "🚀 **Enhancement (Workflow):** You can now send workcodes and the panchayat name directly from the new 'Issued MR Details' report to the 'Duplicate MR Print' tab.",
-      "🚀 **Enhancement (MR Tracking):** The MR Tracking automation is now more intelligent. It can identify and report on specific laborers pending for ABPS by drilling down into wagelist details.",
-      "🚀 **Enhancement (Duplicate MR):** Added a 'Merge Saved PDFs' button in the 'Results' tab. This allows merging all PDFs saved during the automation run into a single, combined PDF file.",
-      "🚀 **Enhancement (Demand):** The Demand automation is now smarter. If demand is requested for multiple laborers approaching 100 mandays, it will automatically divide the remaining available mandays between them.",
-      "🐞 **Bug Fix (PDF Export):** Fixed a critical bug where PDF exporting would fail with an 'Undefined font' error. The system now correctly loads both regular and bold fonts for PDF generation.",
-      "🐞 **Bug Fix (Wagelist Gen/Send):** Fixed a bug that could cause the 'Generate Wagelist' automation to crash. Also corrected the status reporting for the 'Send Wagelist' automation.",
-      "🐞 **Bug Fix (Scheme Closing):** Added missing imports to the Scheme Closing tab to prevent potential crashes."
-    ],
+    "✨ **New Feature (Reports): Issued MR Details** - Added a new automation to fetch the 'MGNREGS daily status as per e-muster issued' report. It drills down into the 'No. Of Ongoing Works' for a specific panchayat and extracts all work codes.",
+    "✨ **New Feature (Utility): PDF Merger** - Added a new standalone utility tab to merge multiple PDF files into a single document.",
+    "🚀 **Enhancement (Workflow):** Added a new workflow. After running FTO Generation, a 'Check Pending ABPS Labour' button appears, directing you to the MR Tracking tab, pre-configured to find ABPS pendency.",
+    "🚀 **Enhancement (Workflow):** You can now send workcodes and the panchayat name directly from the new 'Issued MR Details' report to the 'Duplicate MR Print' tab.",
+    "🚀 **Enhancement (MR Tracking):** The MR Tracking automation is now more intelligent. It can identify and report on specific laborers pending for ABPS by drilling down into wagelist details.",
+    "🚀 **Enhancement (Duplicate MR):** Added a 'Merge Saved PDFs' button in the 'Results' tab. This allows merging all PDFs saved during the automation run into a single, combined PDF file.",
+    "🚀 **Enhancement (Demand):** The Demand automation is now smarter. If demand is requested for multiple laborers approaching 100 mandays, it will automatically divide the remaining available mandays between them.",
+    "🐞 **Bug Fix (PDF Export):** Fixed a critical bug where PDF exporting would fail with an 'Undefined font' error. The system now correctly loads both regular and bold fonts for PDF generation.",
+    "🐞 **Bug Fix (Wagelist Gen/Send):** Fixed a bug that could cause the 'Generate Wagelist' automation to crash. Also corrected the status reporting for the 'Send Wagelist' automation.",
+    "🐞 **Bug Fix (Scheme Closing):** Added missing imports to the Scheme Closing tab to prevent potential crashes."
+  ],
   "2.7.8": [
-      "✨ **New Feature (Core): MR Fill** - A new automation to automatically fill Muster Rolls. It intelligently marks holidays as absent and includes a manual mode for custom attendance.",
-      "✨ **New Feature (Reports): MR Tracking** - Track Muster Roll status in real-time. Includes options to export reports to PDF, Excel, and PNG, plus a workcode extractor.",
-      "✨ **New Feature (Reports): Dashboard Report** - A new tool to fetch and view dashboard reports, with full export capabilities (PDF, Excel, PNG) and a workcode extractor.",
-      "✨ **New Feature (UI): Sound Effects** - Added audible sound effects for key actions (e.g., automation complete, error). This can be toggled on/off in the settings.",
-      "🚀 **Enhancement (Workflow):** A new workflow allows you to send workcodes directly from the **MR Tracking** report to the **eMB Entry** and **MSR Processor** tabs.",
-      "🚀 **Enhancement (Workflow):** Send workcodes and panchayat names directly from the **Dashboard Report** to the **MR Fill** automation.",
-      "🚀 **Enhancement (Demand):** Demand Automation now automatically adjusts for laborers with 100 mandays and fully supports **GP logins**.",
-      "🚀 **Enhancement (Wagelist):** The Wagelist Automation tab now includes an option to **save the generated wagelist as a PDF** document.",
-      "🐞 **Bug Fix (ABPS Verify):** Resolved a critical bug where the automation failed to verify multiple laborers registered under the same job card."
-    ],
+    "✨ **New Feature (Core): MR Fill** - A new automation to automatically fill Muster Rolls. It intelligently marks holidays as absent and includes a manual mode for custom attendance.",
+    "✨ **New Feature (Reports): MR Tracking** - Track Muster Roll status in real-time. Includes options to export reports to PDF, Excel, and PNG, plus a workcode extractor.",
+    "✨ **New Feature (Reports): Dashboard Report** - A new tool to fetch and view dashboard reports, with full export capabilities (PDF, Excel, PNG) and a workcode extractor.",
+    "✨ **New Feature (UI): Sound Effects** - Added audible sound effects for key actions (e.g., automation complete, error). This can be toggled on/off in the settings.",
+    "🚀 **Enhancement (Workflow):** A new workflow allows you to send workcodes directly from the **MR Tracking** report to the **eMB Entry** and **MSR Processor** tabs.",
+    "🚀 **Enhancement (Workflow):** Send workcodes and panchayat names directly from the **Dashboard Report** to the **MR Fill** automation.",
+    "🚀 **Enhancement (Demand):** Demand Automation now automatically adjusts for laborers with 100 mandays and fully supports **GP logins**.",
+    "🚀 **Enhancement (Wagelist):** The Wagelist Automation tab now includes an option to **save the generated wagelist as a PDF** document.",
+    "🐞 **Bug Fix (ABPS Verify):** Resolved a critical bug where the automation failed to verify multiple laborers registered under the same job card."
+  ],
   "2.7.7": [
-      "✨ **New Feature (Workflow):** Added an 'Extract from Text' button to all automation tabs to simplify pasting work codes.",
-      "🚀 **Enhancement (Demand):** Demand automation now supports Rajasthan and includes minor bug fixes.",
-      "🚀 **Enhancement (UI):** Autocomplete for Panchayat names now properly supports arrow key navigation and fixes freezing issues.",
-      "🐞 **Bug Fix (Reports):** Fixed CSV and PDF exports to properly support Hindi fonts and improve PDF data organization.",
-      "🐞 **Bug Fix (eMB Verify):** Added missing imports to resolve errors in the eMB Verify tab."
-    ],
+    "✨ **New Feature (Workflow):** Added an 'Extract from Text' button to all automation tabs to simplify pasting work codes.",
+    "🚀 **Enhancement (Demand):** Demand automation now supports Rajasthan and includes minor bug fixes.",
+    "🚀 **Enhancement (UI):** Autocomplete for Panchayat names now properly supports arrow key navigation and fixes freezing issues.",
+    "🐞 **Bug Fix (Reports):** Fixed CSV and PDF exports to properly support Hindi fonts and improve PDF data organization.",
+    "🐞 **Bug Fix (eMB Verify):** Added missing imports to resolve errors in the eMB Verify tab."
+  ],
   "2.7.6": [
-      "🐞 **Critical Bug Fix (Demand Automation):** Added demo file for demand Automation, improve error handling in demand Automation.",
-      "⚙️ **Improvement (Renew Subscription):** Now Renew and Upgrade plans move to directly web view for easy handling the services and making seamless."
-    ],
+    "🐞 **Critical Bug Fix (Demand Automation):** Added demo file for demand Automation, improve error handling in demand Automation.",
+    "⚙️ **Improvement (Renew Subscription):** Now Renew and Upgrade plans move to directly web view for easy handling the services and making seamless."
+  ],
   "2.7.5": [
-      "🐞 **Critical Bug Fix (IF Editor):** Completely overhauled the Page 3 material entry logic to resolve all known 'stale element' errors and duplicate entry bugs. The automation is now significantly more reliable, especially when re-running on partially completed work codes.",
-      "⚙️ **Improvement (IF Editor):** Material selection is now more precise, using 'startswith' matching to prevent incorrect selections from the dropdown."
-    ],
+    "🐞 **Critical Bug Fix (IF Editor):** Completely overhauled the Page 3 material entry logic to resolve all known 'stale element' errors and duplicate entry bugs. The automation is now significantly more reliable, especially when re-running on partially completed work codes.",
+    "⚙️ **Improvement (IF Editor):** Material selection is now more precise, using 'startswith' matching to prevent incorrect selections from the dropdown."
+  ],
   "2.7.4": [
-      "🚀 Performance: App now launches significantly faster by checking the license in the background.",
-      "✨ UI: Redesigned the navigation menu with a persistent category filter.",
-      "✨ UI: Added a new 'JE & AE Automation' category for eMB Entry and eMB Verify.",
-      "✨ UI: Optimized the header with shorter button text for a cleaner look.",
-      "✨ UI: Removed the expand/collapse feature for a simpler, static navigation menu."
-    ],
+    "🚀 Performance: App now launches significantly faster by checking the license in the background.",
+    "✨ UI: Redesigned the navigation menu with a persistent category filter.",
+    "✨ UI: Added a new 'JE & AE Automation' category for eMB Entry and eMB Verify.",
+    "✨ UI: Optimized the header with shorter button text for a cleaner look.",
+    "✨ UI: Removed the expand/collapse feature for a simpler, static navigation menu."
+  ],
   "2.7.3": [
-      "✨ New Feature: Added 'Demand Automations' tab to demand labours with the csv file",
-      "🐞 Fix: Fixed bug on Add activity now it will skip if activity is already there."
-    ],
+    "✨ New Feature: Added 'Demand Automations' tab to demand labours with the csv file",
+    "🐞 Fix: Fixed bug on Add activity now it will skip if activity is already there."
+  ],
   "2.7.2": [
-      "New Feature: Added 'MIS Reports' tab to download multiple reports into a single multi-sheet Excel file.",
-      "New Feature: The MIS Reports tab now automatically solves the mathematical CAPTCHA.",
-      "New Feature: Added a new 'Social Audit Report' automation for the SA View/Respond page.",
-      "Enhancement: PDF exports for the Social Audit Report now have a dynamic title.",
-      "Enhancement: Added a pop-up alert to notify users when automation tasks are complete.",
-      "Enhancement: The MIS Reports tab now remembers the last used State, District, and Block.",
-      "Fix: Major improvements to web automation stability for handling page reloads and complex dynamic tables.",
-      "Fix: Resolved a crash during PDF export caused by special characters (e.g., Hindi text).",
-      "Fix: Fixed various bugs in the new report automations, including input persistence and navigation logic."
-    ],
+    "New Feature: Added 'MIS Reports' tab to download multiple reports into a single multi-sheet Excel file.",
+    "New Feature: The MIS Reports tab now automatically solves the mathematical CAPTCHA.",
+    "New Feature: Added a new 'Social Audit Report' automation for the SA View/Respond page.",
+    "Enhancement: PDF exports for the Social Audit Report now have a dynamic title.",
+    "Enhancement: Added a pop-up alert to notify users when automation tasks are complete.",
+    "Enhancement: The MIS Reports tab now remembers the last used State, District, and Block.",
+    "Fix: Major improvements to web automation stability for handling page reloads and complex dynamic tables.",
+    "Fix: Resolved a crash during PDF export caused by special characters (e.g., Hindi text).",
+    "Fix: Fixed various bugs in the new report automations, including input persistence and navigation logic."
+  ],
   "2.7.1": [
-      "✨ Feature (eMB Entry): Added an 'Auto' checkbox to automatically fill the MB Number from the last four digits of the work code.",
-      "✨ Improvement (eMB Entry): Mate Name field now accepts multiple comma-separated names and will randomly select one for each entry.",
-      "✨ UI Update (eMB Entry): Removed JE Name and Designation fields to match recent website changes.",
-      "✨ Feature: Added a new 'Reports' tab as a placeholder for upcoming reporting features.",
-      "🐞 Bug Fix: The 'Manage Account' button in the About tab now correctly opens the user's web account page.",
-      "⚙️ Improvement: The 'File Manager' button in the footer now opens the web-based file manager instead of the in-app tab."
-    ],
+    "✨ Feature (eMB Entry): Added an 'Auto' checkbox to automatically fill the MB Number from the last four digits of the work code.",
+    "✨ Improvement (eMB Entry): Mate Name field now accepts multiple comma-separated names and will randomly select one for each entry.",
+    "✨ UI Update (eMB Entry): Removed JE Name and Designation fields to match recent website changes.",
+    "✨ Feature: Added a new 'Reports' tab as a placeholder for upcoming reporting features.",
+    "🐞 Bug Fix: The 'Manage Account' button in the About tab now correctly opens the user's web account page.",
+    "⚙️ Improvement: The 'File Manager' button in the footer now opens the web-based file manager instead of the in-app tab."
+  ],
   "2.7.0": [
-      "✨ Major Performance Overhaul: Implemented lazy loading for all tabs, ensuring near-instant application startup and significantly reduced memory usage.",
-      "✨ Feature: Consolidated report exports on all major tabs into a single, unified system (Image, PDF, CSV) with data filtering.",
-      "✨ Improvement: PDF reports are now styled with headers, footers, and status-based colors (red for failed, green for success).",
-      "✨ Improvement: 'MR Payment' automation now allows verification of an exact wage amount and automatically skips MSRs that are pending approval.",
-      "🐞 Bug Fix: Resolved a cloud upload error that occurred when re-exporting reports by giving each file a unique, timestamped name.",
-      "🐞 Bug Fix: Corrected numerous bugs and crashes that occurred during the recent performance refactoring to ensure stability."
-    ],
+    "✨ Major Performance Overhaul: Implemented lazy loading for all tabs, ensuring near-instant application startup and significantly reduced memory usage.",
+    "✨ Feature: Consolidated report exports on all major tabs into a single, unified system (Image, PDF, CSV) with data filtering.",
+    "✨ Improvement: PDF reports are now styled with headers, footers, and status-based colors (red for failed, green for success).",
+    "✨ Improvement: 'MR Payment' automation now allows verification of an exact wage amount and automatically skips MSRs that are pending approval.",
+    "🐞 Bug Fix: Resolved a cloud upload error that occurred when re-exporting reports by giving each file a unique, timestamped name.",
+    "🐞 Bug Fix: Corrected numerous bugs and crashes that occurred during the recent performance refactoring to ensure stability."
+  ],
   "2.6.4": [
-      "✨ Feature: 'Send Wagelist' tab now supports processing a specific range of wagelists.",
-      "✨ Improvement: 'MR Payment' automation now supports both Block and GP logins and provides more precise approval status results (JE vs. AE).",
-      "✨ Improvement: 'Send Wagelist' automation is now significantly faster, selecting all EFMS options instantly.",
-      "✨ Improvement: The main header now displays a personalized welcome message (with special styling for licensed users) and a quick-access button for the 'Workcode Extractor'.",
-      "✨ Improvement: The footer now includes an animated icon and color-coded text to better indicate the app's status (Ready, Running, Finished).",
-      "✨ Improvement: Enhanced the 'WC Gen' tab with Panchayat autocomplete, automatic profile saving, and a results summary.",
-      "🐞 Bug Fix: Fixed a critical timing issue in the 'IF Edit' tab that could cause the first work code to be skipped.",
-      "🐞 Bug Fix: Reorganized the layouts of the 'IF Edit' and 'WC Gen' tabs for a more intuitive workflow."
-    ],
+    "✨ Feature: 'Send Wagelist' tab now supports processing a specific range of wagelists.",
+    "✨ Improvement: 'MR Payment' automation now supports both Block and GP logins and provides more precise approval status results (JE vs. AE).",
+    "✨ Improvement: 'Send Wagelist' automation is now significantly faster, selecting all EFMS options instantly.",
+    "✨ Improvement: The main header now displays a personalized welcome message (with special styling for licensed users) and a quick-access button for the 'Workcode Extractor'.",
+    "✨ Improvement: The footer now includes an animated icon and color-coded text to better indicate the app's status (Ready, Running, Finished).",
+    "✨ Improvement: Enhanced the 'WC Gen' tab with Panchayat autocomplete, automatic profile saving, and a results summary.",
+    "🐞 Bug Fix: Fixed a critical timing issue in the 'IF Edit' tab that could cause the first work code to be skipped.",
+    "🐞 Bug Fix: Reorganized the layouts of the 'IF Edit' and 'WC Gen' tabs for a more intuitive workflow."
+  ],
   "2.6.3": [
-      "✨ Feature: Added new 'Resend Rejected Wagelist' automation to reprocess payments for bank-rejected transactions.",
-      "✨ Feature: Added a folder share option in the File Manager.",
-      "✨ Improvement: Overhauled 'Jobcard Verification' with a 'Process all villages' option and fixed all critical photo upload bugs.",
-      "✨ Improvement: The footer status bar is now dynamic, showing real-time automation progress and server connectivity.",
-      "✨ Improvement: Updated the layout of the 'Delete Work Allocation' tab for a better user experience."
-    ],
+    "✨ Feature: Added new 'Resend Rejected Wagelist' automation to reprocess payments for bank-rejected transactions.",
+    "✨ Feature: Added a folder share option in the File Manager.",
+    "✨ Improvement: Overhauled 'Jobcard Verification' with a 'Process all villages' option and fixed all critical photo upload bugs.",
+    "✨ Improvement: The footer status bar is now dynamic, showing real-time automation progress and server connectivity.",
+    "✨ Improvement: Updated the layout of the 'Delete Work Allocation' tab for a better user experience."
+  ],
   "2.6.2": [
-      "✨ Feature: Major File Manager overhaul with drag & drop uploads, folder creation, and enhanced UI.",
-      "✨ Feature: Added new Quarterly and Half-Yearly subscription plans for more flexibility.",
-      "✨ Feature: Users can now upgrade their cloud storage capacity directly from their web account page.",
-      "✨ Improvement: The 'About' tab now displays the user's email and current cloud storage usage.",
-      "🐞 Bug Fix: Resolved critical bugs related to application startup, data synchronization, and UI stability for a much smoother experience."
-    ],
+    "✨ Feature: Major File Manager overhaul with drag & drop uploads, folder creation, and enhanced UI.",
+    "✨ Feature: Added new Quarterly and Half-Yearly subscription plans for more flexibility.",
+    "✨ Feature: Users can now upgrade their cloud storage capacity directly from their web account page.",
+    "✨ Improvement: The 'About' tab now displays the user's email and current cloud storage usage.",
+    "🐞 Bug Fix: Resolved critical bugs related to application startup, data synchronization, and UI stability for a much smoother experience."
+  ],
   "2.6.1": [
-      "✨ Improvement: Re-architected the 'WC Gen' and 'IF Editor' tabs with a new tabbed layout (Settings, Results, Logs) for a much cleaner interface and to ensure all settings are always visible.",
-      "✨ Improvement: Selecting a saved profile in the 'WC Gen' tab now automatically loads all required categories from the website, streamlining the setup process.",
-      "✨ Improvement: Added new icons to the 'Launch Chrome', 'Launch Firefox', 'NREGA Bot Website', and 'Join WhatsApp Group' buttons for enhanced visual clarity.",
-      "🛠️ Improvement: Moved the 'Download Demo CSV' buttons from the main footer into their respective 'WC Gen' and 'IF Editor' tabs for better contextual access.",
-      "🐞 Bug Fix: Corrected the color of the 'Download Demo CSV' buttons to make them clearly visible in all themes."
-    ],
+    "✨ Improvement: Re-architected the 'WC Gen' and 'IF Editor' tabs with a new tabbed layout (Settings, Results, Logs) for a much cleaner interface and to ensure all settings are always visible.",
+    "✨ Improvement: Selecting a saved profile in the 'WC Gen' tab now automatically loads all required categories from the website, streamlining the setup process.",
+    "✨ Improvement: Added new icons to the 'Launch Chrome', 'Launch Firefox', 'NREGA Bot Website', and 'Join WhatsApp Group' buttons for enhanced visual clarity.",
+    "🛠️ Improvement: Moved the 'Download Demo CSV' buttons from the main footer into their respective 'WC Gen' and 'IF Editor' tabs for better contextual access.",
+    "🐞 Bug Fix: Corrected the color of the 'Download Demo CSV' buttons to make them clearly visible in all themes."
+  ],
   "2.6.0": [
-      "✨Feature: Admin Dashboard search is now universal, allowing searches by License Key, User Name, Email, Mobile, and Machine ID.",
-      "🛠️ Improvement: Muster Roll PDFs saved to the cloud are now automatically organized into structured folders by date and Panchayat name (e.g., /Muster_Rolls/2025-08-09/PanchayatName/).",
-      "🛠️ Improvement: The license upgrade and renewal process is now seamless. The purchase form is automatically pre-filled with the user's details when they click 'Renew' or 'Upgrade'.",
-      "🐞 Bug Fix: Resolved an issue where active trial users were unable to log in to the desktop app using their email address.",
-      "🐞 Bug Fix: Fixed a critical error ('Expecting value: line 1 column 1') that occurred when activating a new license using a key.",
-      "🐞 Bug Fix (Server): Corrected a 'FileNotFoundError' that prevented file uploads by ensuring user directories are created automatically.",
-      "🐞 Bug Fix (Server): Implemented the missing API endpoint for email-based login, resolving a major activation failure."
-    ],
+    "✨Feature: Admin Dashboard search is now universal, allowing searches by License Key, User Name, Email, Mobile, and Machine ID.",
+    "🛠️ Improvement: Muster Roll PDFs saved to the cloud are now automatically organized into structured folders by date and Panchayat name (e.g., /Muster_Rolls/2025-08-09/PanchayatName/).",
+    "🛠️ Improvement: The license upgrade and renewal process is now seamless. The purchase form is automatically pre-filled with the user's details when they click 'Renew' or 'Upgrade'.",
+    "🐞 Bug Fix: Resolved an issue where active trial users were unable to log in to the desktop app using their email address.",
+    "🐞 Bug Fix: Fixed a critical error ('Expecting value: line 1 column 1') that occurred when activating a new license using a key.",
+    "🐞 Bug Fix (Server): Corrected a 'FileNotFoundError' that prevented file uploads by ensuring user directories are created automatically.",
+    "🐞 Bug Fix (Server): Implemented the missing API endpoint for email-based login, resolving a major activation failure."
+  ],
   "2.5.5": [
-      "✨Feature: Added a new 'File Manager' tab for cloud storage. Users can now upload, download, and manage files across devices.",
-      "✨Feature: Added a 'Feedback' tab for users to submit bug reports and feature requests directly from the app.",
-      "✨Feature: Implemented a web-based file manager on the user account page, including a drag-and-drop uploader.",
-      "✨Feature: Added new admin panel pages to view user feedback and manage user file storage.",
-      "🛠️ Improvement (MR Gen): Generated Muster Roll PDFs with the same name will now be saved with a number (e.g., 'file (1).pdf') instead of being overwritten.",
-      "🛠️ Improvement (MR Gen): Enhanced error handling to detect and skip date overlap errors and other specific page issues without crashing.",
-      "🛠️ Improvement (Trial Activation): Added validation to ensure email and mobile number formats are correct during trial registration.",
-      "🛠️ Improvement (Server): Refactored the monolithic server file into a scalable, blueprint-based structure for better maintenance.",
-      "🐞Critical Bug Fix (Duplicate MR Print): Overhauled logic to resolve persistent timeouts by correctly handling page loading behavior.",
-      "🐞Critical Bug Fix (Firefox PDF Saving): Fixed error preventing PDF saves in Firefox on 'MR Gen' and 'Duplicate MR Print' tabs.",
-      "🛠️ Improvement (MR Gen): Automation now waits up to 30 seconds for the 'Technical Staff' list to populate, preventing timeouts on slow connections.",
-      "🛠️ Improvement (UI/UX): Added a user-friendly pop-up if automation is started before a browser is launched.",
-      "🛠️ Improvement (UI/UX): Standardized PDF filenames for 'Duplicate MR Print' to use the last 6 digits of the work code."
-    ],
+    "✨Feature: Added a new 'File Manager' tab for cloud storage. Users can now upload, download, and manage files across devices.",
+    "✨Feature: Added a 'Feedback' tab for users to submit bug reports and feature requests directly from the app.",
+    "✨Feature: Implemented a web-based file manager on the user account page, including a drag-and-drop uploader.",
+    "✨Feature: Added new admin panel pages to view user feedback and manage user file storage.",
+    "🛠️ Improvement (MR Gen): Generated Muster Roll PDFs with the same name will now be saved with a number (e.g., 'file (1).pdf') instead of being overwritten.",
+    "🛠️ Improvement (MR Gen): Enhanced error handling to detect and skip date overlap errors and other specific page issues without crashing.",
+    "🛠️ Improvement (Trial Activation): Added validation to ensure email and mobile number formats are correct during trial registration.",
+    "🛠️ Improvement (Server): Refactored the monolithic server file into a scalable, blueprint-based structure for better maintenance.",
+    "🐞Critical Bug Fix (Duplicate MR Print): Overhauled logic to resolve persistent timeouts by correctly handling page loading behavior.",
+    "🐞Critical Bug Fix (Firefox PDF Saving): Fixed error preventing PDF saves in Firefox on 'MR Gen' and 'Duplicate MR Print' tabs.",
+    "🛠️ Improvement (MR Gen): Automation now waits up to 30 seconds for the 'Technical Staff' list to populate, preventing timeouts on slow connections.",
+    "🛠️ Improvement (UI/UX): Added a user-friendly pop-up if automation is started before a browser is launched.",
+    "🛠️ Improvement (UI/UX): Standardized PDF filenames for 'Duplicate MR Print' to use the last 6 digits of the work code."
+  ],
   "2.5.4": [
     "✨ New Feature (Duplicate MR Print): Added UI controls to select PDF orientation (Landscape/Portrait) and adjust content scale (50-100%).",
     "✨ New Feature (Muster Roll Gen): Added UI controls for PDF orientation and scale to match the Duplicate MR Print tab.",

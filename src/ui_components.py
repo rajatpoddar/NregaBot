@@ -9,10 +9,12 @@ import platform
 import subprocess
 import threading
 import queue
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 from PIL import Image
 from src import config
-from src.utils import resource_path, get_logger
+from src.utils import resource_path, get_logger, get_data_path
+from src.i18n import tr, get_language, get_available_languages, set_language, LANGUAGES, suggest_language_for_state
 
 logger = get_logger()
 
@@ -111,22 +113,6 @@ class CollapsibleFrame(ctk.CTkFrame):
     def add_widget(self, widget: Any, **pack_options: Any) -> Any:
         widget.pack(in_=self.content_frame, **pack_options)
         return widget
-
-# --- 2. ONBOARDING STEP (Guide UI) ---
-class OnboardingStep(ctk.CTkFrame):
-    def __init__(self, parent: Any, title: str, description: str, icon: Any) -> None:
-        super().__init__(parent, fg_color="transparent")
-        self.pack(expand=True, fill="both", padx=20, pady=(10, 0))
-
-        if icon:
-            icon_label = ctk.CTkLabel(self, image=icon, text="")
-            icon_label.pack(pady=(10, 15))
-
-        title_label = ctk.CTkLabel(self, text=title, font=ctk.CTkFont(size=18, weight="bold"))
-        title_label.pack(pady=(0, 10))
-
-        desc_label = ctk.CTkLabel(self, text=description, wraplength=380, justify="center")
-        desc_label.pack(pady=(0, 20))
 
 # --- 3. SKELETON LOADER (Loading Effect) ---
 
@@ -918,15 +904,35 @@ class ToastNotification(ctk.CTkToplevel):
             pass
         ToastNotification._reflow()
 
-# --- 6. ONBOARDING GUIDE ---
+# --- 6. ONBOARDING GUIDE (Modern interactive wizard) ---
 class OnboardingGuide(ctk.CTkToplevel):
-    def __init__(self, parent: Any) -> None:
+    """Modern first-run wizard that actually SETS UP the user:
+
+      1. Welcome          — what the app does
+      2. Language         — pick language (applies immediately)
+      3. Browser & Login  — launch Chrome, login to the portal
+      4. Add Panchayats   — scrape Panchayat + Villages right here
+      5. Emergency Stop   — what the footer STOP button does
+      6. How to Use       — pick a task, fill details, Start Automation
+      7. Done             — summary + finish
+
+    ``replay=True`` (from the About tab) shows the tour again WITHOUT
+    writing the first-run flag.
+    """
+
+    STEPS = 7
+
+    def __init__(self, parent: Any, replay: bool = False) -> None:
         super().__init__(parent)
         self.parent = parent
+        self.replay = replay
         self.current_step = 0
+        self._browser_launched = False
+        self._panchayat_added = False
+        self._language_note = ""
 
-        self.title("Welcome to NREGA Bot!")
-        w, h = 450, 350
+        self.title(tr("onboarding.title"))
+        w, h = 640, 580
         x = (self.winfo_screenwidth() // 2) - (w // 2)
         y = (self.winfo_screenheight() // 2) - (h // 2)
         self.geometry(f'{w}x{h}+{x}+{y}')
@@ -934,58 +940,409 @@ class OnboardingGuide(ctk.CTkToplevel):
         self.transient(parent)
         self.attributes("-topmost", True)
         self.grab_set()
+        # X-close behaves like Skip — flag is written so the tour never nags again.
+        self.protocol("WM_DELETE_WINDOW", self._finish)
 
-        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        self.scrollable_container = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self.scrollable_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=(0, 10))
-
-        self.steps_data = [
-            {"title": "Step 1: Launch a Browser", "desc": "First, click one of the 'Chrome' buttons in the main app to open a special browser. We recommend Chrome.", "icon": self.parent.icon_images.get("onboarding_launch")},
-            {"title": "Step 2: Log In to the Portal", "desc": "In the new browser window, log in to the VB-G-RAM-G portal (vbgramgde2.dord.gov.in) with your official credentials.", "icon": self.parent.icon_images.get("onboarding_login")},
-            {"title": "Step 3: Choose Your Task", "desc": "Once logged in, return to this app and select your desired automation task from the navigation menu on the left.", "icon": self.parent.icon_images.get("onboarding_select")},
-            {"title": "You're All Set!", "desc": "Fill in the required details for your chosen task and click 'Start Automation'. For more help, visit our website from the link in the footer.", "icon": self.parent.icon_images.get("onboarding_start")}
-        ]
-
-        self.step_frames = []
-        for i, step_info in enumerate(self.steps_data):
-            frame = OnboardingStep(self.scrollable_container, step_info["title"], step_info["desc"], step_info["icon"])
-            self.step_frames.append(frame)
-
-        self.footer = ctk.CTkFrame(self)
-        self.footer.grid(row=1, column=0, sticky="ew", padx=20, pady=(10, 20))
-        self.footer.grid_columnconfigure(0, weight=1)
-
-        self.progress_bar = ctk.CTkProgressBar(self.footer, height=10)
-        self.progress_bar.grid(row=0, column=0, sticky="ew", padx=(0, 15))
-
-        self.next_button = ctk.CTkButton(self.footer, text="Next", command=self.show_next_step, width=100)
-        self.next_button.grid(row=0, column=1)
-
-        self.show_step(0)
-        self.focus_force()
-
-    def show_step(self, step_index: int) -> None:
-        for i, frame in enumerate(self.step_frames):
-            if i == step_index:
-                frame.pack(expand=True, fill="both")
-                frame.tkraise()
-            else:
-                frame.pack_forget()
-
-        progress_value = (step_index + 1) / len(self.steps_data)
-        self.progress_bar.set(progress_value)
-
-        if step_index == len(self.steps_data) - 1:
-            self.next_button.configure(text="Finish", command=self.destroy)
+        # ── Header ──
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=26, pady=(18, 2))
+        icon = self.parent.icon_images.get("onboarding_start") if hasattr(self.parent, 'icon_images') else None
+        if icon:
+            ctk.CTkLabel(header, text="", image=icon).pack(side="left", padx=(0, 12))
         else:
-            self.next_button.configure(text="Next")
+            ctk.CTkLabel(header, text="🏛️", font=ctk.CTkFont(size=30)).pack(side="left", padx=(0, 12))
+        title_box = ctk.CTkFrame(header, fg_color="transparent")
+        title_box.pack(side="left")
+        self.header_title = ctk.CTkLabel(title_box, text=tr("onboarding.title"),
+                                         font=ctk.CTkFont(size=20, weight="bold"))
+        self.header_title.pack(anchor="w")
+        self.header_sub = ctk.CTkLabel(title_box, text=tr("onboarding.subtitle"),
+                                       font=ctk.CTkFont(size=11),
+                                       text_color=("gray50", "gray60"))
+        self.header_sub.pack(anchor="w")
 
-    def show_next_step(self) -> None:
-        self.current_step += 1
-        if self.current_step < len(self.steps_data):
-            self.show_step(self.current_step)
+        # ── Progress bar + step counter ──
+        progress_row = ctk.CTkFrame(self, fg_color="transparent")
+        progress_row.grid(row=1, column=0, sticky="ew", padx=26, pady=(4, 2))
+        progress_row.grid_columnconfigure(0, weight=1)
+        self.progress_bar = ctk.CTkProgressBar(progress_row, height=8)
+        self.progress_bar.grid(row=0, column=0, sticky="ew", padx=(0, 12))
+        self.step_label = ctk.CTkLabel(progress_row, text="", font=ctk.CTkFont(size=11),
+                                       text_color=("gray50", "gray60"), width=70)
+        self.step_label.grid(row=0, column=1)
+
+        # ── Content card ──
+        self.content_card = ctk.CTkFrame(self, corner_radius=14,
+                                         fg_color=("gray95", "gray20"),
+                                         border_width=1, border_color=("gray85", "gray30"))
+        self.content_card.grid(row=2, column=0, sticky="nsew", padx=26, pady=(4, 6))
+        self.content_card.grid_columnconfigure(0, weight=1)
+        self.content_card.grid_rowconfigure(0, weight=1)
+
+        # ── Footer buttons ──
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.grid(row=3, column=0, sticky="ew", padx=26, pady=(2, 16))
+        footer.grid_columnconfigure(0, weight=1)
+
+        self.back_btn = ctk.CTkButton(footer, text=tr("onboarding.back"), width=90,
+                                      fg_color=("gray85", "gray25"),
+                                      text_color=("gray20", "gray80"),
+                                      hover_color=("gray75", "gray35"),
+                                      command=self._go_back)
+        self.back_btn.grid(row=0, column=1, padx=(0, 8))
+
+        self.skip_btn = ctk.CTkButton(footer, text=tr("onboarding.skip"), width=100,
+                                      fg_color="transparent", text_color=("gray40", "gray60"),
+                                      hover_color=("gray90", "gray25"),
+                                      command=self._finish)
+        self.skip_btn.grid(row=0, column=2, padx=(0, 8))
+
+        self.next_btn = ctk.CTkButton(footer, text=tr("onboarding.next"), width=130,
+                                      command=self._go_next)
+        self.next_btn.grid(row=0, column=3)
+
+        self._render_step(0)
+        self.after(120, self.focus_force)
+
+    # ── Navigation ───────────────────────────────────────────────────
+    def _clear_content(self) -> None:
+        for w in self.content_card.winfo_children():
+            w.destroy()
+
+    def _go_back(self) -> None:
+        if self.current_step > 0:
+            self._render_step(self.current_step - 1)
+
+    def _go_next(self) -> None:
+        if self.current_step < self.STEPS - 1:
+            self._render_step(self.current_step + 1)
+        else:
+            self._finish()
+
+    def _refresh_labels(self) -> None:
+        """Rebuild tr()-driven labels after a language change."""
+        try:
+            self.title(tr("onboarding.title"))
+            self.header_title.configure(text=tr("onboarding.title"))
+            self.header_sub.configure(text=tr("onboarding.subtitle"))
+            self.back_btn.configure(text=tr("onboarding.back"))
+            self.skip_btn.configure(text=tr("onboarding.skip"))
+            if self.current_step == self.STEPS - 1:
+                self.next_btn.configure(text=tr("onboarding.finish"))
+            else:
+                self.next_btn.configure(text=tr("onboarding.next"))
+            self.step_label.configure(text=tr("onboarding.step",
+                                               current=self.current_step + 1,
+                                               total=self.STEPS))
+        except Exception:
+            pass
+
+    def _finish(self) -> None:
+        """Mark onboarding complete (unless replay), close, restart if needed."""
+        if not self.replay:
+            try:
+                with open(get_data_path('.first_run_complete'), 'w') as f:
+                    f.write(datetime.now().isoformat())
+            except Exception as e:
+                logger.warning("Could not write first run flag: %s", e)
+        self.destroy()
+        # Panchayats added mid-tour → restart so every tab's dropdown picks them up.
+        if self._panchayat_added and not self.replay:
+            try:
+                from src.tabs.settings_tab import restart_application
+                self.parent.after(500, lambda: restart_application(self.parent))
+            except Exception:
+                pass
+
+    def _render_step(self, idx: int) -> None:
+        self._clear_content()
+        self.current_step = idx
+        self.progress_bar.set((idx + 1) / self.STEPS)
+        self.step_label.configure(text=tr("onboarding.step", current=idx + 1, total=self.STEPS))
+        self.back_btn.configure(state="normal" if idx > 0 else "disabled")
+        if idx == self.STEPS - 1:
+            self.next_btn.configure(text=tr("onboarding.finish"))
+        else:
+            self.next_btn.configure(text=tr("onboarding.next"))
+
+        builders = [self._step_welcome, self._step_language, self._step_browser,
+                    self._step_panchayat, self._step_stop, self._step_how, self._step_done]
+        builders[idx]()
+
+    # ── Step builders ────────────────────────────────────────────────
+    def _card_inner(self) -> ctk.CTkFrame:
+        inner = ctk.CTkFrame(self.content_card, fg_color="transparent")
+        inner.place(relx=0.5, rely=0.5, anchor="center")
+        return inner
+
+    def _step_welcome(self) -> None:
+        inner = self._card_inner()
+        icon = self.parent.icon_images.get("onboarding_start") if hasattr(self.parent, 'icon_images') else None
+        if icon:
+            ctk.CTkLabel(inner, text="", image=icon).pack(pady=(0, 14))
+        else:
+            ctk.CTkLabel(inner, text="🎉", font=ctk.CTkFont(size=52)).pack(pady=(0, 14))
+        ctk.CTkLabel(inner, text=tr("onboarding.welcome.title"),
+                     font=ctk.CTkFont(size=24, weight="bold")).pack()
+        ctk.CTkLabel(inner, text=tr("onboarding.welcome.desc"),
+                     font=ctk.CTkFont(size=13), text_color=("gray35", "gray70"),
+                     wraplength=500, justify="center").pack(pady=(12, 0))
+        ctk.CTkLabel(inner, text=tr("onboarding.welcome.hint"),
+                     font=ctk.CTkFont(size=11), text_color=("gray45", "gray60"),
+                     wraplength=480, justify="center").pack(pady=(16, 0))
+
+    def _step_language(self) -> None:
+        inner = self._card_inner()
+        ctk.CTkLabel(inner, text="🌐", font=ctk.CTkFont(size=46)).pack(pady=(0, 10))
+        ctk.CTkLabel(inner, text=tr("onboarding.lang.title"),
+                     font=ctk.CTkFont(size=22, weight="bold")).pack()
+        ctk.CTkLabel(inner, text=tr("onboarding.lang.desc"),
+                     font=ctk.CTkFont(size=13), text_color=("gray35", "gray70"),
+                     wraplength=480, justify="center").pack(pady=(10, 16))
+
+        available = [c for c in get_available_languages() if c in LANGUAGES]
+        current = get_language()
+        lang_var = ctk.StringVar(value=LANGUAGES.get(current, current))
+        menu = ctk.CTkOptionMenu(inner, variable=lang_var,
+                                 values=[LANGUAGES.get(c, c) for c in available],
+                                 width=280, font=ctk.CTkFont(size=13))
+        menu.pack()
+
+        try:
+            lic = getattr(self.parent, 'license_info', None) or {}
+            state = (lic.get('user_state') or '').strip().upper()
+            suggested = suggest_language_for_state(state)
+            if suggested in LANGUAGES:
+                ctk.CTkLabel(inner, text=tr("onboarding.lang.suggested", lang=LANGUAGES[suggested]),
+                             font=ctk.CTkFont(size=11),
+                             text_color=("#0284C7", "#38BDF8")).pack(pady=(8, 0))
+        except Exception:
+            pass
+
+        self._lang_status = ctk.CTkLabel(inner, text=self._language_note, font=ctk.CTkFont(size=12),
+                                         text_color=("#16A34A", "#4ADE80"))
+        self._lang_status.pack(pady=(14, 0))
+
+        def _apply():
+            display = lang_var.get()
+            code = next((c for c, n in LANGUAGES.items() if n == display), None)
+            if code:
+                set_language(code)
+                self._language_note = tr("onboarding.lang.applied")
+                self._refresh_labels()
+                # Rebuild the current step so its own title/desc/dropdown/button
+                # also switch to the newly selected language.
+                self._render_step(self.current_step)
+                try:
+                    self._lang_status.configure(text=tr("onboarding.lang.applied"),
+                                                text_color=("#16A34A", "#4ADE80"))
+                except Exception:
+                    pass
+                try:  # live-refresh the most visible app surfaces
+                    if hasattr(self.parent, '_create_nav_buttons'):
+                        self.parent._create_nav_buttons(self.parent.sidebar_header,
+                                                        self.parent.nav_scroll_frame)
+                except Exception:
+                    pass
+                try:
+                    if hasattr(self.parent, 'announcement_label') and self.parent.announcement_label:
+                        self.parent.announcement_label.configure(text=tr("app.welcome_loading"))
+                except Exception:
+                    pass
+                try:
+                    if hasattr(self.parent, 'status_label') and self.parent.status_label:
+                        self.parent.status_label.configure(text=tr("app.status_ready"))
+                except Exception:
+                    pass
+
+        ctk.CTkButton(inner, text=tr("onboarding.lang.apply"), width=200, height=38,
+                      fg_color=("#0284C7", "#0284C7"), text_color="white",
+                      hover_color=("#0369A1", "#0369A1"),
+                      font=ctk.CTkFont(size=13, weight="bold"),
+                      command=_apply).pack(pady=(16, 0))
+
+    def _step_browser(self) -> None:
+        inner = self._card_inner()
+        icon = self.parent.icon_images.get("onboarding_launch") if hasattr(self.parent, 'icon_images') else None
+        if icon:
+            ctk.CTkLabel(inner, text="", image=icon).pack(pady=(0, 8))
+        else:
+            ctk.CTkLabel(inner, text="🚀", font=ctk.CTkFont(size=44)).pack(pady=(0, 8))
+        ctk.CTkLabel(inner, text=tr("onboarding.browser.title"),
+                     font=ctk.CTkFont(size=22, weight="bold")).pack()
+        ctk.CTkLabel(inner, text=tr("onboarding.browser.desc"),
+                     font=ctk.CTkFont(size=13), text_color=("gray35", "gray70"),
+                     wraplength=490, justify="center").pack(pady=(10, 14))
+
+        self._browser_status = ctk.CTkLabel(inner, text="", font=ctk.CTkFont(size=12),
+                                            text_color=("#16A34A", "#4ADE80"))
+        self._browser_status.pack(pady=(0, 10))
+
+        def _launch():
+            try:
+                self.parent.launch_chrome_detached()
+                self._browser_launched = True
+                self._browser_status.configure(text=tr("onboarding.browser.launched"),
+                                               text_color=("#16A34A", "#4ADE80"))
+            except Exception as e:
+                self._browser_status.configure(text=f"❌ {e}", text_color=("#DC2626", "#F87171"))
+
+        ctk.CTkButton(inner, text=tr("onboarding.browser.launch_btn"), width=240, height=40,
+                      fg_color=("#DC2626", "#DC2626"), text_color="white",
+                      hover_color=("#B91C1C", "#B91C1C"),
+                      font=ctk.CTkFont(size=14, weight="bold"),
+                      command=_launch).pack(pady=(6, 10))
+
+        login_box = ctk.CTkFrame(inner, corner_radius=10, fg_color=("gray90", "gray25"))
+        login_box.pack(fill="x", padx=30, pady=(4, 4))
+        ctk.CTkLabel(login_box, text=tr("onboarding.browser.login_hint"),
+                     font=ctk.CTkFont(size=12), text_color=("gray40", "gray75"),
+                     wraplength=460, justify="center").pack(padx=14, pady=10)
+
+    def _step_panchayat(self) -> None:
+        inner = self._card_inner()
+        icon = self.parent.icon_images.get("onboarding_select") if hasattr(self.parent, 'icon_images') else None
+        if icon:
+            ctk.CTkLabel(inner, text="", image=icon).pack(pady=(0, 8))
+        else:
+            ctk.CTkLabel(inner, text="🏘️", font=ctk.CTkFont(size=44)).pack(pady=(0, 8))
+        ctk.CTkLabel(inner, text=tr("onboarding.panch.title"),
+                     font=ctk.CTkFont(size=22, weight="bold")).pack()
+        ctk.CTkLabel(inner, text=tr("onboarding.panch.desc"),
+                     font=ctk.CTkFont(size=13), text_color=("gray35", "gray70"),
+                     wraplength=490, justify="center").pack(pady=(10, 14))
+
+        self._panch_status = ctk.CTkLabel(inner, text="", font=ctk.CTkFont(size=12),
+                                          text_color=("gray50", "gray60"),
+                                          wraplength=480, justify="center")
+        self._panch_status.pack(pady=(0, 10))
+
+        def _start():
+            from src.tabs.settings_tab import run_panchayat_scrape
+            self._panch_btn.configure(state="disabled", text=tr("onboarding.panch.scraping"))
+            self._panch_status.configure(text=tr("onboarding.panch.connecting"),
+                                         text_color=("gray50", "gray60"))
+
+            def _status(msg):
+                try:
+                    self._panch_status.configure(text=msg, text_color=("gray50", "gray60"))
+                except Exception:
+                    pass
+
+            def _done(saved_panch, saved_vill, all_panch_villages, gp_mode):
+                try:
+                    self._panch_btn.configure(state="normal", text=tr("onboarding.panch.btn"))
+                    if saved_panch:
+                        self._panchayat_added = True
+                        self._panch_status.configure(
+                            text=tr("onboarding.panch.done", panch=saved_panch, vill=saved_vill),
+                            text_color=("#16A34A", "#4ADE80"))
+                    else:
+                        self._panch_status.configure(
+                            text=tr("onboarding.panch.none"),
+                            text_color=("#D97706", "#FBBF24"))
+                except Exception:
+                    pass
+
+            def _failed(msg):
+                try:
+                    self._panch_btn.configure(state="normal", text=tr("onboarding.panch.btn"))
+                    self._panch_status.configure(text=f"❌ {msg}",
+                                                 text_color=("#DC2626", "#F87171"))
+                except Exception:
+                    pass
+
+            run_panchayat_scrape(self.parent, on_status=_status,
+                                 on_success=_done, on_failed=_failed)
+
+        self._panch_btn = ctk.CTkButton(inner, text=tr("onboarding.panch.btn"), width=260, height=40,
+                                        fg_color=("#F97316", "#EA580C"), text_color="white",
+                                        hover_color=("#EA580C", "#C2410C"),
+                                        font=ctk.CTkFont(size=14, weight="bold"),
+                                        command=_start)
+        self._panch_btn.pack(pady=(6, 8))
+        ctk.CTkLabel(inner, text=tr("onboarding.panch.skip_hint"),
+                     font=ctk.CTkFont(size=11), text_color=("gray45", "gray60"),
+                     wraplength=440, justify="center").pack()
+
+    def _step_stop(self) -> None:
+        inner = self._card_inner()
+        ctk.CTkLabel(inner, text="🛑", font=ctk.CTkFont(size=46)).pack(pady=(0, 8))
+        ctk.CTkLabel(inner, text=tr("onboarding.stop.title"),
+                     font=ctk.CTkFont(size=22, weight="bold")).pack()
+        ctk.CTkLabel(inner, text=tr("onboarding.stop.desc"),
+                     font=ctk.CTkFont(size=13), text_color=("gray35", "gray70"),
+                     wraplength=500, justify="center").pack(pady=(10, 16))
+
+        # Visual mock of the footer STOP button
+        mock = ctk.CTkFrame(inner, corner_radius=10, fg_color=("gray90", "gray25"),
+                            border_width=1, border_color=("gray80", "gray40"))
+        mock.pack(padx=40, pady=(0, 12))
+        mock_row = ctk.CTkFrame(mock, fg_color="transparent")
+        mock_row.pack(padx=16, pady=10)
+        red_dot = ctk.CTkFrame(mock_row, width=12, height=12, corner_radius=6,
+                               fg_color=("#DC2626", "#EF4444"))
+        red_dot.pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(mock_row, text=tr("app.stop_all"), font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color=("#DC2626", "#EF4444")).pack(side="left")
+        ctk.CTkLabel(mock, text=tr("onboarding.stop.caption"),
+                     font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
+                     wraplength=420, justify="center").pack(padx=14, pady=(0, 10))
+
+        for line in [tr("onboarding.stop.when1"), tr("onboarding.stop.when2"),
+                     tr("onboarding.stop.when3")]:
+            ctk.CTkLabel(inner, text=line, font=ctk.CTkFont(size=12),
+                         text_color=("gray40", "gray75"),
+                         wraplength=470, justify="left").pack(pady=2)
+
+    def _step_how(self) -> None:
+        inner = self._card_inner()
+        ctk.CTkLabel(inner, text="🧭", font=ctk.CTkFont(size=44)).pack(pady=(0, 8))
+        ctk.CTkLabel(inner, text=tr("onboarding.how.title"),
+                     font=ctk.CTkFont(size=22, weight="bold")).pack()
+        ctk.CTkLabel(inner, text=tr("onboarding.how.desc"),
+                     font=ctk.CTkFont(size=13), text_color=("gray35", "gray70"),
+                     wraplength=500, justify="center").pack(pady=(10, 14))
+
+        steps = [tr("onboarding.how.step1"), tr("onboarding.how.step2"),
+                 tr("onboarding.how.step3")]
+        for i, s in enumerate(steps, start=1):
+            row = ctk.CTkFrame(inner, fg_color="transparent")
+            row.pack(fill="x", padx=36, pady=4)
+            ctk.CTkLabel(row, text=f"{i}", width=26, height=26, corner_radius=13,
+                         fg_color=("#0284C7", "#0EA5E9"), text_color="white",
+                         font=ctk.CTkFont(size=13, weight="bold")).pack(side="left")
+            ctk.CTkLabel(row, text=s, font=ctk.CTkFont(size=12),
+                         text_color=("gray30", "gray75"), justify="left",
+                         wraplength=420).pack(side="left", padx=(10, 0))
+
+    def _step_done(self) -> None:
+        inner = self._card_inner()
+        icon = self.parent.icon_images.get("onboarding_start") if hasattr(self.parent, 'icon_images') else None
+        if icon:
+            ctk.CTkLabel(inner, text="", image=icon).pack(pady=(0, 10))
+        else:
+            ctk.CTkLabel(inner, text="🎉", font=ctk.CTkFont(size=48)).pack(pady=(0, 10))
+        ctk.CTkLabel(inner, text=tr("onboarding.done.title"),
+                     font=ctk.CTkFont(size=24, weight="bold")).pack()
+        ctk.CTkLabel(inner, text=tr("onboarding.done.desc"),
+                     font=ctk.CTkFont(size=13), text_color=("gray35", "gray70"),
+                     wraplength=500, justify="center").pack(pady=(12, 4))
+
+        summary = [tr("onboarding.done.lang" ), tr("onboarding.done.browser")]
+        if self._panchayat_added:
+            summary.append(tr("onboarding.done.panch"))
+        for s in summary:
+            ctk.CTkLabel(inner, text=f"✅  {s}", font=ctk.CTkFont(size=12),
+                         text_color=("#166534", "#4ADE80")).pack(pady=2)
+
+        if self._panchayat_added:
+            ctk.CTkLabel(inner, text=tr("onboarding.done.restart"),
+                         font=ctk.CTkFont(size=11), text_color=("gray45", "gray60"),
+                         wraplength=460, justify="center").pack(pady=(12, 0))
 
 # --- 7. COMING SOON TAB ---
 class ComingSoonTab(ctk.CTkFrame):

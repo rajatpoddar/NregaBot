@@ -1,19 +1,26 @@
 {
-  "latest_version": "3.2.1",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.1-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.1-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.1-Linux.tar.gz",
+  "latest_version": "3.2.2",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.2-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.2-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.2-Linux.tar.gz",
   "core_update": {
-    "version": "3.2.1",
-    "url": "https://nregabot.com/updates/core_v3.2.1.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.2.1.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.1.zip",
+    "version": "3.2.2",
+    "url": "https://nregabot.com/updates/core_v3.2.2.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.2.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.2.zip",
     "force_full_reinstall": false,
     "hash": "",
     "hash_windows": "",
     "hash_macos": ""
   },
   "changelog": {
+    "3.2.2": [
+      "🎓 **Naya Onboarding (Welcome Tour):** Pehli baar app kholne par ab ek interactive 7-step setup wizard milta hai — language choose karo, browser launch karke login karo, Panchayat & Villages yahin se add karo, Emergency Stop button ka kaam samjho, aur app kaise use karna hai wo bhi. About tab me 'Replay Welcome Tour' button se kabhi bhi dobara dekh sakte hain.",
+      "🌐 **Nayi Language — Hinglish:** Ab app Roman Hindi (Hinglish) me bhi chala sakte hain — Hindi-speaking states ke users ke liye auto-suggest hoti hai. Total 5 languages: English, Hindi, Kannada, Bengali, Hinglish.",
+      "🔄 **Smart Auto-Restart:** Panchayat/Village add karne, language badalne, ya Factory Reset karne ke baad app ab apne aap restart ho jata hai — naye data sabhi tabs me turant dikhte hain. Windows aur macOS dono par reliable.",
+      "🎓 **Factory Reset + Welcome Tour:** Factory reset ke baad Welcome Tour dobara dikhta hai taaki naya user phir se setup kar sake.",
+      "🏘️ **Shared Panchayat Scraper:** Panchayat scrape ab Settings aur onboarding dono se ek hi engine use karta hai — same reliable flow, do jagah."
+    ],
     "3.2.1": [
       "💥 **Crash Reporting:** Agar app crash ho jaye, to poori details (app version, tab/function, error, last 30 log lines) automatically server par bheji jati hain — admin panel ke naye Crashes tab me dikhti hain, filters + CSV export ke saath. Ab koi bhi error chhupa nahi rahega.",
       "📡 **Uptime Monitoring:** Server ab har 5 minute me khud ko check karta hai (Database, Redis, WhatsApp, WebDAV) — koi bhi service down ho to admin ko turant WhatsApp alert milta hai. UptimeRobot ke saath 24x7 external monitoring bhi.",

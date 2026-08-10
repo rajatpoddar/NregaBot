@@ -36,6 +36,207 @@ logger = get_logger()
 # Scrape card ka button label — simple language (users ko "Scrape" confusing lagta tha)
 SCRAPE_BTN_TEXT = "➕  Add Panchayat & Village"
 
+# History keys jahan panchayat / village names save hote hain.
+PANCHAYAT_KEYS = ["location_panchayat", "panchayat_name", "panchayat",
+                  "dashboard_panchayat", "mr_track_panchayat",
+                  "issued_mr_panchayat", "audit_panchayat_respond"]
+VILLAGE_KEYS = ["location_village", "village_name"]
+
+
+def run_panchayat_scrape(app, on_status=None, on_success=None, on_failed=None):
+    """Scrape ALL Panchayats and their villages from the live NREGA website.
+
+    Shared by the Settings tab AND the onboarding wizard. Runs in a
+    background thread so the UI never freezes. All callbacks fire on the
+    main thread via ``app.after(0, ...)``:
+
+      on_status(msg)      — progress updates (str)
+      on_success(saved_panch, saved_vill, all_panch_villages, gp_mode)
+      on_failed(msg)      — error message (str)
+    """
+    def _emit(cb, *args):
+        if cb is None:
+            return
+        try:
+            app.after(0, lambda: cb(*args))
+        except Exception:
+            pass
+
+    def _run():
+        driver = None
+        try:
+            driver = app.get_driver()
+            if not driver:
+                _emit(on_failed, "Browser connect nahi hua. Pehle browser launch karein.")
+                return
+
+            _emit(on_status, "⏳ Demand page par ja rahe hain...")
+
+            demand_url = "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx"
+            driver.get(demand_url)
+            wait = WebDriverWait(driver, 15)
+
+            # ── Step 1: Panchayat dropdown check — Block (PO) login vs
+            # Panchayat (GP) login ──
+            _emit(on_status, "⏳ Panchayat list fetch ho raha hai...")
+
+            hm = app.history_manager
+            hier = get_hierarchy()
+            gp_mode = False
+            try:
+                WebDriverWait(driver, 3).until(EC.presence_of_element_located(
+                    (By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
+            except TimeoutException:
+                gp_mode = True
+            try:
+                app.set_user_level("GP" if gp_mode else "PO")
+            except Exception:
+                pass
+
+            all_panch_villages = {}  # {panchayat_name: [village_names]}
+
+            if gp_mode:
+                _emit(on_status, tr("settings.scrape.gp_scraping"))
+
+                panch_name = ""
+                for lid in ("ctl00_ContentPlaceHolder1_panch",
+                            "ctl00_ContentPlaceHolder1_panch_lbl"):
+                    try:
+                        el = driver.find_element(By.ID, lid)
+                        txt = (el.text or "").strip()
+                        if txt and txt.upper() not in ("PANCHAYAT",
+                                                       "GRAM PANCHAYAT"):
+                            panch_name = txt
+                            break
+                    except Exception:
+                        continue
+                if not panch_name:
+                    _emit(on_failed, "GP login par panchayat ka naam page par nahi mila. Login check karein.")
+                    return
+
+                v_el = wait.until(EC.presence_of_element_located(
+                    (By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
+                v_select = Select(v_el)
+                villages = []
+                for opt in v_select.options:
+                    v_val = opt.get_attribute("value")
+                    v_text = opt.text.strip()
+                    if v_val and v_val != "00" and v_text and v_text != "---Select---":
+                        villages.append(v_text.upper())
+                all_panch_villages[panch_name.upper()] = villages
+
+            else:
+                panch_select_el = wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
+                    )
+                )
+                panch_select = Select(panch_select_el)
+
+                panch_options = []  # list of (index, value, name)
+                for i, opt in enumerate(panch_select.options):
+                    val = opt.get_attribute("value")
+                    text = opt.text.strip()
+                    if val and val != "00" and text and text != "---Select---":
+                        panch_options.append((i, val, text.upper()))
+
+                if not panch_options:
+                    _emit(on_failed, "Panchayat dropdown me koi option nahi mila. Aap login nahi hain?")
+                    return
+
+                total_panch = len(panch_options)
+                for idx, (opt_idx, opt_val, panch_name) in enumerate(panch_options):
+                    _emit(on_status, f"⏳ [{idx+1}/{total_panch}] {panch_name} — villages scrape ho rahe hain...")
+                    try:
+                        panch_el = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
+                        p_select = Select(panch_el)
+                        p_select.select_by_index(opt_idx)
+                        WebDriverWait(driver, 15).until(
+                            lambda d: len(Select(d.find_element(
+                                By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"
+                            )).options) > 1
+                        )
+                        vill_el = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
+                        v_select = Select(vill_el)
+                        villages = []
+                        for opt in v_select.options:
+                            v_val = opt.get_attribute("value")
+                            v_text = opt.text.strip()
+                            if v_val and v_val != "00" and v_text and v_text != "---Select---":
+                                villages.append(v_text.upper())
+                        all_panch_villages[panch_name] = villages
+                    except (StaleElementReferenceException, TimeoutException):
+                        all_panch_villages[panch_name] = []
+                        continue
+
+            # ── Step 3: Save everything with hierarchy ──
+            saved_panch = 0
+            saved_vill = 0
+            for panch_name, villages in all_panch_villages.items():
+                for k in PANCHAYAT_KEYS:
+                    hm.save_entry(k, panch_name)
+                saved_panch += 1
+                for v_name in villages:
+                    for k in VILLAGE_KEYS:
+                        hm.save_entry(k, v_name)
+                    hier.add_child("Panchayat", panch_name, "Village", v_name)
+                    saved_vill += 1
+
+            _emit(on_success, saved_panch, saved_vill, all_panch_villages, gp_mode)
+
+        except TimeoutException:
+            _emit(on_failed, "Page load timeout. NREGA website slow ho ya login required ho.")
+        except NoSuchElementException as e:
+            _emit(on_failed, f"Website ka structure change ho gaya? Element nahi mila: {e}")
+        except Exception as e:
+            _emit(on_failed, str(e))
+
+    import threading
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def restart_application(app):
+    """Relaunch the app after a short delay, then close this instance.
+
+    Both the full app and the lite app use a single-instance socket guard
+    (ports 60123 / 60124). A freshly spawned instance that starts while the
+    old process is still alive sees the old one, sends 'focus', and exits
+    without opening a window — so the relaunch is delayed ~2s to let the
+    old process free the port first.
+    """
+    import shlex
+    import subprocess
+    import sys
+
+    try:
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable]
+        else:
+            cmd = [sys.executable] + list(sys.argv)
+
+        if os.name == "nt":
+            subprocess.Popen(
+                ["cmd", "/c",
+                 "ping 127.0.0.1 -n 3 > NUL & start \"\" " + subprocess.list2cmdline(cmd)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        else:
+            inner = " ".join(shlex.quote(c) for c in cmd)
+            subprocess.Popen(
+                ["sh", "-c", f"sleep 2; exec {inner}"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+    except Exception as e:
+        logger.warning("App restart failed: %s", e)
+
+    try:
+        app.on_closing(force=True)
+    except Exception:
+        pass
+    os._exit(0)
+
 
 class SettingsTab(ctk.CTkFrame):
     """Settings dashboard — 3 streamlined tabs."""
@@ -344,12 +545,10 @@ class SettingsTab(ctk.CTkFrame):
         return t[1] if ctk.get_appearance_mode() == "Dark" else t[0]
 
     def _get_panchayat_keys(self) -> list:
-        return ["location_panchayat", "panchayat_name", "panchayat",
-                "dashboard_panchayat", "mr_track_panchayat",
-                "issued_mr_panchayat", "audit_panchayat_respond"]
+        return list(PANCHAYAT_KEYS)
 
     def _get_village_keys(self) -> list:
-        return ["location_village", "village_name"]
+        return list(VILLAGE_KEYS)
 
     def _refresh_loc_list(self) -> None:
         """Show Panchayat names in the list. Villages are shown under their parent when viewing hierarchy."""
@@ -799,183 +998,23 @@ class SettingsTab(ctk.CTkFrame):
         """
         Scrape ALL Panchayats and their villages from the live NREGA website.
         Selects each panchayat, scrapes its villages, and builds the
-        Panchayat→Village hierarchy.
+        Panchayat→Village hierarchy. Shared scraper used by onboarding too.
         """
         self._scrape_btn.configure(state="disabled", text="⏳ Scraping...")
         self._scrape_status.configure(text=tr("settings.scrape.connecting_browser"))
 
-        def _run_scrape():
-            driver = None
+        def _status(msg):
             try:
-                driver = self.app.get_driver()
-                if not driver:
-                    self.after(0, self._scrape_failed,
-                        "Browser connect nahi hua. Pehle browser launch karein.")
-                    return
+                self._scrape_status.configure(text=msg)
+            except Exception:
+                pass
 
-                self.after(0, lambda: self._scrape_status.configure(
-                    text="⏳ Demand page par ja rahe hain..."))
+        def _success(saved_panch, saved_vill, all_panch_villages, gp_mode):
+            self._scrape_success(saved_panch, saved_vill, all_panch_villages, gp_mode)
 
-                demand_url = "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx"
-                driver.get(demand_url)
-                wait = WebDriverWait(driver, 15)
-
-                # ── Step 1: Panchayat dropdown check — Block (PO) login vs
-                # Panchayat (GP) login ──
-                # Block login par panchayat ka <select> dropdown hota hai;
-                # GP login par NAHI — naam sirf page par text me dikhta hai.
-                # Pehle dropdown mila ya nahi, ye detect karte hain taaki GP
-                # users ke liye bhi ye feature kaam kare (timeout na ho).
-                self.after(0, lambda: self._scrape_status.configure(
-                    text="⏳ Panchayat list fetch ho raha hai..."))
-
-                hm = self.app.history_manager
-                hier = get_hierarchy()
-                gp_mode = False
-                try:
-                    # Detection ke liye chhota timeout — GP page par 15s ka
-                    # wait nahi lagta (block-login branch me dobara 15s wait
-                    # se element milta hai).
-                    WebDriverWait(driver, 3).until(EC.presence_of_element_located(
-                        (By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
-                except TimeoutException:
-                    gp_mode = True
-                # Detected login level save karo — GP (Panchayat level) ya PO
-                # (Block level). Settings card + server (admin panel) me dikhega.
-                try:
-                    self.app.set_user_level("GP" if gp_mode else "PO")
-                except Exception:
-                    pass
-
-                all_panch_villages = {}  # {panchayat_name: [village_names]}
-
-                if gp_mode:
-                    # ── GP login: no panchayat dropdown ──
-                    # Panchayat ka naam text label se, villages village
-                    # dropdown se scrape karte hain — sab kuch save ho jata hai.
-                    self.after(0, lambda: self._scrape_status.configure(
-                        text=tr("settings.scrape.gp_scraping")))
-
-                    panch_name = ""
-                    for lid in ("ctl00_ContentPlaceHolder1_panch",
-                                "ctl00_ContentPlaceHolder1_panch_lbl"):
-                        try:
-                            el = driver.find_element(By.ID, lid)
-                            txt = (el.text or "").strip()
-                            if txt and txt.upper() not in ("PANCHAYAT",
-                                                           "GRAM PANCHAYAT"):
-                                panch_name = txt
-                                break
-                        except Exception:
-                            continue
-                    if not panch_name:
-                        self.after(0, self._scrape_failed,
-                            "GP login par panchayat ka naam page par nahi mila. Login check karein.")
-                        return
-
-                    # Villages village dropdown se scrape karo
-                    v_el = wait.until(EC.presence_of_element_located(
-                        (By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
-                    v_select = Select(v_el)
-                    villages = []
-                    for opt in v_select.options:
-                        v_val = opt.get_attribute("value")
-                        v_text = opt.text.strip()
-                        if v_val and v_val != "00" and v_text and v_text != "---Select---":
-                            villages.append(v_text.upper())
-                    all_panch_villages[panch_name.upper()] = villages
-
-                else:
-                    # ── Block login: dropdown se sabhi panchayat ──
-                    panch_select_el = wait.until(
-                        EC.presence_of_element_located(
-                            (By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
-                        )
-                    )
-                    panch_select = Select(panch_select_el)
-
-                    panch_options = []  # list of (index, value, name)
-                    for i, opt in enumerate(panch_select.options):
-                        val = opt.get_attribute("value")
-                        text = opt.text.strip()
-                        if val and val != "00" and text and text != "---Select---":
-                            panch_options.append((i, val, text.upper()))
-
-                    if not panch_options:
-                        self.after(0, self._scrape_failed,
-                            "Panchayat dropdown me koi option nahi mila. Aap login nahi hain?")
-                        return
-
-                    # ── Step 2: For EACH panchayat, select it and get villages ──
-                    total_panch = len(panch_options)
-
-                    for idx, (opt_idx, opt_val, panch_name) in enumerate(panch_options):
-                        self.after(0, lambda idx=idx, total=total_panch, name=panch_name: self._scrape_status.configure(
-                            text=f"⏳ [{idx+1}/{total}] {name} — villages scrape ho rahe hain..."))
-
-                        try:
-                            # Re-find the panchayat select (it may have been refreshed by postback)
-                            panch_el = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
-                            p_select = Select(panch_el)
-                            p_select.select_by_index(opt_idx)
-
-                            # Wait for village dropdown to update
-                            WebDriverWait(driver, 15).until(
-                                lambda d: len(Select(d.find_element(
-                                    By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"
-                                )).options) > 1
-                            )
-
-                            # Extract villages for THIS panchayat
-                            vill_el = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
-                            v_select = Select(vill_el)
-
-                            villages = []
-                            for opt in v_select.options:
-                                v_val = opt.get_attribute("value")
-                                v_text = opt.text.strip()
-                                if v_val and v_val != "00" and v_text and v_text != "---Select---":
-                                    villages.append(v_text.upper())
-
-                            all_panch_villages[panch_name] = villages
-
-                        except (StaleElementReferenceException, TimeoutException):
-                            # If panchayat selection fails, skip and continue
-                            all_panch_villages[panch_name] = []
-                            continue
-
-                # ── Step 3: Save everything with hierarchy ──
-                saved_panch = 0
-                saved_vill = 0
-
-                for panch_name, villages in all_panch_villages.items():
-                    # Save panchayat to history
-                    for k in self._get_panchayat_keys():
-                        hm.save_entry(k, panch_name)
-                    saved_panch += 1
-
-                    # Save villages and build hierarchy
-                    for v_name in villages:
-                        for k in self._get_village_keys():
-                            hm.save_entry(k, v_name)
-                        hier.add_child("Panchayat", panch_name, "Village", v_name)
-                        saved_vill += 1
-
-                # ── Step 4: Show results ──
-                self.after(0, self._scrape_success,
-                           saved_panch, saved_vill, all_panch_villages, gp_mode)
-
-            except TimeoutException:
-                self.after(0, self._scrape_failed,
-                    "Page load timeout. NREGA website slow ho ya login required ho.")
-            except NoSuchElementException as e:
-                self.after(0, self._scrape_failed,
-                    f"Website ka structure change ho gaya? Element nahi mila: {e}")
-            except Exception as e:
-                self.after(0, self._scrape_failed, str(e))
-
-        import threading
-        threading.Thread(target=_run_scrape, daemon=True).start()
+        run_panchayat_scrape(self.app, on_status=_status,
+                             on_success=_success,
+                             on_failed=self._scrape_failed)
 
     def _scrape_success(self, saved_panch, saved_vill, all_panch_villages, gp_mode=False):
         """Update UI on successful scrape with full hierarchy data."""
@@ -1008,16 +1047,24 @@ class SettingsTab(ctk.CTkFrame):
                        "villages add kar diye gaye. Ab aap bina panchayat dropdown ke bhi "
                        "kaam kar sakte hain.")
 
+        restart_note = ""
+        if saved_panch:
+            restart_note = "\n\n🔄 App abhi restart ho raha hai — naye Panchayat sabhi tabs me dikhenge."
+
         messagebox.showinfo(
             "✅ Scrape Complete",
             f"{result}\n\n" + "\n".join(detail_lines) +
             "\n\nHierarchy bhi save ho gayi hai — Panchayat delete karenge to uske villages bhi delete ho jayenge."
-            + gp_note,
+            + gp_note + restart_note,
             parent=self.winfo_toplevel()
         )
 
         self._refresh_loc_list()
         self.after(8000, lambda: self._scrape_status.configure(text=""))
+
+        # Restart so the newly added panchayats appear in every tab's dropdowns.
+        if saved_panch:
+            self._restart_application()
 
     def _scrape_failed(self, error_msg):
         """Update UI on scrape failure."""
@@ -1912,6 +1959,15 @@ class SettingsTab(ctk.CTkFrame):
                     except Exception:
                         pass
 
+            # ── 6b. Delete first-run flag so the Welcome Tour shows again ──
+            fr_flag = get_data_path(".first_run_complete")
+            if os.path.exists(fr_flag):
+                try:
+                    os.remove(fr_flag)
+                    deleted_files.append("🎓 First-run flag (Welcome Tour will show)")
+                except Exception as e:
+                    failed_files.append(f"🎓 First-run flag: {e}")
+
             # ── 7. Clear all open tab inputs ──
             self._clear_all_tab_widgets()
 
@@ -1927,10 +1983,13 @@ class SettingsTab(ctk.CTkFrame):
                 result_msg += f"\n⚠️ {len(failed_files)} items had errors:\n"
                 for f in failed_files:
                     result_msg += f"  ❌ {f}\n"
-            result_msg += "\n💡 App ko restart karne ki salah di jaati hai."
+            result_msg += "\n\n🔄 App abhi restart ho raha hai — fresh state apply hone ke liye."
 
             messagebox.showinfo("✅ Factory Reset Complete", result_msg,
                                 parent=self.winfo_toplevel())
+
+            # Restart so the app boots into the fresh, reset state.
+            self._restart_application()
 
             self._set_fr_status(
                 f"✅ Reset complete! {len(deleted_files)} items cleared. App restart suggested.",
@@ -1950,6 +2009,10 @@ class SettingsTab(ctk.CTkFrame):
                   "gray": ("gray50", "gray60")}
         self._fr_status.configure(text=msg, text_color=colors.get(color, colors["gray"]))
         self._fr_status.after(8000, lambda: self._fr_status.configure(text=""))
+
+    def _restart_application(self) -> None:
+        """Relaunch the app after a short delay, then close this instance."""
+        restart_application(self.app)
 
     def _clear_all_tab_widgets(self) -> None:
         """
@@ -2192,15 +2255,7 @@ class SettingsTab(ctk.CTkFrame):
                     parent=self.winfo_toplevel()
                 )
                 if restart:
-                    import sys
-                    import subprocess
-                    # Try to restart gracefully
-                    try:
-                        python = sys.executable
-                        subprocess.Popen([python] + sys.argv)
-                        sys.exit(0)
-                    except Exception:
-                        pass
+                    self._restart_application()
 
         lang_menu.configure(command=_on_lang_change)
 

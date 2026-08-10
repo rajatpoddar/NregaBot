@@ -4,9 +4,9 @@
 
 # 🚜 NREGA Bot
 
-**v3.2.1** — Powerful NREGA Automation for Windows, macOS & Linux
+**v3.2.2** — Powerful NREGA Automation for Windows, macOS & Linux
 
-[![Version](https://img.shields.io/badge/version-3.2.1-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
+[![Version](https://img.shields.io/badge/version-3.2.2-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f?style=flat-square)](https://nregabot.com/#downloads)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)]()
 [![Updates](https://img.shields.io/badge/updates-Smart%20SHA--256%20Verified-4c1?style=flat-square)]()
@@ -185,9 +185,9 @@ Only a supported web browser is needed:
 ### Installation
 
 1. **Download** the installer for your platform:
-   - **Windows**: `NREGABot-v3.2.1-Setup.exe`
-   - **macOS**: `NREGABot-v3.2.1-macOS.dmg`
-   - **Lite (low-end PCs)**: `NREGABot-Lite-v3.2.1-Setup.exe` or portable ZIP
+   - **Windows**: `NREGABot-v3.2.2-Setup.exe`
+   - **macOS**: `NREGABot-v3.2.2-macOS.dmg`
+   - **Lite (low-end PCs)**: `NREGABot-Lite-v3.2.2-Setup.exe` or portable ZIP
 2. Run the installer and launch **NREGA Bot**.
 
 ### Quick Start
@@ -266,7 +266,16 @@ Yes — a special **Lite build** is available for low-end PCs with a reduced fea
 
 ## 📜 Changelog
 
-### 🆕 What's New in v3.2.1
+### 🆕 What's New in v3.2.2
+
+- 🎓 **New Onboarding (Welcome Tour)** — first launch now runs an interactive 7-step setup wizard: pick your language, launch & log into the browser, add Panchayat & Villages right there, learn the Emergency Stop button, and how to use the app. Replay anytime from the About tab.
+- 🌐 **New Language — Hinglish** — the whole app now works in Roman Hindi (Hinglish), auto-suggested for Hindi-speaking states. 5 languages total: English, हिन्दी, ಕನ್ನಡ, বাংলা, Hinglish.
+- 🔄 **Smart Auto-Restart** — the app now restarts itself after adding Panchayat/Villages, changing language, or Factory Reset — new data shows up in every tab immediately (reliable on Windows & macOS).
+- 🎓 **Factory Reset + Welcome Tour** — factory reset now brings the Welcome Tour back for a fresh setup.
+- 🏘️ **Shared Panchayat Scraper** — one reliable scraping engine shared by Settings and the onboarding wizard.
+
+<details>
+<summary><b>What's New in v3.2.1</b></summary>
 
 - 💥 **Crash Reporting** — crashes now upload full context (app version, tab/function, error, last 30 log lines) to the server; new admin Crashes tab with filters & CSV export.
 - 📡 **Uptime Monitoring** — the server self-checks every 5 min (Database, Redis, WhatsApp, WebDAV) and alerts the admin on WhatsApp the moment anything goes down.

@@ -270,8 +270,9 @@ No more "Aap X login ho... server tak bhi jaati hai" style verbose/trust-eroding
 
 ### 🎯 Overall status: DESKTOP APP CLEANUP + i18n MIGRATION COMPLETE ✅
 - All user-facing text in `src/` is now clean English (base) + translatable via `tr()`.
-- **885 `tr()` keys** used; **4 locales live** (`en`, `hi`, `kn`, `bn`) — 0 missing in all four.
-- **Final audits: 0 user-facing Hinglish strings, 0 Hinglish log messages, 0 Hinglish comments** in `src/`.
+- **885 `tr()` keys** used; **5 locales live** (`en`, `hi`, `kn`, `bn`, `hinglish`) — 0 missing in all five.
+- 🆕 **Hinglish** added as a user-selectable language — Romanized Hindi (`hinglish.json`, 1039 keys, built from `scripts/translations_hing_1..5.py`). Suggested by default for Hindi-speaking states (BIHAR, UTTAR PRADESH, MADHYA PRADESH, RAJASTHAN, HARYANA, etc.) — Devanagari Hindi (`hi`) still available in the dropdown.
+- **Final audits: 0 user-facing Hinglish strings, 0 Hinglish log messages, 0 Hinglish comments** in `src/` (base English UI stays clean; Hinglish ships only as its own locale).
 - **Full `compileall src/` passes clean; 0 unwrapped messageboxes repo-wide.**
 
 ### ⏳ Remaining (non-blocking)

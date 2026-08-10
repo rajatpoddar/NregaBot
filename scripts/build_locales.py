@@ -1,8 +1,8 @@
-"""Build kn.json / bn.json from translation part files. Reports coverage.
+"""Build kn.json / bn.json / hinglish.json from translation part files. Reports coverage.
 
-NOTE: src/locales/kn.json and src/locales/bn.json are GENERATED artifacts.
+NOTE: src/locales/kn.json, bn.json and hinglish.json are GENERATED artifacts.
 Never edit the .json files directly — edit the part files below
-(scripts/translations_{kn,bn}_1..5.py) and re-run this script.
+(scripts/translations_{kn,bn,hing}_1..5.py) and re-run this script.
 
 Exit codes: 0 = all good (full coverage, placeholders intact);
             1 = missing keys, unused entries, or placeholder mismatches.
@@ -27,6 +27,11 @@ from translations_bn_2 import BN2
 from translations_bn_3 import BN3
 from translations_bn_4 import BN4
 from translations_bn_5 import BN5
+from translations_hing_1 import HING1
+from translations_hing_2 import HING2
+from translations_hing_3 import HING3
+from translations_hing_4 import HING4
+from translations_hing_5 import HING5
 
 en = json.load(open("src/locales/en.json", encoding="utf-8"))
 
@@ -38,6 +43,10 @@ BN = {}
 for part in (BN1, BN2, BN3, BN4, BN5):
     BN.update(part)
 
+HING = {}
+for part in (HING1, HING2, HING3, HING4, HING5):
+    HING.update(part)
+
 
 def _placeholders(text: str) -> list:
     """Sorted list of {token}s — stricter than set comparison (catches dupes)."""
@@ -45,7 +54,7 @@ def _placeholders(text: str) -> list:
 
 
 failures = False
-for code, table in (("kn", KN), ("bn", BN)):
+for code, table in (("kn", KN), ("bn", BN), ("hinglish", HING)):
     missing = [k for k in en if k not in table]
     unused = [k for k in table if k not in en]
     bad_ph = [
