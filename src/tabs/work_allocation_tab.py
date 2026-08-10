@@ -371,26 +371,25 @@ class WorkAllocationTab(BaseAutomationTab):
                 self.app.after(100, lambda: getattr(messagebox, f"show{kind}")("Complete", f"{final_status}. Check results."))
 
     def _setup_page(self, driver, wait, inputs: Dict[str, Any]) -> None:
-        """Selects panchayat (if a dropdown exists) and the work category."""
+        """Selects panchayat (if a dropdown exists) and the work category.
+
+        Central _select_panchayat_or_skip helper: Block/PO login par dropdown
+        se select karta hai; Panchayat/GP login par (dropdown nahi hota)
+        selection skip ho jata hai.
+        """
         self._disable_smooth_scroll(driver)
-        self.log_info("Checking for Panchayat dropdown...")
-        try:
-            panchayat_select_element = WebDriverWait(driver, 3).until(
-                EC.element_to_be_clickable((By.ID, self.PANCHAYAT_IDS[0])))
-            self.log_info("Panchayat dropdown found. Selecting...")
-            if not inputs.get('panchayat_name'):
-                raise ValueError("Panchayat Name is required for PO login.")
-            panchayat_select = Select(panchayat_select_element)
-            if panchayat_select.first_selected_option.text.strip() != inputs['panchayat_name'].strip():
-                self._select_by_text_case_insensitive(panchayat_select, inputs['panchayat_name'])
-                self._settle(driver, "Panchayat")
-                self.log_info("   - Panchayat selected.")
-        except (TimeoutException, NoSuchElementException):
-            self.log_info("Panchayat dropdown not found. Assuming GP Login.")
-        except ValueError as e:
+        status, _ = self._select_panchayat_or_skip(
+            driver, wait, inputs.get('panchayat_name'), self.PANCHAYAT_IDS)
+        if status == "missing":
             # Surface to the caller (run_automation_logic shows the error dialog)
-            self.log_error(str(e))
-            raise
+            self.log_error("Panchayat Name is required for PO login.")
+            raise ValueError("Panchayat Name is required for PO login.")
+        if status == "notfound":
+            self.log_error(f"Panchayat '{inputs.get('panchayat_name')}' not found in dropdown.")
+            raise ValueError(f"Panchayat '{inputs.get('panchayat_name')}' not found in dropdown.")
+        if status == "selected":
+            self._settle(driver, "Panchayat")
+            self.log_info("   - Panchayat selected.")
 
         self.app.after(0, self.app.set_status, "Setting Work Category...")
         category_select_element = wait.until(EC.element_to_be_clickable((By.ID, self.CATEGORY_ID)))

@@ -442,14 +442,16 @@ class DeleteApplicantTab(BaseAutomationTab):
 
                 # ── 1. Panchayat ──
                 if panchayat:
-                    try:
-                        self.log_info(f"📍 Selecting Panchayat: {panchayat}")
-                        panch_dd = wait.until(EC.presence_of_element_located(
-                            (By.ID, "ctl00_ContentPlaceHolder1_ddlpnch")))
-                        self._select_by_text_case_insensitive(Select(panch_dd), panchayat)
-                        time.sleep(1.5)  # Brief wait for postback to begin
-                    except (TimeoutException, NoSuchElementException):
+                    status, _ = self._select_panchayat_or_skip(
+                        driver, wait, panchayat,
+                        ["ctl00_ContentPlaceHolder1_ddlpnch"])
+                    if status == "gp":
                         self.log_info("📍 Panchayat dropdown not found (GP login).")
+                    elif status == "selected":
+                        self.log_info(f"📍 Selecting Panchayat: {panchayat}")
+                        time.sleep(1.5)  # Brief wait for postback to begin
+                    elif status == "notfound":
+                        self.log_warning(f"📍 Panchayat '{panchayat}' dropdown me nahi mila.")
                 # ── 2. Village (JS — fast) ──
                 try:
                     self.log_info("🏘️  Selecting village from jobcard code...")

@@ -1456,39 +1456,35 @@ class DemandTab(BaseAutomationTab):
                                    f"State: {state} — Panchayat {p_idx}/{total_p}: {panchayat}")
                     self.app.after(0, self.app.set_status, f"P {p_idx}/{total_p}: {panchayat}")
 
-                    # --- Detect login mode: Block (panchayat dropdown) vs GP ---
-                    is_gp = False
-                    try:
-                        WebDriverWait(driver, 3).until(EC.element_to_be_clickable(
-                            (By.CSS_SELECTOR, ", ".join(f"#{x}" for x in p_ids))))
-                    except TimeoutException:
-                        is_gp = True
-
-                    if not is_gp:
-                        if not panchayat:
-                            self.app.after(0, self.app.log_message, self.log_display,
-                                           "ERROR: Panchayat name required for Block Login.", "error")
-                            continue
-                        try:
-                            self.app.after(0, self.app.set_status, f"Selecting Panchayat: {panchayat}")
-                            pd = wait.until(EC.element_to_be_clickable(
-                                (By.CSS_SELECTOR, ", ".join(f"#{x}" for x in p_ids))))
-                            if not self._select_by_text_case_insensitive(Select(pd), panchayat):
-                                raise NoSuchElementException(f"Panchayat '{panchayat}' not found in dropdown.")
-                            self._wait_dropdown_populated(driver, wait, v_ids, "villages after panchayat selection")
-                        except NoSuchElementException as e_select:
-                            self.app.after(0, self.app.log_message, self.log_display,
-                                           f"ERROR: {e_select}. Skipping this panchayat.", "error")
-                            for vill, jcs in villages.items():
-                                for jc, apps in jcs.items():
-                                    for a in apps:
-                                        self.app.after(0, self._update_results_tree,
-                                                       (jc, a.get('Name of Applicant'), "FAIL: Panchayat Not Found", panchayat, vill))
-                            continue
-                    else:  # GP Login
+                    # --- Panchayat: Block/PO login (dropdown) select karta hai;
+                    # Panchayat/GP login (no dropdown) SKIP — central helper
+                    # dono ko har tab me ek jaisa handle karta hai. ---
+                    self.app.after(0, self.app.set_status, f"Selecting Panchayat: {panchayat}")
+                    status, page_panchayat = self._select_panchayat_or_skip(
+                        driver, wait, panchayat, p_ids, v_ids,
+                        label_ids=["ctl00_ContentPlaceHolder1_panch"])
+                    if status == "notfound":
                         self.app.after(0, self.app.log_message, self.log_display,
-                                       "GP Login Mode (no panchayat dropdown).", "info")
-                        self._wait_dropdown_populated(driver, wait, v_ids, "villages (GP mode)")
+                                       f"ERROR: Panchayat '{panchayat}' not found in dropdown. Skipping this panchayat.", "error")
+                        for vill, jcs in villages.items():
+                            for jc, apps in jcs.items():
+                                for a in apps:
+                                    self.app.after(0, self._update_results_tree,
+                                                   (jc, a.get('Name of Applicant'), "FAIL: Panchayat Not Found", panchayat, vill))
+                        continue
+                    if status == "missing":
+                        self.app.after(0, self.app.log_message, self.log_display,
+                                       "ERROR: Panchayat name required for Block Login.", "error")
+                        continue
+                    # GP login: panchayat ka naam page par text me hota hai — use
+                    # record karo taaki settings > location data me save ho.
+                    if status == "gp" and not panchayat and page_panchayat:
+                        panchayat = page_panchayat
+                        self._current_panchayat = panchayat
+                    # Panchayat + villages Settings > Location Data me auto-add
+                    # (GP users ke liye bhi — bina panchayat dropdown select
+                    # kiye unka panchayat aur villages add ho jate hain).
+                    self._save_panchayat_villages_to_settings(panchayat, list(villages.keys()))
 
                     # --- Loop through villages ---
                     total_v, v_idx = len(villages), 0
@@ -1905,15 +1901,10 @@ class DemandTab(BaseAutomationTab):
             if self.is_stopped():
                 return
             panchayat = getattr(self, '_current_panchayat', '') or ''
-            # Block-login portals show a panchayat dropdown; GP login does not.
-            try:
-                pd = WebDriverWait(driver, 4).until(EC.element_to_be_clickable(
-                    (By.CSS_SELECTOR, ", ".join(f"#{x}" for x in p_ids))))
-                if panchayat and self._select_by_text_case_insensitive(Select(pd), panchayat):
-                    self._wait_dropdown_populated(driver, wait, v_ids,
-                                                  "villages (recovery)")
-            except TimeoutException:
-                pass  # GP login mode — no panchayat dropdown
+            # Block-login portals show a panchayat dropdown; GP login does not
+            # — central helper dono cases handle karta hai.
+            self._select_panchayat_or_skip(
+                driver, wait, panchayat, p_ids, v_ids, timeout=4)
             village = getattr(self, '_current_village', '') or ''
             if village:
                 try:

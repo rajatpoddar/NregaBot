@@ -270,24 +270,15 @@ class MrFillTab(BaseAutomationTab):
         """Helper to check and select Panchayat if it's not already selected."""
         if not panchayat_name: return # Skip if GP Login (empty name)
 
-        try:
-            panchayat_ddl = wait.until(EC.presence_of_element_located((By.ID, "ddlPanchayat")))
-            select = Select(panchayat_ddl)
-            
-            # Check if already selected to save time
-            if panchayat_name.lower() in select.first_selected_option.text.lower():
-                return
-
-            # If not selected, select it
-            match = next((opt.text for opt in select.options if panchayat_name.strip().lower() in opt.text.lower()), None)
-            if match:
-                select.select_by_visible_text(match)
-                self.log_info(f"Selected Panchayat: {match}")
-                time.sleep(2) # Wait for page refresh
-            else:
-                self.log_warning(f"Panchayat '{panchayat_name}' not found in list.")
-        except Exception:
-            pass # Ignore errors for GP login scenarios
+        status, _ = self._select_panchayat_or_skip(
+            driver, wait, panchayat_name, ["ddlPanchayat"])
+        if status == "gp":
+            self.log_info("Panchayat dropdown not found (GP login) — skipping selection.")
+        elif status == "selected":
+            self.log_info(f"Selected Panchayat: {panchayat_name}")
+            time.sleep(2) # Wait for page refresh
+        elif status == "notfound":
+            self.log_warning(f"Panchayat '{panchayat_name}' not found in list.")
 
     def _process_single_work_code(self, driver, wait, work_key, holiday_cols, is_manual_mode, panchayat_name):
         """

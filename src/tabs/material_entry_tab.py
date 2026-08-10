@@ -414,15 +414,20 @@ class MaterialEntryTab(BaseAutomationTab):
                     # Wait for page to fully load before interacting
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
                     time.sleep(1.5)  # Brief wait for postback to begin
-                    # 1. Panchayat (Block Login)
+                    # 1. Panchayat (Block Login) — central helper: GP login par
+                    # panchayat ka dropdown nahi hota, isliye selection skip ho
+                    # jata hai aur automation villages/work se continue karta hai
                     if inputs['panchayat']:
-                        try:
-                            panchayat_dd = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
-                            self._select_by_text_case_insensitive(Select(panchayat_dd), inputs['panchayat'])
+                        status, _ = self._select_panchayat_or_skip(
+                            driver, wait, inputs['panchayat'],
+                            ["ctl00_ContentPlaceHolder1_ddlpanchayat_code"])
+                        if status == "gp":
+                            self.log_info("ℹ Panchayat dropdown not found (GP login assumed)")
+                        elif status == "selected":
                             self.log_info(f"✓ Panchayat selected: {inputs['panchayat']}")
                             time.sleep(1.5)  # Brief wait for postback to begin
-                        except TimeoutException:
-                            self.log_info("ℹ Panchayat dropdown not found (GP login assumed)")
+                        elif status == "notfound":
+                            self.log_warning(f"⚠️ Panchayat '{inputs['panchayat']}' dropdown me nahi mila.")
                     # 2. Work Category — re-fetch after panchayat postback to avoid stale
                     self.log_info("▶ Selecting Work Category...")
                     for attempt in range(3):

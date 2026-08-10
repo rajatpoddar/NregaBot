@@ -276,12 +276,14 @@ class ZeroMrTab(BaseAutomationTab):
         """Selects the panchayat dropdown on the Zero MR page (postback aware)."""
         self.app.after(0, self.app.set_status, f"Setting Panchayat: {panchayat_name}")
         self.log_info(f"Selecting Panchayat: {panchayat_name}")
-        panchayat_select = Select(wait.until(EC.element_to_be_clickable((By.ID, "ddlpanch"))))
-        match = next((opt.text for opt in panchayat_select.options if panchayat_name.strip().lower() in opt.text.lower()), None)
-        if not match:
+        # Central helper — GP login (no dropdown) par selection skip hota hai.
+        status, _ = self._select_panchayat_or_skip(
+            driver, wait, panchayat_name, ["ddlpanch"])
+        if status == "notfound":
             raise ValueError(f"Panchayat '{panchayat_name}' not found in dropdown.")
-        if panchayat_select.first_selected_option.text != match:
-            panchayat_select.select_by_visible_text(match)
+        if status == "missing":
+            raise ValueError("Panchayat name is required.")
+        if status == "selected":
             self.log_info("Waiting for Panchayat postback...")
             try:
                 WebDriverWait(driver, 10).until(
@@ -289,6 +291,7 @@ class ZeroMrTab(BaseAutomationTab):
                 )
             except TimeoutException:
                 pass
+        # status == "gp" → panchayat skip (GP login), aage badho
 
     def _process_single_item(self, driver, wait, work_key, msr_no, panchayat):
         try:

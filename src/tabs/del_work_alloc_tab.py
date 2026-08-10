@@ -294,33 +294,29 @@ class DelWorkAllocTab(BaseAutomationTab):
                     self.log_error(f"Failed to load page for {p_name}. Skipping.")
                     continue
 
-                # 2. Select Panchayat (With Fuzzy Match)
+                # 2. Select Panchayat (central helper — fuzzy match; GP login
+                # par no-dropdown skip karke aage badho)
                 try:
-                    # Ensure the dropdown is actually visible and interactive
-                    panchayat_dropdown_elem = wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))
-                    panchayat_dropdown = Select(panchayat_dropdown_elem)
-
-                    # --- Fuzzy Matching Logic ---
-                    target_p = p_name.strip().lower()
-                    found_option_text = None
-
-                    for opt in panchayat_dropdown.options:
-                        if opt.text.strip().lower() == target_p:
-                            found_option_text = opt.text
-                            break
-
-                    if found_option_text:
-                        self.log_info(f"Selecting Panchayat: '{found_option_text}'...")
-
-                        # Store current body element to check for staleness (Postback detection)
-                        body_elem = driver.find_element(By.TAG_NAME, "body")
-
-                        panchayat_dropdown.select_by_visible_text(found_option_text)
+                    status, _ = self._select_panchayat_or_skip(
+                        driver, wait, p_name,
+                        ["ctl00_ContentPlaceHolder1_ddlpanchayat_code"])
+                    if status == "notfound":
+                        try:
+                            dd = Select(wait.until(EC.visibility_of_element_located(
+                                (By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code"))))
+                            available = [o.text for o in dd.options[:10]]
+                        except Exception:
+                            available = []
+                        self.log_warning(f"Panchayat '{p_name}' not found. Did you mean: {available}? Skipping.")
+                        continue
+                    if status == "selected":
+                        self.log_info(f"Selecting Panchayat: '{p_name}'...")
 
                         # --- CRITICAL: Wait for Postback ---
                         # Selection triggers __doPostBack. We MUST wait for the page to reload.
                         self.log_info("Waiting for page reload (Postback)...")
                         try:
+                            body_elem = driver.find_element(By.TAG_NAME, "body")
                             wait.until(EC.staleness_of(body_elem))
                         except TimeoutException:
                             self.log_warning("Page did not seem to reload. Continuing...")
@@ -328,11 +324,7 @@ class DelWorkAllocTab(BaseAutomationTab):
                         # Wait for Registration dropdown to come back
                         wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlRegistration")))
                         self.log_success("Panchayat selected successfully.")
-
-                    else:
-                        available = [o.text for o in panchayat_dropdown.options[:10]]
-                        self.log_warning(f"Panchayat '{p_name}' not found. Did you mean: {available}? Skipping.")
-                        continue
+                    # status == "gp" → selection skip (GP login)
 
                 except Exception as e:
                     self.log_error(f"Error selecting Panchayat {p_name}: {e}")

@@ -200,38 +200,23 @@ class DelDemandTab(BaseAutomationTab):
                 self.log_info("Navigating to Delete Demand page...")
                 driver.get(url)
 
-                # 1. Select Panchayat (If Dropdown Exists - Handles PO vs GP login)
-                try:
-                    panchayat_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")
-                    panchayat_dropdown = Select(panchayat_dd_elem)
-
-                    found_p = None
-                    target_p_lower = target_panchayat.lower()
-                    for opt in panchayat_dropdown.options:
-                        if target_p_lower in opt.text.lower():
-                            found_p = opt.text
-                            break
-
-                    if found_p:
-                        self.log_info(f"Selecting Panchayat: '{found_p}'...")
-                        panchayat_dropdown.select_by_visible_text(found_p)
-
-                        # Wait for village dropdown to populate after panchayat postback
-                        fast_wait = WebDriverWait(driver, 20, poll_frequency=0.3)
-                        try:
-                            fast_wait.until(lambda d: len(Select(
-                                d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
-                            ).options) > 1)
-                        except TimeoutException:
-                            pass
-                    else:
-                        self.log_warning(f"Panchayat '{target_panchayat}' not found in dropdown. Skipping.")
-                        continue
-                except NoSuchElementException:
+                # 1. Select Panchayat (central helper — PO login dropdown se
+                # select karta hai; GP login par no-dropdown skip karke seedha
+                # villages par chala jata hai)
+                status, _ = self._select_panchayat_or_skip(
+                    driver, wait, target_panchayat,
+                    ["ctl00_ContentPlaceHolder1_DDL_Panchyt"],
+                    v_ids=["ctl00_ContentPlaceHolder1_DDL_Village"])
+                if status == "gp":
                     self.log_info("Panchayat dropdown not found. Assuming GP Login.")
                     if all_mode:
                         self.log_warning("All Panchayats mode not possible with GP login. Stopping.")
                         break
+                elif status == "notfound":
+                    self.log_warning(f"Panchayat '{target_panchayat}' not found in dropdown. Skipping.")
+                    continue
+                elif status == "selected":
+                    self.log_info(f"Selecting Panchayat: '{target_panchayat}'...")
 
                 # 2. Get list of Villages
                 wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
@@ -283,33 +268,17 @@ class DelDemandTab(BaseAutomationTab):
                             pass
                         time.sleep(1.5)  # Brief wait for postback to begin
 
-                        try:
-                            wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")))
-                        except TimeoutException:
-                            self.log_warning(f"   ⚠️ Panchayat dropdown not found after re-navigation!")
+                        status, _ = self._select_panchayat_or_skip(
+                            driver, wait, target_panchayat,
+                            ["ctl00_ContentPlaceHolder1_DDL_Panchyt"],
+                            v_ids=["ctl00_ContentPlaceHolder1_DDL_Village"], timeout=5)
+                        if status == "gp":
+                            self.log_info(f"   ⚠️ Panchayat dropdown not found (GP Login) — village seedha process hoga.")
+                        elif status == "notfound":
+                            self.log_warning(f"   ⚠️ Panchayat '{target_panchayat}' not found after re-navigation!")
                             continue  # Skip this village instead of crashing
-
-                        try:
-                            panchayat_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Panchyt")
-                            panchayat_dropdown = Select(panchayat_dd_elem)
-                            found_p = None
-                            target_p_lower = target_panchayat.lower()
-                            for opt in panchayat_dropdown.options:
-                                if target_p_lower in opt.text.lower():
-                                    found_p = opt.text
-                                    break
-                            if found_p:
-                                panchayat_dropdown.select_by_visible_text(found_p)
-                                time.sleep(0.5)  # Wait for postback to begin
-                                fast_wait = WebDriverWait(driver, 20, poll_frequency=0.3)
-                                try:
-                                    fast_wait.until(lambda d: len(Select(
-                                        d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
-                                    ).options) > 1)
-                                except TimeoutException:
-                                    self.log_warning(f"   ⚠️ Village dropdown didn't populate after panchayat re-select.")
-                        except NoSuchElementException:
-                            self.log_info(f"   ⚠️ Panchayat dropdown not found (GP Login?).")
+                        elif status == "selected":
+                            time.sleep(0.5)  # Wait for postback to begin
 
                     self._process_village(driver, wait, target_panchayat, v_name)
             # Count results from tree

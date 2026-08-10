@@ -356,22 +356,20 @@ class MsrTab(BaseAutomationTab):
     def _select_panchayat(self, driver, wait, location_panchayat):
         """Selects the panchayat on the MSR page.
         Raises ValueError if a Block-login panchayat is required but missing/not found.
-        Skipped silently for GP-login pages (no panchayat dropdown).
+        Skipped for GP-login pages (no panchayat dropdown) — central helper.
         """
-        try:
-            panchayat_select_element = WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.NAME, "ddlPanchayat")))
-            if not location_panchayat:
-                raise ValueError("Panchayat name is required for Block Login.")
-            panchayat_select = Select(panchayat_select_element)
-            match = next((opt.text for opt in panchayat_select.options if location_panchayat.strip().lower() in opt.text.lower()), None)
-            if not match:
-                raise ValueError(f"Panchayat '{location_panchayat}' not found.")
-            panchayat_select.select_by_visible_text(match)
-            self.app.update_history("location_panchayat", location_panchayat)
-            self.log_success(f"Successfully selected Panchayat: {match}")
-            time.sleep(2)
-        except TimeoutException:
+        status, _ = self._select_panchayat_or_skip(
+            driver, wait, location_panchayat, [(By.NAME, "ddlPanchayat")])
+        if status == "gp":
             self.log_info("Panchayat selection not found/required (GP Login). Proceeding...")
+            return
+        if status == "missing":
+            raise ValueError("Panchayat name is required for Block Login.")
+        if status == "notfound":
+            raise ValueError(f"Panchayat '{location_panchayat}' not found.")
+        self.app.update_history("location_panchayat", location_panchayat)
+        self.log_success(f"Successfully selected Panchayat: {location_panchayat}")
+        time.sleep(2)
 
     def _process_work_code_attempt(self, driver, wait, work_key, verify_amount, panchayat_name=""):
         """

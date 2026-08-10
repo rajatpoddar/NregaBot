@@ -196,10 +196,12 @@ class EmbVerifyTab(BaseAutomationTab):
             panchayats_to_process = []
             if all_mode:
                 driver.get(config.EMB_VERIFY_CONFIG["url"])
-                panch_dd = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
-                panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if t]
+                # Central helper — GP login par dropdown nahi hota; ⭐ My Saved
+                # mode me Settings ke saved panchayats directly use hote hain.
+                panchayats_to_process, _is_gp = self._fetch_panchayats_from_website(
+                    driver, wait, ["ctl00_ContentPlaceHolder1_ddl_panch"],
+                    saved_mode=saved_mode)
                 if saved_mode:
-                    panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
                     self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
                 else:
                     self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
@@ -218,9 +220,14 @@ class EmbVerifyTab(BaseAutomationTab):
 
                 driver.get(config.EMB_VERIFY_CONFIG["url"])
                 self.log_info(f"Selecting Panchayat: {p_name}")
-                panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
-                if not self._select_by_text_case_insensitive(panchayat_select, p_name):
+                # Central helper — GP login (no dropdown) par selection skip
+                status, _ = self._select_panchayat_or_skip(
+                    driver, wait, p_name, ["ctl00_ContentPlaceHolder1_ddl_panch"])
+                if status == "notfound":
                     self.log_warning(f"Panchayat '{p_name}' not found on the website. Skipping.")
+                    continue
+                if status == "missing":
+                    self.log_warning("Panchayat name required for Block login. Skipping.")
                     continue
 
                 self.log_info("Waiting for page to reload...")

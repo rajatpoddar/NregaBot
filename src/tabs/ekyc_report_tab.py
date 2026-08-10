@@ -318,28 +318,29 @@ class EKycReportTab(BaseAutomationTab):
             else:
                 self.update_status("Fetching panchayat list...")
                 try:
-                    panchayat_dd_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
-                    options = Select(panchayat_dd_elem).options
-                    
-                    for opt in options:
-                        val = opt.get_attribute("value")
-                        txt = opt.text.strip()
-                        if val not in ["00", "99"] and txt != "---Select---" and "All" not in txt:
-                            panchayats_to_process.append(txt)
-                    
+                    # Central helper — GP login par dropdown nahi hota; ⭐ My
+                    # Saved mode me Settings ke saved panchayats directly use
+                    # hote hain (timeout nahi hota).
+                    panchayats_to_process, _is_gp = self._fetch_panchayats_from_website(
+                        driver, wait, ["ctl00_ContentPlaceHolder1_DDL_panchayat"],
+                        saved_mode=(panchayat_target == MY_PANCHAYATS_LABEL))
+
                     if panchayat_target == MY_PANCHAYATS_LABEL:
-                        panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
                         self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
                         if not panchayats_to_process:
                             try:
                                 self.app.after(0, self.export_btn.configure, state="normal")
                             except Exception:
                                 pass
-                            self.log_warning("⚠️ No saved panchayat found on the website. Check Settings > Location Data.")
+                            self.log_warning("⚠️ No saved panchayat found. Check Settings > Location Data.")
                             self._reset_ui_state_safe()
                             return
                     else:
                         self.log_info(f"Found {len(panchayats_to_process)} panchayats to scan.")
+                        if not panchayats_to_process:
+                            self.log_warning("🌐 All Panchayats mode requires Block/PO login (no panchayat dropdown on GP login).")
+                            self._reset_ui_state_safe()
+                            return
                 except Exception as e:
                     raise Exception(f"Could not fetch panchayat list: {e}")
 
@@ -351,24 +352,27 @@ class EKycReportTab(BaseAutomationTab):
                 
                 self.update_status(f"Processing Panchayat {p_idx}/{total_panchayats}: {p_name}")
                 self.log_info(f"{'='*50}\nSelecting Panchayat: {p_name}\n{'='*50}")
-                # Select Panchayat (case-insensitive)
+                # Select Panchayat (case-insensitive) — central helper: GP
+                # login (no dropdown) par selection skip karke villages par
                 try:
-                    panchayat_elem = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
-                    panchayat_dd = Select(panchayat_elem)
-                    
-                    if not self._select_by_text_case_insensitive(panchayat_dd, p_name):
-                        # Log available options for debugging
-                        options_text = [opt.text.strip() for opt in panchayat_dd.options if opt.text.strip() not in ("---Select---", "")]
+                    status, _ = self._select_panchayat_or_skip(
+                        driver, wait, p_name,
+                        ["ctl00_ContentPlaceHolder1_DDL_panchayat"],
+                        v_ids=["ctl00_ContentPlaceHolder1_DDL_Village"])
+                    if status == "notfound":
+                        try:
+                            panchayat_dd = Select(wait.until(
+                                EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat"))))
+                            options_text = [opt.text.strip() for opt in panchayat_dd.options
+                                            if opt.text.strip() not in ("---Select---", "")]
+                        except Exception:
+                            options_text = []
                         self.log_error(f"Failed to select panchayat '{p_name}'. Available: {options_text}")
                         continue
-                    
-                    # Wait for village dropdown to populate after panchayat postback
-                    try:
-                        wait.until(lambda d: len(Select(d.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")).options) > 1)
+                    if status == "selected":
                         self.log_success(f"Selected panchayat: '{p_name}' (village list loaded)")
-                    except:
-                        time.sleep(1.5)  # fallback wait
-                    
+                    elif status == "gp":
+                        self.log_info(f"GP login — panchayat dropdown nahi mila, '{p_name}' skip (villages directly).")
                 except Exception as e:
                     self.log_error(f"Failed to select {p_name}: {e}")
                     continue

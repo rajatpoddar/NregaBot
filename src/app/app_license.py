@@ -1783,9 +1783,13 @@ class LicenseMixin:
                     lic = getattr(self.app_state, 'license_info', {}) or {}
                     hb_key = (lic.get('key') or '').strip()
                     if hb_key:
+                        # user_level (GP/PO) bhi bheja jata hai taaki web admin
+                        # panel dikha sake ki user kis level ka hai.
                         self.app_state.http_session.post(
                             f"{config.LICENSE_SERVER_URL}/api/heartbeat",
-                            json={'key': hb_key, 'app_version': config.APP_VERSION},
+                            json={'key': hb_key,
+                                  'app_version': config.APP_VERSION,
+                                  'user_level': (lic.get('user_level') or '').strip().upper()},
                             timeout=5,
                         )
                         _cookie_req_count += 1
@@ -2156,6 +2160,12 @@ class LicenseMixin:
                 payload['district'] = district
             if block:
                 payload['block'] = block
+            # user level (GP/PO) bhi server par bheja jata hai — admin panel
+            # ko batane ke liye user kis level ka hai. (Heartbeat me bhi same
+            # key naam use hota hai: 'user_level'.)
+            level = (self.app_state.license_info.get('user_level') or '').strip().upper()
+            if level in ('GP', 'PO'):
+                payload['user_level'] = level
             if not payload:
                 return False
             resp = self.app_state.http_session.post(
@@ -2174,6 +2184,35 @@ class LicenseMixin:
         except Exception as e:
             logger.error("Fix location on server failed: %s", e)
             return False
+
+    def set_user_level(self, level: str) -> None:
+        """Detected portal login level ko persist karta hai.
+
+        Two type ke users hote hain:
+          • 'GP' — Panchayat (Gram Panchayat) level: portal par panchayat ka
+            dropdown NAHI hota (naam text me), user sirf villages select karta hai.
+          • 'PO' — Block level / Program Officer: portal par panchayat ka
+            dropdown hota hai.
+
+        Level tab ki automation ya Settings scrape se detect hota hai aur
+        yahan save hota hai taaki:
+          - app me (Settings > Server Synced Data) dikh sake, aur
+          - heartbeat/update-location payload me server tak jaye jisse web
+            ADMIN PANEL user ka type (GP/PO) dikha sake.
+        """
+        level = (level or '').strip().upper()
+        if level not in ('GP', 'PO'):
+            return
+        lic = self.app_state.license_info
+        if str(lic.get('user_level', '')).strip().upper() == level:
+            return  # already stored — no repeated disk writes
+        lic['user_level'] = level
+        try:
+            from src.utils import get_data_path
+            with open(get_data_path('license.dat'), 'w') as f:
+                json.dump(lic, f)
+        except Exception:
+            logger.debug("Failed to persist user_level", exc_info=True)
 
     def _apply_feature_flags(self) -> None:
         current_ver = parse_version(config.APP_VERSION)

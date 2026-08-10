@@ -248,13 +248,14 @@ class WagelistGenTab(BaseAutomationTab):
                             self.log_error(f"   Failed to load URL for {agency_name_part}. Skipping...")
                             break # Move to next panchayat
 
-                        # B. Select Agency
+                        # B. Select Agency (central helper — GP login par
+                        # dropdown nahi hota, selection skip ho jata hai)
                         try:
-                            agency_select = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_exe_agency')))
-                            select = Select(agency_select)
                             full_agency_name = config.AGENCY_PREFIX + agency_name_part
-                            
-                            if not self._select_by_text_case_insensitive(select, full_agency_name):
+                            status, _ = self._select_panchayat_or_skip(
+                                driver, wait, full_agency_name,
+                                ['ctl00_ContentPlaceHolder1_exe_agency'])
+                            if status == "notfound":
                                 self.log_warning(f"   No pending wagelists or Agency not found: '{full_agency_name}'.")
                                 break # Move to next panchayat
                         except Exception as e:

@@ -405,11 +405,12 @@ class MbEntryTab(BaseAutomationTab):
                 saved_mode = panchayat_target == config.MY_PANCHAYATS_LABEL
                 if all_mode:
                     driver.get(config.MB_ENTRY_CONFIG["url"])
-                    panch_dd = Select(WebDriverWait(driver, 20).until(
-                        EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch'))))
-                    panchayats_to_process = [t for t in self._get_select_option_texts(panch_dd) if t]
+                    # Central helper — GP login par dropdown nahi hota; ⭐ My
+                    # Saved mode me Settings ke saved panchayats directly use.
+                    panchayats_to_process, _is_gp = self._fetch_panchayats_from_website(
+                        driver, wait, ['ctl00_ContentPlaceHolder1_ddl_panch'],
+                        saved_mode=saved_mode)
                     if saved_mode:
-                        panchayats_to_process = self._filter_panchayats_to_saved(panchayats_to_process)
                         self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
                     else:
                         self.log_info(f"🌐 All Panchayats mode: found {len(panchayats_to_process)} panchayats.")
@@ -499,12 +500,20 @@ class MbEntryTab(BaseAutomationTab):
             if "MustorRoll/MeasurementBook.aspx" not in driver.current_url: driver.get(config.MB_ENTRY_CONFIG["url"])
 
             try:
-                panchayat_dropdown = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
-                selected_option = Select(panchayat_dropdown).first_selected_option
-                if selected_option.text.strip() != cfg['location_panchayat']:
-                    self._select_by_text_case_insensitive(Select(panchayat_dropdown), cfg['location_panchayat'])
-                    wait.until(EC.staleness_of(panchayat_dropdown))
-                    wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
+                # Central helper — GP login (no panchayat dropdown) par
+                # selection skip hota hai, koi timeout/error nahi aata.
+                status, _ = self._select_panchayat_or_skip(
+                    driver, wait, cfg['location_panchayat'],
+                    ['ctl00_ContentPlaceHolder1_ddl_panch'])
+                if status == "selected":
+                    try:
+                        dd = wait.until(EC.presence_of_element_located(
+                            (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
+                        wait.until(EC.staleness_of(dd))
+                        wait.until(EC.presence_of_element_located(
+                            (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
+                    except Exception:
+                        pass
             except Exception as e: logger.debug("MBEntry: Panchayat select wait failed: %s", e)
             
             wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtMBNo')))
@@ -578,14 +587,18 @@ class MbEntryTab(BaseAutomationTab):
             driver.get(config.MB_ENTRY_CONFIG["url"])
 
         try:
-            panchayat_dropdown = wait.until(
-                EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch'))
-            )
-            selected_option = Select(panchayat_dropdown).first_selected_option
-            if selected_option.text.strip().lower() != cfg['location_panchayat'].strip().lower():
-                self._select_by_text_case_insensitive(Select(panchayat_dropdown), cfg['location_panchayat'])
-                wait.until(EC.staleness_of(panchayat_dropdown))
-                wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
+            status, _ = self._select_panchayat_or_skip(
+                driver, wait, cfg['location_panchayat'],
+                ['ctl00_ContentPlaceHolder1_ddl_panch'])
+            if status == "selected":
+                try:
+                    dd = wait.until(EC.presence_of_element_located(
+                        (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
+                    wait.until(EC.staleness_of(dd))
+                    wait.until(EC.presence_of_element_located(
+                        (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
+                except Exception:
+                    pass
         except Exception:
             pass
 

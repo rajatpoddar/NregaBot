@@ -528,8 +528,15 @@ class MusterrollGenTab(BaseAutomationTab):
         try:
             self.log_info("Validating Panchayat name...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
-            panchayat_dropdown = Select(wait.until(EC.presence_of_element_located((By.ID, "exe_agency"))))
-            if not self._select_by_text_case_insensitive(panchayat_dropdown, config.AGENCY_PREFIX + location_panchayat):
+            # Central helper — GP login par agency/panchayat dropdown nahi
+            # hota; validation skip karke True (aage badho).
+            status, _ = self._select_panchayat_or_skip(
+                driver, wait, config.AGENCY_PREFIX + location_panchayat,
+                ["exe_agency"])
+            if status == "gp":
+                self.log_info("GP login detected — panchayat dropdown nahi hai, validation skip.")
+                return True
+            if status != "selected":
                 error_msg = f"Panchayat name '{location_panchayat}' not found on the website. Please check spelling."
                 if "macro" in self.app.active_automations or silent:
                     self.log_error(f"Skipping: {error_msg}")
@@ -566,8 +573,11 @@ class MusterrollGenTab(BaseAutomationTab):
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
             
             self.log_info("   - Selecting Panchayat...")
-            panchayat_dropdown = wait.until(EC.presence_of_element_located((By.ID, "exe_agency")))
-            self._select_by_text_case_insensitive(Select(panchayat_dropdown), config.AGENCY_PREFIX + inputs['panchayat'])
+            status, _ = self._select_panchayat_or_skip(
+                driver, wait, config.AGENCY_PREFIX + inputs['panchayat'],
+                ["exe_agency"])
+            if status == "gp":
+                self.log_info("   - GP login — panchayat dropdown nahi, selection skip.")
             
             self.log_info(f"   - Selecting work code for '{item}'...")
             full_work_code_text = self._select_work_code(driver, wait, item, inputs['auto_mode'])

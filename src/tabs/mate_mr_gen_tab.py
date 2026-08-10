@@ -479,10 +479,15 @@ class MateMrGenTab(BaseAutomationTab):
         try:
             self.log_info("Validating Panchayat name...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
-            panchayat_dropdown = Select(
-                wait.until(EC.presence_of_element_located((By.ID, "exe_agency"))))
-            target = config.AGENCY_PREFIX + location_panchayat
-            if target not in [opt.text for opt in panchayat_dropdown.options]:
+            # Central helper — GP login par agency/panchayat dropdown nahi
+            # hota; validation skip karke True (aage badho).
+            status, _ = self._select_panchayat_or_skip(
+                driver, wait, config.AGENCY_PREFIX + location_panchayat,
+                ["exe_agency"])
+            if status == "gp":
+                self.log_info("GP login detected — panchayat dropdown nahi hai, validation skip.")
+                return True
+            if status != "selected":
                 err = (f"Panchayat '{location_panchayat}' not found on the portal. "
                        "Please check spelling.")
                 if "macro" in self.app.active_automations:
@@ -580,13 +585,15 @@ class MateMrGenTab(BaseAutomationTab):
             self.log_info("   - Navigating to MR page...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
 
-            # 1. Select Panchayat (optional — skip if not provided)
+            # 1. Select Panchayat (optional — skip if not provided; GP login
+            # par no-dropdown skip central helper se)
             self.log_info("   - Selecting Panchayat...")
             if inputs['panchayat']:
-                panchayat_dropdown = wait.until(
-                    EC.presence_of_element_located((By.ID, "exe_agency")))
-                self._select_by_text_case_insensitive(
-                    Select(panchayat_dropdown), config.AGENCY_PREFIX + inputs['panchayat'])
+                status, _ = self._select_panchayat_or_skip(
+                    driver, wait, config.AGENCY_PREFIX + inputs['panchayat'],
+                    ["exe_agency"])
+                if status == "gp":
+                    self.log_info("   - GP login — panchayat dropdown nahi, selection skip.")
             else:
                 self.log_info("   - Panchayat not provided, skipping selection.")
 

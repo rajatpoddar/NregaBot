@@ -145,6 +145,9 @@ class SettingsTab(ctk.CTkFrame):
         srv_state = (lic.get('user_state') or '').strip().upper()
         srv_dist  = (lic.get('user_district') or '').strip().upper()
         srv_block = (lic.get('user_block') or '').strip().upper()
+        # 👤 User Level — GP (Panchayat level) ya PO (Block level / Program
+        # Officer). Automation ya 'Detect Login Level' se set hota hai.
+        user_level = (lic.get('user_level') or '').strip().upper()
 
         def _srv_badge(parent, label, value):
             if not value:
@@ -156,14 +159,22 @@ class SettingsTab(ctk.CTkFrame):
                          font=ctk.CTkFont(size=11),
                          text_color=("#166534", "#86EFAC")).pack()
 
+        if user_level in ('GP', 'PO'):
+            _srv_badge(self._srv_vals_frame, "👤",
+                       "GP (Panchayat Level)" if user_level == 'GP' else "PO (Block Level)")
+        if srv_state:
+            _srv_badge(self._srv_vals_frame, "🏛️", srv_state)
+        if srv_dist:
+            _srv_badge(self._srv_vals_frame, "📍", srv_dist)
+        if srv_block:
+            _srv_badge(self._srv_vals_frame, "📦", srv_block)
+
         if srv_state or srv_dist or srv_block:
-            if srv_state:
-                _srv_badge(self._srv_vals_frame, "🏛️", srv_state)
-            if srv_dist:
-                _srv_badge(self._srv_vals_frame, "📍", srv_dist)
-            if srv_block:
-                _srv_badge(self._srv_vals_frame, "📦", srv_block)
             ctk.CTkLabel(self._srv_vals_frame, text="✅ Auto-synced from your license",
+                         font=ctk.CTkFont(size=10),
+                         text_color=("#166534", "#86EFAC")).pack(side="left", padx=(4, 0))
+        elif user_level in ('GP', 'PO'):
+            ctk.CTkLabel(self._srv_vals_frame, text="👤 Level automation se detect hua",
                          font=ctk.CTkFont(size=10),
                          text_color=("#166534", "#86EFAC")).pack(side="left", padx=(4, 0))
         else:
@@ -193,6 +204,17 @@ class SettingsTab(ctk.CTkFrame):
             command=self._fix_location_now,
         )
         self._fix_loc_btn.pack(side="left", padx=(8, 0))
+
+        # ── Detect Login Level button — GP (Panchayat level) ya PO (Block
+        # level / Program Officer) browser se detect karke save karta hai ──
+        self._detect_level_btn = ctk.CTkButton(
+            srv_btn_row, text="👤 Detect Login Level", width=150, height=26,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color=("#7C3AED", "#8B5CF6"), text_color="white",
+            hover_color=("#6D28D9", "#7C3AED"),
+            command=self._detect_user_level_now,
+        )
+        self._detect_level_btn.pack(side="left", padx=(8, 0))
 
         self._srv_sync_status = ctk.CTkLabel(srv_btn_row, text="",
                                                font=ctk.CTkFont(size=10),
@@ -692,6 +714,99 @@ class SettingsTab(ctk.CTkFrame):
             pass
         return sorted(blocks, key=str.lower)
 
+    def _detect_user_level_now(self) -> None:
+        """Browser me demand page khol ke detect karta hai ki user GP level ka
+        hai ya PO level (Program Officer / Block level).
+
+        Detection: page par panchayat ka <select> dropdown HAI → PO (block
+        level). Dropdown NAHI hai (naam text me dikhta hai) → GP (panchayat
+        level). Result license_info me save hota hai aur server heartbeat ke
+        saath jaata hai — jisse web ADMIN PANEL user ka type dikha sake.
+        """
+        # Agar koi automation chal rahi hai to driver hijack nahi karte —
+        # dono ek hi browser share karte hain.
+        running = getattr(self.app, 'active_automations', None) or \
+            getattr(getattr(self.app, 'app_state', None),
+                    'active_automations', None)
+        if running:
+            messagebox.showwarning(
+                "Automation Running",
+                "Koi automation abhi chal rahi hai. Pehle use rok kar phir "
+                "'Detect Login Level' dabayein.",
+                parent=self.winfo_toplevel())
+            return
+        self._detect_level_btn.configure(state="disabled", text="⏳ Detecting...")
+        self._srv_sync_status.configure(text="⏳ Level detect ho raha hai...")
+
+        def _run_detect() -> None:
+            """Background thread — UI freeze nahi hota aur driver.get() ke
+            waqt app responsive rehta hai."""
+            level, label, err = None, None, None
+            try:
+                driver = self.app.get_driver()
+                if not driver:
+                    err = "Browser connect nahi hua. Pehle browser launch karein."
+                else:
+                    demand_url = "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx"
+                    driver.get(demand_url)
+                    try:
+                        # Panchayat dropdown mila → Block/PO login
+                        WebDriverWait(driver, 5).until(
+                            EC.presence_of_element_located(
+                                (By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
+                        level, label = "PO", "PO — Block Level (Program Officer)"
+                    except TimeoutException:
+                        # Dropdown nahi mila — ya to GP login (panchayat naam
+                        # text me) ya login-page redirect. Village dropdown
+                        # se confirm karte hain taaki GP ki jagah galat
+                        # 'login karo' na bole / login page ko GP na samjhe.
+                        try:
+                            WebDriverWait(driver, 3).until(
+                                EC.presence_of_element_located(
+                                    (By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
+                            level, label = "GP", "GP — Panchayat Level"
+                        except TimeoutException:
+                            err = ("Na panchayat dropdown mila, na village dropdown. "
+                                   "Aap shayad login nahi hain — pehle NREGA portal "
+                                   "par PO/GP login se login karein, phir dobara try "
+                                   "karein.")
+            except Exception as e:
+                err = str(e)
+            self.after(0, lambda: self._finish_detect(level, label, err))
+
+        import threading
+        threading.Thread(target=_run_detect, daemon=True).start()
+
+    def _finish_detect(self, level: Optional[str], label: Optional[str],
+                       err: Optional[str]) -> None:
+        """Detection result UI par dikhata hai (main thread par)."""
+        try:
+            self._detect_level_btn.configure(state="normal",
+                                             text="👤 Detect Login Level")
+        except Exception:
+            pass
+        if err:
+            try:
+                self._srv_sync_status.configure(text="")
+            except Exception:
+                pass
+            messagebox.showerror("Detection Failed", err,
+                                 parent=self.winfo_toplevel())
+            return
+        try:
+            self.app.set_user_level(level)
+        except Exception:
+            pass
+        try:
+            self._refresh_server_data_card()
+            self._srv_sync_status.configure(text=f"✅ {label}")
+        except Exception:
+            pass
+        messagebox.showinfo("Login Level Detected",
+                            f"👤 Aap {label} login ho.\n\nYe info Settings me save ho gayi hai "
+                            "aur server (admin panel) tak bhi jaati hai.",
+                            parent=self.winfo_toplevel())
+
     def _scrape_from_website(self) -> None:
         """
         Live NREGA website se ALL Panchayat aur unke saare Village data scrape karta hai.
@@ -717,70 +832,129 @@ class SettingsTab(ctk.CTkFrame):
                 driver.get(demand_url)
                 wait = WebDriverWait(driver, 15)
 
-                # ── Step 1: Get all panchayat names ──
+                # ── Step 1: Panchayat dropdown check — Block (PO) login vs
+                # Panchayat (GP) login ──
+                # Block login par panchayat ka <select> dropdown hota hai;
+                # GP login par NAHI — naam sirf page par text me dikhta hai.
+                # Pehle dropdown mila ya nahi, ye detect karte hain taaki GP
+                # users ke liye bhi ye feature kaam kare (timeout na ho).
                 self.after(0, lambda: self._scrape_status.configure(
                     text="⏳ Panchayat list fetch ho raha hai..."))
 
-                panch_select_el = wait.until(
-                    EC.presence_of_element_located(
-                        (By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
-                    )
-                )
-                panch_select = Select(panch_select_el)
-
-                panch_options = []  # list of (index, value, name)
-                for i, opt in enumerate(panch_select.options):
-                    val = opt.get_attribute("value")
-                    text = opt.text.strip()
-                    if val and val != "00" and text and text != "---Select---":
-                        panch_options.append((i, val, text.upper()))
-
-                if not panch_options:
-                    self.after(0, self._scrape_failed,
-                        "Panchayat dropdown me koi option nahi mila. Aap login nahi hain?")
-                    return
-
-                # ── Step 2: For EACH panchayat, select it and get villages ──
                 hm = self.app.history_manager
                 hier = get_hierarchy()
+                gp_mode = False
+                try:
+                    # Detection ke liye chhota timeout — GP page par 15s ka
+                    # wait nahi lagta (block-login branch me dobara 15s wait
+                    # se element milta hai).
+                    WebDriverWait(driver, 3).until(EC.presence_of_element_located(
+                        (By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
+                except TimeoutException:
+                    gp_mode = True
+                # Detected login level save karo — GP (Panchayat level) ya PO
+                # (Block level). Settings card + server (admin panel) me dikhega.
+                try:
+                    self.app.set_user_level("GP" if gp_mode else "PO")
+                except Exception:
+                    pass
 
                 all_panch_villages = {}  # {panchayat_name: [village_names]}
-                total_panch = len(panch_options)
 
-                for idx, (opt_idx, opt_val, panch_name) in enumerate(panch_options):
-                    self.after(0, lambda idx=idx, total=total_panch, name=panch_name: self._scrape_status.configure(
-                        text=f"⏳ [{idx+1}/{total}] {name} — villages scrape ho rahe hain..."))
+                if gp_mode:
+                    # ── GP login: no panchayat dropdown ──
+                    # Panchayat ka naam text label se, villages village
+                    # dropdown se scrape karte hain — sab kuch save ho jata hai.
+                    self.after(0, lambda: self._scrape_status.configure(
+                        text="⏳ GP login mila — panchayat + villages scrape ho rahe hain..."))
 
-                    try:
-                        # Re-find the panchayat select (it may have been refreshed by postback)
-                        panch_el = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
-                        p_select = Select(panch_el)
-                        p_select.select_by_index(opt_idx)
+                    panch_name = ""
+                    for lid in ("ctl00_ContentPlaceHolder1_panch",
+                                "ctl00_ContentPlaceHolder1_panch_lbl"):
+                        try:
+                            el = driver.find_element(By.ID, lid)
+                            txt = (el.text or "").strip()
+                            if txt and txt.upper() not in ("PANCHAYAT",
+                                                           "GRAM PANCHAYAT"):
+                                panch_name = txt
+                                break
+                        except Exception:
+                            continue
+                    if not panch_name:
+                        self.after(0, self._scrape_failed,
+                            "GP login par panchayat ka naam page par nahi mila. Login check karein.")
+                        return
 
-                        # Wait for village dropdown to update
-                        WebDriverWait(driver, 15).until(
-                            lambda d: len(Select(d.find_element(
-                                By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"
-                            )).options) > 1
+                    # Villages village dropdown se scrape karo
+                    v_el = wait.until(EC.presence_of_element_located(
+                        (By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
+                    v_select = Select(v_el)
+                    villages = []
+                    for opt in v_select.options:
+                        v_val = opt.get_attribute("value")
+                        v_text = opt.text.strip()
+                        if v_val and v_val != "00" and v_text and v_text != "---Select---":
+                            villages.append(v_text.upper())
+                    all_panch_villages[panch_name.upper()] = villages
+
+                else:
+                    # ── Block login: dropdown se sabhi panchayat ──
+                    panch_select_el = wait.until(
+                        EC.presence_of_element_located(
+                            (By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
                         )
+                    )
+                    panch_select = Select(panch_select_el)
 
-                        # Extract villages for THIS panchayat
-                        vill_el = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
-                        v_select = Select(vill_el)
+                    panch_options = []  # list of (index, value, name)
+                    for i, opt in enumerate(panch_select.options):
+                        val = opt.get_attribute("value")
+                        text = opt.text.strip()
+                        if val and val != "00" and text and text != "---Select---":
+                            panch_options.append((i, val, text.upper()))
 
-                        villages = []
-                        for opt in v_select.options:
-                            v_val = opt.get_attribute("value")
-                            v_text = opt.text.strip()
-                            if v_val and v_val != "00" and v_text and v_text != "---Select---":
-                                villages.append(v_text.upper())
+                    if not panch_options:
+                        self.after(0, self._scrape_failed,
+                            "Panchayat dropdown me koi option nahi mila. Aap login nahi hain?")
+                        return
 
-                        all_panch_villages[panch_name] = villages
+                    # ── Step 2: For EACH panchayat, select it and get villages ──
+                    total_panch = len(panch_options)
 
-                    except (StaleElementReferenceException, TimeoutException):
-                        # If panchayat selection fails, skip and continue
-                        all_panch_villages[panch_name] = []
-                        continue
+                    for idx, (opt_idx, opt_val, panch_name) in enumerate(panch_options):
+                        self.after(0, lambda idx=idx, total=total_panch, name=panch_name: self._scrape_status.configure(
+                            text=f"⏳ [{idx+1}/{total}] {name} — villages scrape ho rahe hain..."))
+
+                        try:
+                            # Re-find the panchayat select (it may have been refreshed by postback)
+                            panch_el = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
+                            p_select = Select(panch_el)
+                            p_select.select_by_index(opt_idx)
+
+                            # Wait for village dropdown to update
+                            WebDriverWait(driver, 15).until(
+                                lambda d: len(Select(d.find_element(
+                                    By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"
+                                )).options) > 1
+                            )
+
+                            # Extract villages for THIS panchayat
+                            vill_el = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
+                            v_select = Select(vill_el)
+
+                            villages = []
+                            for opt in v_select.options:
+                                v_val = opt.get_attribute("value")
+                                v_text = opt.text.strip()
+                                if v_val and v_val != "00" and v_text and v_text != "---Select---":
+                                    villages.append(v_text.upper())
+
+                            all_panch_villages[panch_name] = villages
+
+                        except (StaleElementReferenceException, TimeoutException):
+                            # If panchayat selection fails, skip and continue
+                            all_panch_villages[panch_name] = []
+                            continue
 
                 # ── Step 3: Save everything with hierarchy ──
                 saved_panch = 0
@@ -801,7 +975,7 @@ class SettingsTab(ctk.CTkFrame):
 
                 # ── Step 4: Show results ──
                 self.after(0, self._scrape_success,
-                           saved_panch, saved_vill, all_panch_villages)
+                           saved_panch, saved_vill, all_panch_villages, gp_mode)
 
             except TimeoutException:
                 self.after(0, self._scrape_failed,
@@ -815,7 +989,7 @@ class SettingsTab(ctk.CTkFrame):
         import threading
         threading.Thread(target=_run_scrape, daemon=True).start()
 
-    def _scrape_success(self, saved_panch, saved_vill, all_panch_villages):
+    def _scrape_success(self, saved_panch, saved_vill, all_panch_villages, gp_mode=False):
         """Update UI on successful scrape with full hierarchy data."""
         parts = []
         if saved_panch:
@@ -840,10 +1014,17 @@ class SettingsTab(ctk.CTkFrame):
             if len(all_panch_villages) > 20:
                 detail_lines.append(f"   ... aur {len(all_panch_villages) - 20} aur Panchayats")
 
+        gp_note = ""
+        if gp_mode:
+            gp_note = ("\n\n🎉 Panchayat/GP login detect hua — aapka panchayat aur uske "
+                       "villages add kar diye gaye. Ab aap bina panchayat dropdown ke bhi "
+                       "kaam kar sakte hain.")
+
         messagebox.showinfo(
             "✅ Scrape Complete",
             f"{result}\n\n" + "\n".join(detail_lines) +
-            "\n\nHierarchy bhi save ho gayi hai — Panchayat delete karenge to uske villages bhi delete ho jayenge.",
+            "\n\nHierarchy bhi save ho gayi hai — Panchayat delete karenge to uske villages bhi delete ho jayenge."
+            + gp_note,
             parent=self.winfo_toplevel()
         )
 
@@ -869,6 +1050,7 @@ class SettingsTab(ctk.CTkFrame):
             srv_state = (lic.get('user_state') or '').strip().upper()
             srv_dist  = (lic.get('user_district') or '').strip().upper()
             srv_block = (lic.get('user_block') or '').strip().upper()
+            user_level = (lic.get('user_level') or '').strip().upper()
 
             # Clear existing badges/labels, keep the frame itself
             for w in self._srv_vals_frame.winfo_children():
@@ -884,14 +1066,22 @@ class SettingsTab(ctk.CTkFrame):
                              font=ctk.CTkFont(size=11),
                              text_color=("#166534", "#86EFAC")).pack()
 
+            if user_level in ('GP', 'PO'):
+                _srv_badge(self._srv_vals_frame, "👤",
+                           "GP (Panchayat Level)" if user_level == 'GP' else "PO (Block Level)")
+            if srv_state:
+                _srv_badge(self._srv_vals_frame, "🏛️", srv_state)
+            if srv_dist:
+                _srv_badge(self._srv_vals_frame, "📍", srv_dist)
+            if srv_block:
+                _srv_badge(self._srv_vals_frame, "📦", srv_block)
+
             if srv_state or srv_dist or srv_block:
-                if srv_state:
-                    _srv_badge(self._srv_vals_frame, "🏛️", srv_state)
-                if srv_dist:
-                    _srv_badge(self._srv_vals_frame, "📍", srv_dist)
-                if srv_block:
-                    _srv_badge(self._srv_vals_frame, "📦", srv_block)
                 ctk.CTkLabel(self._srv_vals_frame, text="✅ Auto-synced from your license",
+                             font=ctk.CTkFont(size=10),
+                             text_color=("#166534", "#86EFAC")).pack(side="left", padx=(4, 0))
+            elif user_level in ('GP', 'PO'):
+                ctk.CTkLabel(self._srv_vals_frame, text="👤 Level automation se detect hua",
                              font=ctk.CTkFont(size=10),
                              text_color=("#166534", "#86EFAC")).pack(side="left", padx=(4, 0))
             else:

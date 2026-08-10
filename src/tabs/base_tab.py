@@ -3,7 +3,7 @@ import csv
 import tkinter
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
-import os, sys, platform, re
+import os, sys, platform, re, time
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont 
@@ -31,7 +31,7 @@ def _is_serial_col_name(name: Any) -> bool:
         return False
 
 # Module-level imports for selenium and openpyxl (P4: moved from lazy imports in method bodies)
-from selenium.common.exceptions import NoSuchWindowException, WebDriverException
+from selenium.common.exceptions import NoSuchWindowException, WebDriverException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -2005,6 +2005,243 @@ class BaseAutomationTab(ctk.CTkFrame):
             return True
         cleaned = name.strip().replace(".", "").replace(" ", "")
         return cleaned.isdigit()
+
+    # ────────────────────────────────────────────────────────────────
+    # PANCHAYAT / GP-LOGIN HELPERS — sabhi tabs ke liye CENTRALIZED
+    #
+    # Software ke 2 type ke users hote hain:
+    #   • Block level (PO login)      → portal par Panchayat ka <select>
+    #     dropdown hota hai — automation usme panchayat select karta hai.
+    #   • Panchayat level (GP login)  → portal par panchayat ka dropdown
+    #     NAHI hota; naam sirf text me dikhta hai. User sirf villages
+    #     select karke kaam karta hai.
+    #
+    # Har tab panchayat selection ke liye _select_panchayat_or_skip()
+    # use karta hai taaki dono login types har jagah ek jaisa behave
+    # karein. Ye helper wahi logic samet leta hai jo pehle kai tabs me
+    # alag-alag try/except se bikhra hua tha.
+    # ────────────────────────────────────────────────────────────────
+
+    def _find_panchayat_dropdown(self, driver: Any, wait: Any,
+                                 p_locators: List[Any], timeout: int = 3) -> Any:
+        """Panchayat <select> element return karta hai, ya None agar page par
+        panchayat dropdown NAHI hai (Panchayat/GP login — naam text me).
+
+        Detection ke liye FRESH `WebDriverWait(driver, timeout)` use hota hai
+        (caller ke lambay wait object par GP page par 15-20s nahi lagega).
+
+        p_locators: CSS ids (str) ya (By, selector) tuples ki list.
+        Sab strings ho to ek hi comma-joined CSS selector me try hota hai
+        (pehle wala behaviour), warna har locator alag-alag try hota hai.
+        """
+        locators = p_locators or []
+        if not locators:
+            return None
+        detection_wait = WebDriverWait(driver, timeout)
+        if all(isinstance(l, str) for l in locators):
+            try:
+                return detection_wait.until(EC.element_to_be_clickable(
+                    (By.CSS_SELECTOR, ", ".join(f"#{l}" for l in locators))))
+            except TimeoutException:
+                return None
+        for loc in locators:
+            try:
+                return detection_wait.until(EC.element_to_be_clickable(loc))
+            except TimeoutException:
+                continue
+        return None
+
+    @staticmethod
+    def _select_by_text_fuzzy(select_element: Any, target_text: str) -> bool:
+        """Case-insensitive select: pehle EXACT match, phir SUBSTRING match.
+
+        _select_by_text_case_insensitive ka improved version — kuch tabs
+        (Delete Demand, Zero MR, MR Fill) substring se match karte hain,
+        isliye centralized helper dono try karta hai.
+
+        Substring sirf tabhi select karta hai jab EXACTLY EK option match ho
+        (ambiguity par False → caller 'notfound' samjhega) — taaki galat
+        panchayat silently select na ho. True jab select ho gaya, False warna.
+        """
+        target_lower = (target_text or "").strip().lower()
+        if not target_lower:
+            return False
+        options = list(select_element.options)
+        for opt in options:
+            if opt.text.strip().lower() == target_lower:
+                select_element.select_by_visible_text(opt.text)
+                return True
+        matches = [opt for opt in options if target_lower in opt.text.strip().lower()]
+        if len(matches) == 1:
+            select_element.select_by_visible_text(matches[0].text)
+            return True
+        return False
+
+    def _read_gp_panchayat(self, driver: Any, label_ids: Any = ()) -> str:
+        """GP-login pages par panchayat ka naam TEXT me hota hai (dropdown
+        nahi) — label span se padh kar return karta hai.
+
+        E.g. Demand page: <span id="ctl00_ContentPlaceHolder1_panch">CHOWDAPURA</span>
+        """
+        for lid in (label_ids or ()):
+            try:
+                el = driver.find_element(By.ID, lid)
+                txt = (el.text or "").strip()
+                if txt and txt.upper() not in ("PANCHAYAT", "GRAM PANCHAYAT",
+                                               "SELECT", "---SELECT---", ""):
+                    return txt
+            except Exception:
+                continue
+        return ""
+
+    def _wait_for_dropdown_options(self, driver: Any, wait: Any,
+                                   ids: List[str], label: str) -> None:
+        """Dependent <select> ke options populate hone ka wait (postback).
+        Fail hone par bhi nahi rukta — caller apna kaam continue kare."""
+        ids = ids or []
+        if not ids:
+            return
+        self.log_info(f"Waiting for {label}...")
+        try:
+            wait.until(EC.any_of(*[
+                EC.presence_of_element_located(
+                    (By.XPATH, f"//select[@id='{i}']/option[position()>1]"))
+                for i in ids
+            ]))
+            time.sleep(0.4)  # partial postback settle hone de
+        except Exception:
+            pass
+
+    def _select_panchayat_or_skip(self, driver: Any, wait: Any,
+                                  panchayat_name: str, p_locators: List[Any],
+                                  v_ids: Optional[List[str]] = None,
+                                  label_ids: Any = (), timeout: int = 3) -> Tuple[str, str]:
+        """CENTRAL panchayat handler — har automation tab yahi use karta hai.
+
+        Block/PO login (dropdown present):
+            `panchayat_name` select hota hai (exact→substring, case-
+            insensitive) aur v_ids diye hone par village dropdown ke
+            populate hone ka wait hota hai.
+        Panchayat/GP login (dropdown nahi):
+            Selection SKIP hota hai — caller seedha villages par chala
+            jata hai. GP page par panchayat ka naam text me hota hai
+            (label_ids se padha jata hai) taaki settings me save ho sake.
+
+        Returns:
+            (status, panchayat_used)
+              status:
+                "gp"        → page par panchayat dropdown nahi mila (skip).
+                "selected"  → dropdown mila aur panchayat select ho gaya.
+                "missing"   → dropdown mila par panchayat_name khali hai
+                              (caller decide kare — PO login par required).
+                "notfound"  → dropdown mila par panchayat_name usme nahi.
+              panchayat_used → record karne layak naam (GP login par page-
+                              text fallback, warna panchayat_name).
+        """
+        pd = self._find_panchayat_dropdown(driver, wait, p_locators, timeout=timeout)
+        name = (panchayat_name or "").strip()
+        if pd is None:
+            # ── Panchayat/GP login: no dropdown → skip selection ──
+            self.log_info("Panchayat dropdown not found — Panchayat/GP login mode. "
+                          "Skipping panchayat selection.")
+            self._record_user_level(True)  # GP = Panchayat level
+            used = name or self._read_gp_panchayat(driver, label_ids)
+            if v_ids:
+                self._wait_for_dropdown_options(driver, wait, v_ids,
+                                                "villages (GP mode)")
+            return "gp", used
+        # ── Block/PO login: dropdown present → select panchayat ──
+        self.log_info("Panchayat dropdown found — Block/PO login.")
+        self._record_user_level(False)  # PO = Block level / Program Officer
+        if not name:
+            return "missing", ""
+        if not self._select_by_text_fuzzy(Select(pd), name):
+            return "notfound", name
+        if v_ids:
+            self._wait_for_dropdown_options(driver, wait, v_ids,
+                                            "villages after panchayat selection")
+        return "selected", name
+
+    def _record_user_level(self, is_gp_login: bool) -> None:
+        """Detected login level ko app me save karta hai.
+
+        GP login (no panchayat dropdown) → 'GP' (Panchayat level).
+        Block/PO login (dropdown present) → 'PO' (Program Officer / Block level).
+
+        Har tab ki automation central helper se detect karti hai — ye method
+        app ke set_user_level() se persist karta hai, jo server heartbeat ke
+        saath bhi jaata hai (web admin panel user ka type dikha sake).
+        """
+        try:
+            app = getattr(self, 'app', None)
+            if app is None:
+                return
+            setter = getattr(app, 'set_user_level', None)
+            if setter:
+                setter("GP" if is_gp_login else "PO")
+        except Exception:
+            pass
+
+    def _fetch_panchayats_from_website(self, driver: Any, wait: Any,
+                                       p_locators: List[Any],
+                                       saved_mode: bool = False,
+                                       timeout: int = 5) -> Tuple[List[str], bool]:
+        """Website ke panchayat dropdown se saare panchayat names fetch karta
+        hai (🌐 All / ⭐ My Saved Panchayats mode ke liye).
+
+        GP login (no dropdown) par:
+          - saved_mode (⭐ My Saved Panchayats) → user ke Settings me saved
+            panchayats directly use hote hain (GP user ke liye yahi kaam karta
+            hai — timeout ki jagah saved list se chalta hai).
+          - warna (🌐 All Panchayats) → [] return hota hai — caller warning
+            dekar stop kar dega (All mode ke liye Block/PO login chahiye).
+
+        Returns (names, is_gp):
+          names  → process karne layak panchayat names.
+          is_gp  → True jab page par panchayat dropdown nahi mila.
+        """
+        dd = self._find_panchayat_dropdown(driver, wait, p_locators, timeout=timeout)
+        if dd is None:
+            self._record_user_level(True)  # GP = Panchayat level
+            if saved_mode:
+                saved = self._get_saved_panchayats()
+                self.log_info(f"GP login — no panchayat dropdown; using {len(saved)} "
+                              "saved panchayat(s) from Settings.")
+                return saved, True
+            self.log_info("GP login — panchayat dropdown nahi mila "
+                          "(🌐 All Panchayats mode ke liye Block/PO login chahiye).")
+            return [], True
+        self._record_user_level(False)  # PO = Block level / Program Officer
+        names = [t for t in self._get_select_option_texts(Select(dd)) if t]
+        return names, False
+
+    def _save_panchayat_villages_to_settings(self, panchayat: str,
+                                             villages: Any) -> None:
+        """Panchayat + uske villages ko Settings > Location Data me save
+        karta hai (history keys + location hierarchy).
+
+        GP (panchayat-level) users ke liye bhi kaam karta hai — unhe panchayat
+        dropdown se select karne ki zaroorat nahi; automation ke time unka
+        panchayat aur villages automatically add ho jate hain.
+        """
+        panchayat = (panchayat or "").strip()
+        if not panchayat:
+            return
+        try:
+            hm = self.app.history_manager
+            for k in ("location_panchayat", "panchayat_name", "panchayat"):
+                hm.save_entry(k, panchayat)
+            from src.location_hierarchy import get_hierarchy
+            hier = get_hierarchy()
+            for v in (villages or []):
+                v = (v or "").strip()
+                if not v:
+                    continue
+                for k in ("location_village", "village_name"):
+                    hm.save_entry(k, v)
+                hier.add_child("Panchayat", panchayat, "Village", v)
+        except Exception as e:
+            logger.debug(f"Failed to save panchayat/villages to settings: {e}")
 
     # ────────────────────────────────────────────────────────────────
     # LOCATION HIERARCHY HELPERS
