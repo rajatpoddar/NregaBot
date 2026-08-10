@@ -25,6 +25,7 @@ from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from src import config
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger, truncate_workcode
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
@@ -64,8 +65,7 @@ class MbEntryTab(BaseAutomationTab):
         """Creates and places all UI elements for this tab."""
         
         # --- Header / intro card (P7.2: pending-bills style) ---
-        self._create_header_card(self, "📝", "eMB Entry",
-                                 "Enter measurements for Muster Rolls directly into the eMB portal.",
+        self._create_header_card(self, "📝", tr("tab.mb_entry.title"), tr("tab.mb_entry.subtitle"),
                                  icon_key="emoji_mb_entry")
 
         # --- Tab View (top): Settings | Work Codes | Results | Logs ---
@@ -92,7 +92,7 @@ class MbEntryTab(BaseAutomationTab):
         self.config_vars["location_panchayat"].trace_add("write", self._on_panchayat_change_debounced)
         
         # --- MB No. with Auto Checkbox ---
-        ctk.CTkLabel(config_frame, text="MB No.").grid(row=1, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(config_frame, text=tr("form.mb_entry.mb_no")).grid(row=1, column=0, sticky='w', padx=15, pady=5)
         mb_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
         mb_frame.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
         mb_frame.grid_columnconfigure(0, weight=1)
@@ -103,7 +103,7 @@ class MbEntryTab(BaseAutomationTab):
         self.mb_no_entry.grid(row=0, column=0, sticky='ew')
 
         self.auto_mb_no_checkbox = ctk.CTkCheckBox(
-            mb_frame, text="Auto", variable=self.auto_mb_no_var,
+            mb_frame, text=tr("form.mb_entry.auto"), variable=self.auto_mb_no_var,
             command=self._toggle_mb_no_entry
         )
         self.auto_mb_no_checkbox.grid(row=0, column=1, padx=(10, 0))
@@ -122,15 +122,13 @@ class MbEntryTab(BaseAutomationTab):
         info_card.grid(row=4, column=0, columnspan=4, sticky="ew", padx=15, pady=(10, 15))
         info_card.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
-            info_card, text="💡 Usage Notes",
+            info_card, text=tr("form.mb_entry.usage_notes"),
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
         ).grid(row=0, column=0, sticky="w", padx=14, pady=(10, 2))
         ctk.CTkLabel(
             info_card,
-            text=("• Use this eMB automation only for single activity works.\n"
-                  "• Workcode box khaali chhod kar 'Start Automation' dabayein — "
-                  "saare available works ek-ek karke auto-fill ho jayenge!"),
+            text=tr("form.mb_entry.info_card_text"),
             justify="left", anchor="w", font=ctk.CTkFont(size=11),
             text_color=(config.COLORS["text_dark_alt"], config.COLORS["text_light"])
         ).grid(row=1, column=0, sticky="w", padx=14, pady=(0, 10))
@@ -145,10 +143,10 @@ class MbEntryTab(BaseAutomationTab):
         wc_controls_frame = ctk.CTkFrame(work_codes_frame, fg_color="transparent")
         wc_controls_frame.grid(row=0, column=0, sticky='ew')
         
-        clear_button = ctk.CTkButton(wc_controls_frame, text="Clear", width=80, command=lambda: self.work_codes_text.delete("1.0", tkinter.END))
+        clear_button = ctk.CTkButton(wc_controls_frame, text=tr("common.clear"), width=80, command=lambda: self.work_codes_text.delete("1.0", tkinter.END))
         clear_button.pack(side='right', pady=(5,0), padx=(0,5))
         
-        extract_button = ctk.CTkButton(wc_controls_frame, text="Extract from Text", width=120,
+        extract_button = ctk.CTkButton(wc_controls_frame, text=tr("common.extract_from_text"), width=120,
                                        command=lambda: self._extract_and_update_workcodes(self.work_codes_text))
         extract_button.pack(side='right', pady=(5,0), padx=(0, 5))
         
@@ -164,7 +162,7 @@ class MbEntryTab(BaseAutomationTab):
         export_controls_frame.pack(side='right', padx=(10, 0))
         
         # Updated Export Menu
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report, fg_color="#107C10")
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"), command=self.export_report, fg_color="#107C10")
         self.export_button.pack(side='left')
 
         # --- Results Treeview ---
@@ -279,7 +277,7 @@ class MbEntryTab(BaseAutomationTab):
         else:
             self.mb_no_entry.configure(state="disabled")
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_logs")):
             self._mr_tracking_panchayat_data = None
             self._load_inputs()
             self.config_vars['location_panchayat'].set("") 
@@ -303,7 +301,7 @@ class MbEntryTab(BaseAutomationTab):
         all_items = self.results_tree.get_children()
         
         if not all_items:
-            messagebox.showinfo("Retry", "No results found to retry.")
+            messagebox.showinfo(tr("base.error_tab.retry_btn"), tr("base.retry_no_results"))
             return
 
         for item_id in all_items:
@@ -317,10 +315,10 @@ class MbEntryTab(BaseAutomationTab):
                 failed_items.append(work_code)
         
         if not failed_items:
-            messagebox.showinfo("Great!", "No failed items found.")
+            messagebox.showinfo(tr("dialogs.great"), tr("base.retry_no_fails"))
             return
 
-        if not messagebox.askyesno("Retry Failed", f"Found {len(failed_items)} failed items.\nDo you want to retry them now?"):
+        if not messagebox.askyesno(tr("base.retry_confirm_title"), tr("dialogs.retry_failed_now", count=len(failed_items))):
             return
 
         # 1. Update Input Widget
@@ -338,18 +336,18 @@ class MbEntryTab(BaseAutomationTab):
     def start_automation(self) -> None:
         cfg = {key: var.get().strip() for key, var in self.config_vars.items()}
         if not self.auto_mb_no_var.get() and not cfg.get("measurement_book_no"):
-            messagebox.showwarning("Input Error", "MB No. field is required when 'Auto' is unchecked.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.mb_no_required"))
             return
         required_fields = ["location_panchayat", "page_no", "unit_cost", "default_pit_count", "mate_name"]
         if any(not cfg.get(key) for key in required_fields):
-            messagebox.showwarning("Input Error", "All configuration fields must be filled out.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.all_config_required"))
             return
         work_codes_raw = [line.strip() for line in self.work_codes_text.get("1.0", tkinter.END).strip().splitlines() if line.strip()]
         
         if not work_codes_raw:
             proceed = messagebox.askyesno(
-                "No Work Codes",
-                "No work codes entered. This will process ALL available works from the 'Select Work' dropdown on the portal.\n\nContinue?"
+                tr("form.mb_entry.no_work_codes"),
+                tr("form.mb_entry.no_work_codes_msg")
             )
             if not proceed:
                 return
@@ -388,7 +386,7 @@ class MbEntryTab(BaseAutomationTab):
 
             mate_names_list = [name.strip() for name in cfg["mate_name"].split(',') if name.strip()]
             if not mate_names_list:
-                messagebox.showerror("Input Error", "Please provide at least one Mate Name.")
+                messagebox.showerror(tr("errors.input_error"), tr("dialogs.mate_name_required"))
                 return
 
             # Determine which panchayats to process
@@ -405,7 +403,7 @@ class MbEntryTab(BaseAutomationTab):
                 saved_mode = panchayat_target == config.MY_PANCHAYATS_LABEL
                 if all_mode:
                     driver.get(config.MB_ENTRY_CONFIG["url"])
-                    # Central helper — GP login par dropdown nahi hota; ⭐ My
+                    # Central helper — GP login has no dropdown; ⭐ My
                     # Saved mode me Settings ke saved panchayats directly use.
                     panchayats_to_process, _is_gp = self._fetch_panchayats_from_website(
                         driver, wait, ['ctl00_ContentPlaceHolder1_ddl_panch'],
@@ -463,11 +461,11 @@ class MbEntryTab(BaseAutomationTab):
             final_msg = "Automation finished." if not self.is_stopped() else "Stopped."
             self.app.after(0, self.update_status, final_msg, 1.0)
             if not self.is_stopped():
-                messagebox.showinfo("Complete", "e-MB Entry process has finished.")
+                messagebox.showinfo(tr("dialogs.complete"), tr("dialogs.emb_finished"))
         
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
-            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
+            messagebox.showerror(tr("base.automation_error.title"), tr("dialogs.an_error_occurred_detail", error=e))
         finally:
             # Count success/fail from results_tree
             success_count = 0
@@ -501,7 +499,7 @@ class MbEntryTab(BaseAutomationTab):
 
             try:
                 # Central helper — GP login (no panchayat dropdown) par
-                # selection skip hota hai, koi timeout/error nahi aata.
+                # selection is skipped; no timeout/error occurs.
                 status, _ = self._select_panchayat_or_skip(
                     driver, wait, cfg['location_panchayat'],
                     ['ctl00_ContentPlaceHolder1_ddl_panch'])

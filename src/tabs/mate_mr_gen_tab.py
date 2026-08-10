@@ -25,6 +25,7 @@ from selenium.common.exceptions import (
 )
 
 from src import config
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -53,8 +54,7 @@ class MateMrGenTab(BaseAutomationTab):
     #  UI Construction                                                     #
     def _create_widgets(self) -> None:
         # --- Header / intro card (P7.2: pending-bills style) ---
-        self._create_header_card(self, "🧑‍🏭", "Mate / Mistri MR Generation",
-                                 "Generate blank Mate/Mistri (Skilled/Semi-Skilled) Muster Rolls.",
+        self._create_header_card(self, "🧑‍🏭", tr("tab.mate_mr_gen.title"), tr("tab.mate_mr_gen.subtitle"),
                                  icon_key="emoji_mr_gen")
 
         # --- Main Notebook (Settings | Work Search Keys | Results | Logs) ---
@@ -75,7 +75,7 @@ class MateMrGenTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure((1, 3), weight=1)
 
         # Row 0 – Panchayat
-        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("common.panchayat_name_label")).grid(
             row=0, column=0, sticky='w', padx=15, pady=(15, 0))
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
@@ -85,11 +85,11 @@ class MateMrGenTab(BaseAutomationTab):
 
 
         # Row 2 – Dates
-        ctk.CTkLabel(controls_frame, text="तारीख से:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("form.mr_gen.date_from")).grid(
             row=2, column=0, sticky='w', padx=15, pady=5)
         start_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         start_date_frame.grid(row=2, column=1, sticky='ew', padx=(15, 5), pady=5)
-        self.start_date_entry = ctk.CTkEntry(start_date_frame, placeholder_text="DD/MM/YYYY")
+        self.start_date_entry = ctk.CTkEntry(start_date_frame, placeholder_text=tr("common.date_format"))
         self.start_date_entry.pack(side="left", fill="x", expand=True)
         ctk.CTkButton(
             start_date_frame, text="📅", width=30,
@@ -98,11 +98,11 @@ class MateMrGenTab(BaseAutomationTab):
                 lambda d: [self.start_date_entry.delete(0, "end"), self.start_date_entry.insert(0, d)])
         ).pack(side="right", padx=(5, 0))
 
-        ctk.CTkLabel(controls_frame, text="तारीख को:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("form.mr_gen.date_to")).grid(
             row=2, column=2, sticky='w', padx=10, pady=5)
         end_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         end_date_frame.grid(row=2, column=3, sticky='ew', padx=(5, 15), pady=5)
-        self.end_date_entry = ctk.CTkEntry(end_date_frame, placeholder_text="DD/MM/YYYY")
+        self.end_date_entry = ctk.CTkEntry(end_date_frame, placeholder_text=tr("common.date_format"))
         self.end_date_entry.pack(side="left", fill="x", expand=True)
         ctk.CTkButton(
             end_date_frame, text="📅", width=30,
@@ -112,19 +112,19 @@ class MateMrGenTab(BaseAutomationTab):
         ).pack(side="right", padx=(5, 0))
 
         # Row 3 – No. of MRs to print & Workers per MR
-        ctk.CTkLabel(controls_frame, text="No. of MRs to Print:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("form.mate_mr.no_of_mrs")).grid(
             row=3, column=0, sticky='w', padx=15, pady=5)
-        self.num_mr_entry = ctk.CTkEntry(controls_frame, placeholder_text="e.g. 5")
+        self.num_mr_entry = ctk.CTkEntry(controls_frame, placeholder_text=tr("form.mate_mr.eg_5"))
         self.num_mr_entry.grid(row=3, column=1, sticky='ew', padx=(15, 5), pady=5)
 
-        ctk.CTkLabel(controls_frame, text="Workers per MR Form:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("form.mate_mr.workers_per_form")).grid(
             row=3, column=2, sticky='w', padx=10, pady=5)
         self.workers_per_mr_entry = ctk.CTkEntry(
-            controls_frame, placeholder_text="e.g. 10")
+            controls_frame, placeholder_text=tr("form.mate_mr.eg_10"))
         self.workers_per_mr_entry.grid(row=3, column=3, sticky='ew', padx=(5, 15), pady=5)
 
         # Row 4 – Output action
-        ctk.CTkLabel(controls_frame, text="Output Action:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("common.output_action")).grid(
             row=4, column=0, sticky='w', padx=15, pady=5)
         self.output_action_var = ctk.StringVar(value="Save as PDF")
         self.output_action_menu = ctk.CTkOptionMenu(
@@ -132,14 +132,14 @@ class MateMrGenTab(BaseAutomationTab):
         self.output_action_menu.grid(row=4, column=1, sticky='ew', padx=(15, 5), pady=5)
 
         # Row 5 – Orientation & Scale
-        ctk.CTkLabel(controls_frame, text="Orientation:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("common.orientation")).grid(
             row=5, column=0, sticky='w', padx=15, pady=5)
         self.orientation_var = ctk.StringVar(value="Landscape")
         self.orientation_segmented_button = ctk.CTkSegmentedButton(
             controls_frame, variable=self.orientation_var, values=["Landscape", "Portrait"])
         self.orientation_segmented_button.grid(row=5, column=1, sticky='ew', padx=(15, 5), pady=5)
 
-        ctk.CTkLabel(controls_frame, text="PDF Scale:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("common.pdf_scale")).grid(
             row=5, column=2, sticky='w', padx=10, pady=5)
         scale_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         scale_frame.grid(row=5, column=3, sticky="ew", padx=(5, 15), pady=5)
@@ -153,7 +153,7 @@ class MateMrGenTab(BaseAutomationTab):
 
         ctk.CTkLabel(
             controls_frame,
-            text="💡 Mate/Mistri MRs saved in 'Downloads/NregaBot/MateMR_Output'.",
+            text=tr("form.mate_mr.output_hint"),
             text_color="gray50"
         ).grid(row=6, column=0, columnspan=4, sticky='e', padx=15, pady=(5, 15))
 
@@ -167,11 +167,11 @@ class MateMrGenTab(BaseAutomationTab):
         wc_controls = ctk.CTkFrame(work_codes_tab, fg_color="transparent")
         wc_controls.grid(row=0, column=0, sticky='ew')
         ctk.CTkButton(
-            wc_controls, text="Clear", width=80,
+            wc_controls, text=tr("common.clear"), width=80,
             command=lambda: self.work_codes_text.delete("1.0", tkinter.END)
         ).pack(side='right', pady=(5, 0), padx=(0, 5))
         ctk.CTkButton(
-            wc_controls, text="Extract from Text", width=120,
+            wc_controls, text=tr("common.extract_from_text"), width=120,
             command=lambda: self._extract_and_update_workcodes(self.work_codes_text)
         ).pack(side='right', pady=(5, 0), padx=(0, 5))
         self.work_codes_text = ctk.CTkTextbox(work_codes_tab, height=100)
@@ -184,24 +184,24 @@ class MateMrGenTab(BaseAutomationTab):
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, sticky="ew", pady=(5, 10), padx=5)
         self.merge_pdfs_button = ctk.CTkButton(
-            results_action_frame, text="Merge Saved PDFs", command=self.merge_saved_pdfs)
+            results_action_frame, text=tr("common.merge_saved_pdfs"), command=self.merge_saved_pdfs)
         self.merge_pdfs_button.pack(side='left', padx=(0, 10))
 
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
         self.export_button = ctk.CTkButton(
-            export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+            export_controls_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side='left')
 
         summary_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         summary_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         summary_frame.grid_columnconfigure((0, 1), weight=1)
         self.success_label = ctk.CTkLabel(
-            summary_frame, text="Success: 0",
+            summary_frame, text=tr("common.success_default"),
             text_color="#2E8B57", font=ctk.CTkFont(weight="bold"))
         self.success_label.grid(row=0, column=0, sticky='w')
         self.skipped_label = ctk.CTkLabel(
-            summary_frame, text="Skipped/Failed: 0",
+            summary_frame, text=tr("common.skipped_failed_default"),
             text_color="#DAA520", font=ctk.CTkFont(weight="bold"))
         self.skipped_label.grid(row=0, column=1, sticky='w')
 
@@ -302,8 +302,8 @@ class MateMrGenTab(BaseAutomationTab):
         self.safe_tree_clear()
         self.success_count, self.skipped_count = 0, 0
         self.current_session_files = []
-        self.success_label.configure(text="Success: 0")
-        self.skipped_label.configure(text="Skipped/Failed: 0")
+        self.success_label.configure(text=tr("common.success_default"))
+        self.skipped_label.configure(text=tr("common.skipped_failed_default"))
 
         inputs = {
             'panchayat':      self.panchayat_var.get().strip(),
@@ -332,11 +332,11 @@ class MateMrGenTab(BaseAutomationTab):
             return
 
         if not inputs['workers_per_mr'].isdigit():
-            messagebox.showwarning("Input Error", "'Workers per MR Form' must be a number.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.mr_num_error"))
             return
 
         if inputs['num_mr'] and not inputs['num_mr'].isdigit():
-            messagebox.showwarning("Input Error", "'No. of MRs to Print' must be a number.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.mr_count_error"))
             return
 
         self.app.update_history("location_panchayat", inputs['panchayat'])
@@ -353,7 +353,7 @@ class MateMrGenTab(BaseAutomationTab):
             if "success" not in str(values[3]).lower():
                 failed_items.append(str(values[2]))
         if not failed_items:
-            messagebox.showinfo("Retry", "No failed items found to retry.")
+            messagebox.showinfo(tr("base.error_tab.retry_btn"), tr("dialogs.no_failed_to_retry"))
             return
         if not messagebox.askyesno(
                 "Retry Failed",
@@ -368,7 +368,7 @@ class MateMrGenTab(BaseAutomationTab):
         self.update_status("Retrying failed items...", 0.0)
         self.start_automation()
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_logs")):
             self.panchayat_var.set("")
             self.start_date_entry.delete(0, "end")
             self.end_date_entry.delete(0, "end")
@@ -382,8 +382,8 @@ class MateMrGenTab(BaseAutomationTab):
             self.safe_tree_clear()
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
-            self.success_label.configure(text="Success: 0")
-            self.skipped_label.configure(text="Skipped/Failed: 0")
+            self.success_label.configure(text=tr("common.success_default"))
+            self.skipped_label.configure(text=tr("common.skipped_failed_default"))
             self.log_info("Form has been reset.")
             self.app.after(0, self.app.set_status, "Ready")
 
@@ -400,7 +400,7 @@ class MateMrGenTab(BaseAutomationTab):
             return output_dir
         except Exception as e:
             self.log_error(f"Error creating output directory: {e}")
-            messagebox.showerror("Directory Error", f"Could not create output directory: {e}")
+            messagebox.showerror(tr("dialogs.directory_error"), tr("dialogs.could_not_create_output_dir", error=e))
             return None
 
     #  Automation logic (runs in thread)                                  #
@@ -465,8 +465,8 @@ class MateMrGenTab(BaseAutomationTab):
             self.log_info(f"Batch Finished. Output: {output_dir}")
             return
         if self.success_count > 0 and output_dir and os.path.exists(output_dir):
-            if messagebox.askyesno("Task Finished",
-                                   f"{summary}\n\nOpen the output folder?"):
+            if messagebox.askyesno(tr("dialogs.task_finished"),
+                                   tr("dialogs.open_output_folder", summary=summary)):
                 self.app.open_folder(output_dir)
         else:
             self.log_info(f"📊 {summary}")
@@ -479,13 +479,13 @@ class MateMrGenTab(BaseAutomationTab):
         try:
             self.log_info("Validating Panchayat name...")
             driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
-            # Central helper — GP login par agency/panchayat dropdown nahi
-            # hota; validation skip karke True (aage badho).
+            # Central helper — GP login has no agency/panchayat dropdown;
+            # skip validation and return True (continue).
             status, _ = self._select_panchayat_or_skip(
                 driver, wait, config.AGENCY_PREFIX + location_panchayat,
                 ["exe_agency"])
             if status == "gp":
-                self.log_info("GP login detected — panchayat dropdown nahi hai, validation skip.")
+                self.log_info("GP login detected — no panchayat dropdown, validation skipped.")
                 return True
             if status != "selected":
                 err = (f"Panchayat '{location_panchayat}' not found on the portal. "
@@ -493,7 +493,7 @@ class MateMrGenTab(BaseAutomationTab):
                 if "macro" in self.app.active_automations:
                     self.log_error(f"Skipping: {err}")
                     return False
-                messagebox.showerror("Validation Error", err)
+                messagebox.showerror(tr("dialogs.validation_error"), err)
                 return False
             self.log_success("Panchayat name is valid.")
             return True
@@ -592,8 +592,7 @@ class MateMrGenTab(BaseAutomationTab):
                 status, _ = self._select_panchayat_or_skip(
                     driver, wait, config.AGENCY_PREFIX + inputs['panchayat'],
                     ["exe_agency"])
-                if status == "gp":
-                    self.log_info("   - GP login — panchayat dropdown nahi, selection skip.")
+                if status == "gp":                     self.log_info("   - GP login — no panchayat dropdown, selection skipped.")
             else:
                 self.log_info("   - Panchayat not provided, skipping selection.")
 
@@ -877,7 +876,7 @@ class MateMrGenTab(BaseAutomationTab):
         except Exception as e:
             msg = f"An unexpected error occurred while printing: {e}"
             self.log_error(msg)
-            self.app.after(0, lambda: messagebox.showwarning("Print Error", msg))
+            self.app.after(0, lambda: messagebox.showwarning(tr("dialogs.print_error"), msg))
 
     #  Export report                                                      #
     def export_report(self):
@@ -890,11 +889,11 @@ class MateMrGenTab(BaseAutomationTab):
 
     def _get_filtered_data_and_filepath(self, export_format):
         if not self.results_tree.get_children():
-            messagebox.showinfo("No Data", "No results to export.")
+            messagebox.showinfo(tr("dialogs.no_data"), tr("dialogs.no_results_export"))
             return None, None
         location_panchayat = self.panchayat_var.get().strip()
         if not location_panchayat:
-            messagebox.showwarning("Input Needed", "Panchayat Name is required for report title.")
+            messagebox.showwarning(tr("dialogs.input_needed"), tr("dialogs.panchayat_name_for_title"))
             return None, None
 
         filter_option = self.export_filter_menu.get()
@@ -910,7 +909,7 @@ class MateMrGenTab(BaseAutomationTab):
                 data_to_export.append(row_values)
 
         if not data_to_export:
-            messagebox.showinfo("No Data", f"No records for filter '{filter_option}'.")
+            messagebox.showinfo(tr("dialogs.no_data"), tr("dialogs.no_records_filter", filter=filter_option))
             return None, None
 
         safe_name = "".join(
@@ -925,7 +924,7 @@ class MateMrGenTab(BaseAutomationTab):
             filetypes=details['types'],
             initialdir=self.app.get_report_path("Mate MR"),
             initialfile=filename,
-            title="Save Report")
+            title=tr("common.save_report"))
         return (data_to_export, file_path) if file_path else (None, None)
 
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
@@ -954,7 +953,7 @@ class MateMrGenTab(BaseAutomationTab):
         self.log_info(f"Merging {len(pdf_files)} files generated in this session.")
 
         dialog = ctk.CTkInputDialog(
-            text="Enter a base name for the merged file:", title="Merge PDFs")
+            text=tr("common.merge_base_name"), title=tr("common.merge_pdfs"))
         base_name = dialog.get_input()
         if not base_name:
             self.log_info("Merge cancelled.")
@@ -972,7 +971,7 @@ class MateMrGenTab(BaseAutomationTab):
                 output_path = os.path.join(merge_dir, file_name)
                 count += 1
         except Exception as e:
-            messagebox.showerror("Path Error", f"Could not create merge path: {e}", parent=self)
+            messagebox.showerror(tr("dialogs.path_error"), tr("dialogs.could_not_create_merge_path", error=e), parent=self)
             return
 
         self.app.start_automation_thread(
@@ -981,7 +980,7 @@ class MateMrGenTab(BaseAutomationTab):
     def _run_merge_logic(self, file_list, output_path):
         if PdfWriter is None:
             self.log_error("PDF library (pypdf/PyPDF2) not installed. Please reinstall the latest version from nregabot.com.")
-            messagebox.showerror("PDF Library Missing", "PDF merge requires the 'pypdf' library.\n\nSmart updates cannot add new Python libraries — please download the latest full version from nregabot.com.")
+            messagebox.showerror(tr("dialogs.pdf_lib_missing"), tr("dialogs.pdf_lib_missing_msg"))
             return
         self.app.after(0, self.set_ui_state, True)
         self.log_info(f"Merging {len(file_list)} files...")
@@ -1002,11 +1001,11 @@ class MateMrGenTab(BaseAutomationTab):
             messagebox.showinfo(
                 "Success",
                 f"Merged {len(file_list)} files into:\n{output_path}", parent=self)
-            if messagebox.askyesno("Open Location?", "Open the Merged PDFs folder?", parent=self):
+            if messagebox.askyesno(tr("dialogs.open_location"), tr("dialogs.open_merged_folder"), parent=self):
                 self.app.open_folder(os.path.dirname(output_path))
         except Exception as e:
             self.log_error(f"Merge error: {e}")
-            messagebox.showerror("Merge Error", f"An error occurred: {e}", parent=self)
+            messagebox.showerror(tr("dialogs.merge_error"), tr("dialogs.merge_error_generic", error=e), parent=self)
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")

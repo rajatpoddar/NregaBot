@@ -361,77 +361,76 @@ def mask_columns_rows(columns: List[str], rows: List[List]) -> tuple:
         return columns, rows
 
 
-# ── Error translation (user-friendly Hinglish) ───────────────────
-# India-level UX: raw Selenium/exception messages ko aam users nahi
-# samajhte. translate_error() generic errors ka friendly Hinglish deta hai.
-# NOTE: Developer/admin ke liye ORIGINAL message hamesha log hota rehta
-# hai — ye translation sirf user-facing text/dialog me use hota hai.
+# ── Error translation (clean English) ──────────────────────────
+# Raw Selenium/exception messages → user-friendly English.
+# The ORIGINAL exception is always logged for developers.
+# This translation is only used in user-facing dialogs.
 _ERROR_TRANSLATIONS = [
     # (pattern, translated) — lowercase substring match, first hit wins.
-    # Exception class names (bina space) pehle rakhe hain — Selenium ke
-    # class names me spaces nahi hote.
+    # Exception class names (no spaces) first — Selenium class names
+    # don't have spaces.
     ("staleelementreferenceexception",
-     "Page refresh hone ki wajah se element milne me problem hui. Retry karein."),
+     "Could not find the element because the page refreshed. Please try again."),
     ("nosuchwindowexception",
-     "Browser tab/window band ho gaya — automation ruk gaya. Browser dobara kholkar run karein."),
+     "Browser tab/window was closed — automation stopped. Reopen the browser and run again."),
     ("nosuchelementexception",
-     "Page par required field nahi mila. Page sahi se khula hai confirm karke Retry karein."),
+     "Required field not found on the page. Check that the page loaded correctly and try again."),
     ("elementclickinterceptedexception",
-     "Element click block hua — koi popup/overlay chalu tha. Retry karein."),
+     "Could not click the element — a popup or overlay was in the way. Please try again."),
     ("elementnotinteractableexception",
-     "Element click/type nahi ho paya — page abhi load ho raha tha. Retry karein."),
+     "Could not click or type into the element — the page was still loading. Please try again."),
     ("elementnotvisibleexception",
-     "Element dikh nahi raha — page abhi load ho raha tha. Retry karein."),
+     "Element is not visible — the page may still be loading. Please try again."),
     ("invalidselectorexception",
-     "Element selector galat mila — page layout badla ho sakta hai. Retry karein."),
+     "Element selector was incorrect — the page layout may have changed. Please try again."),
     ("webdriverexception",
-     "Browser me technical problem aayi. Browser restart karke Retry karein."),
+     "A technical error occurred in the browser. Restart the browser and try again."),
     ("no such window",
-     "Browser tab/window band ho gaya — automation ruk gaya. Browser dobara kholkar run karein."),
+     "Browser tab/window was closed — automation stopped. Reopen the browser and run again."),
     ("target window already closed",
-     "Browser tab band ho gaya tha — automation ruk gaya. Browser dobara kholkar run karein."),
+     "Browser tab was already closed — automation stopped. Reopen the browser and run again."),
     ("web view not found",
-     "Browser window nahi mili — browser restart karke dobara try karein."),
+     "Browser window not found — restart the browser and try again."),
     ("invalid session id",
-     "Browser session lost ho gaya — browser restart karke dobara try karein."),
+     "Browser session was lost — restart the browser and try again."),
     ("element is no longer attached to the dom",
-     "Page reload hone ki wajah se purana element hat gaya. Retry karein."),
+     "The page was reloaded and the element was removed. Please try again."),
     ("stale element",
-     "Page refresh hone ki wajah se element milne me problem hui. Retry karein."),
+     "Could not find the element because the page refreshed. Please try again."),
     ("element click intercepted",
-     "Element click block hua — koi popup/overlay chalu tha. Retry karein."),
+     "Could not click the element — a popup or overlay was in the way. Please try again."),
     ("element not interactable",
-     "Element click/type nahi ho paya — page abhi load ho raha tha. Retry karein."),
+     "Could not click or type into the element — the page was still loading. Please try again."),
     ("unable to locate element",
-     "Page par required field nahi mila. Page sahi se khula hai confirm karke Retry karein."),
+     "Required field not found on the page. Check that the page loaded correctly and try again."),
     ("no such element",
-     "Page par required field nahi mila. Page sahi se khula hai confirm karke Retry karein."),
+     "Required field not found on the page. Check that the page loaded correctly and try again."),
     ("timed out",
-     "Page load me time lag gaya (slow network ya portal busy). Retry karein."),
+     "Page load timed out (slow network or portal is busy). Please try again."),
     ("timeout",
-     "Page load me time lag gaya (slow network ya portal busy). Retry karein."),
+     "Page load timed out (slow network or portal is busy). Please try again."),
     ("connection refused",
-     "Portal se connect nahi ho paya — network/internet check karke Retry karein."),
+     "Could not connect to the portal — check your network/internet and try again."),
     ("max retries exceeded",
-     "Internet/portal connection me problem — network check karke Retry karein."),
+     "Internet or portal connection issue — check your network and try again."),
     ("failed to establish a new connection",
-     "Internet/portal connection me problem — network check karke Retry karein."),
+     "Internet or portal connection issue — check your network and try again."),
     ("no route to host",
-     "Network route nahi mila — internet ya portal down ho sakta hai. Baad me try karein."),
+     "Network route not found — internet or portal may be down. Please try again later."),
     ("file not found",
-     "File nahi mili — sahi file select karke dobara try karein."),
+     "File not found — select the correct file and try again."),
     ("permission denied",
-     "File/folder access me permission problem — file khuli to nahi hai? Check karke Retry karein."),
+     "Permission issue accessing the file/folder — check if the file is open in another program and try again."),
     ("not enough values to unpack",
-     "Data format sahi nahi mila — file ka format check karke Retry karein."),
+     "Data format is incorrect — check the file format and try again."),
     ("list index out of range",
-     "Data me kuch missing hai (empty row ho sakti hai). File check karke Retry karein."),
+     "Data is missing something (possibly an empty row). Check the file and try again."),
     ("attributeerror",
-     "Internal issue aaya (AttributeError). App ko latest version me update karke Retry karein."),
+     "An internal error occurred (AttributeError). Update the app to the latest version and try again."),
     ("typeerror",
-     "Internal issue aaya (TypeError). App ko latest version me update karke Retry karein."),
+     "An internal error occurred (TypeError). Update the app to the latest version and try again."),
     ("valueerror",
-     "Diyi gayi value galat hai — inputs check karke Retry karein."),
+     "The value provided is invalid — check your inputs and try again."),
 ]
 
 
@@ -567,15 +566,15 @@ def install_crash_reporter() -> None:
 
 def translate_error(error: Any, error_type: str = "") -> str:
     """
-    Raw exception message → user-friendly Hinglish.
+    Convert raw exception message → user-friendly English.
 
-    - Match hone par friendly message return hota hai
-    - Match NAHI hone par original message wapas (koi data loss nahi)
-    - Kabhi raise nahi karta — UI thread ke liye 100% safe
+    - If a pattern matches, returns a friendly message.
+    - If no pattern matches, returns the original message (no data loss).
+    - Never raises — 100% safe for the UI thread.
 
     Args:
-        error: exception ya message string
-        error_type: optional exception class name (message me nahi hai to prefix)
+        error: exception object or message string
+        error_type: optional exception class name (prepended if not already in message)
     """
     try:
         raw = str(error or "")
@@ -587,7 +586,7 @@ def translate_error(error: Any, error_type: str = "") -> str:
     for pattern, translated in _ERROR_TRANSLATIONS:
         if pattern in low:
             return translated
-    # No pattern match — original message wapas (error_type prefix ke saath)
+    # No pattern match — return original message (with error_type prefix if provided)
     if error_type and not raw.strip().startswith(error_type):
         return f"{error_type}: {raw.strip()}"
     return raw.strip()

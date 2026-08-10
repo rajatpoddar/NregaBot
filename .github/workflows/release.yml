@@ -37,10 +37,32 @@ jobs:
           echo "$CHANGELOG_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+  # --- 1b. Validate Locales (fail fast on key drift / broken translations) ---
+  validate-locales:
+    name: Validate locale parity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check missing keys in all locales (en/hi/kn/bn)
+        run: python scripts/check_missing_keys.py
+
+      - name: Rebuild kn/bn from part files (detects translation drift)
+        run: python scripts/build_locales.py
+
+      - name: Verify rebuild left no drift in git
+        run: git diff --exit-code src/locales/
+
   # --- 2. Build for Windows (Loader EXE + Lite Portable ZIP + Secure Win Core Zip) ---
   build-windows:
       name: Build Windows (Main + Lite + Core)
-      needs: get-release-info
+      needs: [get-release-info, validate-locales]
       runs-on: windows-latest
       steps:
         - name: Checkout code
@@ -147,7 +169,7 @@ jobs:
   # --- 2b. Build Windows BETA Portable (no auto-update, folder+zip) ---
   build-beta-windows:
     name: Build Windows Beta Portable
-    needs: get-release-info
+    needs: [get-release-info, validate-locales]
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -181,7 +203,7 @@ jobs:
   # --- 3. Build for Linux (Portable Loader) ---
   build-linux:
     name: Build Linux Loader
-    needs: get-release-info
+    needs: [get-release-info, validate-locales]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -206,6 +228,7 @@ jobs:
           --add-data="config:config" \
           --add-data="docs/changelog.json:docs/" \
           --add-data="src:src" \
+          --add-data="src/locales:src/locales" \
           --collect-all customtkinter \
           --collect-data fpdf \
           --collect-all selenium \

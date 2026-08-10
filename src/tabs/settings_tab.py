@@ -23,6 +23,7 @@ from src.ui_components import AfterTracker
 from src.location_hierarchy import get_hierarchy, HIERARCHY_TYPES, TYPE_TO_PREFIX
 from src.location_data import STATE_DISTRICT_MAP
 from src.tabs.activity_log_tab import ActivityLogTab
+from src.i18n import tr, get_language, get_available_languages, set_language, suggest_language_for_state, LANGUAGES
 
 # Selenium imports (used in _scrape_from_website)
 from selenium.webdriver.common.by import By
@@ -53,12 +54,12 @@ class SettingsTab(ctk.CTkFrame):
                                          command=self._on_tab_changed)
         self.tab_view.grid(row=1, column=0, sticky="nsew", padx=20, pady=(5, 20))
 
-        self.tab_location  = self.tab_view.add("  🗺️  Location Data  ")
-        self.tab_mapping   = self.tab_view.add("  👥  Staff Mapping  ")
-        self.tab_defaults  = self.tab_view.add("  ⚙️  Default Values  ")
-        self.tab_activity  = self.tab_view.add("  📋 Activity Log  ")
-        self.tab_cloud     = self.tab_view.add("  ☁️  Cloud Backup  ")
-        self.tab_factory   = self.tab_view.add("  🏭  Factory Reset  ")
+        self.tab_location  = self.tab_view.add(tr("settings.tab.location"))
+        self.tab_mapping   = self.tab_view.add(tr("settings.tab.mapping"))
+        self.tab_defaults  = self.tab_view.add(tr("settings.tab.defaults"))
+        self.tab_activity  = self.tab_view.add(tr("settings.tab.activity"))
+        self.tab_cloud     = self.tab_view.add(tr("settings.tab.cloud"))
+        self.tab_factory   = self.tab_view.add(tr("settings.tab.factory"))
 
         self._build_location_tab()
         self._build_mapping_tab()
@@ -113,9 +114,7 @@ class SettingsTab(ctk.CTkFrame):
         info = ctk.CTkFrame(scroll, fg_color=("gray95", "gray25"), corner_radius=8)
         info.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         ctk.CTkLabel(info,
-            text="💡 State, District aur Block server se auto-sync hote hain — 'Sync Now' ya 'Fix Location' se sahi karein. "
-                 "Panchayat aur Village NREGA website se add karein. Delete karne ke liye neeche list se select karke "
-                 "Delete dabayein (uske villages bhi delete ho jayenge).",
+            text=tr("settings.location.info_banner"),
             font=ctk.CTkFont(size=12), text_color=("gray40", "gray80"),
             wraplength=680, justify="left",
         ).pack(padx=15, pady=10)
@@ -170,15 +169,15 @@ class SettingsTab(ctk.CTkFrame):
             _srv_badge(self._srv_vals_frame, "📦", srv_block)
 
         if srv_state or srv_dist or srv_block:
-            ctk.CTkLabel(self._srv_vals_frame, text="✅ Auto-synced from your license",
+            ctk.CTkLabel(self._srv_vals_frame, text=tr("settings.server_synced.auto_synced"),
                          font=ctk.CTkFont(size=10),
                          text_color=("#166534", "#86EFAC")).pack(side="left", padx=(4, 0))
         elif user_level in ('GP', 'PO'):
-            ctk.CTkLabel(self._srv_vals_frame, text="👤 Level automation se detect hua",
+            ctk.CTkLabel(self._srv_vals_frame, text=tr("settings.server_synced.level_detected"),
                          font=ctk.CTkFont(size=10),
                          text_color=("#166534", "#86EFAC")).pack(side="left", padx=(4, 0))
         else:
-            ctk.CTkLabel(self._srv_vals_frame, text="💡  Server par location data set nahi hai.",
+            ctk.CTkLabel(self._srv_vals_frame, text=tr("settings.server_synced.no_data"),
                          font=ctk.CTkFont(size=11),
                          text_color=("gray50", "gray60")).pack(side="left")
 
@@ -230,20 +229,15 @@ class SettingsTab(ctk.CTkFrame):
         # Header
         sc_header = ctk.CTkFrame(self._scrape_frame, fg_color="transparent")
         sc_header.pack(fill="x", padx=12, pady=(8, 4))
-        ctk.CTkLabel(sc_header, text="🌐  Panchayat & Village Add Karein (NREGA Website)",
+        ctk.CTkLabel(sc_header, text=tr("settings.scrape.card_title"),
                      font=ctk.CTkFont(size=13, weight="bold"),
                      text_color=("#9A3412", "#FDBA74")).pack(side="left")
 
-        # Info note — simple language
+        # Info note
         sc_note = ctk.CTkFrame(self._scrape_frame, fg_color="transparent")
         sc_note.pack(fill="x", padx=12, pady=(2, 4))
         ctk.CTkLabel(sc_note,
-            text="Ye button NREGA website (VB-G-RAM G) se aapke Panchayat aur Village ke naam app mein add karta hai.\n\n"
-                 "Sirf 3 kaam karein:\n"
-                 "1️⃣  Browser launch karein\n"
-                 "2️⃣  PO login se login karein\n"
-                 "3️⃣  Neeche 'Add Panchayat & Village' dabayein\n\n"
-                 "Bot khud saare Panchayat aur unke Villages sync kar dega.",
+            text=tr("settings.scrape.info"),
             font=ctk.CTkFont(size=11),
             text_color=("gray50", "gray60"),
             wraplength=620, justify="left",
@@ -330,8 +324,7 @@ class SettingsTab(ctk.CTkFrame):
         )
         self._del_big_btn.grid(row=0, column=0, padx=(10, 10), pady=8)
         ctk.CTkLabel(del_bar,
-            text="💡  Pehle list mein Panchayat par click karke select karein (Ctrl+click = ek se zyada), "
-                 "phir Delete dabayein — ya item par double-click karein. Villages bhi delete ho jayenge.",
+            text=tr("settings.location.delete_hint"),
             font=ctk.CTkFont(size=10), text_color=("gray45", "gray65"),
             justify="left", wraplength=560).grid(row=0, column=1, sticky="w", padx=(0, 10), pady=8)
 
@@ -389,7 +382,7 @@ class SettingsTab(ctk.CTkFrame):
     def _delete_selected_loc(self) -> None:
         sel = self.loc_listbox.curselection()
         if not sel:
-            messagebox.showinfo("No Selection", "Kisi item ko select karein.", parent=self.winfo_toplevel())
+            messagebox.showinfo(tr("confirm.ok"), tr("settings.location.no_selection"), parent=self.winfo_toplevel())
             return
         raw_names = [self.loc_listbox.get(i) for i in sel]
         
@@ -402,10 +395,9 @@ class SettingsTab(ctk.CTkFrame):
             else:
                 panch_names.append(n)
         
-        if not messagebox.askyesno("Confirm Delete",
-            f"Kya aap ye {len(panch_names)} Panchayat(s) delete karna chahte hain?\n\n"
-            + "\n".join(f"  • {n}" for n in panch_names)
-            + f"\n\n⚠️ Inke saath judi hui Villages bhi delete ho jayengi!",
+        if not messagebox.askyesno(tr("settings.location.del_confirm_title"),
+            tr("settings.location.del_confirm_msg", count=len(panch_names),
+               list="\n".join(f"  • {n}" for n in panch_names)),
             parent=self.winfo_toplevel()):
             return
         
@@ -433,10 +425,10 @@ class SettingsTab(ctk.CTkFrame):
             deleted_panch += 1
         
         self._refresh_loc_list()
-        msg = f"{deleted_panch} Panchayat(s) delete kar diye gaye."
+        msg = tr("settings.location.del_success", count=deleted_panch)
         if deleted_vill:
-            msg += f"\n{deleted_vill} Village(s) bhi delete ho gaye."
-        messagebox.showinfo("Deleted", msg, parent=self.winfo_toplevel())
+            msg += "\n" + tr("settings.location.del_success_vill", count=deleted_vill)
+        messagebox.showinfo(tr("status.success"), msg, parent=self.winfo_toplevel())
 
     def _sync_from_server(self) -> None:
         """
@@ -470,29 +462,29 @@ class SettingsTab(ctk.CTkFrame):
 
             if synced:
                 self._srv_sync_status.configure(
-                    text=f"✅ Synced: {', '.join(synced)}",
+                    text=tr("settings.server_synced.synced", details=', '.join(synced)),
                     text_color=("#16A34A", "#4ADE80")
                 )
                 # Refresh the listbox and server card
                 self._refresh_loc_list()
                 self._refresh_server_data_card()
                 self._srv_status_label.configure(
-                    text="✅ Auto-synced from server",
+                    text=tr("settings.server_synced.auto_synced"),
                     text_color=("#16A34A", "#4ADE80")
                 )
                 self.after(5000, lambda: self._srv_sync_status.configure(text=""))
             else:
                 self._srv_sync_status.configure(
-                    text="💡  Server par koi location data nahi hai",
+                    text=tr("settings.server_synced.no_server_data"),
                     text_color=("gray50", "gray60")
                 )
                 self.after(5000, lambda: self._srv_sync_status.configure(text=""))
         except Exception as e:
             logger.error("Sync from server failed: %s", e)
             self._srv_sync_status.configure(
-                text=f"❌ Sync failed: {e}",
-                text_color=("#DC2626", "#F87171")
-            )
+                    text=tr("settings.server_synced.sync_failed", error=str(e)[:80]),
+                    text_color=("#DC2626", "#F87171")
+                )
             self.after(5000, lambda: self._srv_sync_status.configure(text=""))
 
     def _fix_location_now(self) -> None:
@@ -529,24 +521,24 @@ class SettingsTab(ctk.CTkFrame):
         outer = ctk.CTkFrame(win, fg_color="transparent")
         outer.pack(expand=True, fill="both", padx=20, pady=16)
 
-        ctk.CTkLabel(outer, text="🔧  Location Fix Karein",
+        ctk.CTkLabel(outer, text=tr("settings.fix_location.title"),
                      font=ctk.CTkFont(size=16, weight="bold"),
                      text_color=("#F97316", "#FB923C")).pack(anchor="w")
 
         reason_lines = []
         if not cur_state or not state_ok:
-            reason_lines.append(f"• State '{cur_state or '(empty)'}' app ke valid states se match nahi karta.")
+            reason_lines.append(tr("settings.fix_location.reason.state_mismatch", state=cur_state or '(empty)'))
         if cur_state and state_ok and not dist_ok:
-            reason_lines.append(f"• District '{cur_dist or '(empty)'}' {cur_state} ke valid districts se match nahi karta.")
+            reason_lines.append(tr("settings.fix_location.reason.district_mismatch", district=cur_dist or '(empty)', state=cur_state))
         if not cur_state and not cur_dist:
-            reason_lines.append("• Aapne abhi state/district set nahi ki hai.")
+            reason_lines.append(tr("settings.fix_location.reason.not_set"))
         if reason_lines:
             reason_text = "\n".join(reason_lines)
         else:
-            reason_text = "• Sab kuch sahi lag raha hai — phir bhi block ka spelling ya location update karna ho to yahan se karein."
+            reason_text = tr("settings.fix_location.reason.all_ok")
 
         ctk.CTkLabel(outer,
-            text=f"Neeche apna sahi State, District aur Block select/likhein — ye app aur server dono mein update ho jayega.\n\n{reason_text}",
+            text=f"{tr('settings.fix_location.desc')}\n\n{reason_text}",
             font=ctk.CTkFont(size=12), text_color=("gray40", "gray80"),
             justify="left", wraplength=w - 50).pack(anchor="w", pady=(4, 12))
 
@@ -602,7 +594,7 @@ class SettingsTab(ctk.CTkFrame):
         block_sugg = self._collect_block_suggestions()
         if block_sugg:
             ctk.CTkLabel(outer,
-                text="💡  Block suggestions (click karke fill karein):",
+                text=tr("settings.fix_location.block_suggestions"),
                 font=ctk.CTkFont(size=10), text_color=("gray45", "gray65"),
                 anchor="w", justify="left").pack(fill="x", pady=(6, 2))
 
@@ -634,10 +626,10 @@ class SettingsTab(ctk.CTkFrame):
             dist = dist_var.get().strip()
             block = block_entry.get().strip().upper()
             if state == "Select a State" or not state:
-                status_line.configure(text="⚠️  Please select a state.", text_color=("#DC2626", "#EF4444"))
+                status_line.configure(text=tr("settings.fix_location.require_state"), text_color=("#DC2626", "#EF4444"))
                 return
             if dist == "Select District" or not dist:
-                status_line.configure(text="⚠️  Please select a district.", text_color=("#DC2626", "#EF4444"))
+                status_line.configure(text=tr("settings.fix_location.require_district"), text_color=("#DC2626", "#EF4444"))
                 return
 
             # Save locally to history manager (automation dropdowns)
@@ -666,14 +658,14 @@ class SettingsTab(ctk.CTkFrame):
                             if block:
                                 parts.append(block)
                             status_line.configure(
-                                text=f"✅ Location updated: {' / '.join(parts)}",
+                                text=tr("settings.fix_location.updated", details=' / '.join(parts)),
                                 text_color=("#16A34A", "#4ADE80"))
                             self._refresh_server_data_card()
                             self._refresh_loc_list()
                             win.after(900, win.destroy)
                         else:
                             status_line.configure(
-                                text="⚠️  Locally saved, but server update failed (check internet).",
+                                text=tr("settings.fix_location.server_failed"),
                                 text_color=("#DC2626", "#EF4444"))
                     except Exception:
                         pass
@@ -715,13 +707,13 @@ class SettingsTab(ctk.CTkFrame):
         return sorted(blocks, key=str.lower)
 
     def _detect_user_level_now(self) -> None:
-        """Browser me demand page khol ke detect karta hai ki user GP level ka
-        hai ya PO level (Program Officer / Block level).
+        """Open the demand page in the browser and detect whether the user is
+        GP level or PO level (Program Officer / Block level).
 
-        Detection: page par panchayat ka <select> dropdown HAI → PO (block
-        level). Dropdown NAHI hai (naam text me dikhta hai) → GP (panchayat
-        level). Result license_info me save hota hai aur server heartbeat ke
-        saath jaata hai — jisse web ADMIN PANEL user ka type dikha sake.
+        Detection: a panchayat <select> dropdown on the page → PO (block
+        level). No dropdown (name shown as text) → GP (panchayat level).
+        The result is saved in license_info and sent with the server
+        heartbeat, so the web ADMIN PANEL can show the user type.
         """
         # Agar koi automation chal rahi hai to driver hijack nahi karte —
         # dono ek hi browser share karte hain.
@@ -730,13 +722,12 @@ class SettingsTab(ctk.CTkFrame):
                     'active_automations', None)
         if running:
             messagebox.showwarning(
-                "Automation Running",
-                "Koi automation abhi chal rahi hai. Pehle use rok kar phir "
-                "'Detect Login Level' dabayein.",
+                tr("base.automation_error.title"),
+                tr("settings.detect_level.running_warning"),
                 parent=self.winfo_toplevel())
             return
-        self._detect_level_btn.configure(state="disabled", text="⏳ Detecting...")
-        self._srv_sync_status.configure(text="⏳ Level detect ho raha hai...")
+        self._detect_level_btn.configure(state="disabled", text=tr("settings.detect_level.detecting"))
+        self._srv_sync_status.configure(text=tr("settings.detect_level.in_progress"))
 
         def _run_detect() -> None:
             """Background thread — UI freeze nahi hota aur driver.get() ke
@@ -745,7 +736,7 @@ class SettingsTab(ctk.CTkFrame):
             try:
                 driver = self.app.get_driver()
                 if not driver:
-                    err = "Browser connect nahi hua. Pehle browser launch karein."
+                    err = tr("settings.detect_level.err_no_driver")
                 else:
                     demand_url = "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx"
                     driver.get(demand_url)
@@ -766,10 +757,7 @@ class SettingsTab(ctk.CTkFrame):
                                     (By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
                             level, label = "GP", "GP — Panchayat Level"
                         except TimeoutException:
-                            err = ("Na panchayat dropdown mila, na village dropdown. "
-                                   "Aap shayad login nahi hain — pehle NREGA portal "
-                                   "par PO/GP login se login karein, phir dobara try "
-                                   "karein.")
+                            err = tr("settings.detect_level.err_no_dropdown")
             except Exception as e:
                 err = str(e)
             self.after(0, lambda: self._finish_detect(level, label, err))
@@ -782,7 +770,7 @@ class SettingsTab(ctk.CTkFrame):
         """Detection result UI par dikhata hai (main thread par)."""
         try:
             self._detect_level_btn.configure(state="normal",
-                                             text="👤 Detect Login Level")
+                                             text=tr("settings.detect_level.btn"))
         except Exception:
             pass
         if err:
@@ -790,7 +778,7 @@ class SettingsTab(ctk.CTkFrame):
                 self._srv_sync_status.configure(text="")
             except Exception:
                 pass
-            messagebox.showerror("Detection Failed", err,
+            messagebox.showerror(tr("settings.detect_level.result_title"), err,
                                  parent=self.winfo_toplevel())
             return
         try:
@@ -799,22 +787,22 @@ class SettingsTab(ctk.CTkFrame):
             pass
         try:
             self._refresh_server_data_card()
-            self._srv_sync_status.configure(text=f"✅ {label}")
+            self._srv_sync_status.configure(text=tr("settings.detect_level.success", label=label))
         except Exception:
             pass
-        messagebox.showinfo("Login Level Detected",
-                            f"👤 Aap {label} login ho.\n\nYe info Settings me save ho gayi hai "
-                            "aur server (admin panel) tak bhi jaati hai.",
-                            parent=self.winfo_toplevel())
+        messagebox.showinfo(
+            tr("settings.detect_level.result_title"),
+            f"{tr('settings.detect_level.result_msg', label=label)}",
+            parent=self.winfo_toplevel())
 
     def _scrape_from_website(self) -> None:
         """
-        Live NREGA website se ALL Panchayat aur unke saare Village data scrape karta hai.
-        Har panchayat ko select karta hai, uske villages scrape karta hai,
-        aur Panchayat→Village hierarchy build karta hai.
+        Scrape ALL Panchayats and their villages from the live NREGA website.
+        Selects each panchayat, scrapes its villages, and builds the
+        Panchayat→Village hierarchy.
         """
         self._scrape_btn.configure(state="disabled", text="⏳ Scraping...")
-        self._scrape_status.configure(text="⏳ Browser connect ho raha hai...")
+        self._scrape_status.configure(text=tr("settings.scrape.connecting_browser"))
 
         def _run_scrape():
             driver = None
@@ -866,7 +854,7 @@ class SettingsTab(ctk.CTkFrame):
                     # Panchayat ka naam text label se, villages village
                     # dropdown se scrape karte hain — sab kuch save ho jata hai.
                     self.after(0, lambda: self._scrape_status.configure(
-                        text="⏳ GP login mila — panchayat + villages scrape ho rahe hain..."))
+                        text=tr("settings.scrape.gp_scraping")))
 
                     panch_name = ""
                     for lid in ("ctl00_ContentPlaceHolder1_panch",
@@ -1038,8 +1026,8 @@ class SettingsTab(ctk.CTkFrame):
             text_color=("#DC2626", "#F87171")
         )
         self._scrape_btn.configure(state="normal", text=SCRAPE_BTN_TEXT)
-        messagebox.showerror("Scrape Failed",
-            f"Data scrape nahi ho paya.\n\n{error_msg}",
+        messagebox.showerror(tr("dialogs.scrape_failed"),
+            tr("dialogs.scrape_failed_msg", error=error_msg),
             parent=self.winfo_toplevel())
         self.after(8000, lambda: self._scrape_status.configure(text=""))
 
@@ -1085,7 +1073,7 @@ class SettingsTab(ctk.CTkFrame):
                              font=ctk.CTkFont(size=10),
                              text_color=("#166534", "#86EFAC")).pack(side="left", padx=(4, 0))
             else:
-                ctk.CTkLabel(self._srv_vals_frame, text="💡  Server par location data set nahi hai.",
+                ctk.CTkLabel(self._srv_vals_frame, text=tr("settings.server_synced.no_data_hint"),
                              font=ctk.CTkFont(size=11),
                              text_color=("gray50", "gray60")).pack(side="left")
         except Exception as e:
@@ -1103,7 +1091,7 @@ class SettingsTab(ctk.CTkFrame):
         header = ctk.CTkFrame(c, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         ctk.CTkLabel(header,
-            text="💡 Har panchayat ke liye staff/mate ka naam yahan set karein.",
+            text=tr("settings.mapping.info"),
             font=ctk.CTkFont(size=12), text_color=("gray50", "gray60"),
             wraplength=700, justify="left",
         ).pack(anchor="w", pady=(0, 8))
@@ -1226,7 +1214,7 @@ class SettingsTab(ctk.CTkFrame):
         list_frame.grid_rowconfigure(1, weight=1)
         list_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(list_frame, text="📋  Existing Mappings:",
+        ctk.CTkLabel(list_frame, text=tr("settings.mapping.existing_title"),
                       font=ctk.CTkFont(size=12, weight="bold"),
                      ).grid(row=0, column=0, sticky="w", pady=(0, 5))
 
@@ -1290,7 +1278,7 @@ class SettingsTab(ctk.CTkFrame):
         panch = self._get_current_map_panchayat()
         staff = self.map_staff_entry.get().strip()
         if not panch or not staff:
-            messagebox.showwarning("Input Error", "Dono fields bharo: Panchayat aur Staff/Mate Name.",
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.fill_both_fields"),
                                    parent=self.winfo_toplevel())
             return
         data = self._load_map_data()
@@ -1311,17 +1299,17 @@ class SettingsTab(ctk.CTkFrame):
     def _delete_map_entry(self) -> None:
         panch = self._get_current_map_panchayat()
         if not panch:
-            messagebox.showinfo("No Selection", "Pehle ek panchayat select karein.",
+            messagebox.showinfo(tr("dialogs.no_selection"), tr("dialogs.select_panchayat_first"),
                                 parent=self.winfo_toplevel())
             return
         data = self._load_map_data()
         key = self._find_map_key(data, panch)
         if key is None:
-            messagebox.showinfo("Not Found", f"'{panch}' ke liye koi mapping nahi mili.",
+            messagebox.showinfo(tr("dialogs.not_found"), tr("dialogs.no_mapping_for", panchayat=panch),
                                 parent=self.winfo_toplevel())
             return
-        if not messagebox.askyesno("Confirm Delete",
-            f"Kya aap '{panch}' ki mapping delete karna chahte hain?",
+        if not messagebox.askyesno(tr("dialogs.confirm_delete"),
+            tr("dialogs.delete_mapping_confirm", panchayat=panch),
             parent=self.winfo_toplevel()):
             return
         del data[key]
@@ -1338,7 +1326,7 @@ class SettingsTab(ctk.CTkFrame):
         """Load the current mapping for the selected panchayat (case-insensitive)."""
         panch = self._get_current_map_panchayat()
         if not panch:
-            messagebox.showinfo("No Selection", "Pehle ek panchayat select karein.",
+            messagebox.showinfo(tr("dialogs.no_selection"), tr("dialogs.select_panchayat_first"),
                                 parent=self.winfo_toplevel())
             return
         data = self._load_map_data()
@@ -1580,9 +1568,8 @@ class SettingsTab(ctk.CTkFrame):
 
     def _cb_backup_now(self) -> None:
         """Push local data to the server."""
-        if not messagebox.askyesno("Backup to Server",
-            "Local saved data ka snapshot server par upload karein?\n\n"
-            "Isse aapka data naye PC ya factory reset ke baad restore karne ke liye save ho jayega.",
+        if not messagebox.askyesno(tr("dialogs.backup_server"),
+            tr("dialogs.backup_server_msg"),
             parent=self.winfo_toplevel()):
             return
         self._cb_backup_btn.configure(state="disabled", text="⏳ Uploading...")
@@ -1612,9 +1599,8 @@ class SettingsTab(ctk.CTkFrame):
 
     def _cb_restore_now(self) -> None:
         """Pull server backup and merge into local data."""
-        if not messagebox.askyesno("Restore from Server",
-            "Server backup se local data restore karein?\n\n"
-            "Naye entries merge ho jayengi — existing local data delete NAHI hoga.",
+        if not messagebox.askyesno(tr("dialogs.restore_server"),
+            tr("dialogs.restore_server_msg"),
             parent=self.winfo_toplevel()):
             return
         self._cb_restore_btn.configure(state="disabled", text="⏳ Downloading...")
@@ -1645,10 +1631,8 @@ class SettingsTab(ctk.CTkFrame):
 
     def _cb_clear_server(self) -> None:
         """Delete the server-side backup snapshot."""
-        if not messagebox.askyesno("Clear Server Data",
-            "Server par saved backup DELETE kar dein?\n\n"
-            "Aapka local data kuch nahi hoga — sirf cloud backup delete hoga.\n"
-            "Web account page par bhi ye option available hai.",
+        if not messagebox.askyesno(tr("dialogs.clear_server_data"),
+            tr("dialogs.clear_server_data_msg"),
             icon="warning", parent=self.winfo_toplevel()):
             return
         self._cb_clear_btn.configure(state="disabled", text="⏳ Clearing...")
@@ -1694,11 +1678,7 @@ class SettingsTab(ctk.CTkFrame):
                      font=ctk.CTkFont(size=18, weight="bold"),
                      ).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 5))
         ctk.CTkLabel(scroll,
-            text="App ko wapas naye installation jaisa fresh bana dein.\n"
-                 "Saara saved data — history, suggestions, location data, staff mappings, "
-                 "default values, aur settings sab clear ho jayenge.\n\n"
-                 "Sirf aapka license activation (license.dat) safe rahega — "
-                 "aapko dubara activate nahi karna padega.",
+            text=tr("settings.factory_reset_hint"),
             font=ctk.CTkFont(size=12), text_color=("gray50", "gray60"),
             wraplength=650, justify="left",
                      ).grid(row=1, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 15))
@@ -1960,7 +1940,7 @@ class SettingsTab(ctk.CTkFrame):
         except Exception as e:
             logger.error("Factory reset failed: %s", e)
             self._set_fr_status(f"❌ Reset failed: {e}", "red")
-            messagebox.showerror("Error", f"Factory reset failed:\n\n{e}",
+            messagebox.showerror(tr("dialogs.error"), tr("dialogs.factory_reset_failed", error=e),
                                  parent=self.winfo_toplevel())
         finally:
             self._fr_button.configure(state="normal", text="⚠️  Restore Factory Settings")
@@ -2131,6 +2111,105 @@ class SettingsTab(ctk.CTkFrame):
                      ).grid(row=row_num[0], column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 5))
         row_num[0] += 1
 
+        # ── LANGUAGE SELECTION CARD ──
+        lang_card = ctk.CTkFrame(scroll, fg_color=("#F0F9FF", "#0C4A6E"), corner_radius=10,
+                                  border_width=1, border_color=("#BAE6FD", "#0EA5E9"))
+        lang_card.grid(row=row_num[0], column=0, columnspan=3, sticky="ew", padx=10, pady=(2, 10))
+        row_num[0] += 1
+
+        lang_inner = ctk.CTkFrame(lang_card, fg_color="transparent")
+        lang_inner.pack(fill="x", padx=15, pady=(10, 8))
+        lang_inner.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(lang_inner, text="🌐", font=ctk.CTkFont(size=22)).grid(row=0, column=0, rowspan=2, padx=(0, 10))
+        ctk.CTkLabel(lang_inner, text=tr("settings.language.title"),
+                     font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color=("#0284C7", "#38BDF8")).grid(row=0, column=1, sticky="w")
+
+        # Language dropdown
+        available = get_available_languages()
+        lang_names = [f"{LANGUAGES.get(c, c)}" for c in available if c in LANGUAGES]
+        current_lang = get_language()
+        current_display = LANGUAGES.get(current_lang, current_lang)
+
+        # Auto-suggested based on saved state
+        lic = getattr(self.app, 'license_info', {}) or {}
+        saved_state = (lic.get('user_state') or '').strip().upper()
+        suggested_code = suggest_language_for_state(saved_state)
+        suggested_name = LANGUAGES.get(suggested_code, "")
+
+        lang_var = ctk.StringVar(value=current_display)
+        lang_menu = ctk.CTkOptionMenu(lang_inner, variable=lang_var, values=lang_names, width=200)
+        lang_menu.grid(row=1, column=1, sticky="w", pady=(4, 0))
+
+        # Status / suggestion note
+        if saved_state and suggested_name:
+            lang_note = tr("settings.language.info", suggested=suggested_name)
+        else:
+            lang_note = tr("settings.language.no_state_note")
+        self._lang_status = ctk.CTkLabel(lang_inner, text=lang_note,
+                                           font=ctk.CTkFont(size=10),
+                                           text_color=("gray50", "gray60"))
+        self._lang_status.grid(row=2, column=1, sticky="w", pady=(2, 0))
+
+        def _on_lang_change(new_display: str):
+            new_code = None
+            for code, name in LANGUAGES.items():
+                if name == new_display:
+                    new_code = code
+                    break
+            if new_code and new_code != get_language():
+                set_language(new_code)
+                # Apply immediately to the most visible surfaces (sidebar,
+                # header status, home page) so the change is visible even
+                # without restarting.
+                try:
+                    if hasattr(self.app, '_create_nav_buttons') and hasattr(self.app, 'sidebar_header'):
+                        self.app._create_nav_buttons(self.app.sidebar_header, self.app.nav_scroll_frame)
+                except Exception:
+                    pass
+                try:
+                    if hasattr(self.app, 'announcement_label') and self.app.announcement_label:
+                        self.app.announcement_label.configure(text=tr("app.welcome_loading"))
+                except Exception:
+                    pass
+                try:
+                    if hasattr(self.app, 'status_label') and self.app.status_label:
+                        self.app.status_label.configure(text=tr("app.status_ready"))
+                except Exception:
+                    pass
+                try:
+                    home = self.app.app_state.tab_instances.get("Home")
+                    if home and hasattr(home, 'refresh'):
+                        home.refresh()
+                except Exception:
+                    pass
+                # Prompt to restart for full effect
+                from tkinter import messagebox
+                restart = messagebox.askyesno(
+                    tr("settings.language.title"),
+                    tr("settings.language.restart_confirm"),
+                    parent=self.winfo_toplevel()
+                )
+                if restart:
+                    import sys
+                    import subprocess
+                    # Try to restart gracefully
+                    try:
+                        python = sys.executable
+                        subprocess.Popen([python] + sys.argv)
+                        sys.exit(0)
+                    except Exception:
+                        pass
+
+        lang_menu.configure(command=_on_lang_change)
+
+        # thin separator
+        ctk.CTkFrame(scroll, height=1, corner_radius=0,
+                     fg_color=("gray85", "gray35"),
+                     ).grid(row=row_num[0], column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 5))
+        row_num[0] += 1
+
         def add_section(title: str):
             ctk.CTkLabel(scroll, text=title, font=ctk.CTkFont(size=14, weight="bold"),
                          text_color=("#2563EB", "#60A5FA"),
@@ -2247,9 +2326,8 @@ class SettingsTab(ctk.CTkFrame):
         )
 
     def _reset_defaults(self) -> None:
-        if not messagebox.askyesno("Reset Defaults",
-            "Sabhi default values ₹ 300 par reset ho jayenge?\n\n"
-            "(Unit Cost, Verify Amount, Unit Price sab ₹ 300 ho jayenge)",
+        if not messagebox.askyesno(tr("dialogs.reset_defaults"),
+            tr("dialogs.reset_defaults_msg"),
             parent=self.winfo_toplevel()):
             return
         for f in self._defaults_fields:
@@ -2264,5 +2342,5 @@ class SettingsTab(ctk.CTkFrame):
             elif k == "mb_je_desig":
                 e.delete(0, "end"); e.insert(0, "JE")
         self.defaults_status.configure(
-            text="✅ Defaults reset to ₹ 300. 'Save All to Files' dabayein to save ho jayega."
+            text=tr("settings.defaults_reset_msg")
         )

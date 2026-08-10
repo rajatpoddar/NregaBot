@@ -13,6 +13,7 @@ from .base_tab import BaseAutomationTab
 
 logger = get_logger()
 from src import config
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
@@ -37,14 +38,13 @@ class IssuedMrReportTab(BaseAutomationTab):
             "S No.", "Panchayat", "Jobcard No.", "Worker Name", "ABPS Status"
         ]
         
-        # Shared browser use karega (self.app.get_driver()) — apna driver nahi banayega
+        # Uses the shared browser (self.app.get_driver()) — does not create its own driver
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
 
         # ── Header card ──
-        self._create_header_card(self, "📄", "Issued MR Report",
-                                 "Pull issued muster-roll reports with workcodes, results and ABPS data.",
+        self._create_header_card(self, "📄", tr("tab.issued_mr_report.title"), tr("tab.issued_mr_report.subtitle"),
                                  icon_key="emoji_issued_mr_report")
 
         # Frame for all user input controls
@@ -55,25 +55,25 @@ class IssuedMrReportTab(BaseAutomationTab):
 
         # --- Input Fields ---
         # --- Create all entries first (no cross-references) ---
-        ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
+        ctk.CTkLabel(controls_frame, text=tr("common.state_label")).grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
         s_vals = self.app.history_manager.get_suggestions("location_state") or [""]
         self.state_var = ctk.StringVar()
         self.state_menu = ctk.CTkOptionMenu(controls_frame, variable=self.state_var, values=s_vals)
         self.state_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
 
-        ctk.CTkLabel(controls_frame, text="District:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("common.district_label")).grid(row=1, column=0, sticky='w', padx=15, pady=5)
         d_vals = self.app.history_manager.get_suggestions("location_district") or [""]
         self.district_var = ctk.StringVar()
         self.district_menu = ctk.CTkOptionMenu(controls_frame, variable=self.district_var, values=d_vals)
         self.district_menu.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
 
-        ctk.CTkLabel(controls_frame, text="Block:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("common.block_label")).grid(row=2, column=0, sticky='w', padx=15, pady=5)
         b_vals = self.app.history_manager.get_suggestions("location_block") or [""]
         self.block_var = ctk.StringVar()
         self.block_menu = ctk.CTkOptionMenu(controls_frame, variable=self.block_var, values=b_vals)
         self.block_menu.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
 
-        ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("common.panchayat_label")).grid(row=3, column=0, sticky='w', padx=15, pady=5)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=self._all_panchayat_values(p_vals))
@@ -105,7 +105,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         # --- NEW BUTTON FOR ABPS CHECK (next to main actions) ---
         self.btn_abps_check = ctk.CTkButton(
             self,
-            text="Pending demand labour for abps",
+            text=tr("form.issued_mr.pending_labour"),
             command=self.start_abps_automation,
             fg_color=config.COLORS["purple_report"], # Purple color to distinguish
             hover_color=config.COLORS["purple_report_hover"]
@@ -129,11 +129,11 @@ class IssuedMrReportTab(BaseAutomationTab):
         
         copy_frame = ctk.CTkFrame(workcode_tab, fg_color="transparent")
         copy_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
-        self.copy_wc_button = ctk.CTkButton(copy_frame, text="Copy Workcodes", command=self._copy_workcodes)
+        self.copy_wc_button = ctk.CTkButton(copy_frame, text=tr("form.issued_mr.copy_workcodes"), command=self._copy_workcodes)
         self.copy_wc_button.pack(side="left")
 
         self.run_dup_mr_button = ctk.CTkButton(copy_frame,
-                                                  text="Run Duplicate MR Print",
+                                                  text=tr("form.issued_mr.run_dup_mr"),
                                                   command=self._run_duplicate_mr,
                                                   fg_color="#D35400", 
                                                   hover_color="#E67E22")
@@ -148,7 +148,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         
         export_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         export_frame.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.export_button = ctk.CTkButton(export_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side="left")
 
         self.results_tree = ttk.Treeview(results_tab, columns=self.report_headers, show='headings')
@@ -174,7 +174,7 @@ class IssuedMrReportTab(BaseAutomationTab):
 
         abps_export_frame = ctk.CTkFrame(abps_tab, fg_color="transparent")
         abps_export_frame.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.abps_export_button = ctk.CTkButton(abps_export_frame, text="Export ABPS Data", command=self.export_abps_report)
+        self.abps_export_button = ctk.CTkButton(abps_export_frame, text=tr("form.issued_mr.export_abps"), command=self.export_abps_report)
         self.abps_export_button.pack(side="left")
 
         self.abps_tree = ttk.Treeview(abps_tab, columns=self.abps_report_headers, show='headings')
@@ -232,16 +232,16 @@ class IssuedMrReportTab(BaseAutomationTab):
         }
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['panchayat']]):
-            messagebox.showwarning("Input Error", "All fields are required."); return
+            messagebox.showwarning(tr("errors.input_error"), tr("errors.input_required")); return
         if inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL:
-            if not messagebox.askyesno("Confirm", "This will process ALL panchayats in the block. Continue?"):
+            if not messagebox.askyesno(tr("dialogs.confirm"), tr("dialogs.process_all_panchayats")):
                 return
         
         self.save_inputs(inputs)
         
         driver = self.app.get_driver()
         if not driver:
-            messagebox.showwarning("Browser Required", "Kripya pehle 'Launch Chrome' button se browser start karein.")
+            messagebox.showwarning(tr("errors.input_required"), tr("errors.browser_required"))
             return
         
         self.app.after(0, self.set_ui_state, True) 
@@ -259,11 +259,11 @@ class IssuedMrReportTab(BaseAutomationTab):
         }
         
         if not all([inputs['state'], inputs['district'], inputs['block']]):
-            messagebox.showwarning("Input Error", "State, District and Block are required."); return
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.state_district_block_required")); return
         
         driver = self.app.get_driver()
         if not driver:
-            messagebox.showwarning("Browser Required", "Kripya pehle 'Launch Chrome' button se browser start karein.")
+            messagebox.showwarning(tr("errors.input_required"), tr("errors.browser_required"))
             return
         
         self.app.after(0, self.set_ui_state, True) 
@@ -619,7 +619,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.log_error(f"Error: {e}")
             self.success_message = None
         finally:
-            # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
+            # Using the shared browser — so driver.quit() is not called
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")
             if hasattr(self, 'success_message') and self.success_message:
@@ -763,7 +763,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             self.log_error(f"Critical Error in ABPS Scan: {e}")
             self.success_message = None
         finally:
-            # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
+            # Using the shared browser — so driver.quit() is not called
             self.app.after(0, self.set_ui_state, False)
             if hasattr(self, 'success_message') and self.success_message:
                 self.log_info(f"📊 Issued MR Complete: {self.success_message}")
@@ -779,20 +779,20 @@ class IssuedMrReportTab(BaseAutomationTab):
         if text:
             self.app.clipboard_clear()
             self.app.clipboard_append(text)
-            messagebox.showinfo("Copied", f"{len(text.splitlines())} workcodes copied to clipboard.", parent=self)
+            messagebox.showinfo(tr("status.copied"), tr("dialogs.workcodes_copied", count=len(text.splitlines())), parent=self)
         else:
-            messagebox.showwarning("Empty", "There are no workcodes to copy.", parent=self)
+            messagebox.showwarning(tr("dialogs.empty"), tr("dialogs.no_workcodes_copy"), parent=self)
 
     def _run_duplicate_mr(self):
         workcodes = self.workcode_textbox.get("1.0", tkinter.END).strip()
         panchayat_name = self.panchayat_var.get().strip()
 
         if not workcodes:
-            messagebox.showwarning("No Data", "There are no workcodes to send.", parent=self)
+            messagebox.showwarning(tr("errors.no_data"), tr("dialogs.no_workcodes_send"), parent=self)
             return
         
         if not panchayat_name:
-            messagebox.showwarning("No Data", "Panchayat name is missing.", parent=self)
+            messagebox.showwarning(tr("errors.no_data"), tr("dialogs.panchayat_missing"), parent=self)
             return
 
         self.app.switch_to_duplicate_mr_with_data(workcodes, panchayat_name)
@@ -800,7 +800,7 @@ class IssuedMrReportTab(BaseAutomationTab):
     def export_report(self):
         """Export results to professional Excel."""
         if not self.results_tree.get_children():
-            messagebox.showinfo("No Data", "There are no results to export.")
+            messagebox.showinfo(tr("errors.no_data"), tr("errors.no_results_export"))
             return
 
         panchayat = self.panchayat_var.get().strip() or "Report"
@@ -817,7 +817,7 @@ class IssuedMrReportTab(BaseAutomationTab):
     def export_abps_report(self):
         """Export ABPS report to professional Excel."""
         if not self.abps_tree.get_children():
-            messagebox.showinfo("No Data", "There are no ABPS results to export.")
+            messagebox.showinfo(tr("errors.no_data"), tr("dialogs.no_abps_results"))
             return
             
         block = self.block_var.get().strip() or "Block"

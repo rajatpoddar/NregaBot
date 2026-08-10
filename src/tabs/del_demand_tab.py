@@ -5,6 +5,7 @@ import customtkinter as ctk
 import time
 from datetime import datetime
 from src import config
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -34,8 +35,7 @@ class DelDemandTab(BaseAutomationTab):
         self._create_widgets()
     def _create_widgets(self) -> None:
         # --- Header / intro card (pending-bills style) ---
-        self._create_header_card(self, "🗑️", "Delete Demand",
-                                 "Delete demands for one village, or all villages in a Panchayat, on the portal.",
+        self._create_header_card(self, "🗑️", tr("tab.del_demand.title"), tr("tab.del_demand.subtitle"),
                                  icon_key="emoji_del_demand")
 
         # --- Section 1: Input Controls (card) ---
@@ -131,10 +131,10 @@ class DelDemandTab(BaseAutomationTab):
             village = ""  # Process ALL villages in the panchayat
 
         if not panchayat:
-            messagebox.showwarning("Input Error", "Panchayat Name is required.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.panchayat_name_required"))
             return
         if panchayat == config.ALL_PANCHAYATS_LABEL:
-            if not messagebox.askyesno("Confirm", "This will process ALL panchayats in the block. Continue?"):
+            if not messagebox.askyesno(tr("dialogs.confirm"), tr("dialogs.process_all_panchayats")):
                 return
 
         self.safe_tree_clear()
@@ -272,8 +272,7 @@ class DelDemandTab(BaseAutomationTab):
                             driver, wait, target_panchayat,
                             ["ctl00_ContentPlaceHolder1_DDL_Panchyt"],
                             v_ids=["ctl00_ContentPlaceHolder1_DDL_Village"], timeout=5)
-                        if status == "gp":
-                            self.log_info(f"   ⚠️ Panchayat dropdown not found (GP Login) — village seedha process hoga.")
+                        if status == "gp":                             self.log_info(f"   ⚠️ Panchayat dropdown not found (GP Login) — village will be processed directly.")
                         elif status == "notfound":
                             self.log_warning(f"   ⚠️ Panchayat '{target_panchayat}' not found after re-navigation!")
                             continue  # Skip this village instead of crashing

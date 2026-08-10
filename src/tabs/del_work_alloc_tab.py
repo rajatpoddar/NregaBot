@@ -19,6 +19,7 @@ from src import config
 from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
@@ -47,8 +48,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         """Initializes and packs the UI components."""
 
         # --- Header / intro card (pending-bills style) ---
-        self._create_header_card(self, "🗑️", "Delete Work Allocation",
-                                 "Delete work allocations for a Panchayat, optionally filtered by date(s).",
+        self._create_header_card(self, "🗑️", tr("tab.del_work_alloc.title"), tr("tab.del_work_alloc.subtitle"),
                                  icon_key="emoji_del_work_alloc")
         
         # --- Section 1: Input Controls (card) ---
@@ -58,7 +58,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # 1. Panchayat Name Input (with Autocomplete)
-        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=12)
+        ctk.CTkLabel(controls_frame, text=tr("common.panchayat_name_label")).grid(row=0, column=0, sticky='w', padx=(15, 5), pady=12)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var,
@@ -69,9 +69,9 @@ class DelWorkAllocTab(BaseAutomationTab):
         date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         date_frame.grid(row=0, column=2, sticky='e', padx=15, pady=12)
 
-        ctk.CTkLabel(date_frame, text="From Date(s):").pack(side="left", padx=(5, 5))
+        ctk.CTkLabel(date_frame, text=tr("common.from_dates")).pack(side="left", padx=(5, 5))
         
-        self.from_date_entry = ctk.CTkEntry(date_frame, placeholder_text="DD/MM/YYYY, DD/MM/YYYY", width=180)
+        self.from_date_entry = ctk.CTkEntry(date_frame, placeholder_text=tr("form.del_work_alloc.date_placeholder"), width=180)
         self.from_date_entry.pack(side="left", padx=5)
 
         # Calendar Icon Button
@@ -118,7 +118,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         
         ctk.CTkLabel(jc_header_frame, text="Enter Jobcard / Registration IDs (one per line).\nIf left empty, the bot will process all IDs for the selected Panchayat.", wraplength=700, justify="left").pack(side="left", padx=5)
         
-        clear_jc_button = ctk.CTkButton(jc_header_frame, text="Clear", width=80, command=lambda: self.jobcards_text.delete("1.0", "end"))
+        clear_jc_button = ctk.CTkButton(jc_header_frame, text=tr("common.clear"), width=80, command=lambda: self.jobcards_text.delete("1.0", "end"))
         clear_jc_button.pack(side="right")
 
         self.jobcards_text = ctk.CTkTextbox(jobcards_tab, height=150)
@@ -130,7 +130,7 @@ class DelWorkAllocTab(BaseAutomationTab):
 
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="delete_work_alloc_results.xlsx", filter_mode="Export All"))
+        self.export_csv_button = ctk.CTkButton(results_action_frame, text=tr("common.export_excel"), command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="delete_work_alloc_results.xlsx", filter_mode="Export All"))
         self.export_csv_button.pack(side="left")
 
         cols = ("Timestamp", "Panchayat", "Jobcard/RegID", "Status", "Details")
@@ -179,10 +179,10 @@ class DelWorkAllocTab(BaseAutomationTab):
         from_dates_raw = self.from_date_entry.get().strip()
 
         if not panchayat:
-            messagebox.showwarning("Input Error", "Panchayat Name is required.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.panchayat_name_required"))
             return
         if panchayat == config.ALL_PANCHAYATS_LABEL:
-            if not messagebox.askyesno("Confirm", "This will process ALL panchayats in the block. Continue?"):
+            if not messagebox.askyesno(tr("dialogs.confirm"), tr("dialogs.process_all_panchayats")):
                 return
 
         # Clear previous results
@@ -204,7 +204,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         )
     def reset_ui(self) -> None:
         """Resets the form to default state."""
-        if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_logs")):
             self.panchayat_var.set("")
             self.from_date_entry.delete(0, tkinter.END)
             self.jobcards_text.delete('1.0', tkinter.END)
@@ -295,7 +295,7 @@ class DelWorkAllocTab(BaseAutomationTab):
                     continue
 
                 # 2. Select Panchayat (central helper — fuzzy match; GP login
-                # par no-dropdown skip karke aage badho)
+                # has no dropdown, so selection is skipped)
                 try:
                     status, _ = self._select_panchayat_or_skip(
                         driver, wait, p_name,

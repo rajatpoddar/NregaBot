@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import customtkinter as ctk
 
 from src.utils import get_logger
+from src.i18n import tr
 
 logger = get_logger()
 
@@ -69,10 +70,10 @@ class ActivityLogTab(ctk.CTkFrame):
 
         title_frame = ctk.CTkFrame(header, fg_color="transparent")
         title_frame.grid(row=0, column=1, sticky="w")
-        ctk.CTkLabel(title_frame, text="Activity Log",
+        ctk.CTkLabel(title_frame, text=tr("activity_log.title"),
                      font=ctk.CTkFont(size=18, weight="bold")).pack(anchor="w")
         ctk.CTkLabel(title_frame,
-                     text="Aapke saare automations ka record — kab, kaunsa, kya result aaya",
+                     text=tr("activity_log.subtitle"),
                      font=ctk.CTkFont(size=11),
                      text_color=("gray50", "gray60")).pack(anchor="w")
 
@@ -89,26 +90,26 @@ class ActivityLogTab(ctk.CTkFrame):
         filter_frame.grid_columnconfigure(2, weight=1)
 
         # Automation type filter
-        ctk.CTkLabel(filter_frame, text="Filter:",
+        ctk.CTkLabel(filter_frame, text=tr("activity_log.filter_all") + ":",
                      font=ctk.CTkFont(size=12, weight="bold"),
                      ).grid(row=0, column=0, sticky="w", padx=(0, 10))
 
-        self._filter_var = ctk.StringVar(value="All")
+        self._filter_var = ctk.StringVar(value=tr("activity_log.filter_all"))
         self._filter_menu = ctk.CTkOptionMenu(
             filter_frame,
             variable=self._filter_var,
-            values=["All", "Success", "Failed", "Stopped"],
+            values=[tr("activity_log.filter_all"), tr("activity_log.filter_success"), tr("activity_log.filter_failed"), tr("activity_log.filter_stopped")],
             width=120, height=28,
             command=lambda _: self._refresh_log(),
         )
         self._filter_menu.grid(row=0, column=1, sticky="w", padx=(0, 15))
 
         # Panchayat filter
-        self._panchayat_var = ctk.StringVar(value="All Panchayats")
+        self._panchayat_var = ctk.StringVar(value=tr("activity_log.panchayat_filter"))
         self._panchayat_menu = ctk.CTkOptionMenu(
             filter_frame,
             variable=self._panchayat_var,
-            values=["All Panchayats"],
+            values=[tr("activity_log.panchayat_filter")],
             width=160, height=28,
             command=lambda _: self._safe_refresh(),
         )
@@ -116,7 +117,7 @@ class ActivityLogTab(ctk.CTkFrame):
 
         # Action buttons
         self._refresh_btn = ctk.CTkButton(
-            filter_frame, text="🔄 Refresh", width=90, height=28,
+            filter_frame, text=tr("activity_log.refresh_btn"), width=90, height=28,
             font=ctk.CTkFont(size=11),
             fg_color=("#E2E8F0", "#334155"),
             text_color=("#1E293B", "#F1F5F9"),
@@ -126,7 +127,7 @@ class ActivityLogTab(ctk.CTkFrame):
         self._refresh_btn.grid(row=0, column=3, sticky="e", padx=(5, 5))
 
         self._clear_btn = ctk.CTkButton(
-            filter_frame, text="🗑 Clear Logs", width=110, height=28,
+            filter_frame, text=tr("activity_log.clear_btn"), width=110, height=28,
             font=ctk.CTkFont(size=11),
             fg_color=("#DC2626", "#EF4444"),
             text_color="white",
@@ -210,7 +211,7 @@ class ActivityLogTab(ctk.CTkFrame):
                 activities = []
 
             if not activities:
-                self._count_label.configure(text="📭 No activity recorded yet")
+                self._count_label.configure(text=tr("activity_log.no_activity"))
                 return
 
             # Get filter values
@@ -224,11 +225,11 @@ class ActivityLogTab(ctk.CTkFrame):
                 if p:
                     panchayats.add(p)
 
-            current_panch_vals = ["All Panchayats"] + sorted(panchayats)
+            current_panch_vals = [tr("activity_log.panchayat_filter")] + sorted(panchayats)
             if self._panchayat_menu.cget("values") != current_panch_vals:
                 self._panchayat_menu.configure(values=current_panch_vals)
                 if self._panchayat_var.get() not in current_panch_vals:
-                    self._panchayat_var.set("All Panchayats")
+                    self._panchayat_var.set(tr("activity_log.panchayat_filter"))
 
             # ── Date Grouping ──
             today = datetime.now().date()
@@ -247,7 +248,7 @@ class ActivityLogTab(ctk.CTkFrame):
                     continue
 
                 panch = (a.get("panchayat") or "").strip()
-                if panch_filter and panch_filter != "All Panchayats":
+                if panch_filter and panch_filter != tr("activity_log.panchayat_filter"):
                     if panch != panch_filter:
                         continue
 
@@ -339,7 +340,7 @@ class ActivityLogTab(ctk.CTkFrame):
                     ), tags=(tag,) if tag else ())
                     displayed += 1
 
-            self._count_label.configure(text=f"📊 {displayed}/{len(activities)} activities")
+            self._count_label.configure(text=tr("activity_log.count_label", shown=displayed, total=len(activities)))
         finally:
             self._refresh_in_progress = False
 
@@ -351,9 +352,8 @@ class ActivityLogTab(ctk.CTkFrame):
         Standardized name matching other tabs — replaces legacy _clear_log().
         """
         if not messagebox.askyesno(
-            "Clear Activity Log",
-            "Kya aap saari activity history delete karna chahte hain?\n\n"
-            "Yeh action wapas nahi laaya ja sakta.",
+            tr("activity_log.clear_confirm_title"),
+            tr("activity_log.clear_confirm_msg"),
             icon="warning",
             parent=self.winfo_toplevel()
         ):
@@ -367,10 +367,10 @@ class ActivityLogTab(ctk.CTkFrame):
                 cursor.execute("DELETE FROM activity_log")
                 conn.commit()
             self._refresh_log()
-            messagebox.showinfo("Cleared", "Activity log clear ho gaya.", parent=self.winfo_toplevel())
+            messagebox.showinfo(tr("status.success"), tr("activity_log.cleared"), parent=self.winfo_toplevel())
         except Exception as e:
             logger.error("Failed to clear activity log: %s", e)
-            messagebox.showerror("Error", f"Clear failed: {e}", parent=self.winfo_toplevel())
+            messagebox.showerror(tr("base.automation_error.title"), tr("activity_log.clear_failed", error=str(e)[:200]), parent=self.winfo_toplevel())
 
     # ── Helpers ────────────────────────────────────────────────────
     @staticmethod

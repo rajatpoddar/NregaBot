@@ -6,6 +6,7 @@ import os, random, re, time
 from datetime import datetime
 from src import config
 from src.utils import truncate_workcode
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -21,8 +22,7 @@ class MsrTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         # --- Header / intro card (P7.2: pending-bills style) ---
-        self._create_header_card(self, "💵", "MR Payment (MSR)",
-                                 "Process & verify Muster Roll payments against the sanctioned wage amount.",
+        self._create_header_card(self, "💵", tr("tab.msr.title"), tr("tab.msr.subtitle"),
                                  icon_key="emoji_mr_payment")
 
         controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
@@ -32,7 +32,7 @@ class MsrTab(BaseAutomationTab):
         
         panchayat_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         panchayat_frame.grid(row=0, column=0, sticky='new', padx=15, pady=(10,0))
-        ctk.CTkLabel(panchayat_frame, text="Panchayat Name", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
+        ctk.CTkLabel(panchayat_frame, text=tr("form.msr.panchayat_name"), font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(panchayat_frame, variable=self.panchayat_var, values=p_vals)
@@ -41,11 +41,11 @@ class MsrTab(BaseAutomationTab):
         
         amount_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         amount_frame.grid(row=0, column=1, sticky='new', padx=15, pady=(10,0))
-        ctk.CTkLabel(amount_frame, text="Verify Amount (₹)", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
+        ctk.CTkLabel(amount_frame, text=tr("form.msr.verify_amount"), font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         self.verify_amount_entry = ctk.CTkEntry(amount_frame)
         self.verify_amount_entry.insert(0, "300")
         self.verify_amount_entry.pack(fill='x', pady=(5,0))
-        ctk.CTkLabel(amount_frame, text="Reject if amount does not match this value.", text_color="gray50").pack(anchor='w')
+        ctk.CTkLabel(amount_frame, text=tr("form.msr.reject_hint"), text_color="gray50").pack(anchor='w')
 
         ctk.CTkLabel(controls_frame, text="💡 Note: If using GP Login, Panchayat selection is not required and will be skipped.", text_color="gray50").grid(row=1, column=0, columnspan=2, sticky='w', padx=15, pady=(10,15))
 
@@ -60,10 +60,10 @@ class MsrTab(BaseAutomationTab):
         work_codes_frame.grid_columnconfigure(0, weight=1); work_codes_frame.grid_rowconfigure(1, weight=1)
         wc_controls_frame = ctk.CTkFrame(work_codes_frame, fg_color="transparent")
         wc_controls_frame.grid(row=0, column=0, sticky='ew')
-        clear_button = ctk.CTkButton(wc_controls_frame, text="Clear", width=80, command=lambda: self.work_key_text.delete("1.0", tkinter.END))
+        clear_button = ctk.CTkButton(wc_controls_frame, text=tr("common.clear"), width=80, command=lambda: self.work_key_text.delete("1.0", tkinter.END))
         clear_button.pack(side='right', pady=(5,0), padx=(0,5))
         # --- MODIFIED: Update the command to use the base method ---
-        extract_button = ctk.CTkButton(wc_controls_frame, text="Extract from Text", width=120,
+        extract_button = ctk.CTkButton(wc_controls_frame, text=tr("common.extract_from_text"), width=120,
                                        command=lambda: self._extract_and_update_workcodes(self.work_key_text))
         extract_button.pack(side='right', pady=(5,0), padx=(0, 5))
         # ---
@@ -77,7 +77,7 @@ class MsrTab(BaseAutomationTab):
         # --- NEW: Unified Export Controls ---
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side='left')
         # --- End of Unified Export Controls ---
 
@@ -158,7 +158,7 @@ class MsrTab(BaseAutomationTab):
     def start_automation(self) -> None:
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic)
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Clear all inputs, results, and logs?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_all")):
             self._mr_tracking_panchayat_data = None
             self.panchayat_var.set("")
             self.verify_amount_entry.delete(0, tkinter.END); self.verify_amount_entry.insert(0, "300")
@@ -188,13 +188,13 @@ class MsrTab(BaseAutomationTab):
         self._mr_tracking_panchayat_data = None
 
         if not grouped_data and not work_keys:
-            messagebox.showerror("Input Error", "No work keys provided.")
+            messagebox.showerror(tr("errors.input_error"), tr("dialogs.no_work_keys"))
             self.app.after(0, self.set_ui_state, False)
             return
         try:
             verify_amount = float(verify_amount_str)
         except ValueError:
-            messagebox.showerror("Input Error", "Verify Amount must be a valid number.")
+            messagebox.showerror(tr("errors.input_error"), tr("dialogs.verify_amount_number"))
             self.app.after(0, self.set_ui_state, False)
             return
 
@@ -248,7 +248,7 @@ class MsrTab(BaseAutomationTab):
                 self.log_info("📊 Automation finished. Check the 'Results' tab for details.")
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
-            messagebox.showerror("MSR Error", f"An error occurred: {e}")
+            messagebox.showerror(tr("dialogs.msr_error"), tr("dialogs.msr_occurred", error=e))
         finally:
             # Count success/skipped/failed separately from results_tree
             # (columns: Panchayat, Workcode, Scheme Name, Status, Details, Timestamp → status at index 3)
@@ -275,7 +275,7 @@ class MsrTab(BaseAutomationTab):
         all_items = self.results_tree.get_children()
 
         if not all_items:
-            messagebox.showinfo("Retry", "No results found to retry.")
+            messagebox.showinfo(tr("base.error_tab.retry_btn"), tr("base.retry_no_results"))
             return
 
         for item_id in all_items:
@@ -290,7 +290,7 @@ class MsrTab(BaseAutomationTab):
 
         total_failed = sum(len(codes) for codes in failed_groups.values())
         if not total_failed:
-            messagebox.showinfo("Great!", "No failed items found.")
+            messagebox.showinfo(tr("dialogs.great"), tr("base.retry_no_fails"))
             return
 
         if not messagebox.askyesno(

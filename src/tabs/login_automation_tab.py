@@ -7,6 +7,7 @@ from src import config
 from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger
+from src.i18n import tr
 from typing import Any, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, StaleElementReferenceException, TimeoutException  # noqa: F401
 
@@ -24,8 +25,7 @@ class LoginAutomationTab(BaseAutomationTab):
         # ── Header card (pack-managed wrapper — this tab uses pack layout) ──
         header_wrap = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         header_wrap.pack(fill="x", padx=0, pady=(0, 12))
-        self._create_header_card(header_wrap, "🔐", "Login & Navigation Automation",
-                                 "Auto-select Financial Year, District & Block — you only enter User ID & Password.",
+        self._create_header_card(header_wrap, "🔐", tr("tab.login_automation.title"), tr("tab.login_automation.subtitle"),
                                  icon_key="emoji_login_automation")
         
         # --- Financial Year (Auto-set, read-only display) ---
@@ -40,9 +40,7 @@ class LoginAutomationTab(BaseAutomationTab):
         info_frame.pack(fill='x', padx=10, pady=(0, 5))
         
         ctk.CTkLabel(info_frame,
-            text="💡  Bot automatically detects your District & Block from saved settings.\n"
-                 "Pehle Settings > Location Data > 'Add Panchayat & Village' se sync karein.\n"
-                 "Browser launch hone ke baad aapko User ID & Password manual enter karna hoga.",
+            text=tr("login_automation.info"),
             font=ctk.CTkFont(size=12),
             text_color=("gray40", "gray80"),
             wraplength=650, justify="left",
@@ -63,7 +61,7 @@ class LoginAutomationTab(BaseAutomationTab):
         self.login_btn.pack()
 
         # Status
-        self.status_label = ctk.CTkLabel(self.main_frame, text="Ready to automate", text_color="gray", font=ctk.CTkFont(size=12))
+        self.status_label = ctk.CTkLabel(self.main_frame, text=tr("base.status_ready"), text_color="gray", font=ctk.CTkFont(size=12))
         self.status_label.pack(pady=5)
 
     @staticmethod
@@ -112,7 +110,7 @@ class LoginAutomationTab(BaseAutomationTab):
         inner = ctk.CTkFrame(loc_frame, fg_color="transparent")
         inner.pack(padx=15, pady=10)
 
-        ctk.CTkLabel(inner, text="✅  Auto-Detected Location",
+        ctk.CTkLabel(inner, text=tr("login_automation.auto_detected"),
                      font=ctk.CTkFont(size=14, weight="bold"),
                      text_color=("#166534", "#4ADE80")).pack(anchor="w")
 
@@ -137,7 +135,7 @@ class LoginAutomationTab(BaseAutomationTab):
                          font=ctk.CTkFont(size=12, weight="bold"),
                          text_color=("#166534", "#86EFAC")).pack(side="left")
         else:
-            ctk.CTkLabel(dist_row, text="Not set — scrape data first",
+            ctk.CTkLabel(dist_row, text=tr("login_automation.not_set"),
                          font=ctk.CTkFont(size=12),
                          text_color=("#DC2626", "#F87171")).pack(side="left")
 
@@ -152,14 +150,14 @@ class LoginAutomationTab(BaseAutomationTab):
                          font=ctk.CTkFont(size=12, weight="bold"),
                          text_color=("#166534", "#86EFAC")).pack(side="left")
         else:
-            ctk.CTkLabel(block_row, text="Not set — scrape data first",
+            ctk.CTkLabel(block_row, text=tr("login_automation.not_set"),
                          font=ctk.CTkFont(size=12),
                          text_color=("#DC2626", "#F87171")).pack(side="left")
 
         # Note
         if not self.district or not self.block:
             ctk.CTkLabel(loc_frame,
-                text="⚠️  Location data nahi mila. Pehle Settings > Location Data > 'Add Panchayat & Village' se sync karein.",
+                text=tr("login_automation.no_location"),
                 font=ctk.CTkFont(size=11),
                 text_color=("#DC2626", "#F87171"),
                 wraplength=600, justify="left",
@@ -185,10 +183,7 @@ class LoginAutomationTab(BaseAutomationTab):
         block = block_suggestions[0] if block_suggestions else (server_block or "")
 
         if not (district and block):
-            messagebox.showwarning("Missing Data",
-                "District ya Block data nahi mila.\n\n"
-                "Pehle Settings > Location Data > 'Add Panchayat & Village' se sync karein,\n"
-                "ya Settings > Location Data mein manually add karein.")
+            messagebox.showwarning(tr("errors.input_required"), tr("login_automation.missing_data"))
             return
 
         try:
@@ -224,7 +219,7 @@ class LoginAutomationTab(BaseAutomationTab):
 
         except Exception as e:
             self.update_status("Status: Error occurred")
-            messagebox.showerror("Automation Error", f"Error: {str(e)}")
+            messagebox.showerror(tr("base.automation_error.title"), tr("errors.generic", error=str(e)[:200]))
 
     def _safe_select(self, wait, xpath, text, wait_for_options=False):
         for _ in range(3):

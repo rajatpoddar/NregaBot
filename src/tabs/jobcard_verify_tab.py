@@ -8,6 +8,7 @@ from src import config
 from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC  # noqa: F401
 
@@ -34,8 +35,7 @@ class JobcardVerifyTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         # ── Header card ──
-        self._create_header_card(self, "🪪", "Verify Jobcard",
-                                 "Verify jobcards with photo upload and account-number checks in bulk.",
+        self._create_header_card(self, "🪪", tr("tab.jobcard_verify.title"), tr("tab.jobcard_verify.subtitle"),
                                  icon_key="emoji_verify_jobcard")
 
         controls_frame = ctk.CTkFrame(self, corner_radius=12, border_width=1,
@@ -43,7 +43,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         controls_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 6))
         controls_frame.grid_columnconfigure(1, weight=1)
         
-        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=10)
+        ctk.CTkLabel(controls_frame, text=tr("common.panchayat_name_label")).grid(row=0, column=0, sticky='w', padx=15, pady=10)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var,
@@ -52,7 +52,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' for every panchayat of the block, or '⭐ My Saved Panchayats' for only your saved panchayats.",
                      text_color="gray50", font=ctk.CTkFont(size=11)).grid(row=4, column=0, columnspan=2, sticky='w', padx=15, pady=(0, 10))
         
-        ctk.CTkLabel(controls_frame, text="Village Name:").grid(row=1, column=0, sticky='w', padx=15, pady=10)
+        ctk.CTkLabel(controls_frame, text=tr("form.jobcard_verify.village_name")).grid(row=1, column=0, sticky='w', padx=15, pady=10)
         v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
         self.village_var = ctk.StringVar()
         self.village_menu = ctk.CTkOptionMenu(controls_frame, variable=self.village_var, values=v_vals)
@@ -76,7 +76,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         self.process_all_villages_var = tkinter.BooleanVar()
         self.process_all_checkbox = ctk.CTkCheckBox(
             chk_frame,
-            text="Process all villages in this Panchayat",
+            text=tr("form.jobcard_verify.all_villages"),
             variable=self.process_all_villages_var,
             command=self._toggle_village_entry
         )
@@ -85,7 +85,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         self.verify_account_only_var = tkinter.BooleanVar()
         self.verify_account_only_chk = ctk.CTkCheckBox(
             chk_frame,
-            text="Verify only with Account Number",
+            text=tr("form.jobcard_verify.account_only"),
             variable=self.verify_account_only_var
         )
         self.verify_account_only_chk.grid(row=0, column=1, sticky='w')
@@ -94,9 +94,9 @@ class JobcardVerifyTab(BaseAutomationTab):
         photo_frame.grid(row=3, column=0, columnspan=2, sticky='ew', padx=15, pady=10)
         photo_frame.grid_columnconfigure(1, weight=1)
         
-        self.select_folder_button = ctk.CTkButton(photo_frame, text="Select Photo Folder...", command=self.select_photo_folder)
+        self.select_folder_button = ctk.CTkButton(photo_frame, text=tr("form.jobcard_verify.select_photo_folder"), command=self.select_photo_folder)
         self.select_folder_button.grid(row=0, column=0, sticky='w')
-        self.photo_path_label = ctk.CTkLabel(photo_frame, text=f"No folder selected (will use default '{config.JOBCARD_VERIFY_CONFIG['default_photo']}')", text_color="gray", anchor='w')
+        self.photo_path_label = ctk.CTkLabel(photo_frame, text=tr("form.jobcard_verify.no_folder", folder=config.JOBCARD_VERIFY_CONFIG['default_photo']), text_color="gray", anchor='w')
         self.photo_path_label.grid(row=0, column=1, sticky='ew', padx=10)
         
         instruction_text = "💡 Note: Name photos with the last part of the Jobcard No. (e.g., 417.jpg for ...01/417)"
@@ -175,20 +175,20 @@ class JobcardVerifyTab(BaseAutomationTab):
             self.village_menu.configure(state="normal")
 
     def select_photo_folder(self):
-        path = filedialog.askdirectory(title="Select Folder Containing Photos")
+        path = filedialog.askdirectory(title=tr("form.jobcard_verify.select_photo_folder_title"))
         if path:
             self.photo_folder_path = path
             self.photo_path_label.configure(text=self.photo_folder_path)
             self.log_info(f"Selected photo folder: {self.photo_folder_path}")
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Are you sure?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("confirm.are_you_sure")):
             self.panchayat_var.set("")
             self.village_var.set("")
             self.process_all_villages_var.set(False)
             self.verify_account_only_var.set(False)
             self._toggle_village_entry()
             self.photo_folder_path = ""
-            self.photo_path_label.configure(text=f"No folder selected (will use default '{config.JOBCARD_VERIFY_CONFIG['default_photo']}')")
+            self.photo_path_label.configure(text=tr("form.jobcard_verify.no_folder", folder=config.JOBCARD_VERIFY_CONFIG['default_photo']))
             self.app.clear_log(self.log_display)
             self.update_status("Ready")
             self.app.after(0, self.app.set_status, "Ready")
@@ -201,10 +201,10 @@ class JobcardVerifyTab(BaseAutomationTab):
         all_panchayats = panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
 
         if not panchayat:
-            messagebox.showwarning("Input Required", "Panchayat name is required.")
+            messagebox.showwarning(tr("errors.input_required"), tr("dialogs.panchayat_required"))
             return
         if not all_panchayats and not process_all and not village:
-            messagebox.showwarning("Input Required", "Please enter a Village name or check 'Process all villages'.")
+            messagebox.showwarning(tr("errors.input_required"), tr("dialogs.jobcard_village_required"))
             return
         if all_panchayats:
             # Each panchayat's villages are processed automatically
@@ -322,7 +322,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e).splitlines()[0]}"
             self.log_error(f"Error: {error_msg}")
-            messagebox.showerror("Automation Error", f"An error occurred: {error_msg}")
+            messagebox.showerror(tr("base.automation_error.title"), tr("errors.an_error_occurred", error=error_msg))
         finally:
             self.app.after(0, self.update_status, "Finished")
             self.app.after(0, self.set_ui_state, False)

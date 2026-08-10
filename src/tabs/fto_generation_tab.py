@@ -7,6 +7,7 @@ import threading
 from datetime import datetime
 
 from src import config
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, StaleElementReferenceException, TimeoutException  # noqa: F401
@@ -31,8 +32,7 @@ class FtoGenerationTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         # ── Header card ──
-        self._create_header_card(self, "✍️", "FTO Generation",
-                                 "Sign pending FTOs using the DSC-signed Old Firefox session, or delete them.",
+        self._create_header_card(self, "✍️", tr("tab.fto_generation.title"), tr("tab.fto_generation.subtitle"),
                                  icon_key="emoji_fto_gen")
 
         # Main settings card (bordered, pending-bills style)
@@ -41,7 +41,7 @@ class FtoGenerationTab(BaseAutomationTab):
         controls_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
         controls_frame.grid_columnconfigure(0, weight=1)
 
-        note_text = "💡 Instructions:\n1. Check/Set Old Firefox Path and Click 'Launch Old Firefox'.\n2. Log in manually, insert DSC Token, go to FTO page.\n3. Click 'Start' to sign pending FTOs or 'Delete' to remove."
+        note_text = tr("form.fto.instructions")
         ctk.CTkLabel(controls_frame, text=note_text, justify="left").grid(row=0, column=0, sticky='w', padx=15, pady=(5, 2))
         
         # --- NEW: Browser Setup Frame ---
@@ -49,18 +49,18 @@ class FtoGenerationTab(BaseAutomationTab):
         setup_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(2, 2))
         setup_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(setup_frame, text="Old Firefox Path:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky='w', padx=5, pady=5)
+        ctk.CTkLabel(setup_frame, text=tr("form.fto.old_ff_path"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky='w', padx=5, pady=5)
         
         self.ff_path_entry = ctk.CTkEntry(setup_frame, placeholder_text="e.g. C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe")
         self.ff_path_entry.grid(row=0, column=1, sticky='ew', padx=5, pady=5)
 
-        self.browse_btn = ctk.CTkButton(setup_frame, text="Browse", width=70, command=self._browse_firefox)
+        self.browse_btn = ctk.CTkButton(setup_frame, text=tr("common.browse"), width=70, command=self._browse_firefox)
         self.browse_btn.grid(row=0, column=2, padx=5, pady=5)
 
-        self.check_install_btn = ctk.CTkButton(setup_frame, text="Check Install", width=100, fg_color=config.COLORS["orange"], hover_color=config.COLORS["orange_hover"], command=self._check_installation)
+        self.check_install_btn = ctk.CTkButton(setup_frame, text=tr("form.fto.check_install"), width=100, fg_color=config.COLORS["orange"], hover_color=config.COLORS["orange_hover"], command=self._check_installation)
         self.check_install_btn.grid(row=0, column=3, padx=5, pady=5)
 
-        self.launch_btn = ctk.CTkButton(setup_frame, text="Launch Old Firefox", fg_color=config.COLORS["green_launch"], hover_color=config.COLORS["teal_green_hover"], command=self._launch_firefox)
+        self.launch_btn = ctk.CTkButton(setup_frame, text=tr("form.fto.launch_old_ff"), fg_color=config.COLORS["green_launch"], hover_color=config.COLORS["teal_green_hover"], command=self._launch_firefox)
         self.launch_btn.grid(row=0, column=4, padx=5, pady=5)
 
         # --- ABPS Check Button Container (hidden until used) ---
@@ -70,7 +70,7 @@ class FtoGenerationTab(BaseAutomationTab):
         
         self.check_abps_button = ctk.CTkButton(
             self.abps_container, 
-            text="Check Pending ABPS Labour", 
+            text=tr("form.fto.check_pending_abps"), 
             command=self._go_to_mr_tracking,
             width=200,
             height=32,
@@ -92,7 +92,7 @@ class FtoGenerationTab(BaseAutomationTab):
         # Delete Button (Separated from Reset)
         self.delete_btn = ctk.CTkButton(
             inner_container, 
-            text="🗑 Delete FTOs", 
+            text=tr("form.fto.delete_ftos"), 
             command=self.start_delete_automation,
             fg_color="#9B2C2C", 
             hover_color="#7F1D1D",
@@ -132,7 +132,7 @@ class FtoGenerationTab(BaseAutomationTab):
 
     def _browse_firefox(self):
         path = filedialog.askopenfilename(
-            title="Select Old Firefox Executable",
+            title=tr("form.fto.select_ff_exe"),
             filetypes=[("Executable Files", "*.exe")]
         )
         if path:
@@ -150,19 +150,19 @@ class FtoGenerationTab(BaseAutomationTab):
                     break
         
         if path and os.path.exists(path):
-            messagebox.showinfo("Success", f"Old Firefox found at:\n{path}")
+            messagebox.showinfo(tr("status.success"), tr("dialogs.ff_found", path=path))
             self._save_path(path)
         else:
-            messagebox.showwarning("Not Found", "Old Firefox not found! Please browse and select 'firefox.exe' manually.")
+            messagebox.showwarning(tr("dialogs.not_found"), tr("dialogs.ff_not_found"))
 
     def _launch_firefox(self):
         path = self.ff_path_entry.get().strip()
         if not path or not os.path.exists(path):
-            messagebox.showerror("Error", "Valid Firefox path is required!")
+            messagebox.showerror(tr("dialogs.error"), tr("dialogs.valid_ff_required"))
             return
         
         self.log_info("Launching Old Firefox...")
-        self.launch_btn.configure(state="disabled", text="Launching...")
+        self.launch_btn.configure(state="disabled", text=tr("form.fto.launching"))
         
         url = "https://nregade4.nic.in/netnrega/Login.aspx?&level=HomePO&state_code=34"
 
@@ -171,12 +171,12 @@ class FtoGenerationTab(BaseAutomationTab):
             success, msg = self.app.browser_manager.launch_old_firefox(path, url)
             if success:
                 self.log_success("Browser Launched. Please login manually, plug in your DSC token, then click Start.")
-                self.app.after(0, lambda: messagebox.showinfo("Browser Ready", "Old Firefox is open.\n\n1. Login to NREGA.\n2. Go to FTO page.\n3. Return here and click 'Start'."))
+                self.app.after(0, lambda: messagebox.showinfo(tr("dialogs.browser_ready"), tr("dialogs.ff_open_msg")))
             else:
                 self.log_error(msg)
-                self.app.after(0, lambda: messagebox.showerror("Browser Error", msg))
+                self.app.after(0, lambda: messagebox.showerror(tr("dialogs.browser_error"), msg))
             
-            self.app.after(0, lambda: self.launch_btn.configure(state="normal", text="Launch Old Firefox"))
+            self.app.after(0, lambda: self.launch_btn.configure(state="normal", text=tr("form.fto.launch_old_ff")))
 
         threading.Thread(target=_thread, daemon=True).start()
 
@@ -215,7 +215,7 @@ class FtoGenerationTab(BaseAutomationTab):
         self.app.start_automation_thread(self.automation_key, self.run_generation_logic)
 
     def start_delete_automation(self):
-        if not messagebox.askyesno("Confirm Delete", "This will delete the FIRST FTO in the dropdown.\n\nEnsure you want to proceed."):
+        if not messagebox.askyesno(tr("dialogs.confirm_delete"), tr("dialogs.delete_fto_confirm")):
             return
         self.app.start_automation_thread(self.automation_key + "_del", self.run_delete_logic)
 
@@ -368,7 +368,7 @@ class FtoGenerationTab(BaseAutomationTab):
             self._process_deletion_page(driver, wait, cfg["delete_url_2"], "Delete (Type 2)")
             
             self.log_info("Deletion process finished.")
-            messagebox.showinfo("Finished", "FTO Deletion check complete.")
+            messagebox.showinfo(tr("dialogs.finished"), tr("dialogs.fto_delete_complete"))
 
         except Exception as e:
             self.log_error(f"Critical Error: {e}")

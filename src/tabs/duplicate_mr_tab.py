@@ -19,6 +19,7 @@ except ImportError:
 from src import config
 from .base_tab import BaseAutomationTab
 from src.utils import truncate_workcode
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
@@ -46,8 +47,7 @@ class DuplicateMrTab(BaseAutomationTab):
         main_container.grid_rowconfigure(3, weight=1)
 
         # ── Header card ──
-        self._create_header_card(main_container, "🖨️", "Duplicate MR Print",
-                                 "Print or save duplicate Muster Rolls for the selected Panchayat.",
+        self._create_header_card(main_container, "🖨️", tr("tab.duplicate_mr.title"), tr("tab.duplicate_mr.subtitle"),
                                  icon_key="emoji_duplicate_mr")
 
         input_frame = ctk.CTkFrame(main_container, corner_radius=12, border_width=1,
@@ -55,23 +55,23 @@ class DuplicateMrTab(BaseAutomationTab):
         input_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
         input_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=10, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("common.panchayat_name_label")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
 
-        ctk.CTkLabel(input_frame, text="Output Action:").grid(row=1, column=0, padx=15, pady=10, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("common.output_action")).grid(row=1, column=0, padx=15, pady=10, sticky="w")
         self.output_action_var = ctk.StringVar(value="Save as PDF Only")
         self.output_action_menu = ctk.CTkOptionMenu(input_frame, variable=self.output_action_var, values=["Save as PDF Only", "Print and Save PDF"])
         self.output_action_menu.grid(row=1, column=1, padx=15, pady=10, sticky="w")
 
-        ctk.CTkLabel(input_frame, text="Orientation:").grid(row=2, column=0, padx=15, pady=10, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("common.orientation")).grid(row=2, column=0, padx=15, pady=10, sticky="w")
         self.orientation_var = ctk.StringVar(value="Landscape")
         self.orientation_segmented_button = ctk.CTkSegmentedButton(input_frame, variable=self.orientation_var, values=["Landscape", "Portrait"])
         self.orientation_segmented_button.grid(row=2, column=1, padx=15, pady=10, sticky="w")
 
-        ctk.CTkLabel(input_frame, text="PDF Scale:").grid(row=3, column=0, padx=15, pady=10, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("common.pdf_scale")).grid(row=3, column=0, padx=15, pady=10, sticky="w")
         scale_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
         scale_frame.grid(row=3, column=1, padx=15, pady=10, sticky="ew")
         scale_frame.grid_columnconfigure(0, weight=1)
@@ -103,10 +103,10 @@ class DuplicateMrTab(BaseAutomationTab):
         wc_controls = ctk.CTkFrame(work_codes_tab, fg_color="transparent")
         wc_controls.grid(row=0, column=0, sticky='ew', padx=5, pady=(5,0))
         
-        clear_button = ctk.CTkButton(wc_controls, text="Clear", width=80, command=lambda: self.work_codes_textbox.delete("1.0", tkinter.END))
+        clear_button = ctk.CTkButton(wc_controls, text=tr("common.clear"), width=80, command=lambda: self.work_codes_textbox.delete("1.0", tkinter.END))
         clear_button.pack(side='right', padx=(0, 5))
         
-        extract_button = ctk.CTkButton(wc_controls, text="Extract from Text", width=120,
+        extract_button = ctk.CTkButton(wc_controls, text=tr("common.extract_from_text"), width=120,
                                        command=lambda: self._extract_and_update_workcodes(self.work_codes_textbox))
         extract_button.pack(side='right', padx=(0, 5))
 
@@ -119,11 +119,11 @@ class DuplicateMrTab(BaseAutomationTab):
         results_action_frame.grid(row=0, column=0, sticky="ew", pady=(5, 10), padx=5)
         
         # --- MERGE BUTTON ADDED ---
-        self.merge_pdfs_button = ctk.CTkButton(results_action_frame, text="Merge Saved PDFs", command=self.merge_saved_pdfs)
+        self.merge_pdfs_button = ctk.CTkButton(results_action_frame, text=tr("common.merge_saved_pdfs"), command=self.merge_saved_pdfs)
         self.merge_pdfs_button.pack(side='left', padx=(0, 10))
         # --- END ---
 
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="duplicate_mr_results.xlsx", filter_mode="Export All"))
+        self.export_csv_button = ctk.CTkButton(results_action_frame, text=tr("common.export_excel"), command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="duplicate_mr_results.xlsx", filter_mode="Export All"))
         self.export_csv_button.pack(side="left") # Changed to left
 
         cols = ("Timestamp", "Panchayat", "Work Code", "MSR No", "Status")
@@ -181,7 +181,7 @@ class DuplicateMrTab(BaseAutomationTab):
         scale = self.scale_slider.get()
 
         if not panchayat or not work_codes_raw:
-            messagebox.showwarning("Input Required", "Panchayat Name and Work Codes are required.")
+            messagebox.showwarning(tr("dialogs.input_required"), tr("dialogs.panchayat_workcodes_required"))
             return
             
         work_codes = [line.strip() for line in work_codes_raw.splitlines() if line.strip()]
@@ -217,7 +217,7 @@ class DuplicateMrTab(BaseAutomationTab):
             return output_dir
         except Exception as e:
             self.log_error(f"Error creating output directory: {e}")
-            messagebox.showerror("Directory Error", f"Could not create output directory: {e}")
+            messagebox.showerror(tr("dialogs.directory_error"), tr("dialogs.could_not_create_output_dir", error=e))
             return None
         
     def load_data_from_report(self, workcodes: str, location_panchayat: str):
@@ -299,7 +299,7 @@ class DuplicateMrTab(BaseAutomationTab):
         final_message = f"Duplicate MR process has finished.\n✅ {success_count} saved, ❌ {fail_count} failed"
         # --- UPDATED PATH CHECK ---
         if self.output_dir and os.path.exists(self.output_dir) and any(os.scandir(self.output_dir)):
-            if messagebox.askyesno("Complete", f"{final_message}\n\nDo you want to open the output folder?"):
+            if messagebox.askyesno(tr("dialogs.complete"), tr("dialogs.open_output_after", summary=final_message)):
                 self.app.open_folder(self.output_dir)
         else:
             self.log_info(f"📊 {final_message}")
@@ -542,7 +542,7 @@ class DuplicateMrTab(BaseAutomationTab):
         self.merge_pdfs_button.configure(state=state) # <-- ADDED
         self.export_csv_button.configure(state=state) # <-- ADDED
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Are you sure?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.are_you_sure")):
             self.panchayat_var.set("")
             self.work_codes_textbox.delete("1.0", "end")
             self.app.clear_log(self.log_display)
@@ -559,14 +559,14 @@ class DuplicateMrTab(BaseAutomationTab):
         # 1. Get current output directory
         panchayat = self.panchayat_var.get().strip()
         if not panchayat:
-            messagebox.showwarning("Input Required", "Please enter a Panchayat name to find the correct folder.", parent=self)
+            messagebox.showwarning(tr("dialogs.input_required"), tr("dialogs.enter_panchayat_folder"), parent=self)
             return
             
         # Get the directory for *today's* saved files for this panchayat
         output_dir = self._get_output_dir(panchayat)
         if not os.path.exists(output_dir):
             self.log_warning(f"No output folder found for today: {output_dir}")
-            messagebox.showinfo("No Files", f"No saved PDFs found for '{panchayat}' from today.", parent=self)
+            messagebox.showinfo(tr("dialogs.no_files"), tr("dialogs.no_pdfs_today", panchayat=panchayat), parent=self)
             return
 
         # 2. Find all PDF files in that directory
@@ -574,13 +574,13 @@ class DuplicateMrTab(BaseAutomationTab):
         
         if not pdf_files:
             self.log_warning("No PDF files found in the directory.")
-            messagebox.showinfo("No Files", f"No PDFs found in:\n{output_dir}", parent=self)
+            messagebox.showinfo(tr("dialogs.no_files"), tr("dialogs.no_pdfs_in", output_dir=output_dir), parent=self)
             return
             
         pdf_files.sort() # Sort files alphabetically
         self.log_info(f"Found {len(pdf_files)} PDF files to merge.")
         # 3. Get output file name from user
-        dialog = ctk.CTkInputDialog(text="Enter a base name for the merged file:", title="Merge PDFs")
+        dialog = ctk.CTkInputDialog(text=tr("common.merge_base_name"), title=tr("common.merge_pdfs"))
         base_name = dialog.get_input()
         
         if not base_name:
@@ -602,7 +602,7 @@ class DuplicateMrTab(BaseAutomationTab):
                 output_path = os.path.join(merge_output_dir, file_name)
                 count += 1
         except Exception as e:
-            messagebox.showerror("Path Error", f"Could not create merge output path: {e}", parent=self)
+            messagebox.showerror(tr("dialogs.path_error"), tr("dialogs.could_not_create_merge_output_path", error=e), parent=self)
             return
 
         # 5. Run merge in a separate thread to keep UI responsive
@@ -616,7 +616,7 @@ class DuplicateMrTab(BaseAutomationTab):
         """The actual PDF merging logic that runs in a thread."""
         if PdfWriter is None:
             self.log_error("PDF library (pypdf/PyPDF2) not installed. Please reinstall the latest version from nregabot.com.")
-            messagebox.showerror("PDF Library Missing", "PDF merge requires the 'pypdf' library.\n\nSmart updates cannot add new Python libraries — please download the latest full version from nregabot.com.", parent=self)
+            messagebox.showerror(tr("dialogs.pdf_lib_missing"), tr("dialogs.pdf_lib_missing_msg"), parent=self)
             return
         self.app.after(0, self.set_ui_state, True)
         self.log_info(f"Merging {len(file_list)} files...")
@@ -656,13 +656,13 @@ class DuplicateMrTab(BaseAutomationTab):
             merger.close()
             
             self.log_success("Merge complete!")
-            messagebox.showinfo("Success", f"Successfully merged {len(file_list)} files into:\n{output_path}", parent=self)
-            if messagebox.askyesno("Open Location?", "Open the Merged PDFs folder?", parent=self):
+            messagebox.showinfo(tr("dialogs.success"), tr("dialogs.merged_success", count=len(file_list), path=output_path), parent=self)
+            if messagebox.askyesno(tr("dialogs.open_location"), tr("dialogs.open_merged_folder"), parent=self):
                 self.app.open_folder(os.path.dirname(output_path))
                 
         except Exception as e:
             self.log_error(f"Error during merge: {e}")
-            messagebox.showerror("Merge Error", f"An error occurred: {e}", parent=self)
+            messagebox.showerror(tr("dialogs.merge_error"), tr("dialogs.merge_error_generic", error=e), parent=self)
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")

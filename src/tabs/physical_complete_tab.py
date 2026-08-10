@@ -12,6 +12,7 @@ from datetime import datetime
 
 from src import config
 from src.utils import truncate_workcode
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -39,8 +40,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         main_container.grid_rowconfigure(3, weight=1)
 
         # ── Header card ──
-        self._create_header_card(main_container, "✅", "Physical Complete",
-                                 "Mark works as physically complete on the portal for the selected Panchayat.",
+        self._create_header_card(main_container, "✅", tr("tab.physical_complete.title"), tr("tab.physical_complete.subtitle"),
                                  icon_key="emoji_physical_complete")
 
         # --- Input Frame (bordered card) ---
@@ -50,14 +50,14 @@ class PhysicalCompleteTab(BaseAutomationTab):
         input_frame.grid_columnconfigure(1, weight=1)
 
         # Row 0: Panchayat
-        ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("common.panchayat_name_label")).grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, columnspan=3, padx=15, pady=(15, 5), sticky="ew")
 
         # Row 1: Work Category
-        ctk.CTkLabel(input_frame, text="Work Category:").grid(row=1, column=0, padx=15, pady=5, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("form.material_entry.work_category")).grid(row=1, column=0, padx=15, pady=5, sticky="w")
         work_category_options = [
             "Anganwadi/Other Rural Infrastructure", "Coastal Areas", "Drought Proofing", "Rural Drinking Water",
             "Food Grain", "Flood Control and Protection", "Fisheries", "Micro Irrigation Works",
@@ -72,7 +72,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         # Row 2: Auto Forward Checkbox
         self.auto_forward_checkbox = ctk.CTkCheckBox(
             input_frame, 
-            text="Auto-Forward to Scheme Closing after success", 
+            text=tr("form.physical_complete.auto_forward"), 
             variable=self.auto_forward_var
         )
         self.auto_forward_checkbox.grid(row=2, column=1, columnspan=3, padx=15, pady=(5, 15), sticky="w")
@@ -95,10 +95,10 @@ class PhysicalCompleteTab(BaseAutomationTab):
         wc_header_frame = ctk.CTkFrame(work_codes_tab, fg_color="transparent")
         wc_header_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(5,0))
         
-        clear_wc_button = ctk.CTkButton(wc_header_frame, text="Clear", width=80, command=lambda: self.work_codes_textbox.delete("1.0", "end"))
+        clear_wc_button = ctk.CTkButton(wc_header_frame, text=tr("common.clear"), width=80, command=lambda: self.work_codes_textbox.delete("1.0", "end"))
         clear_wc_button.pack(side="right", padx=5)
 
-        extract_button = ctk.CTkButton(wc_header_frame, text="Extract from Text", width=120, command=self._extract_work_codes_local)
+        extract_button = ctk.CTkButton(wc_header_frame, text=tr("common.extract_from_text"), width=120, command=self._extract_work_codes_local)
         extract_button.pack(side='right', padx=(0, 5))
         
         self.work_codes_textbox = ctk.CTkTextbox(work_codes_tab, height=150)
@@ -113,7 +113,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         # Forward Button
         self.forward_btn = ctk.CTkButton(
             results_action_frame, 
-            text="Forward to Scheme Closing ➡", 
+            text=tr("form.physical_complete.forward_btn"), 
             command=self.manual_forward,
             fg_color="#2b7a0b", hover_color="#1e5c06"
         )
@@ -121,7 +121,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side='left')
 
         cols = ("Timestamp", "Panchayat", "Work Code", "Status", "Details")
@@ -179,7 +179,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
     def start_automation(self) -> None:
         inputs = self._get_inputs()
         if not inputs["panchayat"] or not inputs["work_category"] or not inputs["work_codes"]:
-            messagebox.showwarning("Input Required", "Panchayat, Work Category, and at least one Work Code are required.")
+            messagebox.showwarning(tr("errors.input_required"), tr("dialogs.physical_complete_required"))
             return
 
         self._save_inputs(inputs)
@@ -199,7 +199,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         self.log_info("--- Starting Physical Complete Automation ---")        
         driver = self.app.get_driver()
         if not driver:
-            messagebox.showerror("Browser Not Found", "Please launch a browser first.")
+            messagebox.showerror(tr("errors.browser_not_found"), tr("errors.browser_required"))
             self.app.after(0, self.set_ui_state, False)
             return
 
@@ -337,21 +337,21 @@ class PhysicalCompleteTab(BaseAutomationTab):
     def manual_forward(self):
         """Button click handler for forwarding to Scheme Closing"""
         if not self.last_successful_codes:
-            messagebox.showinfo("No Data", "Koi successful work code nahi hai forward karne ke liye. Pehle automation run karein.")
+            messagebox.showinfo(tr("confirm.ok"), tr("physical.complete.no_success"))
             return
         self.forward_to_scheme_closing(self.last_successful_panchayat, self.last_successful_codes, auto_start=False)
 
     def forward_to_scheme_closing(self, panchayat, work_codes, auto_start=False):
         scheme_tab = None
         
-        # NregaBot me tabs 'tab_instances' dictionary me display name ke sath store hote hain
+        # NregaBot stores tabs in the 'tab_instances' dict by display name
         if hasattr(self.app, 'tab_instances') and "Scheme Closing" in self.app.tab_instances:
             scheme_tab = self.app.tab_instances["Scheme Closing"]
         elif hasattr(self.app, 'tabs') and "scheme_closing" in self.app.tabs:
             scheme_tab = self.app.tabs["scheme_closing"]
             
         if not scheme_tab:
-            messagebox.showerror("Error", "Scheme Closing tab application mein load nahi hua hai. Kripya pehle us tab par ek baar click karein.")
+            messagebox.showerror(tr("base.automation_error.title"), tr("physical.complete.scheme_not_loaded"))
             return
             
         try:
@@ -376,9 +376,9 @@ class PhysicalCompleteTab(BaseAutomationTab):
             # Chhota sa delay taaki UI update ho sake aur uske baad Scheme Closing start ho jaye
             self.app.after(500, scheme_tab.start_automation)
         else:
-            messagebox.showinfo("Forwarded Successfully", f"{len(work_codes)} successful work codes 'Scheme Closing' tab mein bhej diye gaye hain.")
+            messagebox.showinfo(tr("status.success"), tr("physical.complete.forwarded", count=len(work_codes)))
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Are you sure? This will clear all inputs."):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_inputs")):
             self.panchayat_var.set("")
             self.work_codes_textbox.delete("1.0", "end")
             self.safe_tree_clear()
@@ -408,10 +408,10 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
     def _get_filtered_data_and_filepath(self, export_format):
         if not self.results_tree.get_children(): 
-            messagebox.showinfo("No Data", "No results to export."); return None, None
+            messagebox.showinfo(tr("errors.no_data"), tr("errors.no_results_export")); return None, None
         location_panchayat = self.panchayat_entry.get().strip()
         if not location_panchayat: 
-            messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
+            messagebox.showwarning(tr("errors.input_needed"), tr("dialogs.panchayat_for_report")); return None, None
         
         filter_option = self.export_filter_menu.get()
         data_to_export = []
@@ -423,19 +423,19 @@ class PhysicalCompleteTab(BaseAutomationTab):
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)
             
         if not data_to_export: 
-            messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
+            messagebox.showinfo(tr("errors.no_data"), tr("dialogs.no_records_for_filter", filter=filter_option)); return None, None
 
         safe_name = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {"Image (.jpg)": { "ext": ".jpg", "types": [("JPEG Image", "*.jpg")]}, "PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
         filename = f"Physical_Complete_Report_{safe_name}_{timestamp}{details['ext']}"
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_report_path("Physical Complete"), initialfile=filename, title="Save Report")
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_report_path("Physical Complete"), initialfile=filename, title=tr("common.save_report"))
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
         title = f"Physical Complete Report: {self.panchayat_entry.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
-        if success and messagebox.askyesno("Success", f"PDF Report saved to:\n{file_path}\n\nDo you want to open it?"):
+        if success and messagebox.askyesno(tr("status.success"), tr("export.pdf_saved", path=file_path)):
             if sys.platform == "win32": os.startfile(file_path)
             else: subprocess.call(['open', file_path])

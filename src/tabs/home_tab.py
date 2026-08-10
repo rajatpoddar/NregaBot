@@ -9,6 +9,7 @@ import tkinter as tk
 from PIL import Image
 from src.utils import resource_path, _suppress_overscroll
 from src import config
+from src.i18n import tr
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -80,7 +81,7 @@ class HomeTab(ctk.CTkFrame):
 
         # Greeting
         user_name = self.app.license_info.get("user_name", "")
-        greet = f"Welcome, {user_name} !" if user_name else "Welcome !"
+        greet = tr("home.welcome", name=user_name) if user_name else tr("home.welcome_default")
         ctk.CTkLabel(
             header_frame,
             text=greet,
@@ -91,7 +92,7 @@ class HomeTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             header_frame,
-            text="Select an automation below to get started. Quickly find what you need.",
+            text=tr("home.subtitle"),
             font=ctk.CTkFont(family="Segoe UI", size=13),
             text_color=(config.COLORS["text_medium"], config.COLORS["text_light"]),
             anchor="w",
@@ -111,14 +112,14 @@ class HomeTab(ctk.CTkFrame):
         }
 
         ctk.CTkButton(
-            actions_frame, text="Launch Chrome",
+            actions_frame, text=tr("home.launch_chrome_btn"),
             image=self.app.icon_images.get("chrome"),
             compound="left",
             command=self.app.launch_chrome_detached, **btn_style
         ).pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
-            actions_frame, text="Auto Login",
+            actions_frame, text=tr("home.auto_login_btn"),
             image=self.app.icon_images.get("emoji_login_automation"),
             compound="left",
             command=self.app._quick_login_automation, **btn_style
@@ -130,7 +131,7 @@ class HomeTab(ctk.CTkFrame):
         stats_icon = self.app.icon_images.get("emoji_tools")
         ctk.CTkLabel(
             actions_frame,
-            text=f"  {total} Automations Available",
+            text=tr("home.stats_label", count=total),
             image=stats_icon,
             compound="left",
             font=ctk.CTkFont(family="Segoe UI", size=12),
@@ -157,7 +158,7 @@ class HomeTab(ctk.CTkFrame):
 
         self.search_entry = ctk.CTkEntry(
             entry_frame,
-            placeholder_text="🔍  Search automations...",
+            placeholder_text=tr("home.search_placeholder"),
             font=ctk.CTkFont(family="Segoe UI", size=13),
             height=38,
             corner_radius=12,
@@ -205,7 +206,7 @@ class HomeTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             label_frame,
-            text="⭐ Most Used",
+            text=tr("home.most_used_title"),
             font=ctk.CTkFont(family="Helvetica Neue", size=18, weight="bold"),
             text_color=(config.COLORS["text_dark"], config.COLORS["text_white"]),
         ).grid(row=0, column=0, sticky="w")
@@ -252,7 +253,7 @@ class HomeTab(ctk.CTkFrame):
                 card.destroy()
             except Exception:
                 pass
-            # Stale callback references prune karo (memory-leak fix)
+            # Prune stale callback references (memory-leak fix)
             if name in getattr(self, '_feature_cards', {}) and card in self._feature_cards[name]:
                 try:
                     self._feature_cards[name].remove(card)
@@ -281,7 +282,7 @@ class HomeTab(ctk.CTkFrame):
         if not names:
             self._most_used_placeholder = ctk.CTkLabel(
                 self.most_used_grid,
-                text="Start using automations — your most-used will appear here.",
+                text=tr("home.most_used_placeholder"),
                 font=ctk.CTkFont(family="Segoe UI", size=12),
                 text_color=(config.COLORS["text_light"], config.COLORS["text_medium"]),
             )
@@ -317,7 +318,7 @@ class HomeTab(ctk.CTkFrame):
 
             ctk.CTkLabel(
                 cat_header,
-                text=cat,
+                text=tr(f"nav.cat.{cat}", default=cat),
                 font=ctk.CTkFont(family="Helvetica Neue", size=16, weight="bold"),
                 text_color=accent,
             ).grid(row=0, column=0, sticky="w")
@@ -404,7 +405,7 @@ class HomeTab(ctk.CTkFrame):
 
         name_label = ctk.CTkLabel(
             inner,
-            text=name,
+            text=tr(f"nav.tab.{name}", default=name),
             font=ctk.CTkFont(family="Segoe UI", size=font_size, weight="bold"),
             text_color=(config.COLORS["tv_header_bg_dark"], config.COLORS["text_white"]),
         )
@@ -437,7 +438,7 @@ class HomeTab(ctk.CTkFrame):
             )
             name_label.configure(text=f"🔒 {name}", text_color=("#4F46E5", "#A5B4FC"))
 
-        # Refresh helper — feature flags update hone par card ko re-style karta hai
+        # Refresh helper — re-styles the card when feature flags update
         def _apply_card_state():
             s = self._get_feature_state(name)
             if s == "blocked":
@@ -461,7 +462,7 @@ class HomeTab(ctk.CTkFrame):
                 nl.configure(text_color=htc)
 
         def on_leave(e, c=card):
-            # Live feature-state ke hisaab se restore karo (blocked/premium styling bachti hai)
+            # Restore per the live feature state (keeps blocked/premium styling)
             _apply_card_state()
 
         def on_click(e=None):
@@ -469,20 +470,20 @@ class HomeTab(ctk.CTkFrame):
             if st == "blocked":
                 alert = getattr(self.app, 'show_feature_maintenance_alert', None)
                 if alert:
-                    alert(name)  # internally error sound play karta hai
+                    alert(name)  # internally plays the error sound
                 else:  # Lite app fallback
                     self.app.play_sound("error")
-                    tk.messagebox.showwarning("Under Maintenance",
-                                              f"'{name}' is currently under maintenance.\n\nPlease try again later.")
+                    tk.messagebox.showwarning(tr("home.maintenance_title"),
+                                              tr("home.maintenance_msg", name=name))
                 return
             if st == "premium":
                 alert = getattr(self.app, 'show_trial_lock_alert', None)
                 if alert:
-                    alert(name)  # internally error sound play karta hai
+                    alert(name)  # internally plays the error sound
                 else:  # Lite app fallback
                     self.app.play_sound("error")
-                    tk.messagebox.showinfo("Premium Feature",
-                                           f"'{name}' is a premium feature available in paid plans.")
+                    tk.messagebox.showinfo(tr("home.premium_feature_title"),
+                                           tr("home.premium_feature_msg", name=name))
                 return
             self.app.play_sound("click")
             self.app.show_frame(name)
@@ -582,7 +583,7 @@ class HomeTab(ctk.CTkFrame):
         return None
 
     def refresh_feature_states(self):
-        """Feature flags update hone par saare LIVE home cards ko re-style karta hai.
+        """Re-style all LIVE home cards when feature flags update.
         Called from _apply_feature_flags (main_app + lite_app)."""
         for cards in list(getattr(self, '_feature_cards', {}).values()):
             for card in cards:

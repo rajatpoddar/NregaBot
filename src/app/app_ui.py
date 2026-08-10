@@ -18,6 +18,7 @@ from PIL import Image, ImageDraw
 from src import config
 from src.utils import resource_path, get_logger, get_config, save_config
 from src.ui_components import MarqueeLabel, PerformanceMonitor
+from src.i18n import tr
 
 logger = get_logger()
 
@@ -41,7 +42,7 @@ class UIMixin:
                     self.status_label.configure(text=message, text_color=(config.COLORS["blue"], config.COLORS["blue_light"]))
             def on_leave(e):
                 if hasattr(self, 'status_label') and self.status_label and self.status_label.winfo_exists():
-                    self.status_label.configure(text="Ready", text_color="gray60")
+                    self.status_label.configure(text=tr("app.status_ready"), text_color="gray60")
             btn.bind("<Enter>", on_enter)
             btn.bind("<Leave>", on_leave)
 
@@ -72,7 +73,7 @@ class UIMixin:
         announcement_frame.grid(row=0, column=1, sticky="ew", padx=20)
         announcement_frame.grid_propagate(False)
 
-        self.announcement_label = MarqueeLabel(announcement_frame, text="Welcome to NREGA Bot! Loading...", width=300)
+        self.announcement_label = MarqueeLabel(announcement_frame, text=tr("app.welcome_loading"), width=300)
         self.announcement_label.pack(fill="both", expand=True, pady=5)
 
         controls_frame = ctk.CTkFrame(header, fg_color="transparent")
@@ -85,7 +86,7 @@ class UIMixin:
             command=lambda: self.show_frame("Workcode Extractor")
         )
         self.extractor_btn.pack(side="left", padx=(0, 10))
-        add_status_hover(self.extractor_btn, "Open Workcode Extractor")
+        add_status_hover(self.extractor_btn, tr("app.tooltip.workcode_extractor"))
 
         self.quick_login_btn = ctk.CTkButton(
             controls_frame, text="", image=self.icon_images.get("emoji_login_automation"),
@@ -94,7 +95,7 @@ class UIMixin:
             command=self._quick_login_automation
         )
         self.quick_login_btn.pack(side="left", padx=(0, 10))
-        add_status_hover(self.quick_login_btn, "Auto Login to NREGA")
+        add_status_hover(self.quick_login_btn, tr("app.tooltip.auto_login"))
 
         ctk.CTkFrame(controls_frame, width=2, height=20, corner_radius=0, fg_color=(config.COLORS["gray90"], config.COLORS["gray30"])).pack(side="left", padx=(0, 10))
 
@@ -108,7 +109,7 @@ class UIMixin:
             command=self.launch_chrome_detached
         )
         self.launch_chrome_btn.pack(side="left", padx=2)
-        add_status_hover(self.launch_chrome_btn, "Launch Google Chrome")
+        add_status_hover(self.launch_chrome_btn, tr("app.tooltip.launch_chrome"))
 
         self.launch_edge_btn = ctk.CTkButton(
             browser_group, text="", image=self.icon_images.get("edge"),
@@ -117,7 +118,7 @@ class UIMixin:
             command=self.launch_edge_detached
         )
         self.launch_edge_btn.pack(side="left", padx=2)
-        add_status_hover(self.launch_edge_btn, "Launch Microsoft Edge")
+        add_status_hover(self.launch_edge_btn, tr("app.tooltip.launch_edge"))
 
         self.launch_firefox_btn = ctk.CTkButton(
             browser_group, text="", image=self.icon_images.get("firefox"),
@@ -126,7 +127,7 @@ class UIMixin:
             command=self.launch_firefox_managed
         )
         self.launch_firefox_btn.pack(side="left", padx=2)
-        add_status_hover(self.launch_firefox_btn, "Launch Mozilla Firefox")
+        add_status_hover(self.launch_firefox_btn, tr("app.tooltip.launch_firefox"))
 
         ctk.CTkFrame(controls_frame, width=2, height=20, corner_radius=0, fg_color=(config.COLORS["gray90"], config.COLORS["gray30"])).pack(side="left", padx=(0, 10))
 
@@ -147,7 +148,7 @@ class UIMixin:
             command=self._cycle_theme
         )
         self.theme_btn.pack(side="left", padx=(5, 2), pady=4)
-        add_status_hover(self.theme_btn, "Switch Theme (Light/Dark)")
+        add_status_hover(self.theme_btn, tr("app.tooltip.switch_theme"))
         self._update_theme_icon()
 
         self.sound_btn = ctk.CTkButton(
@@ -157,7 +158,7 @@ class UIMixin:
             command=self._on_sound_toggle_click
         )
         self.sound_btn.pack(side="left", padx=2, pady=4)
-        add_status_hover(self.sound_btn, "Toggle Sound Effects")
+        add_status_hover(self.sound_btn, tr("app.tooltip.toggle_sound"))
         # Improved ON/OFF visual (green pill = on, red + muted icon = off)
         self._update_sound_btn_visual()
 
@@ -168,7 +169,7 @@ class UIMixin:
             command=self._on_minimize_toggle_click
         )
         self.minimize_btn.pack(side="left", padx=(2, 5), pady=4)
-        add_status_hover(self.minimize_btn, "Auto-Minimize on Start")
+        add_status_hover(self.minimize_btn, tr("app.tooltip.auto_minimize"))
         self._update_settings_btn_visuals(self.minimize_btn, self.app_state.minimize_var.get())
 
         self.theme_combo = ctk.CTkOptionMenu(self, width=0, height=0)
@@ -281,7 +282,7 @@ class UIMixin:
 
         # ── Status Label ──
         # Footer reads: "© 2025 NREGA Bot | ▶ Running: X | Status: ..."
-        self.status_label = ctk.CTkLabel(status_frame, text="Ready", text_color="gray60", font=ctk.CTkFont(size=12))
+        self.status_label = ctk.CTkLabel(status_frame, text=tr("app.status_ready"), text_color="gray60", font=ctk.CTkFont(size=12))
         self.status_label.pack(side="left", padx=(8, 0))
 
         dock_frame = ctk.CTkFrame(footer, fg_color="transparent")
@@ -307,7 +308,7 @@ class UIMixin:
         # "STOP ALL" label
         self.emergency_stop_label = ctk.CTkLabel(
             self.emergency_stop_frame,
-            text="STOP ALL",
+            text=tr("app.stop_all"),
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=("gray50", "gray50"),
             cursor="hand2",
@@ -318,10 +319,10 @@ class UIMixin:
         # Hover tooltip for the whole group
         def _stop_enter(e):
             if hasattr(self, 'status_label') and self.status_label and self.status_label.winfo_exists():
-                self.status_label.configure(text="Emergency Stop — Click to halt all automations", text_color=("#DC2626", "#EF4444"))
+                self.status_label.configure(text=tr("app.emergency_stop_hint"), text_color=("#DC2626", "#EF4444"))
         def _stop_leave(e):
             if hasattr(self, 'status_label') and self.status_label and self.status_label.winfo_exists():
-                self.status_label.configure(text="Ready", text_color="gray60")
+                self.status_label.configure(text=tr("app.status_ready"), text_color="gray60")
         self.emergency_stop_frame.bind("<Enter>", _stop_enter)
         self.emergency_stop_frame.bind("<Leave>", _stop_leave)
         self.emergency_stop_indicator.bind("<Enter>", _stop_enter)
@@ -341,28 +342,28 @@ class UIMixin:
             def on_enter(e):
                 self.status_label.configure(text=tooltip_text, text_color=("#3B82F6", "#60A5FA"))
             def on_leave(e):
-                self.status_label.configure(text="Ready", text_color="gray60")
+                self.status_label.configure(text=tr("app.status_ready"), text_color="gray60")
 
             btn.bind("<Enter>", on_enter)
             btn.bind("<Leave>", on_leave)
             return btn
 
-        create_icon_btn(dock_frame, "history", lambda: self.show_activity_log_tab(), "View Activity Log (Settings → Activity Log)")
-        create_icon_btn(dock_frame, "emoji_file_manager", self.open_web_file_manager, "Open Cloud Files")
-        create_icon_btn(dock_frame, "whatsapp", lambda: webbrowser.open("https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn"), "Join Community")
-        create_icon_btn(dock_frame, "settings", lambda: self.show_frame("Settings"), "Open Settings")
+        create_icon_btn(dock_frame, "history", lambda: self.show_activity_log_tab(), tr("app.tooltip.activity_log"))
+        create_icon_btn(dock_frame, "emoji_file_manager", self.open_web_file_manager, tr("app.tooltip.cloud_files"))
+        create_icon_btn(dock_frame, "whatsapp", lambda: webbrowser.open("https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn"), tr("app.tooltip.join_community"))
+        create_icon_btn(dock_frame, "settings", lambda: self.show_frame("Settings"), tr("app.tooltip.open_settings"))
 
         ctk.CTkFrame(dock_frame, width=2, height=20, corner_radius=0, fg_color=("gray80", "gray40")).pack(side="left", padx=10)
 
         self.server_status_indicator = ctk.CTkFrame(dock_frame, width=12, height=12, corner_radius=6, fg_color="gray")
         self.server_status_indicator.pack(side="left", padx=(0, 5))
 
-        def on_server_hover(e): self.status_label.configure(text="Server Connection Status")
-        def on_server_leave(e): self.status_label.configure(text="Ready")
+        def on_server_hover(e): self.status_label.configure(text=tr("app.tooltip.server_status"))
+        def on_server_leave(e): self.status_label.configure(text=tr("app.status_ready"))
         self.server_status_indicator.bind("<Enter>", on_server_hover)
         self.server_status_indicator.bind("<Leave>", on_server_leave)
 
-        self.set_status("Ready")
+        self.set_status(tr("app.status_ready"))
 
     # ============================================================================
     # RESIZE SMOOTHING
@@ -658,7 +659,7 @@ class UIMixin:
             return
         user_name, key_type = self.app_state.license_info.get('user_name'), self.app_state.license_info.get('key_type')
         if user_name:
-            self.header_welcome_prefix_label.configure(text=f"v{config.APP_VERSION} | Welcome, ")
+            self.header_welcome_prefix_label.configure(text=f"v{config.APP_VERSION} | {tr('app.welcome_prefix')} ")
             self.header_welcome_name_label.configure(text=user_name)
             self.header_welcome_suffix_label.configure(text=" !")
             if key_type != 'trial':
@@ -666,6 +667,6 @@ class UIMixin:
             else:
                 self.header_welcome_name_label.configure(text_color=ctk.ThemeManager.theme["CTkLabel"]["text_color"], font=ctk.CTkFont(size=13, weight="normal"))
         else:
-            self.header_welcome_prefix_label.configure(text=f"v{config.APP_VERSION} | Log in, then select a task.")
+            self.header_welcome_prefix_label.configure(text=f"v{config.APP_VERSION} | {tr('app.welcome_login_prompt')}")
             self.header_welcome_name_label.configure(text="")
             self.header_welcome_suffix_label.configure(text="")

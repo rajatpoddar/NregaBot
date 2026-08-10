@@ -1,3 +1,4 @@
+from src.i18n import tr
 import tkinter
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
@@ -20,8 +21,7 @@ class MacroManagerTab(BaseAutomationTab):
         self.grid_rowconfigure(3, weight=1)
 
         # ── Header card ──
-        self._create_header_card(self, "🔁", "Macro Manager",
-                                 "Chain multiple automations into one queue and run them back-to-back.",
+        self._create_header_card(self, "🔁", tr("tab.macro_manager.title"), tr("tab.macro_manager.subtitle"),
                                  icon_key="emoji_tools")
 
         # --- 1. Control Panel ---
@@ -31,7 +31,7 @@ class MacroManagerTab(BaseAutomationTab):
         control_frame.grid_columnconfigure(1, weight=1)
 
         # Task Selector
-        ctk.CTkLabel(control_frame, text="Select Task Type:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        ctk.CTkLabel(control_frame, text=tr("form.macro.select_task"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=10, pady=10, sticky="w")
         
         self.task_type_menu = ctk.CTkOptionMenu(
             control_frame, 
@@ -59,17 +59,17 @@ class MacroManagerTab(BaseAutomationTab):
         self._update_input_fields("Bulk Demand (CSV)")
 
         # Instructions Label (Static)
-        self.instruction_label = ctk.CTkLabel(control_frame, text="Tip: Ensure 'State/Block' are selected.", text_color="gray60", font=ctk.CTkFont(size=11))
+        self.instruction_label = ctk.CTkLabel(control_frame, text=tr("form.macro.state_block_tip"), text_color="gray60", font=ctk.CTkFont(size=11))
         self.instruction_label.grid(row=2, column=1, sticky="w", padx=10, pady=(0,10))
 
         # --- 2. Action Buttons (OUTSIDE the card) ---
         action_frame = ctk.CTkFrame(self, fg_color="transparent")
         action_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
         
-        self.start_btn = ctk.CTkButton(action_frame, text="▶ Run Macro Queue", fg_color="#2E7D32", hover_color="#1B5E20", height=40, font=ctk.CTkFont(size=14, weight="bold"), command=self.start_macro)
+        self.start_btn = ctk.CTkButton(action_frame, text=tr("form.macro.run_queue"), fg_color="#2E7D32", hover_color="#1B5E20", height=40, font=ctk.CTkFont(size=14, weight="bold"), command=self.start_macro)
         self.start_btn.pack(side="left", fill="x", expand=True, padx=5)
         
-        self.stop_btn = ctk.CTkButton(action_frame, text="⏹ Stop", fg_color="#C62828", hover_color="#B91C1C", height=40, state="disabled", command=self.stop_automation)
+        self.stop_btn = ctk.CTkButton(action_frame, text=tr("form.macro.stop"), fg_color="#C62828", hover_color="#B91C1C", height=40, state="disabled", command=self.stop_automation)
         self.stop_btn.pack(side="left", fill="x", expand=True, padx=5)
 
         # --- 3. Queue & Logs Notebook ---
@@ -107,9 +107,7 @@ class MacroManagerTab(BaseAutomationTab):
         self.queue_tree.tag_configure('Failed', background='#FFEBEE', foreground='#B71C1C')
 
     def _update_input_fields(self, choice):
-        """
-        Dropdown change hone par inputs ko badalta hai.
-        """
+        """Update the input fields when the task-type dropdown changes."""
         # Clear existing widgets in input_frame
         for widget in self.input_frame.winfo_children():
             widget.destroy()
@@ -119,7 +117,7 @@ class MacroManagerTab(BaseAutomationTab):
 
         if choice == "Bulk Demand (CSV)":
             # --- UI For Bulk Demand ---
-            ctk.CTkLabel(self.input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.input_frame, text=tr("common.panchayat_name_label")).grid(row=0, column=0, padx=10, pady=5, sticky="w")
             
             p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
             p_var = ctk.StringVar()
@@ -128,7 +126,7 @@ class MacroManagerTab(BaseAutomationTab):
             self.bulk_inputs['panchayat'] = p_entry
             self.bulk_inputs['panchayat_var'] = p_var
 
-            ctk.CTkLabel(self.input_frame, text="Select CSV File:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.input_frame, text=tr("form.macro.select_csv")).grid(row=1, column=0, padx=10, pady=5, sticky="w")
             
             f_frame = ctk.CTkFrame(self.input_frame, fg_color="transparent")
             f_frame.grid(row=1, column=1, padx=10, pady=5, sticky="w")
@@ -143,14 +141,14 @@ class MacroManagerTab(BaseAutomationTab):
                     f_entry.delete(0, "end")
                     f_entry.insert(0, path)
 
-            ctk.CTkButton(f_frame, text="Browse", width=50, command=browse_file).pack(side="left", padx=5)
+            ctk.CTkButton(f_frame, text=tr("common.browse"), width=50, command=browse_file).pack(side="left", padx=5)
             
             # Add Button specifically for Bulk
-            ctk.CTkButton(self.input_frame, text="+ Add to Queue", width=120, command=self.add_to_queue).grid(row=2, column=1, padx=10, pady=10, sticky="w")
+            ctk.CTkButton(self.input_frame, text=tr("form.macro.add_to_queue"), width=120, command=self.add_to_queue).grid(row=2, column=1, padx=10, pady=10, sticky="w")
 
         else:
             # --- UI For Standard Tasks (Wagelist, MR, etc.) ---
-            ctk.CTkLabel(self.input_frame, text="Target Panchayat(s):").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
+            ctk.CTkLabel(self.input_frame, text=tr("form.macro.target_panchayats")).grid(row=0, column=0, padx=10, pady=5, sticky="nw")
             
             # Re-create the standard target entry
             t_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
@@ -161,8 +159,8 @@ class MacroManagerTab(BaseAutomationTab):
             btn_frame = ctk.CTkFrame(self.input_frame, fg_color="transparent")
             btn_frame.grid(row=1, column=1, sticky="w", padx=10)
             
-            ctk.CTkButton(btn_frame, text="+ Add to Queue", width=100, command=self.add_to_queue).pack(side="left")
-            ctk.CTkButton(btn_frame, text="Clear Queue", width=100, fg_color="#C62828", hover_color="#B91C1C", command=self.clear_queue).pack(side="left", padx=10)
+            ctk.CTkButton(btn_frame, text=tr("form.macro.add_to_queue"), width=100, command=self.add_to_queue).pack(side="left")
+            ctk.CTkButton(btn_frame, text=tr("form.macro.clear_queue"), width=100, fg_color="#C62828", hover_color="#B91C1C", command=self.clear_queue).pack(side="left", padx=10)
 
     def add_to_queue(self):
         task = self.task_type_menu.get()
@@ -173,11 +171,11 @@ class MacroManagerTab(BaseAutomationTab):
             f_path = self.bulk_inputs['filepath'].get().strip()
             
             if not p_name or not f_path:
-                messagebox.showwarning("Input Error", "Please enter Panchayat Name AND select a CSV file.")
+                messagebox.showwarning(tr("errors.input_error"), "Please enter Panchayat Name AND select a CSV file.")
                 return
             
             if not os.path.exists(f_path):
-                messagebox.showerror("File Error", "Selected file does not exist.")
+                messagebox.showerror(tr("dialogs.file_error"), tr("dialogs.selected_file_missing"))
                 return
 
             item_id = len(self.queue_items) + 1
@@ -204,7 +202,7 @@ class MacroManagerTab(BaseAutomationTab):
             target = self.target_var.get().strip()
             
             if not target:
-                messagebox.showwarning("Input", "Please enter a Panchayat Name.")
+                messagebox.showwarning(tr("dialogs.input"), tr("dialogs.enter_panchayat_name"))
                 return
 
             targets = [t.strip() for t in target.split(',') if t.strip()]
@@ -241,12 +239,12 @@ class MacroManagerTab(BaseAutomationTab):
 
     def start_macro(self):
         if not self.queue_items:
-            messagebox.showwarning("Empty", "Queue is empty.")
+            messagebox.showwarning(tr("dialogs.empty"), "Queue is empty.")
             return
             
         pending = [i for i in self.queue_items if i['status'] in ['Pending', 'Failed']]
         if not pending:
-            if messagebox.askyesno("Reset", "All tasks finished. Reset statuses to run again?"):
+            if messagebox.askyesno(tr("dialogs.reset"), tr("dialogs.tasks_finished_reset")):
                 for i in self.queue_items: 
                     self.update_item_status(i['id'], "Pending", "Waiting...")
             else: return

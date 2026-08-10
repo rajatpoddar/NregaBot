@@ -16,14 +16,15 @@ from urllib.parse import urlencode
 # --- MODIFIED IMPORT ---
 # Assuming utils.py has resource_path, get_data_path, get_config, save_config
 from src.utils import resource_path, get_data_path, get_config, save_config, get_logger, format_bytes
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = get_logger()
 
 # ── License & Terms content ──────────────────────────────────────────────
-# Full EULA docs/license.txt se load hota hai (ab build me bundled). Agar
-# packaged app me file na mile (purana build), to ye condensed fallback
-# dikhta hai — License & Terms tab kabhi khali nahi rahta.
+# Full EULA is loaded from docs/license.txt (now bundled in the build). If the
+# file is missing in a packaged app (old build), this condensed fallback is
+# shown — the License & Terms tab is never empty.
 _LICENSE_FALLBACK = """\
 NREGA BOT — END USER LICENSE AGREEMENT (SUMMARY)
 Copyright (c) 2025-2026 Rajat Poddar (PoddarSolutions). All rights reserved.
@@ -191,7 +192,7 @@ class AboutTab(ctk.CTkFrame):
         # Server status dot
         self.server_dot = ctk.CTkFrame(header, width=10, height=10, corner_radius=5, fg_color="gray")
         self.server_dot.grid(row=0, column=3, padx=(10, 0))
-        self.server_status_label = ctk.CTkLabel(header, text="Checking...", font=ctk.CTkFont(size=10), text_color="gray50")
+        self.server_status_label = ctk.CTkLabel(header, text=tr("about.server_checking"), font=ctk.CTkFont(size=10), text_color="gray50")
         self.server_status_label.grid(row=0, column=4, padx=(4, 0))
 
     def _create_left_frame(self):
@@ -220,7 +221,7 @@ class AboutTab(ctk.CTkFrame):
         welcome_top.pack(fill="x", padx=18, pady=(14, 4))
         ctk.CTkLabel(welcome_top, text="👋", font=ctk.CTkFont(size=22)).pack(side="left", padx=(0, 8))
         
-        self.welcome_prefix_label = ctk.CTkLabel(welcome_top, text="Welcome", font=ctk.CTkFont(size=16, weight="bold"))
+        self.welcome_prefix_label = ctk.CTkLabel(welcome_top, text=tr("about.welcome"), font=ctk.CTkFont(size=16, weight="bold"))
         self.welcome_prefix_label.pack(side="left")
         self.welcome_name_label = ctk.CTkLabel(welcome_top, text="", font=ctk.CTkFont(size=16, weight="bold"))
         self.welcome_name_label.pack(side="left", padx=(4, 0))
@@ -437,7 +438,7 @@ class AboutTab(ctk.CTkFrame):
 
     # --- License & Terms content loaders ---
     def _load_license_text(self) -> str:
-        """Full EULA docs/license.txt se load karo; na mile to summary fallback."""
+        """Load the full EULA from docs/license.txt; fall back to the summary if missing."""
         try:
             path = resource_path(os.path.join("docs", "license.txt"))
             with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -461,7 +462,7 @@ class AboutTab(ctk.CTkFrame):
         key_type = license_info.get('key_type')
 
         if user_name:
-            self.welcome_prefix_label.configure(text="Welcome, ")
+            self.welcome_prefix_label.configure(text=tr("about.welcome") + ", ")
             self.welcome_name_label.configure(text=user_name)
             self.welcome_suffix_label.configure(text="!")
 
@@ -471,7 +472,7 @@ class AboutTab(ctk.CTkFrame):
                 default_color = ctk.ThemeManager.theme["CTkLabel"]["text_color"]
                 self.welcome_name_label.configure(text_color=default_color, font=ctk.CTkFont(size=18, weight="bold"))
         else: # Fallback if no name
-            self.welcome_prefix_label.configure(text="Welcome!")
+            self.welcome_prefix_label.configure(text=tr("about.welcome") + "!")
             self.welcome_name_label.configure(text=""); self.welcome_suffix_label.configure(text="")
 
         self.machine_id_label.configure(text=self.app.machine_id)
@@ -590,8 +591,8 @@ class AboutTab(ctk.CTkFrame):
         def create_manage_button(parent):
             # (Keep this helper function as is)
             def open_manage_url():
-                # Secure path: signed token fetch → browser (raw key kabhi
-                # URL mein nahi). User ka account page bina login khul jata hai.
+                # Secure path: signed token fetch → browser (raw key never in
+                # the URL). The user's account page opens without login.
                 self.app.open_web_page('account')
             return ctk.CTkButton(parent, text="Manage on Website", fg_color="transparent", border_width=1, text_color=(config.COLORS["gray10"], config.COLORS["text_bright"]), command=open_manage_url)
 
@@ -874,10 +875,10 @@ class AboutTab(ctk.CTkFrame):
                     self.app.after(0, self._update_device_label_text, machine_id)
                     # --- END SYNC ---
                 else:
-                    self.app.after(0, lambda: messagebox.showerror("Request Failed", result.get("reason", "Unknown server error."), parent=self))
+                    self.app.after(0, lambda: messagebox.showerror(tr("base.automation_error.title"), result.get("reason", "Unknown server error."), parent=self))
 
             except Exception as e:
-                self.app.after(0, lambda: messagebox.showerror("Error", f"An unexpected error occurred: {e}", parent=self))
+                self.app.after(0, lambda: messagebox.showerror(tr("base.automation_error.title"), tr("errors.generic", error=str(e)[:200]), parent=self))
             finally:
                 # --- FIX: Check if button still exists before configuring ---
                 def safe_re_enable_button():
@@ -931,14 +932,14 @@ class AboutTab(ctk.CTkFrame):
         encoded_params = urlencode(params)
         mailto_url = f"mailto:{config.SUPPORT_EMAIL}?{encoded_params}"
         try: webbrowser.open(mailto_url)
-        except Exception as e: messagebox.showerror("Error", f"Could not open email client. Please manually email {config.SUPPORT_EMAIL}.\n\nError: {e}")
+        except Exception as e: messagebox.showerror(tr("base.automation_error.title"), f"Could not open email client. Please manually email {config.SUPPORT_EMAIL}.\n\nError: {e}")
 
     def _copy_key(self):
         # (Keep this method as is)
         key_to_copy = self.key_label.cget("text")
         if key_to_copy and key_to_copy != "N/A":
             self.app.clipboard_clear(); self.app.clipboard_append(key_to_copy)
-            messagebox.showinfo("Copied", "License key copied to clipboard.")
+            messagebox.showinfo(tr("base.copied_title"), tr("about.copied_key"))
 
     # --- START: MODIFIED COPY REFERRAL METHOD ---
     def _copy_referral_code(self):
@@ -946,13 +947,13 @@ class AboutTab(ctk.CTkFrame):
         if code_to_copy and code_to_copy != "N/A":
             self.app.clipboard_clear()
             self.app.clipboard_append(code_to_copy)
-            messagebox.showinfo("Copied", "Referral code copied to clipboard.")
+            messagebox.showinfo(tr("base.copied_title"), tr("about.copied_referral"))
     # --- END: MODIFIED COPY REFERRAL METHOD ---
 
     def _copy_machine_id(self):
         # (Keep this method as is)
         self.app.clipboard_clear(); self.app.clipboard_append(self.app.machine_id)
-        messagebox.showinfo("Copied", "Machine ID copied to clipboard.")
+        messagebox.showinfo(tr("base.copied_title"), tr("about.copied_machine"))
 
     def check_for_updates(self):
         if config.BETA_BUILD:

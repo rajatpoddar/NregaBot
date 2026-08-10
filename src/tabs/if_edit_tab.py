@@ -7,6 +7,7 @@ from datetime import datetime
 from collections import defaultdict
 from src import config
 from src.utils import truncate_workcode
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException  # noqa: F401
@@ -43,8 +44,7 @@ class IfEditTab(BaseAutomationTab):
         results_tab.grid_columnconfigure(0, weight=1)
 
         # ── Header card ──
-        self._create_header_card(settings_tab, "📝", "IF Editor",
-                                 "Edit IF details on the portal for work codes from a CSV or WC Gen.",
+        self._create_header_card(settings_tab, "📝", tr("tab.if_edit.title"), tr("tab.if_edit.subtitle"),
                                  icon_key="emoji_if_editor")
 
         # ── Settings card (bordered scrollable, pending-bills style) ──
@@ -57,7 +57,7 @@ class IfEditTab(BaseAutomationTab):
         mode_frame = ctk.CTkFrame(settings_container)
         mode_frame.grid(row=0, column=0, sticky='ew', padx=5, pady=5)
         mode_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(mode_frame, text="Automation Mode:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
+        ctk.CTkLabel(mode_frame, text=tr("form.if_edit.automation_mode"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
         # --- MODIFIED: Added new automation mode ---
         self.automation_mode_var = ctk.StringVar()
         self.automation_mode_menu = ctk.CTkOptionMenu(mode_frame, variable=self.automation_mode_var, values=["Full Process (All Pages)", "Page 2 & 3 Only", "Page 3 Only (Activities/Materials)"])
@@ -68,37 +68,37 @@ class IfEditTab(BaseAutomationTab):
         profile_frame = ctk.CTkFrame(settings_container)
         profile_frame.grid(row=1, column=0, sticky='ew', padx=5, pady=5)
         profile_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(profile_frame, text="Configuration Profile:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
+        ctk.CTkLabel(profile_frame, text=tr("form.if_edit.config_profile"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
         self.profile_var = ctk.StringVar()
         self.profile_combobox = ctk.CTkOptionMenu(profile_frame, variable=self.profile_var, values=[], command=self._load_profile)
         self.profile_combobox.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
-        self.profile_name_entry = ctk.CTkEntry(profile_frame, placeholder_text="Enter new profile name to save")
+        self.profile_name_entry = ctk.CTkEntry(profile_frame, placeholder_text=tr("common.profile_name_placeholder"))
         self.profile_name_entry.grid(row=1, column=1, padx=15, pady=5, sticky="ew")
         profile_actions = ctk.CTkFrame(profile_frame, fg_color="transparent")
         profile_actions.grid(row=1, column=0, padx=15, pady=5)
-        self.save_profile_button = ctk.CTkButton(profile_actions, text="Save", command=self._save_profile)
+        self.save_profile_button = ctk.CTkButton(profile_actions, text=tr("common.save"), command=self._save_profile)
         self.save_profile_button.pack(side="left", padx=(0, 5))
-        self.delete_profile_button = ctk.CTkButton(profile_actions, text="Delete", fg_color="transparent", border_width=1, text_color=(config.COLORS["gray10"], config.COLORS["text_bright"]), command=self._delete_profile)
+        self.delete_profile_button = ctk.CTkButton(profile_actions, text=tr("common.delete"), fg_color="transparent", border_width=1, text_color=(config.COLORS["gray10"], config.COLORS["text_bright"]), command=self._delete_profile)
         self.delete_profile_button.pack(side="left")
 
         # CSV Frame
         csv_frame = ctk.CTkFrame(settings_container)
         csv_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
         csv_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(csv_frame, text="Data Source:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", padx=15, pady=10)
+        ctk.CTkLabel(csv_frame, text=tr("form.if_edit.data_source"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", padx=15, pady=10)
         file_frame = ctk.CTkFrame(csv_frame, fg_color="transparent")
         file_frame.grid(row=0, column=1, sticky='ew', pady=10, padx=15)
-        self.select_button = ctk.CTkButton(file_frame, text="Select CSV File", command=self.select_csv_file)
+        self.select_button = ctk.CTkButton(file_frame, text=tr("common.select_csv_file"), command=self.select_csv_file)
         self.select_button.pack(side="left", padx=(0, 10))
-        self.demo_csv_button = ctk.CTkButton(file_frame, text="Download Demo CSV", command=lambda: self.app.save_demo_csv("if_edit"), fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["green_button_hover"])
+        self.demo_csv_button = ctk.CTkButton(file_frame, text=tr("common.download_demo_csv"), command=lambda: self.app.save_demo_csv("if_edit"), fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["green_button_hover"])
         self.demo_csv_button.pack(side="left", padx=(0, 10))
-        self.file_label = ctk.CTkLabel(file_frame, text="No data source selected", text_color="gray")
+        self.file_label = ctk.CTkLabel(file_frame, text=tr("errors.no_data_source"), text_color="gray")
         self.file_label.pack(side="left")
 
         # Convergence Switch
         switch_frame = ctk.CTkFrame(settings_container)
         switch_frame.grid(row=3, column=0, sticky="ew", padx=5, pady=5)
-        self.convergence_switch = ctk.CTkSwitch(switch_frame, text="Enable Page 2 & 3 (Convergence Work)", command=self._toggle_page_settings)
+        self.convergence_switch = ctk.CTkSwitch(switch_frame, text=tr("form.if_edit.enable_pages"), command=self._toggle_page_settings)
         self.convergence_switch.grid(row=0, column=0, padx=15, pady=10)
         self.ui_fields['run_convergence'] = self.convergence_switch
         
@@ -120,7 +120,7 @@ class IfEditTab(BaseAutomationTab):
 
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, sticky="ew", pady=(5, 10), padx=5)
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="if_edit_results.xlsx", filter_mode="Export All"))
+        self.export_csv_button = ctk.CTkButton(results_action_frame, text=tr("common.export_excel"), command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="if_edit_results.xlsx", filter_mode="Export All"))
         self.export_csv_button.pack(side="left")
 
         cols = ("Timestamp", "Work Code", "Job Card", "Status", "Details")
@@ -158,7 +158,7 @@ class IfEditTab(BaseAutomationTab):
         parent.grid_columnconfigure(1, weight=1)
         self._create_field(parent, "estimated_pd", "Estimated PD:", 0)
         self._create_field(parent, "beneficiaries_count", "Beneficiaries Count:", 1)
-        ctk.CTkLabel(parent, text="--- Convergence Settings (If Enabled) ---", font=ctk.CTkFont(weight="bold")).grid(row=3, column=0, columnspan=2, pady=(15,5))
+        ctk.CTkLabel(parent, text=tr("form.if_edit.convergence_section"), font=ctk.CTkFont(weight="bold")).grid(row=3, column=0, columnspan=2, pady=(15,5))
         self._create_field(parent, "convergence_scheme_type", "Scheme Type:", 4, widget_type='combo', values=["State", "Centre"], command=self._toggle_scheme_dropdowns)
         state_schemes = ["ABUA AWAS YOJNA", "Agriculture", "Anganbari kendra Dumaria, Dahijor", "Animal Husbandry", "B.R.G.F", "Baba Saheb Bhim Rao Ambedkar Awaas Yojna", "Birsa Sichai Kup Samvardhan Yojana", "CONST. OF PANCHAYAT BHAWAN", "Department of School Education and Literacy", "Department of Tourism, Arts, Culture, Sports & You", "Diary Development", "EAST SINGHBHUM(DUMARIA BLOCK) ST BENIFIRIES", "Fisheries", "Integrated Action Plan", "IRRIGATION WELL", "JSLPS- Jharkhand State Livelihood Promotion Societ", "Mukhyamantri Grameen Path Yojna", "SINCHAI KUP NIRMAN , PESARDAH(BICHGARHA)", "Soil Conservation", "ST Benifiries", "TestScheme", "Water Harvestig"]
         self._create_field(parent, "state_scheme_name", "State Scheme Name:", 5, widget_type='combo', values=state_schemes)
@@ -173,13 +173,13 @@ class IfEditTab(BaseAutomationTab):
         self._create_field(parent, "avg_labour_per_day", "Avg. Labour/Day:", 1, 2)
         self._create_field(parent, "expected_mandays", "Expected Mandays:", 2, 0)
         self._create_field(parent, "tech_sanction_amount", "Tech Sanction Amt:", 2, 2)
-        ctk.CTkLabel(parent, text="--- Estimated Cost (in Lakhs) ---", font=ctk.CTkFont(weight="bold")).grid(row=3, column=0, columnspan=4, pady=(15,5))
+        ctk.CTkLabel(parent, text=tr("form.if_edit.estimated_cost"), font=ctk.CTkFont(weight="bold")).grid(row=3, column=0, columnspan=4, pady=(15,5))
         self._create_field(parent, "unskilled_labour_cost", "Unskilled Labour:", 4, 0)
         self._create_field(parent, "mgnrega_material_cost", "MGNREGA Material:", 4, 2)
         self._create_field(parent, "skilled_labour_cost", "Skilled Labour:", 5, 0)
         self._create_field(parent, "semi_skilled_labour_cost", "Semi-Skilled Labour:", 5, 2)
         self._create_field(parent, "scheme1_cost", "Scheme 1 Cost:", 6, 0)
-        ctk.CTkLabel(parent, text="--- Financial Sanction ---", font=ctk.CTkFont(weight="bold")).grid(row=7, column=0, columnspan=4, pady=(15,5))
+        ctk.CTkLabel(parent, text=tr("form.if_edit.financial_sanction"), font=ctk.CTkFont(weight="bold")).grid(row=7, column=0, columnspan=4, pady=(15,5))
         self._create_field(parent, "fin_sanction_no", "Fin. Sanction No:", 8, 0)
         self._create_field(parent, "fin_sanction_date", "Fin. Sanction Date:", 8, 2)
         self._create_field(parent, "fin_sanction_amount", "Fin. Sanction Amt:", 9, 0)
@@ -187,18 +187,18 @@ class IfEditTab(BaseAutomationTab):
 
     def _create_page3_widgets(self, parent):
         parent.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(parent, text="💡 Note: These values will be applied to all work codes in the CSV.", text_color="gray50").grid(row=0, column=0, padx=15, pady=(10,5))
+        ctk.CTkLabel(parent, text=tr("form.if_edit.note"), text_color="gray50").grid(row=0, column=0, padx=15, pady=(10,5))
         
         # --- Activity Section ---
-        ctk.CTkLabel(parent, text="--- Add Activities ---", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, pady=(10,5))
-        ctk.CTkLabel(parent, text="One activity per line. Format: Activity Code,Unit Price,Quantity", text_color="gray50").grid(row=2, column=0, padx=15, pady=(0,5))
+        ctk.CTkLabel(parent, text=tr("form.if_edit.add_activities"), font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, pady=(10,5))
+        ctk.CTkLabel(parent, text=tr("form.if_edit.activity_format"), text_color="gray50").grid(row=2, column=0, padx=15, pady=(0,5))
         activities_textbox = ctk.CTkTextbox(parent, height=100)
         activities_textbox.grid(row=3, column=0, sticky="ew", padx=15, pady=5)
         self.ui_fields['activities_list'] = activities_textbox
         
         # --- Material Section ---
-        ctk.CTkLabel(parent, text="--- Add Materials (Optional) ---", font=ctk.CTkFont(weight="bold")).grid(row=4, column=0, pady=(15,5))
-        ctk.CTkLabel(parent, text="One material per line. Format: Material Name,Unit Price,Quantity", text_color="gray50").grid(row=5, column=0, padx=15, pady=(0,5))
+        ctk.CTkLabel(parent, text=tr("form.if_edit.add_materials"), font=ctk.CTkFont(weight="bold")).grid(row=4, column=0, pady=(15,5))
+        ctk.CTkLabel(parent, text=tr("form.if_edit.material_format"), text_color="gray50").grid(row=5, column=0, padx=15, pady=(0,5))
         materials_textbox = ctk.CTkTextbox(parent, height=100)
         materials_textbox.grid(row=6, column=0, sticky="ew", padx=15, pady=5)
         self.ui_fields['materials_list'] = materials_textbox
@@ -253,7 +253,7 @@ class IfEditTab(BaseAutomationTab):
     def _save_profile(self, profile_name=None, is_autosave=False):
         if not is_autosave:
             profile_name = self.profile_name_entry.get().strip()
-            if not profile_name: messagebox.showwarning("Input Error", "Please enter a name for the profile."); return
+            if not profile_name: messagebox.showwarning(tr("errors.input_error"), tr("dialogs.enter_name_profile")); return
         if not profile_name: return
 
         config_data = {}
@@ -271,9 +271,9 @@ class IfEditTab(BaseAutomationTab):
             self.profile_combobox.set(profile_name)
             if not is_autosave:
                 self.profile_name_entry.delete(0, tkinter.END)
-                messagebox.showinfo("Success", f"Profile '{profile_name}' saved successfully.")
+                messagebox.showinfo(tr("dialogs.success"), tr("dialogs.profile_saved", name=profile_name))
         except Exception as e:
-            if not is_autosave: messagebox.showerror("Error", f"Failed to save profile: {e}")
+            if not is_autosave: messagebox.showerror(tr("dialogs.error"), tr("dialogs.failed_save_profile", error=e))
 
     def _load_profile(self, profile_name):
         if not profile_name or not self.profiles: return
@@ -300,8 +300,8 @@ class IfEditTab(BaseAutomationTab):
     def _delete_profile(self):
         profile_name = self.profile_combobox.get()
         if not profile_name or profile_name not in self.profiles or profile_name == "Last Used Config":
-            messagebox.showwarning("Selection Error", "Please select a valid, user-saved profile to delete."); return
-        if not messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete the profile '{profile_name}'?"): return
+            messagebox.showwarning(tr("dialogs.selection_error"), tr("dialogs.select_user_profile")); return
+        if not messagebox.askyesno(tr("dialogs.confirm_delete"), tr("dialogs.confirm_delete_profile", name=profile_name)): return
         del self.profiles[profile_name]
         try:
             with open(self.profile_file, 'w') as f: json.dump(self.profiles, f, indent=4)
@@ -311,8 +311,8 @@ class IfEditTab(BaseAutomationTab):
                 self.profile_combobox.set(profile_names[0]); self._load_profile(profile_names[0])
             else:
                 self.profile_combobox.set(""); self._populate_defaults()
-            messagebox.showinfo("Success", f"Profile '{profile_name}' deleted.")
-        except Exception as e: messagebox.showerror("Error", f"Failed to delete profile: {e}")
+            messagebox.showinfo(tr("dialogs.success"), tr("dialogs.profile_deleted", name=profile_name))
+        except Exception as e: messagebox.showerror(tr("dialogs.error"), tr("dialogs.failed_delete_profile", error=e))
 
     def _toggle_page_settings(self):
         is_enabled = self.convergence_switch.get() == 1
@@ -349,8 +349,8 @@ class IfEditTab(BaseAutomationTab):
             for key in ['estimated_pd', 'beneficiaries_count', 'automation_mode']: self.ui_fields[key].configure(state="normal")
             self._toggle_page_settings()
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Are you sure?"):
-            self.file_label.configure(text="No data source selected")
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.are_you_sure")):
+            self.file_label.configure(text=tr("errors.no_data_source"))
             self.csv_path = None
             self.column_map = {}
             self.data_from_wc_gen = None # NEW
@@ -361,7 +361,7 @@ class IfEditTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def select_csv_file(self):
-        path = filedialog.askopenfilename(title="Select CSV", filetypes=[("CSV files", "*.csv")])
+        path = filedialog.askopenfilename(title=tr("common.select_csv"), filetypes=[("CSV files", "*.csv")])
         if path:
             self.csv_path = path
             self.data_from_wc_gen = None # Clear any previously loaded data
@@ -372,11 +372,11 @@ class IfEditTab(BaseAutomationTab):
                 self.column_map = {col: self.csv_headers.index(col) for col in required_cols}
                 self.log_success("CSV loaded. Required columns found.")
             except Exception as e:
-                messagebox.showerror("CSV Error", f"Required columns not in CSV header: {', '.join(required_cols)}\n\nError: {e}")
-                self.csv_path = None; self.column_map = {}; self.file_label.configure(text="No data source selected")
+                messagebox.showerror(tr("dialogs.csv_error"), tr("dialogs.csv_columns_missing", cols=', '.join(required_cols), error=e))
+                self.csv_path = None; self.column_map = {}; self.file_label.configure(text=tr("errors.no_data_source"))
     def start_automation(self) -> None:
         if not self.csv_path and not self.data_from_wc_gen:
-            messagebox.showwarning("Input Missing", "Please select a CSV file or generate data from the WC Gen tab."); return
+            messagebox.showwarning(tr("dialogs.input_missing"), tr("dialogs.select_csv_wcgen")); return
         self._save_profile(profile_name="Last Used Config", is_autosave=True)
         form_config = {}
         for key, field in self.ui_fields.items():

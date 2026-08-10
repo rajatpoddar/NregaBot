@@ -8,6 +8,7 @@ from datetime import datetime
 from src import config
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
@@ -50,14 +51,14 @@ class CloudFilePicker(ctk.CTkToplevel):
         self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         
-        self.back_button = ctk.CTkButton(self.header_frame, text="< Back", width=60, command=self._go_back, state="disabled")
+        self.back_button = ctk.CTkButton(self.header_frame, text=tr("form.demand.back"), width=60, command=self._go_back, state="disabled")
         self.back_button.pack(side="left")
 
         self.path_label = ctk.CTkLabel(self.header_frame, text=self.current_path_str, anchor="w")
         self.path_label.pack(side="left", fill="x", expand=True, padx=10)
 
         # Status label (e.g., "Loading...")
-        self.status_label = ctk.CTkLabel(self, text="Loading files...", text_color="gray")
+        self.status_label = ctk.CTkLabel(self, text=tr("common.loading_files"), text_color="gray")
         self.status_label.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
         
         # Scrollable frame for file/folder list
@@ -105,10 +106,10 @@ class CloudFilePicker(ctk.CTkToplevel):
         Populates the scrollable frame with buttons for each file/folder.
         """
         self._clear_list()
-        self.status_label.configure(text="Select a file or folder:")
+        self.status_label.configure(text=tr("form.demand.select_file_or_folder"))
         
         if not files:
-            ctk.CTkLabel(self.file_frame, text="No .csv / .xlsx files or folders found.", text_color="gray").pack(pady=10)
+            ctk.CTkLabel(self.file_frame, text=tr("form.demand.no_csv_xlsx"), text_color="gray").pack(pady=10)
             return
 
         # Sort: Folders first, then by name
@@ -252,8 +253,7 @@ class DemandTab(BaseAutomationTab):
         select_tab.grid_rowconfigure(0, weight=1)
 
         # ── Header card ──
-        self._create_header_card(settings_tab, "📥", "Demand",
-                                 "Upload the eKYC & ABPS report, select job cards and create work demands on the portal.",
+        self._create_header_card(settings_tab, "📥", tr("tab.demand.title"), tr("tab.demand.subtitle"),
                                  icon_key="emoji_demand")
 
         # Wrap ALL settings content in a bordered scrollable card
@@ -274,7 +274,7 @@ class DemandTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure((0, 2), weight=0)
 
         # --- Row 0: State and Panchayat ---
-        ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, padx=(10, 5), pady=5, sticky="w")
+        ctk.CTkLabel(controls_frame, text=tr("common.state_label")).grid(row=0, column=0, padx=(10, 5), pady=5, sticky="w")
         self.state_var = ctk.StringVar()
         # Only the user's own state(s) — saved from license/settings — are shown,
         # like the panchayat dropdowns in the other automations. Falls back to
@@ -283,7 +283,7 @@ class DemandTab(BaseAutomationTab):
         self.state_combobox = ctk.CTkOptionMenu(controls_frame, variable=self.state_var, values=self.state_options)
         self.state_combobox.grid(row=0, column=1, padx=(0, 10), pady=5, sticky="ew")
 
-        ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=2, padx=(0, 5), pady=5, sticky="w")
+        ctk.CTkLabel(controls_frame, text=tr("common.panchayat_label")).grid(row=0, column=2, padx=(0, 5), pady=5, sticky="w")
         # ALL panchayats saved in Settings > Location Data (merged across keys),
         # like every other tab — NOT just the 'location_panchayat' key.
         p_vals = self._get_saved_panchayats() or [""]
@@ -292,12 +292,12 @@ class DemandTab(BaseAutomationTab):
         self.panchayat_menu.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
 
         # --- Row 1: Demand Date (From) ---
-        ctk.CTkLabel(controls_frame, text="Work Demand From:").grid(row=1, column=0, padx=(10, 5), pady=5, sticky="w")
+        ctk.CTkLabel(controls_frame, text=tr("form.demand.work_demand_from")).grid(row=1, column=0, padx=(10, 5), pady=5, sticky="w")
 
         # Demand Date Frame
         d_date_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         d_date_frame.grid(row=1, column=1, padx=(0, 10), pady=5, sticky="ew")
-        self.demand_date_entry = ctk.CTkEntry(d_date_frame, placeholder_text="DD/MM/YYYY")
+        self.demand_date_entry = ctk.CTkEntry(d_date_frame, placeholder_text=tr("common.date_format"))
         self.demand_date_entry.pack(side="left", fill="x", expand=True)
         ctk.CTkButton(d_date_frame, text="📅", width=30, fg_color=("gray85", "gray25"), text_color=("black", "white"),
                     command=lambda: self.open_date_picker(lambda d: [self.demand_date_entry.delete(0, "end"), self.demand_date_entry.insert(0, d)])).pack(side="right", padx=(5,0))
@@ -305,30 +305,30 @@ class DemandTab(BaseAutomationTab):
         # --- Row 2: Days and No. of Labour ---
         
         # Days Input
-        ctk.CTkLabel(controls_frame, text="Days:").grid(row=2, column=0, padx=(10, 5), pady=5, sticky="w")
+        ctk.CTkLabel(controls_frame, text=tr("form.demand.days")).grid(row=2, column=0, padx=(10, 5), pady=5, sticky="w")
         self.days_entry = ctk.CTkEntry(controls_frame, validate="key", validatecommand=(self.register(lambda P: P.isdigit() or P == ""), '%P'))
         self.days_entry.grid(row=2, column=1, padx=(0, 10), pady=5, sticky="ew")
         self.days_entry.insert(0, self.app.history_manager.get_suggestions("demand_days")[0] if self.app.history_manager.get_suggestions("demand_days") else "14")
         
         # No. of Labour (Custom Selection)
-        ctk.CTkLabel(controls_frame, text="No. of Labour:").grid(row=2, column=2, padx=(0, 5), pady=5, sticky="w")
+        ctk.CTkLabel(controls_frame, text=tr("form.demand.no_of_labour")).grid(row=2, column=2, padx=(0, 5), pady=5, sticky="w")
         
         custom_select_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         custom_select_frame.grid(row=2, column=3, sticky="ew", padx=5, pady=5)
         custom_select_frame.grid_columnconfigure(0, weight=1) 
         
         # UPDATED: Removed width=70
-        self.custom_select_entry = ctk.CTkEntry(custom_select_frame, validate="key", validatecommand=(self.register(lambda P: P.isdigit() or P == ""), '%P'), placeholder_text="Count")
+        self.custom_select_entry = ctk.CTkEntry(custom_select_frame, validate="key", validatecommand=(self.register(lambda P: P.isdigit() or P == ""), '%P'), placeholder_text=tr("common.count_col"))
         self.custom_select_entry.grid(row=0, column=0, sticky="w", padx=(0, 5))
         
-        self.custom_select_button = ctk.CTkButton(custom_select_frame, text="Select", command=self._select_custom_number, width=70)
+        self.custom_select_button = ctk.CTkButton(custom_select_frame, text=tr("common.select"), command=self._select_custom_number, width=70)
         self.custom_select_button.grid(row=0, column=1, sticky="e")
         
         # --- Row 3: Work Key (typeable input) ---
         # User types ONE work key here — selected workers are allocated to it
         # automatically after the demand is submitted. If the report CSV has a
         # per-worker 'Allocation Work Code' column, those codes take priority.
-        ctk.CTkLabel(controls_frame, text="Work Key:").grid(row=3, column=0, padx=(10, 5), pady=5, sticky="w")
+        ctk.CTkLabel(controls_frame, text=tr("form.demand.work_key")).grid(row=3, column=0, padx=(10, 5), pady=5, sticky="w")
         
         work_key_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         work_key_frame.grid(row=3, column=1, columnspan=3, padx=5, pady=5, sticky="ew")
@@ -338,7 +338,7 @@ class DemandTab(BaseAutomationTab):
         self.allocation_work_key_entry = ctk.CTkEntry(
             work_key_frame,
             textvariable=self.allocation_work_key_var,
-            placeholder_text="Type work key (optional) — demand ke baad selected workers is par allocate honge")
+            placeholder_text=tr("form.demand.workkey_placeholder"))
         self.allocation_work_key_entry.grid(row=0, column=0, sticky="ew")
         
         # --- END Row 3 ---
@@ -354,30 +354,30 @@ class DemandTab(BaseAutomationTab):
         file_row.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 2))
         file_row.grid_columnconfigure(4, weight=1)
 
-        self.select_csv_button = ctk.CTkButton(file_row, text="📄 Upload Report", command=self._select_csv_from_computer)
+        self.select_csv_button = ctk.CTkButton(file_row, text=tr("form.demand.upload_report"), command=self._select_csv_from_computer)
         self.select_csv_button.grid(row=0, column=0, padx=(0, 6))
 
         # Load a previously-uploaded eKYC report for the same panchayat (stored
         # locally by panchayat — no need to re-upload every time).
         self.previous_reports_button = ctk.CTkButton(
-            file_row, text="🕘 Previous", width=100,
+            file_row, text=tr("form.demand.previous"), width=100,
             command=self._select_report_from_history,
             fg_color=config.COLORS["teal_named"], hover_color=config.COLORS["teal_hover"])
         self.previous_reports_button.grid(row=0, column=1, padx=(0, 6))
 
-        self.demo_csv_button = ctk.CTkButton(file_row, text="Demo CSV", command=lambda: self.app.save_demo_csv("demand"), fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["green_button_hover"], width=90)
+        self.demo_csv_button = ctk.CTkButton(file_row, text=tr("common.demo_csv"), command=lambda: self.app.save_demo_csv("demand"), fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["green_button_hover"], width=90)
         self.demo_csv_button.grid(row=0, column=2, padx=(0, 6))
 
-        self.select_all_button = ctk.CTkButton(file_row, text="Select All", command=self._select_all_applicants, width=90)
+        self.select_all_button = ctk.CTkButton(file_row, text=tr("common.select_all"), command=self._select_all_applicants, width=90)
         self.select_all_button.grid(row=0, column=3, padx=(0, 6))
 
-        self.clear_selection_button = ctk.CTkButton(file_row, text="Clear", command=self._clear_selection, fg_color="gray", hover_color="gray50", width=60)
+        self.clear_selection_button = ctk.CTkButton(file_row, text=tr("common.clear"), command=self._clear_selection, fg_color="gray", hover_color="gray50", width=60)
         self.clear_selection_button.grid(row=0, column=4, sticky="w")
 
-        self.file_label = ctk.CTkLabel(file_row, text="No file loaded.", text_color="gray", anchor="w")
+        self.file_label = ctk.CTkLabel(file_row, text=tr("errors.no_file_loaded"), text_color="gray", anchor="w")
         self.file_label.grid(row=1, column=0, columnspan=5, sticky="w", pady=(2, 0))
 
-        self.selection_summary_label = ctk.CTkLabel(file_row, text="0 applicants selected", text_color="gray", anchor="w")
+        self.selection_summary_label = ctk.CTkLabel(file_row, text=tr("form.demand.applicants_selected"), text_color="gray", anchor="w")
         self.selection_summary_label.grid(row=2, column=0, columnspan=5, sticky="w")
 
         # --- Row 1: Quick-select bar ---
@@ -385,16 +385,16 @@ class DemandTab(BaseAutomationTab):
         qs_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(4, 4))
         qs_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(qs_frame, text="Quick Select:", font=ctk.CTkFont(weight="bold")).grid(
+        ctk.CTkLabel(qs_frame, text=tr("form.demand.quick_select"), font=ctk.CTkFont(weight="bold")).grid(
             row=0, column=0, padx=(10, 6), pady=6, sticky="w")
 
         self.quick_select_entry = ctk.CTkEntry(
             qs_frame,
-            placeholder_text="Type JC suffixes e.g.  1/5, 12/44, 10/150  then press Enter")
+            placeholder_text=tr("form.demand.jc_suffixes"))
         self.quick_select_entry.grid(row=0, column=1, padx=(0, 6), pady=6, sticky="ew")
         self.quick_select_entry.bind("<Return>", lambda e: self._quick_select_jcs())
 
-        ctk.CTkButton(qs_frame, text="Add", width=60, command=self._quick_select_jcs).grid(
+        ctk.CTkButton(qs_frame, text=tr("common.add"), width=60, command=self._quick_select_jcs).grid(
             row=0, column=2, padx=(0, 6), pady=6)
 
         # Search row (below quick-select)
@@ -403,7 +403,7 @@ class DemandTab(BaseAutomationTab):
         self.search_var = ctk.StringVar()
         self.search_var.trace_add("write", lambda *_: self._refresh_search_results())
         self.search_entry = ctk.CTkEntry(qs_frame, textvariable=self.search_var,
-                                         placeholder_text="🔍  Search by name or JC number to find & tick individually...")
+                                         placeholder_text=tr("form.demand.search_placeholder"))
         self.search_entry.grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 6), sticky="ew")
 
         # --- Row 2: Selected-JC summary table + search results panel ---
@@ -452,14 +452,14 @@ class DemandTab(BaseAutomationTab):
         results_button_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 5))
 
         # Left Side: Retry Button
-        self.retry_failed_button = ctk.CTkButton(results_button_frame, text="Retry Failed Applicants", command=self._retry_failed_applicants)
+        self.retry_failed_button = ctk.CTkButton(results_button_frame, text=tr("form.demand.retry_failed"), command=self._retry_failed_applicants)
         self.retry_failed_button.pack(side="left", padx=5)
 
         # Right Side: Export Button
         export_controls_frame = ctk.CTkFrame(results_button_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
 
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side='left')
 
         # ── Action buttons (OUTSIDE the card) ──
@@ -486,7 +486,7 @@ class DemandTab(BaseAutomationTab):
                 selected_count += 1
         if len(self.all_applicants_data) > 400:
             self.log_warning(f"Selected first {selected_count} applicants (report has {len(self.all_applicants_data)}). Use Quick Select/Search for more.")
-            messagebox.showinfo("Batch Limit", f"Selected first {selected_count} applicants (report has {len(self.all_applicants_data)}).\nUse Quick Select or Search to add more.")
+            messagebox.showinfo(tr("dialogs.batch_limit"), tr("dialogs.batch_limit_msg", count=selected_count, total=len(self.all_applicants_data)))
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
         self.log_info(f"Selected {selected_count} valid applicants.")
@@ -495,22 +495,22 @@ class DemandTab(BaseAutomationTab):
         Selects a custom number of applicants from the top of the list.
         """
         if not self.all_applicants_data:
-            messagebox.showwarning("No Data", "Please load a CSV file first.")
+            messagebox.showwarning(tr("dialogs.no_data"), tr("dialogs.load_csv_first"))
             return
 
         try:
             num_to_select = int(self.custom_select_entry.get().strip())
         except ValueError:
-            messagebox.showwarning("Invalid Input", "Please enter a valid number of applicants to select.")
+            messagebox.showwarning(tr("dialogs.invalid_input"), tr("dialogs.valid_number_select"))
             return
 
         if num_to_select <= 0:
-            messagebox.showwarning("Invalid Input", "Number must be greater than zero.")
+            messagebox.showwarning(tr("dialogs.invalid_input"), tr("dialogs.number_greater_zero"))
             return
             
         if num_to_select > len(self.all_applicants_data):
             num_to_select = len(self.all_applicants_data)
-            messagebox.showinfo("Adjustment", f"Selecting maximum available applicants: {num_to_select}.")
+            messagebox.showinfo(tr("dialogs.adjustment"), tr("dialogs.selecting_max_applicants", count=num_to_select))
 
         self._clear_selection() # Clear any existing selection first
 
@@ -573,7 +573,7 @@ class DemandTab(BaseAutomationTab):
     def _select_csv_from_computer(self):
         """Opens a file dialog to select an eKYC report (Excel/CSV) and processes it."""
         path = filedialog.askopenfilename(
-            title="Select eKYC Report (Excel/CSV)",
+            title=tr("form.demand.select_ekyc_report"),
             filetypes=[("eKYC Report / Excel", "*.xlsx *.csv"),
                        ("Excel Workbook", "*.xlsx"),
                        ("CSV", "*.csv")]
@@ -710,10 +710,10 @@ class DemandTab(BaseAutomationTab):
             self._update_applicant_display()
 
         except Exception as e:
-            messagebox.showerror("Error Reading Report", f"Could not read the report.\nError: {e}")
+            messagebox.showerror(tr("dialogs.error_reading_report"), tr("dialogs.could_not_read_report", error=e))
             self.csv_path = None
             self.all_applicants_data = []
-            self.file_label.configure(text="No file")
+            self.file_label.configure(text=tr("errors.no_file"))
             self._update_applicant_display()
             self._update_selection_summary()
 
@@ -806,8 +806,7 @@ class DemandTab(BaseAutomationTab):
         """Shows a picker of previously-uploaded reports (by panchayat)."""
         data = self._load_report_history()
         if not data:
-            messagebox.showinfo("No History",
-                                "Koi previous report nahi mila.\nPehle ek eKYC & ABPS report upload karo.")
+            messagebox.showinfo(tr("demand.no_history_title"), tr("demand.no_history_msg"))
             return
 
         win = ctk.CTkToplevel(self)
@@ -818,7 +817,7 @@ class DemandTab(BaseAutomationTab):
         win.grid_columnconfigure(0, weight=1)
         win.grid_rowconfigure(1, weight=1)
 
-        ctk.CTkLabel(win, text="🕘 Previously uploaded eKYC reports",
+        ctk.CTkLabel(win, text=tr("form.demand.previous_reports"),
                      font=ctk.CTkFont(size=15, weight="bold")).grid(
             row=0, column=0, padx=12, pady=(12, 4), sticky="w")
 
@@ -832,8 +831,7 @@ class DemandTab(BaseAutomationTab):
             if entry.get('path') and os.path.exists(entry['path']):
                 self._process_input_file(entry['path'])
             else:
-                messagebox.showerror("File Missing",
-                                     f"Report file ab exist nahi karta:\n{entry.get('path', '?')}\n\nDobara upload karo.")
+                messagebox.showerror(tr("demand.file_missing_title"), tr("demand.file_missing_msg", path=entry.get('path', '?')))
 
         for pan, entry in sorted(data.items()):
             label = entry.get('label', '') or ''
@@ -847,7 +845,7 @@ class DemandTab(BaseAutomationTab):
                 command=lambda p=pan: _load(p))
             btn.grid(row=len(scroll.winfo_children()), column=0, sticky="ew", padx=4, pady=3)
 
-        ctk.CTkButton(win, text="Cancel", width=90,
+        ctk.CTkButton(win, text=tr("common.cancel"), width=90,
                       command=win.destroy).grid(row=2, column=0, padx=12, pady=(4, 10))
 
     # APPLICANT SELECTION — new fast approach
@@ -862,7 +860,7 @@ class DemandTab(BaseAutomationTab):
         if not raw:
             return
         if not self.all_applicants_data:
-            messagebox.showwarning("No Data", "Please load a CSV file first.")
+            messagebox.showwarning(tr("dialogs.no_data"), tr("dialogs.load_csv_first"))
             return
 
         tokens = [t.strip() for t in re.split(r'[,\s]+', raw) if t.strip()]
@@ -951,7 +949,7 @@ class DemandTab(BaseAutomationTab):
 
         if not self.all_applicants_data:
             ctk.CTkLabel(self.search_results_frame,
-                         text="No report loaded.\nUpload the eKYC & ABPS report first.",
+                         text=tr("form.demand.no_report"),
                          text_color="gray", justify="left").pack(padx=10, pady=16)
             return
 
@@ -1091,7 +1089,7 @@ class DemandTab(BaseAutomationTab):
 
         if not selected_by_jc:
             ctk.CTkLabel(self.selected_jc_frame,
-                         text="Nothing selected yet.\nUse Quick Select or Search →",
+                         text=tr("form.demand.nothing_selected"),
                          text_color="gray", justify="left").pack(padx=10, pady=20)
             return
 
@@ -1297,13 +1295,13 @@ class DemandTab(BaseAutomationTab):
         """
         # --- 1. Get and Validate Inputs ---
         state = self.state_var.get()
-        if not state: messagebox.showerror("Input Error", "Select state."); return
+        if not state: messagebox.showerror(tr("errors.input_error"), tr("dialogs.select_state")); return
         try:
             cfg = config.STATE_DEMAND_CONFIG[state]
             logic_key = cfg.get("village_code_logic", "jh")
             url = cfg["base_url"]
         except KeyError:
-            messagebox.showerror("Config Error", f"Demand config missing for: {state}"); return
+            messagebox.showerror(tr("dialogs.config_error"), tr("dialogs.config_missing_state", state=state)); return
 
         selected = [r for r in self.all_applicants_data if r.get('_selected', False)]
         panchayat = self.panchayat_var.get().strip(); days_str = self.days_entry.get().strip()
@@ -1315,17 +1313,17 @@ class DemandTab(BaseAutomationTab):
             demand_dt_str = self.demand_date_entry.get()
             demand_dt = datetime.strptime(demand_dt_str, '%d/%m/%Y').date() 
             work_start = demand_dt.strftime('%d/%m/%Y') 
-        except ValueError: messagebox.showerror("Invalid Date", "Use DD/MM/YYYY."); return
+        except ValueError: messagebox.showerror(tr("dialogs.invalid_date"), tr("dialogs.use_dd_mm_yyyy")); return
 
         if demand_dt < datetime.now().date():
-            messagebox.showerror("Invalid Date", "Demand/Work Date cannot be in the past. Please select today or a future date.")
+            messagebox.showerror(tr("dialogs.invalid_date"), tr("dialogs.no_past_date"))
             return
 
-        if not days_str: messagebox.showerror("Missing Info", "Days required."); return
-        if not self.csv_path: messagebox.showerror("Missing Info", "Load the eKYC report first."); return
-        if not selected: messagebox.showwarning("No Selection", "Select applicants."); return
+        if not days_str: messagebox.showerror(tr("dialogs.missing_info"), tr("dialogs.days_required")); return
+        if not self.csv_path: messagebox.showerror(tr("dialogs.missing_info"), tr("dialogs.load_ekyc_first")); return
+        if not selected: messagebox.showwarning(tr("dialogs.no_selection"), tr("dialogs.select_applicants")); return
         try: days_int = int(days_str); assert days_int > 0
-        except (ValueError, AssertionError): messagebox.showerror("Invalid Input", "Days must be positive number."); return
+        except (ValueError, AssertionError): messagebox.showerror(tr("dialogs.invalid_input"), tr("dialogs.days_positive")); return
 
         # --- 2. Setup UI for Running State ---
         # self.stop_event.clear(); <-- Handled by app.start_automation_thread
@@ -1379,7 +1377,7 @@ class DemandTab(BaseAutomationTab):
         )
     def reset_ui(self) -> None:
         """Resets all inputs, selections, and logs on the tab."""
-        if not messagebox.askokcancel("Reset?", "Clear inputs, selections, logs?"): return
+        if not messagebox.askokcancel(tr("dialogs.reset_question"), tr("dialogs.clear_inputs_selections_logs")): return
         self.state_var.set("")
         self.panchayat_var.set("")
         self.days_entry.delete(0, 'end')
@@ -1392,7 +1390,7 @@ class DemandTab(BaseAutomationTab):
         self.all_applicants_data.clear()
         self._current_panchayat = ""
         self._current_village = ""
-        self.file_label.configure(text="No file loaded.", text_color="gray")
+        self.file_label.configure(text=tr("errors.no_file_loaded"), text_color="gray")
 
         self._refresh_selected_jc_panel()
         self._refresh_search_results()
@@ -1412,9 +1410,9 @@ class DemandTab(BaseAutomationTab):
         self.results_tree.column("Job Card No", anchor='w', width=180); self.results_tree.column("Applicant Name", anchor='w', width=150)
         self.results_tree.column("Status", anchor='w', width=250)
         self.results_tree.heading("#0", text=""); self.results_tree.heading("#", text="#")
-        self.results_tree.heading("Panchayat", text="Panchayat"); self.results_tree.heading("Village", text="Village")
-        self.results_tree.heading("Job Card No", text="Job Card No"); self.results_tree.heading("Applicant Name", text="Applicant Name")
-        self.results_tree.heading("Status", text="Status")
+        self.results_tree.heading("Panchayat", text=tr("common.panchayat_col")); self.results_tree.heading("Village", text=tr("common.village_col"))
+        self.results_tree.heading("Job Card No", text=tr("common.jobcard_no_col")); self.results_tree.heading("Applicant Name", text=tr("common.applicant_name_col"))
+        self.results_tree.heading("Status", text=tr("common.status_col"))
         self.style_treeview(self.results_tree)
 
     def _process_demand(self, state, grouped, user_days, demand_from, base_url, work_key_for_allocation):
@@ -1542,7 +1540,7 @@ class DemandTab(BaseAutomationTab):
         except Exception as e:
             self.app.after(0, self.app.log_message, self.log_display, f"CRITICAL ERROR: {type(e).__name__} - {e}", "error")
             self.app.after(0, self.update_status, f"Error: {type(e).__name__}", 0.0)
-            self.app.after(0, lambda: messagebox.showerror("Error", f"Automation stopped: {e}"))
+            self.app.after(0, lambda: messagebox.showerror(tr("dialogs.error"), tr("dialogs.automation_stopped", error=e)))
         finally:
             final_status_text = "Finished"
             final_tab_status = "Finished"
@@ -1632,9 +1630,7 @@ class DemandTab(BaseAutomationTab):
         if failed_names:
             sample = "\n".join(sorted(failed_names)[:6])
             more = "\n..." if len(failed_names) > 6 else ""
-            msg = (f"{len(failed_names)} labourer(s) ki demand fail hui:\n"
-                   f"{sample}{more}\n\n"
-                   f"Unhe pehle Retry karna hai, ya bina unke allocation continue karein?")
+            msg = tr("demand.failures_msg", count=len(failed_names), sample=sample, more=more)
             self.app.after(0, lambda: self._ask_failed_handoff(msg, _proceed))
         else:
             _proceed()
@@ -1642,8 +1638,8 @@ class DemandTab(BaseAutomationTab):
     def _ask_failed_handoff(self, msg: str, proceed: Callable) -> None:
         """Main-thread dialog: Yes = retry failed (skip allocation), No = allocate."""
         do_retry = messagebox.askyesno(
-            "Demand me failures hain",
-            msg + "\n\n(Yes = Failed labourers ka retry | No = Allocation karo)")
+            tr("demand.failures_title"),
+            msg + tr("demand.failures_suffix"))
         if do_retry:
             self.log_warning("Allocation skipped — failed labourers ka retry shuru...")
             # Demand thread ko finish hone de, phir failed applicants ka turant retry
@@ -2315,7 +2311,7 @@ class DemandTab(BaseAutomationTab):
         """
         failed_items = self.results_tree.tag_has('failed')
         if not failed_items:
-            messagebox.showinfo("Retry Failed", "Results me koi failed applicant nahi hai.")
+            messagebox.showinfo(tr("demand.retry_title"), tr("demand.retry_no_failed"))
             return
 
         # Clear all selections, then re-select ONLY the failed ones
@@ -2340,9 +2336,8 @@ class DemandTab(BaseAutomationTab):
 
         if not re_selected_count:
             messagebox.showwarning(
-                "Retry Failed",
-                "Failed applicants CSV list me nahi mile.\n"
-                "Kya report abhi bhi loaded hai? Agar nahi, to report dobara load karo.")
+                tr("demand.retry_title"),
+                tr("demand.retry_not_in_csv"))
             return
 
         self._refresh_selected_jc_panel()
@@ -2357,7 +2352,7 @@ class DemandTab(BaseAutomationTab):
         """
         Exports the contents of the results treeview to a CSV file.
         """
-        if not self.results_tree.get_children(): messagebox.showinfo("Export", "No results."); return
+        if not self.results_tree.get_children(): messagebox.showinfo(tr("dialogs.export"), tr("dialogs.no_results")); return
         p = self.panchayat_var.get().strip().replace(" ", "_") or "UnknownPanchayat"; s = self.state_var.get() or "UnknownState"
         fname = f"Demand_Report_{s}_{p}_{datetime.now():%Y%m%d_%H%M}.csv"; self.export_treeview_to_csv(self.results_tree, fname)
 
@@ -2423,7 +2418,7 @@ class DemandTab(BaseAutomationTab):
         """Export results to professional Excel."""
         panchayat_name = self.panchayat_var.get().strip()
         if not panchayat_name:
-            messagebox.showwarning("Input Needed", "Please enter a Panchayat Name to include in the report filename.")
+            messagebox.showwarning(tr("dialogs.input_needed"), tr("dialogs.enter_panchayat_filename"))
             return
         safe_p = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
         self.export_treeview_to_excel(

@@ -11,6 +11,7 @@ from src import config
 from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException  # noqa: F401
 
@@ -29,8 +30,7 @@ class AbpsVerifyTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         # ── Header card ──
-        self._create_header_card(self, "✅", "Verify ABPS",
-                                 "Verify ABPS (UID-linked) accounts for jobcard holders in bulk.",
+        self._create_header_card(self, "✅", tr("tab.abps_verify.title"), tr("tab.abps_verify.subtitle"),
                                  icon_key="emoji_verify_abps")
 
         # --- Controls Frame ---
@@ -39,14 +39,14 @@ class AbpsVerifyTab(BaseAutomationTab):
         controls_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 6))
         controls_frame.grid_columnconfigure((1, 3), weight=1)
 
-        ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=0, sticky="w", padx=15, pady=(15, 5))
+        ctk.CTkLabel(controls_frame, text=tr("form.abps.panchayat_label")).grid(row=0, column=0, sticky="w", padx=15, pady=(15, 5))
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var,
                                                 values=self._all_panchayat_values(p_vals))
         self.panchayat_menu.grid(row=0, column=1, sticky="ew", padx=(0, 15), pady=(15, 5))
 
-        ctk.CTkLabel(controls_frame, text="Village:").grid(row=0, column=2, sticky="w", padx=15, pady=(15, 5))
+        ctk.CTkLabel(controls_frame, text=tr("form.abps.village_label")).grid(row=0, column=2, sticky="w", padx=15, pady=(15, 5))
         v_vals = self.app.history_manager.get_suggestions("location_village") or [""]
         self.village_var = ctk.StringVar(value=ALL_VILLAGES_LABEL)
         self.village_menu = ctk.CTkOptionMenu(controls_frame, variable=self.village_var,
@@ -85,14 +85,14 @@ class AbpsVerifyTab(BaseAutomationTab):
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
         
         # --- Export Buttons ---
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel",
+        self.export_csv_button = ctk.CTkButton(results_action_frame, text=tr("common.export_excel"),
                                                command=self._export_excel_report)
         self.export_csv_button.pack(side="left", padx=(0, 10))
 
         # NEW: PDF Export Button
         self.export_pdf_button = ctk.CTkButton(
             results_action_frame, 
-            text="Export to PDF", 
+            text=tr("common.export_pdf"), 
             command=self.export_to_pdf, 
             fg_color=config.COLORS["orange_abps"], 
             hover_color=config.COLORS["orange_abps_hover"]
@@ -130,11 +130,11 @@ class AbpsVerifyTab(BaseAutomationTab):
         if village == ALL_VILLAGES_LABEL:
             village = ""  # Process all villages
         if not panchayat:
-            messagebox.showwarning("Input Required", "Please enter a Panchayat name.")
+            messagebox.showwarning(tr("errors.input_required"), tr("dialogs.abps_panchayat_required"))
             return
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(panchayat, village))
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_logs")):
             self.panchayat_var.set("")
             self.village_var.set(ALL_VILLAGES_LABEL)
             self.safe_tree_clear()
@@ -244,7 +244,7 @@ class AbpsVerifyTab(BaseAutomationTab):
 
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
-            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
+            messagebox.showerror(tr("base.automation_error.title"), tr("dialogs.an_error_occurred_detail", error=e))
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
@@ -394,7 +394,7 @@ class AbpsVerifyTab(BaseAutomationTab):
     def _export_excel_report(self):
         """Export ABPS verification results to Excel (standard report folder)."""
         if not self.results_tree.get_children():
-            messagebox.showinfo("No Data", "There are no results to export.")
+            messagebox.showinfo(tr("errors.no_data"), "There are no results to export.")
             return
         panchayat = self.panchayat_var.get().strip() or "Report"
         safe_panchayat = re.sub(r'[\\/*?:"<>|]', '_', panchayat)
@@ -410,11 +410,11 @@ class AbpsVerifyTab(BaseAutomationTab):
         
         # 1. Check if there is data
         if not self.results_tree.get_children():
-            messagebox.showinfo("No Data", "There are no results to export.")
+            messagebox.showinfo(tr("errors.no_data"), "There are no results to export.")
             return
 
         # 2. Prepare Data — local serial pehle column, tree ka Panchayat col
-        #    PDF ke in headers me nahi hai isliye skip (Job Card se aage).
+        #    not in these PDF headers, so skip (continue from Job Card).
         headers = ["Sr. No.", "Job Card No.", "Applicant Name", "Status", "Timestamp"]
         data = []
         for idx, item in enumerate(self.results_tree.get_children()):
@@ -433,7 +433,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         try:
             os.makedirs(target_dir, exist_ok=True)
         except OSError as e:
-             messagebox.showerror("Folder Error", f"Could not create report directory:\n{target_dir}\nError: {e}")
+             messagebox.showerror(tr("dialogs.folder_error"), tr("dialogs.could_not_create_dir", dir=target_dir, error=e))
              return
 
         # Default Filename
@@ -446,7 +446,7 @@ class AbpsVerifyTab(BaseAutomationTab):
             initialfile=self._timestamped_filename(default_filename),
             defaultextension=".pdf",
             filetypes=[("PDF Documents", "*.pdf"), ("All Files", "*.*")],
-            title="Save PDF Report"
+            title=tr("common.save_report")
         )
         
         if not file_path:
@@ -460,7 +460,7 @@ class AbpsVerifyTab(BaseAutomationTab):
         success = self.generate_report_pdf(data, headers, col_widths, title, f"Date: {date_str}", file_path)
 
         if success:
-            messagebox.showinfo("Success", f"PDF report saved successfully to:\n{file_path}")
+            messagebox.showinfo(tr("status.success"), tr("dialogs.pdf_saved_to", path=file_path))
             # Try to open the file
             try:
                 if os.name == 'nt': os.startfile(file_path)

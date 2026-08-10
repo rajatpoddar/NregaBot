@@ -6,6 +6,7 @@ import time, csv, sys, os, re  # <-- ADD 're'
 from datetime import datetime
 from src import config
 from src.utils import truncate_workcode
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
@@ -21,8 +22,7 @@ class UpdateEstimateTab(BaseAutomationTab):
 
         """Creates the UI elements for the tab, inspired by the MSR Tab layout."""
         # ── Header / intro card (pending-bills style) ──
-        self._create_header_card(self, "📝", "Update Estimate",
-                                 "Update the estimated outcome for multiple work codes in one go.",
+        self._create_header_card(self, "📝", tr("tab.update_estimate.title"), tr("tab.update_estimate.subtitle"),
                                  icon_key="emoji_update_estimate")
 
         # --- Top Controls Frame (settings card) ---
@@ -34,10 +34,10 @@ class UpdateEstimateTab(BaseAutomationTab):
         # Estimated Outcome Input
         outcome_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         outcome_frame.grid(row=0, column=0, sticky='ew', padx=15, pady=(10,0))
-        ctk.CTkLabel(outcome_frame, text="Estimated Outcome", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
+        ctk.CTkLabel(outcome_frame, text=tr("form.update_estimate.estimated_outcome"), font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         self.estimated_outcome_entry = ctk.CTkEntry(outcome_frame)
         self.estimated_outcome_entry.pack(fill='x', pady=(5,0))
-        ctk.CTkLabel(outcome_frame, text="This value will be used for all work codes processed.", text_color="gray50").pack(anchor='w')
+        ctk.CTkLabel(outcome_frame, text=tr("form.update_estimate.outcome_hint"), text_color="gray50").pack(anchor='w')
 
         # Action Buttons (Start, Stop, Reset) — OUTSIDE the card
         action_frame = self._create_action_buttons(parent_frame=self)
@@ -56,13 +56,13 @@ class UpdateEstimateTab(BaseAutomationTab):
         wc_controls_frame = ctk.CTkFrame(work_codes_frame, fg_color="transparent")
         wc_controls_frame.grid(row=0, column=0, sticky='ew')
         
-        ctk.CTkLabel(wc_controls_frame, text="Enter one Work Code per line.", text_color="gray50").pack(side='left', padx=5)
+        ctk.CTkLabel(wc_controls_frame, text=tr("form.update_estimate.workcode_hint"), text_color="gray50").pack(side='left', padx=5)
         
-        clear_button = ctk.CTkButton(wc_controls_frame, text="Clear", width=80, command=lambda: self.work_key_text.delete("1.0", tkinter.END))
+        clear_button = ctk.CTkButton(wc_controls_frame, text=tr("common.clear"), width=80, command=lambda: self.work_key_text.delete("1.0", tkinter.END))
         clear_button.pack(side='right', pady=(5,0), padx=(0,5))
         
         # --- NEW: Extract Button (points to a new local method) ---
-        extract_button = ctk.CTkButton(wc_controls_frame, text="Extract from Text", width=120,
+        extract_button = ctk.CTkButton(wc_controls_frame, text=tr("common.extract_from_text"), width=120,
                                        command=self._extract_full_workcodes)
         extract_button.pack(side='right', pady=(5,0), padx=(0, 5))
         # ---
@@ -79,7 +79,7 @@ class UpdateEstimateTab(BaseAutomationTab):
         # Export Controls
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 5))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side='left')
 
         # Results Treeview
@@ -113,7 +113,7 @@ class UpdateEstimateTab(BaseAutomationTab):
         self.app.start_automation_thread(key=self.automation_key, target=self.run_automation_logic)
     def reset_ui(self) -> None:
         """Resets the UI to its initial state."""
-        if messagebox.askokcancel("Reset Form?", "This will clear all inputs, results, and logs. Continue?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_full")):
             self.estimated_outcome_entry.delete(0, tkinter.END)
             self.work_key_text.delete("1.0", tkinter.END)
             self.safe_tree_clear()
@@ -129,10 +129,10 @@ class UpdateEstimateTab(BaseAutomationTab):
         work_codes = [line.strip() for line in self.work_key_text.get("1.0", tkinter.END).strip().splitlines() if line.strip()]
 
         if not outcome_value:
-            messagebox.showerror("Input Error", "Estimated Outcome cannot be empty.")
+            messagebox.showerror(tr("errors.input_error"), tr("dialogs.outcome_required"))
             self.app.after(0, self.set_ui_state, False); return
         if not work_codes:
-            messagebox.showerror("Input Error", "No work codes provided.")
+            messagebox.showerror(tr("errors.input_error"), tr("dialogs.no_work_codes"))
             self.app.after(0, self.set_ui_state, False); return
 
         try:
@@ -169,7 +169,7 @@ class UpdateEstimateTab(BaseAutomationTab):
                 self.log_info(f"{'='*50}")
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
-            messagebox.showerror("Automation Error", f"An unexpected error occurred: {e}")
+            messagebox.showerror(tr("base.automation_error.title"), tr("dialogs.unexpected_error", error=e))
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Finished", 1.0)
@@ -247,12 +247,12 @@ class UpdateEstimateTab(BaseAutomationTab):
                 self.work_key_text.configure(state="normal")
                 self.work_key_text.delete("1.0", tkinter.END)
                 self.work_key_text.insert("1.0", "\n".join(final_results))
-                messagebox.showinfo("Extraction Complete", f"Found and extracted {len(final_results)} unique full work codes.", parent=self)
+                messagebox.showinfo(tr("dialogs.extraction_complete"), tr("dialogs.extracted_count", count=len(final_results)), parent=self)
             else:
-                messagebox.showinfo("No Codes Found", "Could not find any matching full work codes (e.g., 34.../.../...).", parent=self)
+                messagebox.showinfo(tr("dialogs.no_codes_found"), tr("dialogs.no_full_codes_msg"), parent=self)
         
         except Exception as e:
-            messagebox.showerror("Extraction Error", f"An error occurred during extraction: {e}", parent=self)
+            messagebox.showerror(tr("dialogs.extraction_error"), tr("dialogs.extraction_error_msg", error=e), parent=self)
 
     def _log_result(self, work_code, outcome, status, details, is_error=False):
         """Logs the result to the UI."""

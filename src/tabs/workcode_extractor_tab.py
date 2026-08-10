@@ -4,6 +4,7 @@ import customtkinter as ctk
 import re
 import webbrowser
 from src import config
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 class WorkcodeExtractorTab(ctk.CTkFrame):
@@ -34,7 +35,7 @@ class WorkcodeExtractorTab(ctk.CTkFrame):
             text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
         ).pack(anchor="w", padx=14, pady=(10, 0))
         ctk.CTkLabel(
-            header, text="Paste the MR Tracking table and extract workcodes / wagelist IDs instantly.",
+            header, text=tr("form.workcode_ext.subtitle"),
             font=ctk.CTkFont(size=12),
             text_color=(config.COLORS["text_dark_alt"], config.COLORS["text_light"])
         ).pack(anchor="w", padx=14, pady=(0, 10))
@@ -46,19 +47,19 @@ class WorkcodeExtractorTab(ctk.CTkFrame):
         input_frame.grid_columnconfigure(0, weight=1)
         input_frame.grid_rowconfigure(2, weight=1)
 
-        ctk.CTkLabel(input_frame, text="Paste Text Below", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=(10,0), sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("form.workcode_ext.paste_label"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=(10,0), sticky="w")
 
         note_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
         note_frame.grid(row=1, column=0, sticky="w", padx=15, pady=(2, 8))
         
-        ctk.CTkLabel(note_frame, text="💡 Note: Go to the ").pack(side="left")
+        ctk.CTkLabel(note_frame, text=tr("form.workcode_ext.note_prefix")).pack(side="left")
         
-        link_label = ctk.CTkLabel(note_frame, text="MR Tracking Page", text_color=("#0000EE", "#ADD8E6"), cursor="hand2")
+        link_label = ctk.CTkLabel(note_frame, text=tr("form.workcode_ext.note_link"), text_color=("#0000EE", "#ADD8E6"), cursor="hand2")
         link_label.pack(side="left")
         link_url = "https://nregastrep.nic.in/netnrega/dynamic_muster_track.aspx?lflag=eng&state_code=34&fin_year=2025-2026&state_name=JHARKHAND&Digest=FjAL4jfLQiHS1NU1KnbRZg"
         link_label.bind("<Button-1>", lambda e: webbrowser.open_new_tab(link_url))
         
-        ctk.CTkLabel(note_frame, text=", copy the entire table, and paste it below.").pack(side="left")
+        ctk.CTkLabel(note_frame, text=tr("form.workcode_ext.note_suffix")).pack(side="left")
         
         self.input_text = ctk.CTkTextbox(input_frame, wrap=tkinter.WORD)
         self.input_text.grid(row=2, column=0, sticky="nsew", padx=15, pady=(0, 15))
@@ -74,8 +75,8 @@ class WorkcodeExtractorTab(ctk.CTkFrame):
         output_header_frame.grid(row=0, column=0, sticky="ew", padx=15, pady=10)
         output_header_frame.grid_columnconfigure(1, weight=1)
         
-        ctk.CTkLabel(output_header_frame, text="Extracted Codes", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w")
-        self.copy_button = ctk.CTkButton(output_header_frame, text="Copy", width=70, command=self._copy_results)
+        ctk.CTkLabel(output_header_frame, text=tr("form.workcode_ext.extracted_label"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w")
+        self.copy_button = ctk.CTkButton(output_header_frame, text=tr("common.copy"), width=70, command=self._copy_results)
         self.copy_button.grid(row=0, column=2, sticky="e")
 
         self.output_text = ctk.CTkTextbox(output_frame, wrap=tkinter.NONE, state="disabled")
@@ -86,29 +87,29 @@ class WorkcodeExtractorTab(ctk.CTkFrame):
         action_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 6))
         action_frame.grid_columnconfigure(1, weight=1)
         
-        self.extract_button = ctk.CTkButton(action_frame, text="▶ Extract Codes", command=self._extract_codes)
+        self.extract_button = ctk.CTkButton(action_frame, text=tr("form.workcode_ext.extract_btn"), command=self._extract_codes)
         self.extract_button.grid(row=0, column=0, padx=15, pady=10)
         
         checkbox_frame = ctk.CTkFrame(action_frame, fg_color="transparent")
         checkbox_frame.grid(row=0, column=1, padx=10, pady=10)
         
-        self.remove_duplicates_checkbox = ctk.CTkCheckBox(checkbox_frame, text="Remove Duplicates")
+        self.remove_duplicates_checkbox = ctk.CTkCheckBox(checkbox_frame, text=tr("form.workcode_ext.remove_dups"))
         self.remove_duplicates_checkbox.pack(side="left", padx=(0, 15))
         # --- MODIFIED: The line below is removed to make it unchecked by default ---
         # self.remove_duplicates_checkbox.select()
 
-        self.extract_full_code_checkbox = ctk.CTkCheckBox(checkbox_frame, text="Extract Full Workcode")
+        self.extract_full_code_checkbox = ctk.CTkCheckBox(checkbox_frame, text=tr("form.workcode_ext.extract_full"))
         self.extract_full_code_checkbox.pack(side="left")
         
         # --- NEW: Checkbox to extract wagelist IDs like 3422003WL031552 ---
-        self.extract_wagelist_checkbox = ctk.CTkCheckBox(checkbox_frame, text="Extract Wagelist IDs")
+        self.extract_wagelist_checkbox = ctk.CTkCheckBox(checkbox_frame, text=tr("form.workcode_ext.extract_wl_ids"))
         self.extract_wagelist_checkbox.pack(side="left", padx=(10,0))
 
         # --- NEW: Optional date filter for wagelist extraction (format DD-MM-YYYY) ---
-        self.wagelist_date_entry = ctk.CTkEntry(checkbox_frame, width=160, placeholder_text="Filter date (DD-MM-YYYY)")
+        self.wagelist_date_entry = ctk.CTkEntry(checkbox_frame, width=160, placeholder_text=tr("form.workcode_ext.filter_date"))
         self.wagelist_date_entry.pack(side="left", padx=(8,0))
         
-        self.clear_button = ctk.CTkButton(action_frame, text="Clear All", command=self._clear_all, fg_color="transparent", border_width=2, text_color=("gray10", "#DCE4EE"))
+        self.clear_button = ctk.CTkButton(action_frame, text=tr("common.clear_all"), command=self._clear_all, fg_color="transparent", border_width=2, text_color=("gray10", "#DCE4EE"))
         self.clear_button.grid(row=0, column=2, padx=15, pady=10)
 
     def _extract_codes(self):
@@ -183,8 +184,8 @@ class WorkcodeExtractorTab(ctk.CTkFrame):
         if results and "No matching" not in results:
             self.app.clipboard_clear()
             self.app.clipboard_append(results)
-            self.copy_button.configure(text="Copied!")
-            self.app.after(2000, lambda: self.copy_button.configure(text="Copy"))
+            self.copy_button.configure(text=tr("status.copied"))
+            self.app.after(2000, lambda: self.copy_button.configure(text=tr("common.copy")))
 
     def _clear_all(self):
         """Clears both the input and output textboxes."""

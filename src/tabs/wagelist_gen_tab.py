@@ -11,6 +11,7 @@ from src import config
 from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger, truncate_workcode
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, PrintOptions, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
@@ -42,8 +43,7 @@ class WagelistGenTab(BaseAutomationTab):
         settings_tab.grid_rowconfigure(1, weight=1)  # controls card expands (row 1)
         
         # ── Header / intro card (pending-bills style) ──
-        self._create_header_card(settings_tab, "📄", "Wagelist Generation",
-                                 "Generate wagelists for pending work codes and optionally auto-send them.",
+        self._create_header_card(settings_tab, "📄", tr("tab.wagelist_gen.title"), tr("tab.wagelist_gen.subtitle"),
                                  icon_key="emoji_gen_wagelist")
         
         # Controls Container (Scrollable or Frame) in a card
@@ -61,12 +61,12 @@ class WagelistGenTab(BaseAutomationTab):
         self.agency_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15,0))
         
         # Note for Macro usage
-        ctk.CTkLabel(controls_frame, text="💡 Select '🌐 All Panchayats' for every panchayat of the block, or '⭐ My Saved Panchayats' for only your saved panchayats.", text_color="gray60", font=ctk.CTkFont(size=11)).grid(row=1, column=1, sticky='w', padx=15, pady=(5,10))
+        ctk.CTkLabel(controls_frame, text=tr("form.wagelist.panchayat_hint"), text_color="gray60", font=ctk.CTkFont(size=11)).grid(row=1, column=1, sticky='w', padx=15, pady=(5,10))
         
         # --- 2. Settings Checkboxes ---
         self.save_pdf_var = ctk.StringVar(value="off")
         self.save_pdf_checkbox = ctk.CTkCheckBox(
-            controls_frame, text="Save generated wagelist page as PDF",
+            controls_frame, text=tr("form.wagelist.save_pdf"),
             variable=self.save_pdf_var, onvalue="on", offvalue="off"
         )
         self.save_pdf_checkbox.grid(row=2, column=0, columnspan=2, sticky='w', padx=15, pady=(10, 0))
@@ -116,7 +116,7 @@ class WagelistGenTab(BaseAutomationTab):
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
         
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side='left')
 
 
@@ -131,7 +131,7 @@ class WagelistGenTab(BaseAutomationTab):
         self.send_to_sender_checkbox.configure(state=state)
         self.export_button.configure(state=state)
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Are you sure?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("confirm.are_you_sure")):
             self.agency_var.set("")
             self.save_pdf_var.set("off") 
             self.send_to_sender_var.set("on")
@@ -144,7 +144,7 @@ class WagelistGenTab(BaseAutomationTab):
         agency = self.agency_var.get().strip()
         
         if not agency:
-            messagebox.showwarning("Input Error", "Please enter an Agency/Panchayat name.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.agency_panchayat_required"))
             return
 
         if agency not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
@@ -159,7 +159,7 @@ class WagelistGenTab(BaseAutomationTab):
         Since this works on a 'Pending List' from the website, 
         'Retrying' simply means running the automation again for the same panchayat.
         """
-        if messagebox.askyesno("Retry", "Retrying will check for any remaining items in the list.\nContinue?"):
+        if messagebox.askyesno(tr("base.error_tab.retry_btn"), tr("dialogs.retry_remaining")):
             self.start_automation()
 
     def run_automation_logic(self, agency_input):
@@ -249,7 +249,7 @@ class WagelistGenTab(BaseAutomationTab):
                             break # Move to next panchayat
 
                         # B. Select Agency (central helper — GP login par
-                        # dropdown nahi hota, selection skip ho jata hai)
+                        # no dropdown, so selection is skipped)
                         try:
                             full_agency_name = config.AGENCY_PREFIX + agency_name_part
                             status, _ = self._select_panchayat_or_skip(
@@ -449,9 +449,9 @@ class WagelistGenTab(BaseAutomationTab):
 
     def _get_filtered_data_and_filepath(self, export_format):
         all_items = self.results_tree.get_children()
-        if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
+        if not all_items: messagebox.showinfo(tr("errors.no_data"), tr("errors.no_results_export")); return None, None
         agency_name = self.agency_var.get().strip()
-        if not agency_name: messagebox.showwarning("Input Needed", "Please enter an Agency Name for the report title."); return None, None
+        if not agency_name: messagebox.showwarning(tr("errors.input_needed"), tr("dialogs.agency_name_required")); return None, None
 
         filter_option = self.export_filter_menu.get()
         data_to_export = []
@@ -461,7 +461,7 @@ class WagelistGenTab(BaseAutomationTab):
             if filter_option == "Export All": data_to_export.append(row_values)
             elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)
-        if not data_to_export: messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
+        if not data_to_export: messagebox.showinfo(tr("errors.no_data"), tr("dialogs.no_records_for_filter", filter=filter_option)); return None, None
 
         safe_name = "".join(c for c in agency_name if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -470,7 +470,7 @@ class WagelistGenTab(BaseAutomationTab):
         details = file_details.get(export_format, {"ext": ".txt", "types": [("Text File", "*.txt")]}) # Fallback
         filename = f"WagelistGen_Report_{safe_name}_{timestamp}{details['ext']}"
 
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_report_path("Wagelist"), initialfile=filename, title="Save Report")
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_report_path("Wagelist"), initialfile=filename, title=tr("common.save_report"))
         return (data_to_export, file_path) if file_path else (None, None)
 
     def _prepare_report_data(self, raw_data):
@@ -489,6 +489,6 @@ class WagelistGenTab(BaseAutomationTab):
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
         if success:
-            if messagebox.askyesno("Success", f"PDF Report saved to:\n{file_path}\n\nDo you want to open it?"):
+            if messagebox.askyesno(tr("status.success"), tr("export.pdf_saved", path=file_path)):
                 if sys.platform == "win32": os.startfile(file_path)
                 else: subprocess.call(['open', file_path])

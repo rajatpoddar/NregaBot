@@ -10,6 +10,7 @@ from datetime import datetime
 
 from src import config
 from src.utils import truncate_workcode
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Dict, List, Optional
@@ -75,8 +76,7 @@ class WorkAllocationTab(BaseAutomationTab):
     # ------------------------------------------------------------------
     def _create_widgets(self) -> None:
         # ── Header card ──
-        self._create_header_card(self, "📌", "Work Allocation",
-                                 "Allocate selected work keys to job cards on the portal.",
+        self._create_header_card(self, "📌", tr("tab.work_allocation.title"), tr("tab.work_allocation.subtitle"),
                                  icon_key="emoji_work_allocation")
 
         # ── Input controls (bordered card) ──
@@ -86,7 +86,7 @@ class WorkAllocationTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # Row 0: Panchayat
-        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("common.panchayat_name_label")).grid(
             row=0, column=0, sticky='w', padx=15, pady=(15, 5))
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
@@ -94,7 +94,7 @@ class WorkAllocationTab(BaseAutomationTab):
         self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
 
         # Row 1: Work Category
-        ctk.CTkLabel(controls_frame, text="Work Category:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("form.work_alloc.work_category")).grid(
             row=1, column=0, padx=15, pady=5, sticky="w")
         self.work_category_var = ctk.StringVar(value=self.WORK_CATEGORY_OPTIONS[8])
         self.work_category_menu = ctk.CTkOptionMenu(
@@ -102,18 +102,18 @@ class WorkAllocationTab(BaseAutomationTab):
         self.work_category_menu.grid(row=1, column=1, sticky="ew", padx=15, pady=5)
 
         # Row 2: Demand CSV upload (granular mode)
-        ctk.CTkLabel(controls_frame, text="Use Demand CSV:").grid(
+        ctk.CTkLabel(controls_frame, text=tr("form.work_alloc.use_demand_csv")).grid(
             row=2, column=0, padx=15, pady=5, sticky="w")
 
         csv_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         csv_frame.grid(row=2, column=1, sticky="ew", padx=15, pady=5)
 
-        self.load_csv_btn = ctk.CTkButton(csv_frame, text="Load Demand CSV",
+        self.load_csv_btn = ctk.CTkButton(csv_frame, text=tr("form.work_alloc.load_demand_csv"),
                                           command=self._load_demand_csv,
                                           fg_color="#D35400", hover_color="#A04000", width=150)
         self.load_csv_btn.pack(side="left", padx=(0, 10))
 
-        self.file_label = ctk.CTkLabel(csv_frame, text="No file selected", text_color="gray")
+        self.file_label = ctk.CTkLabel(csv_frame, text=tr("common.no_file_selected"), text_color="gray")
         self.file_label.pack(side="left")
 
         # ── Action buttons (Start / Stop / Reset / Retry) ──
@@ -134,8 +134,8 @@ class WorkAllocationTab(BaseAutomationTab):
         wc_controls_frame = ctk.CTkFrame(work_list_tab, fg_color="transparent")
         wc_controls_frame.grid(row=0, column=0, sticky='ew', padx=5, pady=(5, 0))
 
-        ctk.CTkLabel(wc_controls_frame, text="Enter one Work Key (Search Key) per line.").pack(side='left', padx=5)
-        ctk.CTkButton(wc_controls_frame, text="Clear", width=80,
+        ctk.CTkLabel(wc_controls_frame, text=tr("form.work_alloc.work_key_hint")).pack(side='left', padx=5)
+        ctk.CTkButton(wc_controls_frame, text=tr("common.clear"), width=80,
                       command=lambda: self.work_list_text.delete("1.0", tkinter.END)).pack(side='right', padx=5)
 
         self.work_list_text = ctk.CTkTextbox(work_list_tab)
@@ -150,11 +150,11 @@ class WorkAllocationTab(BaseAutomationTab):
 
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_demand_button = ctk.CTkButton(export_controls_frame, text="📤 Export for Demand",
+        self.export_demand_button = ctk.CTkButton(export_controls_frame, text=tr("form.work_alloc.export_demand"),
                                                   command=self.export_for_demand,
                                                   fg_color="#2E7D32", hover_color="#1B5E20")
         self.export_demand_button.pack(side='left', padx=(0, 10))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel",
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"),
                                            command=self.export_report)
         self.export_button.pack(side='left')
 
@@ -192,7 +192,7 @@ class WorkAllocationTab(BaseAutomationTab):
         self.panchayat_var.set("")
         self.csv_allocation_data = {}
         self.allocated_workers_data = []
-        self.file_label.configure(text="No file selected", text_color="gray")
+        self.file_label.configure(text=tr("common.no_file_selected"), text_color="gray")
         self.work_list_text.configure(state="normal")
         self.work_list_text.delete("1.0", tkinter.END)
         for item in self.results_tree.get_children():
@@ -236,7 +236,7 @@ class WorkAllocationTab(BaseAutomationTab):
             inputs['work_keys'] = list(allocation_data.keys())
             inputs['allocation_map'] = allocation_data
         else:
-            messagebox.showerror("Error", "Invalid data format received from Demand tab.")
+            messagebox.showerror(tr("dialogs.error"), tr("dialogs.invalid_demand_data"))
             return
 
         self.panchayat_var.set(panchayat_name)
@@ -259,7 +259,7 @@ class WorkAllocationTab(BaseAutomationTab):
         }
 
         if not inputs['work_category']:
-            messagebox.showwarning("Input Error", "Work Category is required.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.work_category_required"))
             return
 
         if self.csv_allocation_data:
@@ -270,11 +270,11 @@ class WorkAllocationTab(BaseAutomationTab):
         else:
             # Bulk mode: work keys typed in the text box
             if not inputs['work_list_raw']:
-                messagebox.showwarning("Input Error", "Please enter Work Keys or Load a CSV.")
+                messagebox.showwarning(tr("errors.input_error"), tr("dialogs.enter_work_keys_or_csv"))
                 return
             work_keys = [line.strip() for line in inputs['work_list_raw'].splitlines() if line.strip()]
             if not work_keys:
-                messagebox.showwarning("Input Error", "No valid items found in the Work Key List.")
+                messagebox.showwarning(tr("errors.input_error"), tr("dialogs.no_valid_work_keys"))
                 return
             inputs['work_keys'] = work_keys
             inputs['allocation_map'] = None
@@ -344,13 +344,13 @@ class WorkAllocationTab(BaseAutomationTab):
             had_error = True
             error_msg = str(e)
             self.log_error(error_msg)
-            messagebox.showerror("Input Error", error_msg)
+            messagebox.showerror(tr("errors.input_error"), error_msg)
             self.app.after(0, self.app.set_status, "Error")
         except Exception as e:
             had_error = True
             error_msg = f"A critical error occurred: {e}"
             self.log_error(error_msg)
-            messagebox.showerror("Critical Error", error_msg)
+            messagebox.showerror(tr("dialogs.critical_error"), error_msg)
             self.app.after(0, self.app.set_status, "Error")
         finally:
             self.app.after(0, self.set_ui_state, False)
@@ -373,9 +373,8 @@ class WorkAllocationTab(BaseAutomationTab):
     def _setup_page(self, driver, wait, inputs: Dict[str, Any]) -> None:
         """Selects panchayat (if a dropdown exists) and the work category.
 
-        Central _select_panchayat_or_skip helper: Block/PO login par dropdown
-        se select karta hai; Panchayat/GP login par (dropdown nahi hota)
-        selection skip ho jata hai.
+        Central _select_panchayat_or_skip helper: selects via the dropdown on
+        Block/PO login; on Panchayat/GP login (no dropdown) selection is skipped.
         """
         self._disable_smooth_scroll(driver)
         status, _ = self._select_panchayat_or_skip(
@@ -793,7 +792,7 @@ class WorkAllocationTab(BaseAutomationTab):
                 pass
             if time.time() - last_progress_log >= 15:
                 last_progress_log = time.time()
-                self.log_info("      ...still waiting for confirmation (allocation saved ho chuki ho sakti hai).")
+                self.log_info("      ...still waiting for confirmation (allocation may already be saved).")
             time.sleep(0.7)
         return None
 
@@ -803,7 +802,7 @@ class WorkAllocationTab(BaseAutomationTab):
     def _load_demand_csv(self) -> None:
         """Loads a Demand CSV and groups workers by their work code."""
         file_path = filedialog.askopenfilename(
-            title="Select Demand CSV",
+            title=tr("form.work_alloc.select_demand_csv"),
             filetypes=[("CSV Files", "*.csv")]
         )
         if not file_path:
@@ -824,7 +823,7 @@ class WorkAllocationTab(BaseAutomationTab):
                 wc_key = next((header_map[k] for k in ('allocationworkcode', 'workcode')
                                if k in header_map), None)
                 if wc_key is None:
-                    messagebox.showerror("Error", "CSV must have 'Allocation Work Code' column.")
+                    messagebox.showerror(tr("dialogs.error"), tr("dialogs.csv_allocation_column"))
                     return
                 name_key = next((header_map[k] for k in
                                  ('nameofapplicant', 'name', 'applicantname', 'workername')
@@ -850,7 +849,7 @@ class WorkAllocationTab(BaseAutomationTab):
 
         except Exception as e:
             self.log_error(f"Error loading CSV: {e}")
-            messagebox.showerror("Error", f"Failed to load CSV: {e}")
+            messagebox.showerror(tr("dialogs.error"), tr("dialogs.failed_load_csv", error=e))
 
     # ------------------------------------------------------------------
     # Results / retry / persistence
@@ -876,7 +875,7 @@ class WorkAllocationTab(BaseAutomationTab):
         all_items = self.results_tree.get_children()
 
         if not all_items:
-            messagebox.showinfo("Retry", "No results found to retry.")
+            messagebox.showinfo(tr("base.error_tab.retry_btn"), tr("base.retry_no_results"))
             return
 
         for item_id in all_items:
@@ -887,11 +886,11 @@ class WorkAllocationTab(BaseAutomationTab):
                 failed_keys.append(work_key)
 
         if not failed_keys:
-            messagebox.showinfo("Great!", "No failed items found.")
+            messagebox.showinfo(tr("dialogs.great"), tr("base.retry_no_fails"))
             return
 
-        if not messagebox.askyesno("Retry Failed",
-                                   f"Found {len(failed_keys)} failed work keys.\nDo you want to retry them now?"):
+        if not messagebox.askyesno(tr("base.retry_confirm_title"),
+                                   tr("dialogs.retry_failed_keys", count=len(failed_keys))):
             return
 
         self.work_list_text.configure(state="normal")
@@ -900,7 +899,7 @@ class WorkAllocationTab(BaseAutomationTab):
 
         # Force bulk mode for the retry (ignore the loaded CSV)
         self.csv_allocation_data = {}
-        self.file_label.configure(text="Retry Mode (Text)", text_color="orange")
+        self.file_label.configure(text=tr("form.work_alloc.retry_mode"), text_color="orange")
 
         for item in all_items:
             self.results_tree.delete(item)
@@ -923,12 +922,10 @@ class WorkAllocationTab(BaseAutomationTab):
         load it next week and re-do demand + allocation for the same workers."""
         if not self.allocated_workers_data:
             messagebox.showinfo(
-                "No Data",
-                "Koi allocated labourer nahi mila.\n"
-                "Pehle Work Allocation automation chalao (successful allocation ke baad data save hota hai).")
+                tr("errors.no_data"), tr("dialogs.no_allocated_labourers"))
             return
         path = filedialog.asksaveasfilename(
-            title="Export for Demand",
+            title=tr("form.work_alloc.export_demand_title"),
             defaultextension=".csv",
             initialfile=f"Work_Allocation_Demand_{datetime.now():%Y%m%d_%H%M}.csv",
             filetypes=[("CSV", "*.csv")])
@@ -950,10 +947,9 @@ class WorkAllocationTab(BaseAutomationTab):
                         "Panchayat": r.get('panchayat', ''),
                     })
             self.log_info(f"Demand-ready CSV exported: {path} ({len(self.allocated_workers_data)} labourers)")
-            messagebox.showinfo("Export", f"Demand-ready CSV saved:\n{path}\n\n"
-                                          f"Isse Demand tab me 'Upload Report' se load karo — work key khud set ho jayega.")
+            messagebox.showinfo(tr("dialogs.export"), tr("dialogs.export_csv_saved", path=path))
         except Exception as e:
-            messagebox.showerror("Export Error", str(e))
+            messagebox.showerror(tr("dialogs.export_error"), str(e))
 
     def _save_inputs(self, inputs: Dict[str, Any]) -> None:
         save_data = {

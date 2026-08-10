@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 from src.utils import resource_path, get_logger
 from .base_tab import BaseAutomationTab
 from src import config
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
@@ -38,8 +39,7 @@ class DashboardReportTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         # ── Header / intro card (pending-bills style) ──
-        self._create_header_card(self, "📈", "Dashboard Report",
-                                 "Scrape the delay-monitoring dashboard for pending E-MRs of a panchayat.",
+        self._create_header_card(self, "📈", tr("tab.dashboard_report.title"), tr("tab.dashboard_report.subtitle"),
                                  icon_key="emoji_dashboard_report")
 
         # ── Settings card: Location + Delay column ──
@@ -50,25 +50,25 @@ class DashboardReportTab(BaseAutomationTab):
 
         # --- Input Fields ---
         # --- Create all entries first (no cross-references) ---
-        ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
+        ctk.CTkLabel(controls_frame, text=tr("common.state_label")).grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
         s_vals = self.app.history_manager.get_suggestions("location_state") or [""]
         self.state_var = ctk.StringVar()
         self.state_menu = ctk.CTkOptionMenu(controls_frame, variable=self.state_var, values=s_vals)
         self.state_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
 
-        ctk.CTkLabel(controls_frame, text="District:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("common.district_label")).grid(row=1, column=0, sticky='w', padx=15, pady=5)
         d_vals = self.app.history_manager.get_suggestions("location_district") or [""]
         self.district_var = ctk.StringVar()
         self.district_menu = ctk.CTkOptionMenu(controls_frame, variable=self.district_var, values=d_vals)
         self.district_menu.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
 
-        ctk.CTkLabel(controls_frame, text="Block:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("common.block_label")).grid(row=2, column=0, sticky='w', padx=15, pady=5)
         b_vals = self.app.history_manager.get_suggestions("location_block") or [""]
         self.block_var = ctk.StringVar()
         self.block_menu = ctk.CTkOptionMenu(controls_frame, variable=self.block_var, values=b_vals)
         self.block_menu.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
 
-        ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("common.panchayat_label")).grid(row=3, column=0, sticky='w', padx=15, pady=5)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=self._all_panchayat_values(p_vals))
@@ -93,7 +93,7 @@ class DashboardReportTab(BaseAutomationTab):
             self.panchayat_menu.configure(values=self._all_panchayat_values(vals))
         self.block_var.trace_add("write", _on_block_change)
 
-        ctk.CTkLabel(controls_frame, text="Delay Column:").grid(row=4, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("form.dashboard.delay_column")).grid(row=4, column=0, sticky='w', padx=15, pady=5)
         self.delay_column_options = [
             "Attendance not filled in T+2 days",
             "Measurement Book not filled in T+5 days",
@@ -121,10 +121,10 @@ class DashboardReportTab(BaseAutomationTab):
         
         copy_frame = ctk.CTkFrame(workcode_tab, fg_color="transparent")
         copy_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
-        self.copy_wc_button = ctk.CTkButton(copy_frame, text="Copy Workcodes", command=self._copy_workcodes)
+        self.copy_wc_button = ctk.CTkButton(copy_frame, text=tr("form.dashboard.copy_workcodes"), command=self._copy_workcodes)
         self.copy_wc_button.pack(side="left")
 
-        self.run_mr_fill_button = ctk.CTkButton(copy_frame, text="Run MR Fill", command=self._run_mr_fill,
+        self.run_mr_fill_button = ctk.CTkButton(copy_frame, text=tr("form.dashboard.run_mr_fill"), command=self._run_mr_fill,
                                                   fg_color=config.COLORS["green_dashboard"], hover_color=config.COLORS["green_dashboard_hover"])
         self.run_mr_fill_button.pack_forget()
 
@@ -137,7 +137,7 @@ class DashboardReportTab(BaseAutomationTab):
         
         export_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         export_frame.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.export_button = ctk.CTkButton(export_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side="left")
 
         # --- Treeview Config ---
@@ -183,9 +183,9 @@ class DashboardReportTab(BaseAutomationTab):
         }
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['panchayat'], inputs['delay_column']]):
-            messagebox.showwarning("Input Error", "All fields are required."); return
+            messagebox.showwarning(tr("errors.input_error"), tr("errors.input_required")); return
         if inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL:
-            if not messagebox.askyesno("Confirm", "This will process ALL panchayats in the block. Continue?"):
+            if not messagebox.askyesno(tr("dialogs.confirm"), tr("dialogs.process_all_panchayats")):
                 return
         
         self.save_inputs(inputs)
@@ -650,14 +650,14 @@ class DashboardReportTab(BaseAutomationTab):
         text = self.workcode_textbox.get("1.0", tkinter.END).strip()
         if text:
             self.app.clipboard_clear(); self.app.clipboard_append(text)
-            messagebox.showinfo("Copied", f"Copied to clipboard.")
-        else: messagebox.showwarning("Empty", "No workcodes.")
+            messagebox.showinfo(tr("status.copied"), tr("dialogs.copied_to_clipboard"))
+        else: messagebox.showwarning(tr("dialogs.empty"), tr("dialogs.no_workcodes_short"))
 
     def _run_mr_fill(self):
         wc = self.workcode_textbox.get("1.0", tkinter.END).strip()
         gp = self.panchayat_var.get().strip()
         if wc and gp: self.app.switch_to_mr_fill_with_data(wc, gp)
-        else: messagebox.showwarning("Error", "Missing Data.")
+        else: messagebox.showwarning(tr("dialogs.error"), tr("dialogs.missing_data"))
 
     # =========================================================================
     # ==================== FINAL EXPORT LOGIC (FIXED) =========================
@@ -666,7 +666,7 @@ class DashboardReportTab(BaseAutomationTab):
     def export_report(self):
         """Export results to professional Excel."""
         if not self.results_tree.get_children():
-            messagebox.showinfo("No Data", "No results to export.")
+            messagebox.showinfo(tr("errors.no_data"), tr("dialogs.no_results_export_short"))
             return
 
         delay_type = self.delay_column_var.get()
@@ -786,7 +786,7 @@ class DashboardReportTab(BaseAutomationTab):
             pdf.output(file_path)
             return True
         except Exception as e:
-            messagebox.showerror("PDF Error", f"{e}"); return False
+            messagebox.showerror(tr("dialogs.pdf_error"), str(e)); return False
 
     def save_inputs(self, inputs):
         d = {k: inputs.get(k) for k in ('state', 'district', 'block', 'panchayat')}

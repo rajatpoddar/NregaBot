@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from src import config
 from src.utils import resource_path, get_logger, truncate_workcode, translate_error
+from src.i18n import tr
 
 logger = get_logger()
 
@@ -362,14 +363,14 @@ class BaseAutomationTab(ctk.CTkFrame):
             # Colour-coded by outcome: passed → green, failed → red,
             # stopped → amber.
             if status == "success":
-                title = "✅ Automation Complete"
-                kind = "success"  # GREEN = passed
+                title = tr("base.automation_complete.title")
+                kind = "success"
             elif status == "stopped":
-                title = "⏹ Automation Stopped"
-                kind = "warning"  # AMBER = stopped
+                title = tr("base.automation_stopped.title")
+                kind = "warning"
             else:
-                title = "⚠️ Automation Failed"
-                kind = "error"    # RED = failed
+                title = tr("base.automation_failed.title")
+                kind = "error"
             
             # Build location string
             location_parts = []
@@ -388,7 +389,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             if location_str and location_str not in (summary or ""):
                 detail_lines.append(location_str)
             
-            details_str = "\n".join(detail_lines) if detail_lines else "Check the 'Results' tab for full details"
+            details_str = "\n".join(detail_lines) if detail_lines else tr("base.automation_details_default")
             
             self.app.show_toast(
                 message=f"📋 {key_display}",
@@ -456,13 +457,13 @@ class BaseAutomationTab(ctk.CTkFrame):
         if "no such window" in error_msg or "target window already closed" in error_msg or "web view not found" in error_msg:
             self.log_error("Automation Stopped: Browser tab/window was closed.")
             try:
-                self.app.after(0, lambda: messagebox.showwarning("Browser Closed", "Automation stopped because the browser window was closed."))
+                self.app.after(0, lambda: messagebox.showwarning(tr("base.browser_closed.title"), tr("base.browser_closed.msg")))
             except Exception:
                 pass
         elif "invalid session id" in error_msg:
             self.log_error("Error: Browser session lost.")
             try:
-                self.app.after(0, lambda: messagebox.showwarning("Connection Lost", "Browser session was lost. Please restart the browser."))
+                self.app.after(0, lambda: messagebox.showwarning(tr("base.connection_lost.title"), tr("base.connection_lost.msg")))
             except Exception:
                 pass
         else:
@@ -472,8 +473,8 @@ class BaseAutomationTab(ctk.CTkFrame):
             try:
                 friendly = translate_error(e)
                 self.app.after(0, lambda m=friendly: messagebox.showerror(
-                    "Automation Error",
-                    f"Automation me problem aayi:\n\n{m}"
+                    tr("base.automation_error.title"),
+                    tr("base.automation_error.msg", details=m)
                 ))
             except Exception:
                 pass
@@ -651,7 +652,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             final_img.save(output_path, "PNG", dpi=(300, 300))
             return True
         except Exception as e:
-            messagebox.showerror("PNG Export Error", f"Could not generate PNG report.\nError: {e}", parent=self.app)
+            messagebox.showerror(tr("base.png_export_error"), f"Could not generate PNG report.\nError: {e}", parent=self.app)
             return False
 
     def _wrap_text(self, text: str, font: Any, max_width: float) -> List[str]:
@@ -764,7 +765,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             
         except Exception as e:
             print(f"PDF Gen Error: {e}")
-            messagebox.showerror("PDF Export Error", f"Could not generate PDF.\nError: {e}", parent=self.app)
+            messagebox.showerror(tr("base.pdf_export_error"), f"Could not generate PDF.\nError: {e}", parent=self.app)
             return False
 
     def _create_action_buttons(self, parent_frame: Any) -> ctk.CTkFrame:
@@ -773,10 +774,10 @@ class BaseAutomationTab(ctk.CTkFrame):
         inner_container = ctk.CTkFrame(outer_wrapper, fg_color="transparent")
         inner_container.pack(expand=True, anchor="center")
         
-        self.start_button = ctk.CTkButton(inner_container, text="▶ Start", command=self.start_automation, width=110, height=32, corner_radius=8, fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["btn_start_hover"], font=ctk.CTkFont(size=13, weight="bold"))
+        self.start_button = ctk.CTkButton(inner_container, text=tr("base.btn_start"), command=self.start_automation, width=110, height=32, corner_radius=8, fg_color=config.COLORS["btn_start"], hover_color=config.COLORS["btn_start_hover"], font=ctk.CTkFont(size=13, weight="bold"))
         self.start_button.pack(side="left", padx=(0, 8))
 
-        self.stop_button = ctk.CTkButton(inner_container, text="■ Stop", command=self.stop_automation, state="disabled", width=90, height=32, corner_radius=8, fg_color=config.COLORS["btn_stop"], hover_color=config.COLORS["btn_stop_hover"], font=ctk.CTkFont(size=13, weight="bold"))
+        self.stop_button = ctk.CTkButton(inner_container, text=tr("base.btn_stop"), command=self.stop_automation, state="disabled", width=90, height=32, corner_radius=8, fg_color=config.COLORS["btn_stop"], hover_color=config.COLORS["btn_stop_hover"], font=ctk.CTkFont(size=13, weight="bold"))
         self.stop_button.pack(side="left", padx=(0, 8))
         
         # --- NEW RETRY BUTTON ---
@@ -784,7 +785,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.retry_btn.pack(side="left", padx=(0, 8))
         self.retry_btn.configure(state="disabled") # Initially disabled
 
-        self.reset_button = ctk.CTkButton(inner_container, text="↺ Reset", command=self.reset_ui, width=90, height=32, corner_radius=8, fg_color=(config.COLORS["gray70"], config.COLORS["gray40_"]), hover_color=(config.COLORS["gray60"], config.COLORS["gray35_"]), text_color="white", font=ctk.CTkFont(size=13))
+        self.reset_button = ctk.CTkButton(inner_container, text=tr("base.btn_reset"), command=self.reset_ui, width=90, height=32, corner_radius=8, fg_color=(config.COLORS["gray70"], config.COLORS["gray40_"]), hover_color=(config.COLORS["gray60"], config.COLORS["gray35_"]), text_color="white", font=ctk.CTkFont(size=13))
         self.reset_button.pack(side="left")
         
         return outer_wrapper
@@ -794,7 +795,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         # auto-switch between "Logs & Status" (while running) and "Results"
         # (when the run finishes).
         self.notebook = parent_notebook
-        log_frame = parent_notebook.add("Logs & Status")
+        log_frame = parent_notebook.add(tr("base.logs_tab"))
         log_frame.grid_columnconfigure(0, weight=1)
         log_frame.grid_rowconfigure(1, weight=1)
 
@@ -805,9 +806,9 @@ class BaseAutomationTab(ctk.CTkFrame):
             logs = self.log_display.get("1.0", tkinter.END)
             if logs.strip():
                 self.app.clipboard_clear(); self.app.clipboard_append(logs)
-                messagebox.showinfo("Copied", "Logs copied to clipboard.", parent=self.app)
+                messagebox.showinfo(tr("base.copied_title"), tr("base.copied_msg"), parent=self.app)
             else:
-                messagebox.showwarning("Empty", "There are no logs to copy.", parent=self.app)
+                messagebox.showwarning(tr("base.no_logs_title"), tr("base.no_logs_msg"), parent=self.app)
 
         def clear_log_display():
             self.log_display.configure(state="normal")
@@ -815,10 +816,10 @@ class BaseAutomationTab(ctk.CTkFrame):
             self.log_display.configure(state="disabled")
             self.update_status("Logs cleared", None)
 
-        copy_button = ctk.CTkButton(log_actions_frame, text="📋 Copy Logs", width=110, command=copy_logs_to_clipboard)
+        copy_button = ctk.CTkButton(log_actions_frame, text=tr("base.copy_logs_btn"), width=110, command=copy_logs_to_clipboard)
         copy_button.pack(side="right", padx=(0, 5))
 
-        self.clear_logs_button = ctk.CTkButton(log_actions_frame, text="🗑 Clear Logs", width=110, command=clear_log_display,
+        self.clear_logs_button = ctk.CTkButton(log_actions_frame, text=tr("base.clear_logs_btn"), width=110, command=clear_log_display,
                                                 fg_color=("#DC2626", "#EF4444"), hover_color=("#B91C1C", "#DC2626"))
         self.clear_logs_button.pack(side="right", padx=(0, 5))
 
@@ -828,7 +829,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         status_bar_frame = ctk.CTkFrame(log_frame, height=30)
         status_bar_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=(0, 5))
 
-        self.status_label = ctk.CTkLabel(status_bar_frame, text="Status: Ready", anchor="w")
+        self.status_label = ctk.CTkLabel(status_bar_frame, text=tr("base.status_ready"), anchor="w")
         self.status_label.pack(side="left", padx=10)
         
         self.progress_bar = ctk.CTkProgressBar(status_bar_frame, mode="determinate")
@@ -972,7 +973,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         if not self._is_alive():
             return
         try:
-            self.start_button.configure(state="disabled" if running else "normal", text="Running..." if running else "▶ Start")
+            self.start_button.configure(state="disabled" if running else "normal", text=tr("base.btn_start_running") if running else tr("base.btn_start"))
         except Exception:
             pass
         try:
@@ -1069,7 +1070,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         elif hasattr(self, 'jobcards_text'): # For Demand Tab support
             self.retry_failed_automation(self.jobcards_text)
         else:
-            messagebox.showinfo("Info", "Retry logic not configured for this tab.")
+            messagebox.showinfo(tr("confirm.ok"), tr("base.no_retry_logic"))
 
     def retry_failed_automation(self, input_widget: Any) -> None:
         """
@@ -1083,7 +1084,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         all_items = self.results_tree.get_children()
         
         if not all_items:
-            messagebox.showinfo("Retry", "No results found to retry.")
+            messagebox.showinfo(tr("base.retry_confirm_title"), tr("base.retry_no_results"))
             return
 
         # Columns are detected from the tree headings ('Status' / code-like
@@ -1109,11 +1110,11 @@ class BaseAutomationTab(ctk.CTkFrame):
                 failed_items.append(code)
         
         if not failed_items:
-            messagebox.showinfo("Great!", "No failed items found.")
+            messagebox.showinfo(tr("confirm.ok"), tr("base.retry_no_fails"))
             return
 
         # Confirm before action
-        if not messagebox.askyesno("Retry Failed", f"Found {len(failed_items)} failed items.\nDo you want to retry them now?"):
+        if not messagebox.askyesno(tr("base.retry_confirm_title"), tr("base.retry_confirm_msg", count=len(failed_items))):
             return
 
         # 1. Update Input Widget
@@ -1127,7 +1128,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             self.results_tree.delete(item)
 
         # 3. Auto Start
-        self.log_info(f"Retrying {len(failed_items)} failed items...")
+        self.log_info(tr("base.retry_running", count=len(failed_items)))
         self.start_automation()
 
     def _get_style(self) -> ttk.Style:
@@ -1306,9 +1307,9 @@ class BaseAutomationTab(ctk.CTkFrame):
                 for idx, item_id in enumerate(tree.get_children()):
                     vals = list(tree.item(item_id)['values'])
                     writer.writerow(vals if has_serial else [idx + 1] + vals)
-            messagebox.showinfo("Success", f"Report successfully exported to\n{file_path}", parent=self)
+            messagebox.showinfo(tr("status.success"), tr("base.csv_export_success", path=file_path), parent=self)
         except Exception as e:
-            messagebox.showerror("Export Failed", f"An error occurred while saving the CSV file:\n{e}", parent=self)
+            messagebox.showerror(tr("base.automation_error.title"), tr("base.csv_export_failed", error=e), parent=self)
 
     def export_treeview_to_excel(self, tree: Any, default_filename: str = "report.xlsx",
                                   filter_mode: str = "Export All",
@@ -1339,7 +1340,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         """
         all_items = tree.get_children()
         if not all_items:
-            messagebox.showinfo("No Data", "No records to export.")
+            messagebox.showinfo(tr("base.excel_export_no_data"), tr("base.excel_export_no_data"))
             return None
 
         # ── Auto-detect Status column index ──
@@ -1389,7 +1390,7 @@ class BaseAutomationTab(ctk.CTkFrame):
                 data_to_export.append(values)
 
         if not data_to_export:
-            messagebox.showinfo("Empty", "No data matches the selected filter.")
+            messagebox.showinfo(tr("base.no_logs_title"), tr("base.excel_export_empty"))
             return None
 
         # ── Serial column: tree me khud ka serial col ho to use rakho, warna
@@ -1562,7 +1563,7 @@ class BaseAutomationTab(ctk.CTkFrame):
             # SAVE
             # ═══════════════════════════════════════════════
             wb.save(file_path)
-            messagebox.showinfo("Success", f"✅ Excel report saved successfully!\n{file_path}")
+            messagebox.showinfo(tr("status.success"), tr("base.excel_export_success", path=file_path))
 
             # Try to open the file automatically
             try:
@@ -1577,12 +1578,11 @@ class BaseAutomationTab(ctk.CTkFrame):
             return file_path
 
         except ImportError:
-            messagebox.showerror("Missing Library",
-                                "Excel export requires 'openpyxl'.\n"
-                                "Please install it: pip install openpyxl")
+            messagebox.showerror(tr("dialogs.missing_library"),
+                                tr("dialogs.openpyxl_required"))
             return None
         except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to export Excel:\n{e}")
+            messagebox.showerror(tr("base.automation_error.title"), tr("base.excel_export_failed", error=e))
             return None
 
     def export_treeview_to_excel_auto(self, tree: Any, default_filename: str = "report.xlsx",
@@ -1820,12 +1820,12 @@ class BaseAutomationTab(ctk.CTkFrame):
                 textbox_widget.configure(state="normal")
                 textbox_widget.delete("1.0", tkinter.END)
                 textbox_widget.insert("1.0", "\n".join(final_results))
-                messagebox.showinfo("Extraction Complete", f"Found and extracted {len(final_results)} items.", parent=self)
+                messagebox.showinfo(tr("dialogs.extraction_complete"), tr("dialogs.found_extracted", count=len(final_results)), parent=self)
             else:
-                messagebox.showinfo("No Codes Found", "Could not find any matching work codes or wagelist IDs in the text.", parent=self)
+                messagebox.showinfo(tr("dialogs.no_codes_found"), tr("dialogs.no_matching_codes"), parent=self)
         
         except Exception as e:
-            messagebox.showerror("Extraction Error", f"An error occurred during extraction: {e}", parent=self)
+            messagebox.showerror(tr("dialogs.extraction_error"), tr("dialogs.extraction_error_msg", error=e), parent=self)
 
     # ────────────────────────────────────────────────────────────────
     # DROPDOWN SELECTION HELPERS (P6.2, P6.3)

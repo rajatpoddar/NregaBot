@@ -64,7 +64,7 @@ class HistoryManager:
                 logger.debug("HistoryManager.close failed: %s", e)
 
     def _init_db(self):
-        """Tables create karta hai."""
+        """Create the tables."""
         with self.lock:
             try:
                 conn = self._get_connection()

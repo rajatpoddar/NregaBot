@@ -12,6 +12,7 @@ import customtkinter as ctk
 from src import config
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException  # noqa: F401
 
@@ -40,8 +41,7 @@ class EKycReportTab(BaseAutomationTab):
         # ── Header card (pack-managed wrapper — tab uses pack layout) ──
         header_wrap = ctk.CTkFrame(self, fg_color="transparent")
         header_wrap.pack(fill="x", padx=0, pady=0)
-        self._create_header_card(header_wrap, "📇", "eKYC Report",
-                                 "Scan eKYC & ABPS status for jobcard holders — panchayat-wise summary.",
+        self._create_header_card(header_wrap, "📇", tr("tab.ekyc_report.title"), tr("tab.ekyc_report.subtitle"),
                                  icon_key="emoji_ekyc_report")
 
         # ── Main tab view at the top: Settings / Results / Logs & Status ──
@@ -171,7 +171,7 @@ class EKycReportTab(BaseAutomationTab):
                 self.progress_bar.set(progress)
             except Exception:
                 pass
-            # Footer '%' display — app ko progress report karo
+            # Footer '%' display — report progress to the app
             try:
                 if hasattr(self.app, 'report_automation_progress'):
                     self.app.report_automation_progress(self.automation_key, progress)
@@ -214,7 +214,7 @@ class EKycReportTab(BaseAutomationTab):
         self.run_process()
 
     def _update_stats_display(self):
-        """Scraped data se panchayat-wise stats calculate karke display karo"""
+        """Calculate and display panchayat-wise stats from the scraped data"""
         if not self.all_scraped_data:
             self.stats_text.configure(text="(No data yet)")
             return
@@ -257,7 +257,7 @@ class EKycReportTab(BaseAutomationTab):
         try:
             items = self.tree.get_children() if getattr(self, 'tree', None) is not None else []
             if not items:
-                # Khali tree → purani run ke counts leak na karein ("success + no data → skip" bhi sahi ho)
+                # Empty tree → don't leak counts from a previous run ("success + no data → skip" is also correct)
                 return ""
             total = len(items)
             done = 0
@@ -318,9 +318,9 @@ class EKycReportTab(BaseAutomationTab):
             else:
                 self.update_status("Fetching panchayat list...")
                 try:
-                    # Central helper — GP login par dropdown nahi hota; ⭐ My
-                    # Saved mode me Settings ke saved panchayats directly use
-                    # hote hain (timeout nahi hota).
+                    # Central helper — GP login has no dropdown; ⭐ My
+                    # Saved mode uses the panchayats saved in Settings
+                    # directly (no timeout).
                     panchayats_to_process, _is_gp = self._fetch_panchayats_from_website(
                         driver, wait, ["ctl00_ContentPlaceHolder1_DDL_panchayat"],
                         saved_mode=(panchayat_target == MY_PANCHAYATS_LABEL))
@@ -352,8 +352,8 @@ class EKycReportTab(BaseAutomationTab):
                 
                 self.update_status(f"Processing Panchayat {p_idx}/{total_panchayats}: {p_name}")
                 self.log_info(f"{'='*50}\nSelecting Panchayat: {p_name}\n{'='*50}")
-                # Select Panchayat (case-insensitive) — central helper: GP
-                # login (no dropdown) par selection skip karke villages par
+                # Select Panchayat (case-insensitive) — central helper: on GP
+                # login (no dropdown), selection is skipped and villages
                 try:
                     status, _ = self._select_panchayat_or_skip(
                         driver, wait, p_name,
@@ -371,8 +371,7 @@ class EKycReportTab(BaseAutomationTab):
                         continue
                     if status == "selected":
                         self.log_success(f"Selected panchayat: '{p_name}' (village list loaded)")
-                    elif status == "gp":
-                        self.log_info(f"GP login — panchayat dropdown nahi mila, '{p_name}' skip (villages directly).")
+                    elif status == "gp":                         self.log_info(f"GP login — panchayat dropdown not found, '{p_name}' skipped (villages directly).")
                 except Exception as e:
                     self.log_error(f"Failed to select {p_name}: {e}")
                     continue
@@ -510,7 +509,7 @@ class EKycReportTab(BaseAutomationTab):
                         ekyc = cols[-1].text.strip()
                         
                         # --- STRICT DUPLICATE CHECK ---
-                        # Spaces hata kar aur lowercase karke check karenge
+                        # Remove spaces and lowercase before checking
                         clean_jc = "".join(jc.split()).lower()
                         clean_name = "".join(name.split()).lower()
                         
@@ -574,7 +573,7 @@ class EKycReportTab(BaseAutomationTab):
     def export_professional_report(self):
         """Export using the base class professional Excel method."""
         if not self.tree.get_children():
-            messagebox.showinfo("No Data", "No records to export. Run automation first.")
+            messagebox.showinfo(tr("dialogs.no_data"), tr("dialogs.no_records_export_run"))
             return
         self.export_treeview_to_excel(
             tree=self.tree,

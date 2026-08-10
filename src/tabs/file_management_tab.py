@@ -9,10 +9,10 @@ Layout (top → bottom):
     File tree   : multi-select, right-click menu, empty-state hint
     Action bar  : Download | Send via WhatsApp | Delete
 
-WhatsApp fast-path: PDFs select karo → "Send via WhatsApp" → server PDFs ko
-merge karke (footer/blank pages remove) Evolution API se **aapke apne
-registered WhatsApp number par** bhej deta hai. Koi mobile input nahi —
-number hamesha license se aata hai. Koi manual WhatsApp Web attach nahi.
+WhatsApp fast-path: select PDFs → "Send via WhatsApp" → the server merges the PDFs
+(removes footers/blank pages) and sends them via the Evolution API to **your own
+registered WhatsApp number**. No mobile input needed — the number always
+comes from the license. No manual WhatsApp Web attach.
 """
 import tkinter
 from tkinter import ttk, messagebox, filedialog, simpledialog
@@ -26,6 +26,7 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder, MultipartEncod
 
 from src import config
 from src.utils import format_bytes
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 WHATSAPP_GREEN = "#25D366"
@@ -60,7 +61,7 @@ class WhatsAppSendDialog(ctk.CTkToplevel):
             text_color=WHATSAPP_GREEN
         ).grid(row=0, column=0, sticky="w", pady=(0, 10))
 
-        # Document aapke apne WhatsApp number par jayegi — koi number input nahi
+        # The document goes to the user's own WhatsApp number — no number input
         self.user_mobile = self._get_user_mobile()
         if self.user_mobile:
             ctk.CTkLabel(
@@ -70,7 +71,7 @@ class WhatsAppSendDialog(ctk.CTkToplevel):
             ).grid(row=1, column=0, sticky="w", pady=(0, 10))
         else:
             ctk.CTkLabel(
-                frame, text="⚠️ Aapka WhatsApp number account me registered nahi hai",
+                frame, text=tr("whatsapp.not_registered"),
                 font=ctk.CTkFont(size=12, weight="bold"),
                 text_color="orange"
             ).grid(row=1, column=0, sticky="w", pady=(0, 10))
@@ -85,7 +86,7 @@ class WhatsAppSendDialog(ctk.CTkToplevel):
             variable=self.clean_var
         ).grid(row=4, column=0, sticky="w")
         ctk.CTkLabel(
-            frame, text="(Wahi filter jo PDF Merger use karta hai)",
+            frame, text=tr("file_manager.same_filter_as_pdf_merger"),
             font=ctk.CTkFont(size=11), text_color="gray50"
         ).grid(row=5, column=0, sticky="w", padx=(22, 0), pady=(0, 6))
 
@@ -120,11 +121,11 @@ class WhatsAppSendDialog(ctk.CTkToplevel):
             return ''
 
     def _submit(self):
-        # Mobile number input nahi hai — hamesha user ke apne number par jata hai
+        # No mobile number input — always sent to the user's own number
         digits = self._get_user_mobile()
         if len(digits) < 10:
             self.status_label.configure(
-                text="⚠️ Aapka WhatsApp number account me registered nahi hai",
+                text=tr("whatsapp.not_registered"),
                 text_color="orange")
             return
 
@@ -192,7 +193,7 @@ class FileManagementTab(ctk.CTkFrame):
             text_color=("#1D4ED8", "#60A5FA")
         ).pack(side="left")
         ctk.CTkLabel(
-            title_frame, text="Upload karo, client ko WhatsApp par bhejo",
+            title_frame, text=tr("file_manager.upload_hint"),
             font=ctk.CTkFont(size=11),
             text_color=("#475569", "#94A3B8")
         ).pack(side="left", padx=(10, 0))
@@ -265,7 +266,7 @@ class FileManagementTab(ctk.CTkFrame):
         scrollbar.grid(row=0, column=1, sticky='ns')
 
         self.empty_label = ctk.CTkLabel(
-            main_frame, text="📂 Folder empty hai\n\n'Upload ▾' se files add karein",
+            main_frame, text=tr("file_manager.folder_empty"),
             font=ctk.CTkFont(size=14), text_color="gray50"
         )
 
@@ -397,7 +398,7 @@ class FileManagementTab(ctk.CTkFrame):
     # ════════════════════════════════════════════════════════════
     def get_auth_headers(self):
         if not self.app.license_info.get('key'):
-            messagebox.showerror("Authentication Error", "No active license key found.")
+            messagebox.showerror(tr("base.automation_error.title"), tr("file_manager.auth_error"))
             return None
         return {'Authorization': f"Bearer {self.app.license_info['key']}"}
 
@@ -431,9 +432,9 @@ class FileManagementTab(ctk.CTkFrame):
                     self.app.after(0, self.update_ui_with_data, data)
                 else:
                     reason = response.json().get('reason', 'Unknown error')
-                    self.app.after(0, messagebox.showerror, "Error", f"Failed to fetch file list: {reason}")
+                    self.app.after(0, messagebox.showerror, tr("base.automation_error.title"), tr("file_manager.fetch_failed", reason=reason))
             except requests.exceptions.RequestException as e:
-                self.app.after(0, messagebox.showerror, "Connection Error", f"Could not connect to the server: {e}")
+                self.app.after(0, messagebox.showerror, tr("base.connection_lost.title"), tr("file_manager.connection_error", error=str(e)[:200]))
 
         threading.Thread(target=_fetch, daemon=True).start()
 
@@ -546,7 +547,7 @@ class FileManagementTab(ctk.CTkFrame):
                 relative_path = os.path.join(base_folder_name, os.path.relpath(local_path, folder_path))
                 files_to_upload.append({'local_path': local_path, 'relative_path': str(Path(relative_path))})
         if not files_to_upload:
-            messagebox.showinfo("Empty Folder", "The selected folder is empty.")
+            messagebox.showinfo(tr("confirm.ok"), tr("file_manager.empty_folder"))
             return
         self._start_upload_session(files_to_upload, is_folder=True)
 
@@ -577,8 +578,8 @@ class FileManagementTab(ctk.CTkFrame):
 
                 success = self._perform_upload(local_path, relative_path, headers, create_callback)
                 if not success:
-                    if not messagebox.askyesno("Upload Failed",
-                                               f"Failed to upload {filename}. Continue with remaining files?"):
+                    if not messagebox.askyesno(tr("dialogs.upload_failed"),
+                                               tr("dialogs.upload_continue", file=filename)):
                         break
 
             self.app.after(0, self.op_progress_label.configure, {"text": "Upload Complete!"})
@@ -632,9 +633,9 @@ class FileManagementTab(ctk.CTkFrame):
                         reason = response.json().get('reason', 'An unknown server error occurred.')
                     except requests.exceptions.JSONDecodeError:
                         reason = f"Server returned a non-JSON response (Status: {response.status_code})."
-                    self.app.after(0, messagebox.showerror, "Creation Failed", reason)
+                    self.app.after(0, messagebox.showerror, tr("base.automation_error.title"), tr("file_manager.creation_failed", reason=reason))
             except requests.exceptions.RequestException as e:
-                self.app.after(0, messagebox.showerror, "Connection Error", str(e))
+                self.app.after(0, messagebox.showerror, tr("base.connection_lost.title"), str(e)[:200])
 
         threading.Thread(target=_create, daemon=True).start()
 
@@ -655,11 +656,11 @@ class FileManagementTab(ctk.CTkFrame):
             return
 
         if any(it['is_folder'] for it in items):
-            messagebox.showinfo("Folders Selected",
-                                "Folders ko individually download karein (double-click se khol kar).")
+            messagebox.showinfo(tr("confirm.ok"),
+                                tr("file_manager.folders_download_hint"))
             return
 
-        save_dir = filedialog.askdirectory(title="Select folder to save the downloaded files")
+        save_dir = filedialog.askdirectory(title=tr("file_manager.download_folder"))
         if not save_dir:
             return
         self._download_multiple_files(items, save_dir)
@@ -687,8 +688,8 @@ class FileManagementTab(ctk.CTkFrame):
                             for chunk in r.iter_content(chunk_size=8192):
                                 f.write(chunk)
                 except requests.exceptions.RequestException:
-                    if not messagebox.askyesno("Download Failed",
-                                               f"Failed to download {item['filename']}. Continue?"):
+                    if not messagebox.askyesno(tr("dialogs.download_failed"),
+                                               tr("dialogs.download_continue", file=item['filename'])):
                         break
             self.app.after(0, self.op_progress.set, 1.0)
             self.app.after(0, self.op_progress_label.configure, {"text": "Download Complete!"})
@@ -724,10 +725,10 @@ class FileManagementTab(ctk.CTkFrame):
                                 self.app.after(0, self.op_progress.set, progress)
                                 self.app.after(0, self.op_progress_label.configure,
                                                {"text": f"Downloading: {item_data['filename']} ({int(progress*100)}%)"})
-                self.app.after(0, messagebox.showinfo, "Download Complete",
-                               f"Successfully downloaded '{item_data['filename']}'")
+                self.app.after(0, messagebox.showinfo, tr("file_manager.download_complete"),
+                               tr("file_manager.downloaded_ok", file=item_data['filename']))
             except requests.exceptions.RequestException as e:
-                self.app.after(0, messagebox.showerror, "Download Failed", str(e))
+                self.app.after(0, messagebox.showerror, tr("dialogs.download_failed"), str(e))
             finally:
                 self.app.after(0, lambda: self.op_progress.grid_remove())
                 self.app.after(0, lambda: self.op_progress_label.grid_remove())
@@ -786,8 +787,8 @@ class FileManagementTab(ctk.CTkFrame):
                             for chunk in r.iter_content(chunk_size=8192):
                                 f.write(chunk)
                 except requests.exceptions.RequestException:
-                    if not messagebox.askyesno("Download Failed",
-                                               f"Failed to download {os.path.basename(file_info['path'])}. Continue?"):
+                    if not messagebox.askyesno(tr("dialogs.download_failed"),
+                                               tr("dialogs.download_continue", file=os.path.basename(file_info['path']))):
                         break
 
             self.app.after(0, self.op_progress.set, 1.0)
@@ -809,8 +810,8 @@ class FileManagementTab(ctk.CTkFrame):
             names = f"'{items[0]['filename']}'"
         else:
             names = f"{len(items)} items"
-        if not messagebox.askyesno("Confirm Deletion",
-                                   f"Are you sure you want to permanently delete {names}? This cannot be undone."):
+        if not messagebox.askyesno(tr("dialogs.confirm_deletion"),
+                                   tr("dialogs.permanent_delete", names=names)):
             return
         headers = self.get_auth_headers()
         if not headers:
@@ -839,7 +840,7 @@ class FileManagementTab(ctk.CTkFrame):
     def send_whatsapp_selected(self):
         pdf_files = self._selected_pdf_files()
         if not pdf_files:
-            messagebox.showinfo("Select PDFs", "WhatsApp par bhejne ke liye ek ya zyada PDF files select karein.")
+            messagebox.showinfo(tr("dialogs.select_pdfs"), tr("dialogs.select_pdfs_msg"))
             return
         self._wa_dialog = WhatsAppSendDialog(self, len(pdf_files))
 
@@ -887,9 +888,8 @@ class FileManagementTab(ctk.CTkFrame):
                     self.app.show_toast("📤 PDF WhatsApp par bhej diya!", "success")
             except Exception:
                 pass
-            messagebox.showinfo("WhatsApp Send", "PDF WhatsApp par bhej di gayi!\n\n"
-                                                 "Document aapke WhatsApp par kuch seconds me aa jayega.")
+            messagebox.showinfo(tr("dialogs.whatsapp_send"), tr("dialogs.whatsapp_sent"))
 
     def open_upgrade_page(self):
-        # Secure path: signed token fetch → browser (raw key kabhi URL mein nahi)
+        # Secure path: signed token fetch → browser (raw key never in the URL)
         self.app.open_web_page('storage')

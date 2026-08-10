@@ -22,6 +22,7 @@ from src.utils import (
     resource_path, get_data_path, get_user_downloads_path,
     get_config, save_config, get_logger, parse_version, format_bytes
 )
+from src.i18n import tr
 from src.location_data import STATE_DISTRICT_MAP
 
 logger = get_logger()
@@ -116,7 +117,7 @@ class LicenseMixin:
                 self.show_frame("About")
         self._sync_location_from_server()
         self.check_for_updates_background()
-        self.set_status("Ready")
+        self.set_status(tr("app.status_ready"))
         self.after(500, self.run_onboarding_if_needed)
 
     def _setup_unlicensed_ui(self) -> None:
@@ -778,7 +779,7 @@ class LicenseMixin:
                          font=ctk.CTkFont(size=14, weight="bold"),
                          anchor="w").pack(fill="x")
             ctk.CTkLabel(quick_inner,
-                         text="Browser khulega — Google ya passkey se login karein. Login ke baad app apne aap activate ho jayega.",
+                         text=tr("license.browser_login_hint"),
                          font=ctk.CTkFont(size=11), text_color="gray60",
                          anchor="w", wraplength=390, justify="left").pack(fill="x", pady=(2, 14))
 
@@ -864,7 +865,7 @@ class LicenseMixin:
                         params={"request_id": rid}, timeout=8)
                     data = resp.json()
                 except Exception:
-                    data = {"status": "error", "reason": "Server se connect nahi ho paya."}
+                    data = {"status": "error", "reason": tr("license.server_unreachable")}
 
                 def _handle():
                     if not win.winfo_exists():
@@ -874,7 +875,7 @@ class LicenseMixin:
                     st = data.get("status")
                     if st == "pending":
                         if time.time() > _oauth_state["deadline"]:
-                            _quick_status("⏱️  Login session expire ho gaya. Dobara try karein.",
+                            _quick_status(tr("license.session_expired"),
                                           ("#DC2626", "#EF4444"))
                             _set_quick_buttons("normal")
                             _oauth_state["request_id"] = None
@@ -917,7 +918,7 @@ class LicenseMixin:
 
                         def _open():
                             webbrowser.open_new_tab(data["auth_url"])
-                            _quick_status("🖥️  Browser khul gaya — wahan login karein...",
+                            _quick_status(tr("license.browser_opened"),
                                           ("#2563EB", "#60A5FA"))
                             _oauth_poll(rid)
                         self.after(0, _open)
@@ -941,8 +942,7 @@ class LicenseMixin:
                 wgt.destroy()
             _quick_ui.clear()
 
-            ctk.CTkLabel(quick_inner,
-                         text="📝  Registration Complete Karein",
+            ctk.CTkLabel(quick_inner,                          text=tr("license.registration_title"),
                          font=ctk.CTkFont(size=14, weight="bold"), anchor="w").pack(fill="x")
             name_lbl = profile.get("name") or ""
             email_lbl = profile.get("email") or ""
@@ -952,8 +952,7 @@ class LicenseMixin:
             ctk.CTkLabel(quick_inner, text=info_txt, font=ctk.CTkFont(size=11),
                          text_color="gray60", anchor="w", justify="left",
                          wraplength=390).pack(fill="x", pady=(2, 4))
-            ctk.CTkLabel(quick_inner,
-                         text="Mobile number, state, district aur block bharna zaroori hai — iske baad hi registration complete hogi.",
+            ctk.CTkLabel(quick_inner,                          text=tr("license.registration_hint"),
                          font=ctk.CTkFont(size=11), text_color="gray60", anchor="w",
                          justify="left", wraplength=390).pack(fill="x", pady=(0, 10))
 
@@ -1035,7 +1034,7 @@ class LicenseMixin:
                     return
 
                 submit_btn.configure(state="disabled", text="⏳ Registering...")
-                pf_status.configure(text="⏳  Registration ho rahi hai...",
+                pf_status.configure(text=tr("license.registration_in_progress"),
                                     text_color=("#2563EB", "#60A5FA"))
 
                 def _thread():

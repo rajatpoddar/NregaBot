@@ -10,6 +10,7 @@ from src import config
 from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger, truncate_workcode
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException, UnexpectedAlertPresentException  # noqa: F401
 
@@ -29,8 +30,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
         """Creates the user interface elements for the tab."""
         # ── Header card ──
-        self._create_header_card(self, "🔍", "eMB Verify",
-                                 "Verify eMB entries against the sanctioned amount for the selected Panchayat.",
+        self._create_header_card(self, "🔍", tr("tab.emb_verify.title"), tr("tab.emb_verify.subtitle"),
                                  icon_key="emoji_emb_verify")
 
         # --- Top Frame for Configuration (bordered card) ---
@@ -40,7 +40,7 @@ class EmbVerifyTab(BaseAutomationTab):
         config_frame.grid_columnconfigure(1, weight=1)
 
         # Panchayat input field
-        ctk.CTkLabel(config_frame, text="Panchayat Name:").grid(row=0, column=0, sticky='w', padx=15, pady=15)
+        ctk.CTkLabel(config_frame, text=tr("common.panchayat_name_label")).grid(row=0, column=0, sticky='w', padx=15, pady=15)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
         self.panchayat_menu = ctk.CTkOptionMenu(config_frame, variable=self.panchayat_var,
@@ -50,7 +50,7 @@ class EmbVerifyTab(BaseAutomationTab):
                      text_color="gray50", font=ctk.CTkFont(size=11)).grid(row=2, column=0, columnspan=2, sticky='w', padx=15, pady=(0, 8))
         
         # Verify Amount input field
-        ctk.CTkLabel(config_frame, text="Verify Amount (₹):").grid(row=1, column=0, sticky='w', padx=15, pady=(0, 15))
+        ctk.CTkLabel(config_frame, text=tr("form.emb_verify.verify_amount")).grid(row=1, column=0, sticky='w', padx=15, pady=(0, 15))
         self.verify_amount_entry = ctk.CTkEntry(config_frame)
         self.verify_amount_entry.insert(0, "300")
         self.verify_amount_entry.grid(row=1, column=1, sticky='ew', padx=15, pady=(0, 15))
@@ -74,13 +74,13 @@ class EmbVerifyTab(BaseAutomationTab):
         wc_header_frame = ctk.CTkFrame(work_codes_tab, fg_color="transparent")
         wc_header_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(5,0))
         
-        ctk.CTkLabel(wc_header_frame, text="Enter Work Codes (one per line). Leave blank to process all.").pack(side="left", padx=5)
+        ctk.CTkLabel(wc_header_frame, text=tr("form.emb_verify.work_codes_hint")).pack(side="left", padx=5)
         
-        clear_wc_button = ctk.CTkButton(wc_header_frame, text="Clear", width=80, command=lambda: self.work_codes_text.delete("1.0", "end"))
+        clear_wc_button = ctk.CTkButton(wc_header_frame, text=tr("common.clear"), width=80, command=lambda: self.work_codes_text.delete("1.0", "end"))
         clear_wc_button.pack(side="right", padx=(0, 5))
         
         # --- NEW: Added the Extract from Text button (using correct frame name) ---
-        extract_button = ctk.CTkButton(wc_header_frame, text="Extract from Text", width=120,
+        extract_button = ctk.CTkButton(wc_header_frame, text=tr("common.extract_from_text"), width=120,
                                        command=lambda: self._extract_and_update_workcodes(self.work_codes_text))
         extract_button.pack(side='right', padx=(0, 5))
         # ---
@@ -98,7 +98,7 @@ class EmbVerifyTab(BaseAutomationTab):
         
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side='left')
 
         cols = ("Panchayat", "Work Code", "Status", "Details", "Timestamp")
@@ -126,7 +126,7 @@ class EmbVerifyTab(BaseAutomationTab):
         self.export_button.configure(state=state)
     def reset_ui(self) -> None:
         """Resets the UI to its initial state."""
-        if messagebox.askokcancel("Reset Form?", "This will clear all inputs and results. Continue?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_results")):
             self.panchayat_var.set("")
             self.verify_amount_entry.delete(0, tkinter.END)
             self.verify_amount_entry.insert(0, "300")
@@ -142,7 +142,7 @@ class EmbVerifyTab(BaseAutomationTab):
         verify_amount = self.verify_amount_entry.get().strip()
         
         if not panchayat or not verify_amount:
-            messagebox.showwarning("Input Error", "Panchayat Name and Verify Amount are required.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.emb_verify_required"))
             return
 
         work_codes = [line.strip() for line in self.work_codes_text.get("1.0", "end-1c").splitlines() if line.strip()]
@@ -196,8 +196,8 @@ class EmbVerifyTab(BaseAutomationTab):
             panchayats_to_process = []
             if all_mode:
                 driver.get(config.EMB_VERIFY_CONFIG["url"])
-                # Central helper — GP login par dropdown nahi hota; ⭐ My Saved
-                # mode me Settings ke saved panchayats directly use hote hain.
+                # Central helper — GP login has no dropdown; ⭐ My Saved
+                # mode uses the panchayats saved in Settings directly.
                 panchayats_to_process, _is_gp = self._fetch_panchayats_from_website(
                     driver, wait, ["ctl00_ContentPlaceHolder1_ddl_panch"],
                     saved_mode=saved_mode)
@@ -277,7 +277,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
-            messagebox.showerror("Automation Error", f"An unexpected error occurred:\n\n{e}")
+            messagebox.showerror(tr("base.automation_error.title"), f"An unexpected error occurred:\n\n{e}")
             # Still show summary if some results exist
             try:
                 self.app.after(200, lambda: self._show_emb_summary(total))
@@ -286,7 +286,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
-            messagebox.showerror("Automation Error", f"An unexpected error occurred:\n\n{e}")
+            messagebox.showerror(tr("base.automation_error.title"), f"An unexpected error occurred:\n\n{e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")

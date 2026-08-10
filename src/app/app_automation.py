@@ -24,6 +24,7 @@ import requests
 
 from src import config
 from src.utils import get_logger, get_config
+from src.i18n import tr
 
 logger = get_logger()
 
@@ -467,8 +468,8 @@ class AutomationMixin:
             self.app_state.active_automations.remove(key)
         self.app_state.automation_progress.pop(key, None)
         self._update_running_automation_indicator()
-        self.set_status("Finished")
-        self.after(5000, lambda: self.set_status("Ready"))
+        self.set_status(tr("app.status_finished"))
+        self.after(5000, lambda: self.set_status(tr("app.status_ready")))
         if not self.app_state.active_automations:
             self.allow_sleep()
             self._update_emergency_stop_btn()
@@ -781,7 +782,7 @@ class AutomationMixin:
                 return
             self._running_chip_keys = cur_keys
             self._clear_running_chips()
-            self.running_automation_prefix.configure(text="▶ Running: ")
+            self.running_automation_prefix.configure(text=tr("app.running_prefix"))
             tab_map = self._automation_key_to_tab_name()
             for idx, k in enumerate(cur_keys):
                 if idx > 0:
@@ -791,8 +792,11 @@ class AutomationMixin:
                     self.running_automation_chips.append(sep)
                 name = _automation_display_name(k)
                 tab_name = tab_map.get(k)
+                # Translate the chip label via the tab-name translation (falls
+                # back to the English display name if the key is not translated).
+                chip_text = tr(f"nav.tab.{tab_name}", default=name) if tab_name else name
                 chip = ctk.CTkLabel(
-                    frame, text=name,
+                    frame, text=chip_text,
                     font=ctk.CTkFont(size=12, weight="bold"),
                     text_color=("#2563EB", "#60A5FA"),
                     cursor="hand2" if tab_name else ""

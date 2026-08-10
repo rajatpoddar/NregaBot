@@ -51,6 +51,7 @@ pyinstaller --noconfirm --windowed --onefile ^
 --add-data="docs/changelog.json:docs/" ^
 --add-data="docs/license.txt:docs/" ^
 --add-data="src:src" ^
+--add-data="src/locales:src/locales" ^
 %ENV_ARG% ^
 --collect-all customtkinter ^
 --collect-data fpdf ^
@@ -88,6 +89,7 @@ pyinstaller --noconfirm --windowed --onedir ^
 --add-data="docs/changelog.json:docs/" ^
 --add-data="docs/license.txt:docs/" ^
 --add-data="src:src" ^
+--add-data="src/locales:src/locales" ^
 %ENV_ARG% ^
 --collect-all customtkinter ^
 --collect-data fpdf ^

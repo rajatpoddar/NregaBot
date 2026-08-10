@@ -12,6 +12,7 @@ from datetime import datetime
 
 from src import config
 from src.utils import truncate_workcode
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -49,8 +50,7 @@ class SchemeClosingTab(BaseAutomationTab):
         settings_tab.grid_rowconfigure(1, weight=1)
 
         # --- Header / intro card (pending-bills style) ---
-        self._create_header_card(settings_tab, "🏁", "Scheme Closing",
-                                 "Close schemes by filling completion details for the selected Panchayat.",
+        self._create_header_card(settings_tab, "🏁", tr("tab.scheme_closing.title"), tr("tab.scheme_closing.subtitle"),
                                  icon_key="emoji_scheme_closing")
 
         # --- Input Card ---
@@ -60,14 +60,14 @@ class SchemeClosingTab(BaseAutomationTab):
         input_frame.grid_columnconfigure(1, weight=1)
 
         # Row 0: Panchayat
-        ctk.CTkLabel(input_frame, text="Panchayat Name:").grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("common.panchayat_name_label")).grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, columnspan=3, padx=15, pady=(15, 5), sticky="ew")
 
         # Row 1: Work Category
-        ctk.CTkLabel(input_frame, text="Work Category:").grid(row=1, column=0, padx=15, pady=5, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("form.material_entry.work_category")).grid(row=1, column=0, padx=15, pady=5, sticky="w")
         work_category_options = [
             "Anganwadi/Other Rural Infrastructure", "Coastal Areas", "Drought Proofing", "Rural Drinking Water",
             "Food Grain", "Flood Control and Protection", "Fisheries", "Micro Irrigation Works",
@@ -80,12 +80,12 @@ class SchemeClosingTab(BaseAutomationTab):
         self.work_category_menu.grid(row=1, column=1, columnspan=3, padx=15, pady=5, sticky="ew")
 
         # Row 2: Actual Benefited Area
-        ctk.CTkLabel(input_frame, text="Actual Benefited Area:").grid(row=2, column=0, padx=15, pady=5, sticky="w")
-        self.area_entry = ctk.CTkEntry(input_frame, placeholder_text="e.g., 1")
+        ctk.CTkLabel(input_frame, text=tr("form.scheme_closing.actual_area")).grid(row=2, column=0, padx=15, pady=5, sticky="w")
+        self.area_entry = ctk.CTkEntry(input_frame, placeholder_text=tr("form.scheme_closing.eg_1"))
         self.area_entry.grid(row=2, column=1, padx=15, pady=5, sticky="ew")
 
         # Row 3: Measured By (Designation)
-        ctk.CTkLabel(input_frame, text="Measured by (Designation):").grid(row=3, column=0, padx=15, pady=5, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("form.scheme_closing.measured_by_designation")).grid(row=3, column=0, padx=15, pady=5, sticky="w")
         designation_options = [
             "Account Assistant(BP)", "Acrited Engineer(AE)(GP)", "Assistant Engineer(BP)", "Block Development Officer(BP)",
             "Gram Rozgar Sewak(GP)", "Junior Engineer(BP)", "Junior Engineer(GP)", "Panchayat Sachiv(GP)",
@@ -96,33 +96,33 @@ class SchemeClosingTab(BaseAutomationTab):
         self.measured_by_menu.grid(row=3, column=1, padx=15, pady=5, sticky="ew")
 
         # Row 4: Measured By (Name)
-        ctk.CTkLabel(input_frame, text="Measured by (Name):").grid(row=4, column=0, padx=15, pady=5, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("form.scheme_closing.measured_by_name")).grid(row=4, column=0, padx=15, pady=5, sticky="w")
         s_vals = self.app.history_manager.get_suggestions("staff_name") or [""]
         self.measured_name_var = ctk.StringVar()
         self.measured_name_menu = ctk.CTkOptionMenu(input_frame, variable=self.measured_name_var, values=s_vals)
         self.measured_name_menu.grid(row=4, column=1, padx=15, pady=5, sticky="ew")
         
         # Row 5: Completion Certificate Start No
-        ctk.CTkLabel(input_frame, text="Completion Cert. Start No:").grid(row=5, column=0, padx=15, pady=5, sticky="w")
-        self.cert_no_entry = ctk.CTkEntry(input_frame, placeholder_text="e.g., 54 (will auto-increment for each work code)")
+        ctk.CTkLabel(input_frame, text=tr("form.scheme_closing.cert_start_no")).grid(row=5, column=0, padx=15, pady=5, sticky="w")
+        self.cert_no_entry = ctk.CTkEntry(input_frame, placeholder_text=tr("form.scheme_closing.eg_54"))
         self.cert_no_entry.grid(row=5, column=1, padx=15, pady=5, sticky="ew")
 
         # --- Row 6: Completion Date AND Checkbox Combined ---
-        ctk.CTkLabel(input_frame, text="Completion Date:").grid(row=6, column=0, padx=15, pady=(5, 15), sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("form.scheme_closing.completion_date")).grid(row=6, column=0, padx=15, pady=(5, 15), sticky="w")
         
         # Sub-frame to hold Date and Checkbox in one line
         date_check_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
         date_check_frame.grid(row=6, column=1, sticky="ew", padx=15, pady=(5, 15))
 
         # Completion Date with Calendar Button
-        self.completion_date_entry = ctk.CTkEntry(date_check_frame, placeholder_text="DD/MM/YYYY", width=120)
+        self.completion_date_entry = ctk.CTkEntry(date_check_frame, placeholder_text=tr("common.date_format"), width=120)
         self.completion_date_entry.pack(side="left")
         ctk.CTkButton(date_check_frame, text="📅", width=30, fg_color=("gray85", "gray25"), text_color=("black", "white"),
                     command=lambda: self.open_date_picker(lambda d: [self.completion_date_entry.delete(0, "end"), self.completion_date_entry.insert(0, d)])).pack(side="left", padx=(5,0))
         
         self.skip_confirm_checkbox = ctk.CTkCheckBox(
             date_check_frame, 
-            text="Skip final confirmation", 
+            text=tr("form.scheme_closing.skip_confirmation"), 
             variable=self.skip_confirmation_var, 
             onvalue=True, 
             offvalue=False
@@ -140,10 +140,10 @@ class SchemeClosingTab(BaseAutomationTab):
         wc_header_frame = ctk.CTkFrame(work_codes_tab, fg_color="transparent")
         wc_header_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(5,0))
         
-        clear_wc_button = ctk.CTkButton(wc_header_frame, text="Clear", width=80, command=lambda: self.work_codes_textbox.delete("1.0", "end"))
+        clear_wc_button = ctk.CTkButton(wc_header_frame, text=tr("common.clear"), width=80, command=lambda: self.work_codes_textbox.delete("1.0", "end"))
         clear_wc_button.pack(side="right", padx=5)
 
-        extract_button = ctk.CTkButton(wc_header_frame, text="Extract from Text", width=120,
+        extract_button = ctk.CTkButton(wc_header_frame, text=tr("common.extract_from_text"), width=120,
                                        command=self._extract_work_codes_local)
         extract_button.pack(side='right', padx=(0, 5))
         
@@ -158,7 +158,7 @@ class SchemeClosingTab(BaseAutomationTab):
         
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side='left')
 
         cols = ("Timestamp", "Panchayat", "Work Code", "Status", "Details")
@@ -240,13 +240,13 @@ class SchemeClosingTab(BaseAutomationTab):
         
         required_fields = ["panchayat", "work_category", "area", "measured_by", "measured_name", "cert_no_start", "completion_date", "work_codes"]
         if not all(inputs.get(field) for field in required_fields):
-            messagebox.showwarning("Input Required", "All fields and at least one work code are required.")
+            messagebox.showwarning(tr("errors.input_required"), tr("dialogs.scheme_closing_required"))
             return
         
         try:
             inputs["cert_no_start"] = int(inputs["cert_no_start"])
         except ValueError:
-            messagebox.showwarning("Input Error", "Completion Certificate Start No must be a number.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.cert_start_must_be_number"))
             return
 
         self._save_inputs(inputs)
@@ -268,7 +268,7 @@ class SchemeClosingTab(BaseAutomationTab):
         self.log_info("--- Starting Scheme Closing ---")        
         driver = self.app.get_driver()
         if not driver:
-            messagebox.showerror("Browser Not Found", "Please launch a browser first.")
+            messagebox.showerror(tr("errors.browser_not_found"), tr("errors.browser_required"))
             self.app.after(0, self.set_ui_state, False)
             return
 
@@ -393,8 +393,8 @@ class SchemeClosingTab(BaseAutomationTab):
             asset_desc_input.send_keys("Completed")
             
             if not self.skip_confirmation_var.get():
-                confirm_text = f"You are about to close the following scheme:\n\n{work_name_full}\n\nDo you want to proceed?"
-                if not messagebox.askyesno("Confirm Scheme Closing", confirm_text):
+                confirm_text = tr("dialogs.scheme_closing_confirm_msg", scheme=work_name_full)
+                if not messagebox.askyesno(tr("dialogs.confirm_scheme_closing"), confirm_text):
                     return "Cancelled", "User cancelled the operation."
 
             self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
@@ -431,7 +431,7 @@ class SchemeClosingTab(BaseAutomationTab):
             self.log_error(f"   - An unexpected error occurred: {error_message}")
             return "Failed", f"An unexpected error occurred: {error_message}"
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Are you sure? This will clear all inputs."):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_inputs")):
             self.panchayat_var.set("")
             self.work_category_var.set("Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers")
             self.area_entry.delete(0, "end")
@@ -476,9 +476,9 @@ class SchemeClosingTab(BaseAutomationTab):
         )
 
     def _get_filtered_data_and_filepath(self, export_format):
-        if not self.results_tree.get_children(): messagebox.showinfo("No Data", "No results to export."); return None, None
+        if not self.results_tree.get_children(): messagebox.showinfo(tr("errors.no_data"), tr("errors.no_results_export")); return None, None
         location_panchayat = self.panchayat_var.get().strip()
-        if not location_panchayat: messagebox.showwarning("Input Needed", "Panchayat Name is required for report title."); return None, None
+        if not location_panchayat: messagebox.showwarning(tr("errors.input_needed"), tr("dialogs.panchayat_for_report")); return None, None
         
         filter_option = self.export_filter_menu.get()
         data_to_export = []
@@ -488,19 +488,19 @@ class SchemeClosingTab(BaseAutomationTab):
             if filter_option == "Export All": data_to_export.append(row_values)
             elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)
-        if not data_to_export: messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
+        if not data_to_export: messagebox.showinfo(tr("errors.no_data"), tr("dialogs.no_records_for_filter", filter=filter_option)); return None, None
 
         safe_name = "".join(c for c in location_panchayat if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         details = {"Image (.jpg)": { "ext": ".jpg", "types": [("JPEG Image", "*.jpg")]}, "PDF (.pdf)": { "ext": ".pdf", "types": [("PDF Document", "*.pdf")]}}[export_format]
         filename = f"Scheme_Closing_Report_{safe_name}_{timestamp}{details['ext']}"
-        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_report_path("Scheme Closing"), initialfile=filename, title="Save Report")
+        file_path = filedialog.asksaveasfilename(defaultextension=details['ext'], filetypes=details['types'], initialdir=self.app.get_report_path("Scheme Closing"), initialfile=filename, title=tr("common.save_report"))
         return (data_to_export, file_path) if file_path else (None, None)
     
     def _handle_pdf_export(self, data, headers, col_widths, file_path):
         title = f"Scheme Closing Report: {self.panchayat_var.get().strip()}"
         report_date = datetime.now().strftime('%d %b %Y')
         success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
-        if success and messagebox.askyesno("Success", f"PDF Report saved to:\n{file_path}\n\nDo you want to open it?"):
+        if success and messagebox.askyesno(tr("status.success"), tr("export.pdf_saved", path=file_path)):
             if sys.platform == "win32": os.startfile(file_path)
             else: subprocess.call(['open', file_path])

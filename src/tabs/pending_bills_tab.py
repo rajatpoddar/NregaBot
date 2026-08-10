@@ -46,6 +46,7 @@ import customtkinter as ctk
 from .base_tab import BaseAutomationTab
 from src import config
 from src.utils import get_logger
+from src.i18n import tr
 
 logger = get_logger()
 
@@ -105,7 +106,7 @@ class PendingBillsTab(BaseAutomationTab):
         header = ctk.CTkFrame(settings_tab, fg_color=("gray95", "gray20"), corner_radius=12)
         header.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
         ctk.CTkLabel(
-            header, text="💸 Pending Bills Scraper",
+            header, text=tr("form.pending_bills.scraper_title"),
             font=ctk.CTkFont(size=17, weight="bold"),
             text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
         ).pack(anchor="w", padx=14, pady=(10, 0))
@@ -122,35 +123,35 @@ class PendingBillsTab(BaseAutomationTab):
         inputs_card.grid_columnconfigure(1, weight=1)
 
         # State
-        ctk.CTkLabel(inputs_card, text="State *", font=ctk.CTkFont(size=12, weight="bold")).grid(
+        ctk.CTkLabel(inputs_card, text=tr("form.pending_bills.state_required"), font=ctk.CTkFont(size=12, weight="bold")).grid(
             row=0, column=0, sticky="w", padx=(16, 10), pady=(14, 5))
         self.state_menu = ctk.CTkOptionMenu(inputs_card, variable=self.state_var,
                                             values=self._state_values(), width=240)
         self.state_menu.grid(row=0, column=1, sticky="ew", padx=(0, 16), pady=(14, 5))
 
         # District
-        ctk.CTkLabel(inputs_card, text="District *", font=ctk.CTkFont(size=12, weight="bold")).grid(
+        ctk.CTkLabel(inputs_card, text=tr("form.pending_bills.district_required"), font=ctk.CTkFont(size=12, weight="bold")).grid(
             row=1, column=0, sticky="w", padx=(16, 10), pady=5)
         self.district_menu = ctk.CTkOptionMenu(inputs_card, variable=self.district_var,
                                                values=[], width=240)
         self.district_menu.grid(row=1, column=1, sticky="ew", padx=(0, 16), pady=5)
 
         # Block
-        ctk.CTkLabel(inputs_card, text="Block *", font=ctk.CTkFont(size=12, weight="bold")).grid(
+        ctk.CTkLabel(inputs_card, text=tr("form.pending_bills.block_required"), font=ctk.CTkFont(size=12, weight="bold")).grid(
             row=2, column=0, sticky="w", padx=(16, 10), pady=5)
         self.block_menu = ctk.CTkOptionMenu(inputs_card, variable=self.block_var,
                                             values=[], width=240)
         self.block_menu.grid(row=2, column=1, sticky="ew", padx=(0, 16), pady=5)
 
         # Panchayat
-        ctk.CTkLabel(inputs_card, text="Panchayat", font=ctk.CTkFont(size=12, weight="bold")).grid(
+        ctk.CTkLabel(inputs_card, text=tr("common.panchayat_col"), font=ctk.CTkFont(size=12, weight="bold")).grid(
             row=3, column=0, sticky="w", padx=(16, 10), pady=5)
         self.panchayat_menu = ctk.CTkOptionMenu(inputs_card, variable=self.panchayat_var,
                                                 values=[ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL], width=240)
         self.panchayat_menu.grid(row=3, column=1, sticky="ew", padx=(0, 16), pady=5)
 
         # Financial Year
-        ctk.CTkLabel(inputs_card, text="Financial Year", font=ctk.CTkFont(size=12, weight="bold")).grid(
+        ctk.CTkLabel(inputs_card, text=tr("form.pending_bills.financial_year"), font=ctk.CTkFont(size=12, weight="bold")).grid(
             row=4, column=0, sticky="w", padx=(16, 10), pady=(5, 14))
         self.fy_menu = ctk.CTkOptionMenu(inputs_card, variable=self.fy_var,
                                          values=self._fy_values(), width=240)
@@ -171,7 +172,7 @@ class PendingBillsTab(BaseAutomationTab):
         info.grid(row=2, column=0, sticky="nsew", padx=12, pady=6)
         info.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
-            info, text="💡 How it works",
+            info, text=tr("common.how_it_works"),
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 2))
@@ -196,12 +197,12 @@ class PendingBillsTab(BaseAutomationTab):
         res_btn_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         res_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(5, 0))
         self.export_button = ctk.CTkButton(
-            res_btn_frame, text="📥 Export to Excel", width=150, height=32,
+            res_btn_frame, text=tr("common.export_excel"), width=150, height=32,
             fg_color=config.COLORS["green_export"], hover_color="#0B5E0B",
             command=self.export_report, font=ctk.CTkFont(size=12, weight="bold"))
         self.export_button.pack(side="right")
         ctk.CTkLabel(
-            res_btn_frame, text="Summary (one row per panchayat)", font=ctk.CTkFont(size=11),
+            res_btn_frame, text=tr("form.pending_bills.summary_hint"), font=ctk.CTkFont(size=11),
             text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
         ).pack(side="left", padx=5)
 
@@ -353,7 +354,7 @@ class PendingBillsTab(BaseAutomationTab):
             fy = ""
 
         if not state or not district or not block:
-            messagebox.showwarning("Input Error", "Please select State, District and Block.",
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.select_state_district_block"),
                                    parent=self)
             return
         if state not in config.PENDING_BILLS_CONFIG:
@@ -822,8 +823,8 @@ class PendingBillsTab(BaseAutomationTab):
     # ────────────────────────────────────────────────────────────────────────
     def export_report(self) -> None:
         if not self.collected_rows:
-            messagebox.showinfo("No Data",
-                                "No scraped data to export yet.\nRun the automation first.",
+            messagebox.showinfo(tr("dialogs.no_data"),
+                                tr("dialogs.no_scraped_data_export"),
                                 parent=self)
             return
         # Save under ~/Downloads/NregaBot/Report {fin_year}/Pending Bills/
@@ -835,13 +836,13 @@ class PendingBillsTab(BaseAutomationTab):
             filetypes=[("Excel Workbook", "*.xlsx")],
             initialdir=reports_dir,
             initialfile=f"Pending_Bills_{datetime.now().strftime('%d-%m-%Y')}.xlsx",
-            title="Save Pending Bills Report")
+            title=tr("form.pending_bills.save_report"))
         if not file_path:
             return
         try:
             self._write_excel(file_path)
-            messagebox.showinfo("Success",
-                                f"✅ Report saved successfully!\n{file_path}", parent=self)
+            messagebox.showinfo(tr("dialogs.success"),
+                                tr("dialogs.report_saved_success", path=file_path), parent=self)
             try:
                 if sys.platform == "win32":
                     os.startfile(file_path)
@@ -851,7 +852,7 @@ class PendingBillsTab(BaseAutomationTab):
             except Exception:
                 pass
         except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to export Excel:\n{e}", parent=self)
+            messagebox.showerror(tr("dialogs.export_error"), tr("dialogs.failed_export_excel", error=e), parent=self)
 
     def _write_excel(self, file_path: str) -> None:
         import openpyxl
@@ -882,7 +883,7 @@ class PendingBillsTab(BaseAutomationTab):
 
         # ── Sheet 1: Summary (per FY × panchayat) — color-coded extremes + grand total ──
         ws = wb.active
-        ws.title = "Summary"
+        ws.title = tr("form.pending_bills.summary_title")
         sum_headers = ["Financial Year", "Panchayat", "Muster Rolls", "Bills",
                        "Skilled MSR", "Skilled Voucher", "Total Amount (Rs)", "Share %"]
         ncols2 = len(sum_headers)

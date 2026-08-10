@@ -17,6 +17,7 @@ from selenium.common.exceptions import (
 )
 from src import config
 from src.utils import truncate_workcode
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException, WebDriverException  # noqa: F401
@@ -52,13 +53,13 @@ class MaterialEntryTab(BaseAutomationTab):
             with open(PROFILES_FILE, "w", encoding="utf-8") as f:
                 json.dump(self._profiles, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            messagebox.showerror("Profile Error", f"Could not save profiles:\n{e}", parent=self)
+            messagebox.showerror(tr("dialogs.profile_error"), tr("dialogs.could_not_save_profiles", error=e), parent=self)
     def _get_profile_names(self):
         return list(self._profiles.keys()) if self._profiles else []
     def _save_current_as_profile(self):
         name = self.profile_name_entry.get().strip()
         if not name:
-            messagebox.showwarning("Profile Name", "Please enter a profile name.", parent=self)
+            messagebox.showwarning(tr("dialogs.profile_name"), tr("dialogs.enter_profile_name"), parent=self)
             return
         materials = []
         for mat in self.materials_ui:
@@ -71,17 +72,17 @@ class MaterialEntryTab(BaseAutomationTab):
                     "gst": mat["gst"].get()
                 })
         if not materials:
-            messagebox.showwarning("No Data", "Fill at least one material row before saving.", parent=self)
+            messagebox.showwarning(tr("errors.no_data"), tr("dialogs.fill_material_row"), parent=self)
             return
         self._profiles[name] = materials
         self._save_profiles()
         self._refresh_profile_menu()
         self.profile_var.set(name)
-        messagebox.showinfo("Saved", f"Profile '{name}' saved successfully.", parent=self)
+        messagebox.showinfo(tr("dialogs.saved"), tr("dialogs.profile_saved", name=name), parent=self)
     def _load_selected_profile(self):
         name = self.profile_var.get()
         if not name or name not in self._profiles:
-            messagebox.showwarning("No Profile", "Select a valid profile to load.", parent=self)
+            messagebox.showwarning(tr("dialogs.no_profile"), tr("dialogs.select_valid_profile"), parent=self)
             return
         materials = self._profiles[name]
         # Ensure enough rows exist
@@ -106,9 +107,9 @@ class MaterialEntryTab(BaseAutomationTab):
     def _delete_selected_profile(self):
         name = self.profile_var.get()
         if not name or name not in self._profiles:
-            messagebox.showwarning("No Profile", "Select a valid profile to delete.", parent=self)
+            messagebox.showwarning(tr("dialogs.no_profile"), tr("dialogs.select_profile_delete"), parent=self)
             return
-        if messagebox.askyesno("Delete Profile", f"Delete profile '{name}'?", parent=self):
+        if messagebox.askyesno(tr("dialogs.delete_profile"), tr("dialogs.delete_profile_confirm", name=name), parent=self):
             del self._profiles[name]
             self._save_profiles()
             self._refresh_profile_menu()
@@ -139,8 +140,7 @@ class MaterialEntryTab(BaseAutomationTab):
         settings_tab.grid_rowconfigure(1, weight=1)
 
         # ── Header / intro card (pending-bills style) ──
-        self._create_header_card(settings_tab, "🧱", "Material Entry",
-                                 "Enter material details (rate, quantity, GST) for multiple work keys and bill numbers.",
+        self._create_header_card(settings_tab, "🧱", tr("tab.material_entry.title"), tr("tab.material_entry.subtitle"),
                                  icon_key="emoji_material_entry")
 
         # --- General Details (settings card) ---
@@ -149,12 +149,12 @@ class MaterialEntryTab(BaseAutomationTab):
         input_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
         input_frame.grid_columnconfigure(1, weight=1)
         input_frame.grid_columnconfigure(3, weight=1)
-        ctk.CTkLabel(input_frame, text="Panchayat (For Block Login):").grid(row=0, column=0, padx=15, pady=5, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("form.material_entry.panchayat_block")).grid(row=0, column=0, padx=15, pady=5, sticky="w")
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, columnspan=3, padx=15, pady=5, sticky="ew")
-        ctk.CTkLabel(input_frame, text="Work Category:").grid(row=1, column=0, padx=15, pady=5, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("form.material_entry.work_category")).grid(row=1, column=0, padx=15, pady=5, sticky="w")
         work_category_options = [
             "Anganwadi/Other Rural Infrastructure", "Coastal Areas", "Drought Proofing", "Rural Drinking Water",
             "Food Grain", "Flood Control and Protection", "Fisheries", "Micro Irrigation Works",
@@ -165,13 +165,13 @@ class MaterialEntryTab(BaseAutomationTab):
         self.work_category_var = ctk.StringVar(value=work_category_options[8])
         self.work_category_menu = ctk.CTkOptionMenu(input_frame, variable=self.work_category_var, values=work_category_options, dynamic_resizing=False)
         self.work_category_menu.grid(row=1, column=1, columnspan=3, padx=15, pady=5, sticky="ew")
-        ctk.CTkLabel(input_frame, text="Vendor Code:").grid(row=2, column=0, padx=15, pady=5, sticky="w")
-        self.vendor_code_entry = ctk.CTkEntry(input_frame, placeholder_text="e.g., 6430")
+        ctk.CTkLabel(input_frame, text=tr("form.material_entry.vendor_code")).grid(row=2, column=0, padx=15, pady=5, sticky="w")
+        self.vendor_code_entry = ctk.CTkEntry(input_frame, placeholder_text=tr("form.material_entry.vendor_example"))
         self.vendor_code_entry.grid(row=2, column=1, padx=15, pady=5, sticky="ew")
-        ctk.CTkLabel(input_frame, text="Bill Date (DD/MM/YYYY):").grid(row=2, column=2, padx=15, pady=5, sticky="w")
+        ctk.CTkLabel(input_frame, text=tr("form.material_entry.bill_date")).grid(row=2, column=2, padx=15, pady=5, sticky="w")
         date_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
         date_frame.grid(row=2, column=3, sticky="ew", padx=15, pady=5)
-        self.bill_date_entry = ctk.CTkEntry(date_frame, placeholder_text="DD/MM/YYYY")
+        self.bill_date_entry = ctk.CTkEntry(date_frame, placeholder_text=tr("common.date_format"))
         self.bill_date_entry.pack(side="left", fill="x", expand=True)
         ctk.CTkButton(date_frame, text="📅", width=35, fg_color=("gray85", "gray25"), text_color=("black", "white"),
                       command=lambda: self.open_date_picker(lambda d: [self.bill_date_entry.delete(0, "end"), self.bill_date_entry.insert(0, d)])).pack(side="right", padx=(5, 0))
@@ -180,23 +180,23 @@ class MaterialEntryTab(BaseAutomationTab):
                                      border_color=("gray85", "gray30"))
         profile_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
         profile_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(profile_frame, text="Material Profiles:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=8, sticky="w")
+        ctk.CTkLabel(profile_frame, text=tr("form.material_entry.material_profiles"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=15, pady=8, sticky="w")
         self.profile_var = ctk.StringVar(value="")
         profile_names = self._get_profile_names()
         self.profile_menu = ctk.CTkOptionMenu(profile_frame, variable=self.profile_var,
                                                values=profile_names if profile_names else [""],
                                                dynamic_resizing=False, width=200)
         self.profile_menu.grid(row=0, column=1, padx=5, pady=8, sticky="ew")
-        ctk.CTkButton(profile_frame, text="Load Profile", width=110,
+        ctk.CTkButton(profile_frame, text=tr("form.material_entry.load_profile"), width=110,
                       fg_color="#2563EB", hover_color="#1D4ED8",
                       command=self._load_selected_profile).grid(row=0, column=2, padx=5, pady=8)
-        ctk.CTkLabel(profile_frame, text="Save As:").grid(row=0, column=3, padx=(15, 5), pady=8, sticky="w")
-        self.profile_name_entry = ctk.CTkEntry(profile_frame, placeholder_text="Profile name", width=140)
+        ctk.CTkLabel(profile_frame, text=tr("form.material_entry.save_as")).grid(row=0, column=3, padx=(15, 5), pady=8, sticky="w")
+        self.profile_name_entry = ctk.CTkEntry(profile_frame, placeholder_text=tr("form.material_entry.profile_name"), width=140)
         self.profile_name_entry.grid(row=0, column=4, padx=5, pady=8)
-        ctk.CTkButton(profile_frame, text="💾 Save Profile", width=110,
+        ctk.CTkButton(profile_frame, text=tr("form.material_entry.save_profile"), width=110,
                       fg_color="#059669", hover_color="#047857",
                       command=self._save_current_as_profile).grid(row=0, column=5, padx=5, pady=8)
-        ctk.CTkButton(profile_frame, text="🗑 Delete", width=80,
+        ctk.CTkButton(profile_frame, text=tr("common.delete"), width=80,
                       fg_color="#DC2626", hover_color="#B91C1C",
                       command=self._delete_selected_profile).grid(row=0, column=6, padx=5, pady=8)
         # --- Material Details (settings card) ---
@@ -206,13 +206,13 @@ class MaterialEntryTab(BaseAutomationTab):
         mat_outer.grid_columnconfigure(0, weight=1)
         mat_header = ctk.CTkFrame(mat_outer, fg_color="transparent")
         mat_header.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 2))
-        ctk.CTkLabel(mat_header, text="Material Details", font=ctk.CTkFont(weight="bold")).pack(side="left")
+        ctk.CTkLabel(mat_header, text=tr("form.material_entry.material_details"), font=ctk.CTkFont(weight="bold")).pack(side="left")
         self.row_count_label = ctk.CTkLabel(mat_header, text=f"(Rows: {DEFAULT_MATERIAL_ROWS} / {MAX_MATERIAL_ROWS})", text_color="gray60")
         self.row_count_label.pack(side="left", padx=8)
-        ctk.CTkButton(mat_header, text="+ Add Row", width=90, height=28,
+        ctk.CTkButton(mat_header, text=tr("common.add_row"), width=90, height=28,
                       fg_color="#059669", hover_color="#047857",
                       command=self._add_material_row).pack(side="right", padx=5)
-        ctk.CTkButton(mat_header, text="- Remove Row", width=100, height=28,
+        ctk.CTkButton(mat_header, text=tr("common.remove_row"), width=100, height=28,
                       fg_color="#DC2626", hover_color="#B91C1C",
                       command=self._remove_material_row).pack(side="right", padx=5)
         # Column headers
@@ -230,13 +230,13 @@ class MaterialEntryTab(BaseAutomationTab):
         # --- Totals Summary ---
         totals_frame = ctk.CTkFrame(mat_outer, fg_color=("gray90", "gray20"))
         totals_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 8))
-        self.lbl_total_amount = ctk.CTkLabel(totals_frame, text="Amount: ₹0.00", anchor="center")
+        self.lbl_total_amount = ctk.CTkLabel(totals_frame, text=tr("form.material_entry.amount"), anchor="center")
         self.lbl_total_amount.pack(side="left", expand=True, padx=10, pady=6)
         ctk.CTkFrame(totals_frame, width=1, height=20, fg_color="gray50").pack(side="left", pady=6)
-        self.lbl_total_gst = ctk.CTkLabel(totals_frame, text="GST: ₹0.00", anchor="center")
+        self.lbl_total_gst = ctk.CTkLabel(totals_frame, text=tr("form.material_entry.gst"), anchor="center")
         self.lbl_total_gst.pack(side="left", expand=True, padx=10, pady=6)
         ctk.CTkFrame(totals_frame, width=1, height=20, fg_color="gray50").pack(side="left", pady=6)
-        self.lbl_grand_total = ctk.CTkLabel(totals_frame, text="Grand Total: ₹0.00",
+        self.lbl_grand_total = ctk.CTkLabel(totals_frame, text=tr("form.material_entry.grand_total"),
                                              font=ctk.CTkFont(weight="bold"), anchor="center")
         self.lbl_grand_total.pack(side="left", expand=True, padx=10, pady=6)
         # --- Action Buttons ---
@@ -246,7 +246,7 @@ class MaterialEntryTab(BaseAutomationTab):
         # ════════════════ INPUT TAB ════════════════
         batch_tab.grid_columnconfigure(0, weight=1)
         batch_tab.grid_rowconfigure(1, weight=1)
-        ctk.CTkLabel(batch_tab, text="Format: WorkSearchKey, BillNumber (One per line)\nExample: 25554, 855").grid(row=0, column=0, sticky="w", padx=5, pady=(5, 0))
+        ctk.CTkLabel(batch_tab, text=tr("form.material_entry.format_hint")).grid(row=0, column=0, sticky="w", padx=5, pady=(5, 0))
         # Textbox with scrollbar
         wk_frame = ctk.CTkFrame(batch_tab, fg_color="transparent")
         wk_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
@@ -264,11 +264,11 @@ class MaterialEntryTab(BaseAutomationTab):
         results_tab.grid_rowconfigure(0, weight=1)
         res_btn_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         res_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(5, 0))
-        ctk.CTkButton(res_btn_frame, text="📥 Export to Excel", width=110,
+        ctk.CTkButton(res_btn_frame, text=tr("common.export_excel"), width=110,
                       fg_color="#107C10", hover_color="#0B5E0B",
                       command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="material_entry_results.xlsx", filter_mode="Export All")
                       ).pack(side="right")
-        ctk.CTkButton(res_btn_frame, text="🗑 Clear", width=80,
+        ctk.CTkButton(res_btn_frame, text=tr("common.clear"), width=80,
                       fg_color=("gray70", "gray30"),
                       command=lambda: [self.results_tree.delete(i) for i in self.results_tree.get_children()]
                       ).pack(side="right", padx=5)
@@ -298,7 +298,7 @@ class MaterialEntryTab(BaseAutomationTab):
     # =========================================================================
     def _add_material_row(self):
         if len(self.materials_ui) >= MAX_MATERIAL_ROWS:
-            messagebox.showwarning("Limit Reached", f"Maximum {MAX_MATERIAL_ROWS} rows allowed.", parent=self)
+            messagebox.showwarning(tr("dialogs.limit_reached"), tr("dialogs.max_rows", count=MAX_MATERIAL_ROWS), parent=self)
             return
         row_idx = len(self.materials_ui)
         row_frame = ctk.CTkFrame(self.mat_scroll_frame, fg_color="transparent")
@@ -306,9 +306,9 @@ class MaterialEntryTab(BaseAutomationTab):
         row_frame.grid_columnconfigure(0, weight=1)
         name_ent = ctk.CTkEntry(row_frame, width=200, placeholder_text=f"Material {row_idx + 1}", height=30)
         name_ent.grid(row=0, column=0, padx=5, sticky="ew")
-        rate_ent = ctk.CTkEntry(row_frame, width=110, placeholder_text="Rate", height=30)
+        rate_ent = ctk.CTkEntry(row_frame, width=110, placeholder_text=tr("form.material_entry.rate"), height=30)
         rate_ent.grid(row=0, column=1, padx=5)
-        qty_ent = ctk.CTkEntry(row_frame, width=110, placeholder_text="Qty", height=30)
+        qty_ent = ctk.CTkEntry(row_frame, width=110, placeholder_text=tr("form.material_entry.qty"), height=30)
         qty_ent.grid(row=0, column=2, padx=5)
         gst_var = ctk.StringVar(value="0")
         gst_menu = ctk.CTkOptionMenu(row_frame, variable=gst_var, values=["0", "5", "6", "12", "18", "28"],
@@ -322,7 +322,7 @@ class MaterialEntryTab(BaseAutomationTab):
         self._recalculate_totals()
     def _remove_material_row(self):
         if len(self.materials_ui) <= 1:
-            messagebox.showwarning("Cannot Remove", "At least one material row must remain.", parent=self)
+            messagebox.showwarning(tr("dialogs.cannot_remove"), tr("dialogs.material_row_remain"), parent=self)
             return
         last = self.materials_ui.pop()
         last["frame"].destroy()
@@ -383,10 +383,10 @@ class MaterialEntryTab(BaseAutomationTab):
     def start_automation(self) -> None:
         inputs = self._get_inputs()
         if not inputs["vendor_code"] or not inputs["bill_date"] or not inputs["tasks"]:
-            messagebox.showwarning("Missing Input", "Vendor Code, Bill Date, and at least one Work Key/Bill No pair are required.", parent=self)
+            messagebox.showwarning(tr("dialogs.missing_input"), tr("dialogs.vendor_bill_required"), parent=self)
             return
         if not inputs["materials"]:
-            messagebox.showwarning("Missing Material", "Please fill at least one material row.", parent=self)
+            messagebox.showwarning(tr("dialogs.missing_material"), tr("dialogs.fill_material_row"), parent=self)
             return
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
     def run_automation_logic(self, inputs):
@@ -415,8 +415,8 @@ class MaterialEntryTab(BaseAutomationTab):
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
                     time.sleep(1.5)  # Brief wait for postback to begin
                     # 1. Panchayat (Block Login) — central helper: GP login par
-                    # panchayat ka dropdown nahi hota, isliye selection skip ho
-                    # jata hai aur automation villages/work se continue karta hai
+                    # panchayat has no dropdown, so selection is skipped and
+                    # automation continues with villages/work
                     if inputs['panchayat']:
                         status, _ = self._select_panchayat_or_skip(
                             driver, wait, inputs['panchayat'],
@@ -426,8 +426,7 @@ class MaterialEntryTab(BaseAutomationTab):
                         elif status == "selected":
                             self.log_info(f"✓ Panchayat selected: {inputs['panchayat']}")
                             time.sleep(1.5)  # Brief wait for postback to begin
-                        elif status == "notfound":
-                            self.log_warning(f"⚠️ Panchayat '{inputs['panchayat']}' dropdown me nahi mila.")
+                        elif status == "notfound":                             self.log_warning(f"⚠️ Panchayat '{inputs['panchayat']}' not found in dropdown.")
                     # 2. Work Category — re-fetch after panchayat postback to avoid stale
                     self.log_info("▶ Selecting Work Category...")
                     for attempt in range(3):

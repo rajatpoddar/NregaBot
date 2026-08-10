@@ -13,6 +13,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 import requests
 from src import config
+from src.i18n import tr
 import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -37,8 +38,8 @@ class WhatsAppChatTab(ctk.CTkFrame):
         self.app = app_instance
         self.poll_after_id = None
         self.last_message_id = 0
-        self._awaiting_ai = False       # AI reply aane tak typing indicator
-        self._awaiting_ai_after = None  # indicator timeout (reply na aaye to reset)
+        self._awaiting_ai = False       # show typing indicator until the AI reply arrives
+        self._awaiting_ai_after = None  # indicator timeout (reset if no reply)
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -83,25 +84,25 @@ class WhatsAppChatTab(ctk.CTkFrame):
         )
         avatar_canvas.grid(row=0, column=0, rowspan=2, padx=(14, 10), pady=11)
         avatar_canvas.create_oval(2, 2, 40, 40, fill="#34B7F1", outline="")
-        avatar_canvas.create_text(21, 22, text="AI", fill="white",
+        avatar_canvas.create_text(21, 22, text=tr("chat.ai"), fill="white",
                                   font=("Segoe UI", 15, "bold"))
 
         # Title
         ctk.CTkLabel(
-            header, text="Support Chat",
+            header, text=tr("chat.support_chat"),
             font=ctk.CTkFont(size=16, weight="bold"),
             text_color="white"
         ).grid(row=0, column=1, sticky="w", pady=(12, 0))
 
-        # Subtitle — AI assistant pehle reply karta hai, phir human support
+        # Subtitle — AI assistant replies first, then human support
         ctk.CTkLabel(
-            header, text="🤖 AI Assistant • 24x7 Support",
+            header, text=tr("chat.ai_subtitle"),
             font=ctk.CTkFont(size=10),
             text_color="#A8D8EA"
         ).grid(row=1, column=1, sticky="w", pady=(0, 10))
 
         self.status_label = ctk.CTkLabel(
-            header, text="🟢 Online",
+            header, text=tr("chat.online"),
             font=ctk.CTkFont(size=10),
             text_color="#A8D8EA"
         )
@@ -117,7 +118,7 @@ class WhatsAppChatTab(ctk.CTkFrame):
 
         self.message_entry = ctk.CTkEntry(
             input_bg,
-            placeholder_text="Type a message",
+            placeholder_text=tr("chat.type_message"),
             height=40,
             corner_radius=20,
             border_width=0,
@@ -153,9 +154,9 @@ class WhatsAppChatTab(ctk.CTkFrame):
     def _on_typing(self, event=None):
         txt = self.message_entry.get().strip()
         if txt:
-            self.sound_indicator.configure(text="Press Enter to send")
+            self.sound_indicator.configure(text=tr("chat.press_enter"))
         else:
-            self.sound_indicator.configure(text="🔔 Notification on reply")
+            self.sound_indicator.configure(text=tr("chat.notify_reply"))
 
     # ── Send Message ──────────────────────────────────────────
     def send_message(self, event=None):
@@ -167,7 +168,7 @@ class WhatsAppChatTab(ctk.CTkFrame):
         self.message_entry.delete(0, "end")
         # AI typing indicator — reply polling me aate hi hat jayega
         # (safety: 90s ke baad timeout — reply na aaye to bhi reset ho jaye)
-        self.sound_indicator.configure(text="🤖 AI soch raha hai...")
+        self.sound_indicator.configure(text=tr("chat.ai_thinking"))
         self._awaiting_ai = True
         if self._awaiting_ai_after:
             try:
@@ -218,16 +219,14 @@ class WhatsAppChatTab(ctk.CTkFrame):
         self.send_button.configure(state="normal", text="➤")
 
         if success:
-            self.status_label.configure(text="🟢 Online")
+            self.status_label.configure(text=tr("chat.online"))
             self.load_messages()
         else:
             self._reset_ai_indicator()
-            self.status_label.configure(text="🔴 Error")
+            self.status_label.configure(text=tr("chat.error"))
             messagebox.showerror(
-                "Send Failed",
-                f"Could not send message.\n\nReason: {reason}\n\n"
-                f"💡 Tip: For local testing, run:\n"
-                f"LICENSE_SERVER_URL=http://localhost:8000 python main_app.py"
+                tr("dialogs.send_failed"),
+                tr("dialogs.send_failed_msg", reason=reason)
             )
             self.message_entry.insert(0, original_text)
 
@@ -248,13 +247,13 @@ class WhatsAppChatTab(ctk.CTkFrame):
             w.destroy()
         ctk.CTkLabel(
             self.chat_frame,
-            text="💬 No messages yet",
+            text=tr("chat.no_messages"),
             font=ctk.CTkFont(size=15, weight="bold"),
             text_color=("#667781", "#8696A0")
         ).pack(pady=(60, 5))
         ctk.CTkLabel(
             self.chat_frame,
-            text="Send a message to start the conversation!",
+            text=tr("chat.start_convo"),
             font=ctk.CTkFont(size=12),
             text_color=("#8696A0", "#8696A0")
         ).pack(pady=(0, 5))
@@ -287,7 +286,7 @@ class WhatsAppChatTab(ctk.CTkFrame):
             w.destroy()
         ctk.CTkLabel(
             self.chat_frame,
-            text="🚧 Server update needed",
+            text=tr("chat.server_update"),
             font=ctk.CTkFont(size=15, weight="bold"),
             text_color=("#E74C3C", "#E74C3C")
         ).pack(pady=(60, 5))
@@ -367,7 +366,7 @@ class WhatsAppChatTab(ctk.CTkFrame):
 
             ctk.CTkLabel(
                 label_frame,
-                text="👨‍💼 Support",
+                text=tr("chat.support"),
                 font=ctk.CTkFont(size=9, weight="bold"),
                 text_color=("#075E54", "#25D366")
             ).pack(anchor="w", padx=10, pady=(6, 0))
@@ -404,7 +403,7 @@ class WhatsAppChatTab(ctk.CTkFrame):
 
             ctk.CTkLabel(
                 label_frame,
-                text="👤 You",
+                text=tr("chat.you"),
                 font=ctk.CTkFont(size=9, weight="bold"),
                 text_color=("#1B5E20", "#4ADE80")
             ).pack(anchor="e", padx=10, pady=(6, 0))
@@ -442,7 +441,7 @@ class WhatsAppChatTab(ctk.CTkFrame):
                 pass
             self._awaiting_ai_after = None
         try:
-            self.sound_indicator.configure(text="🔔 Notification on reply")
+            self.sound_indicator.configure(text=tr("chat.notify_reply"))
         except Exception:
             pass
 

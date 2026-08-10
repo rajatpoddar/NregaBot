@@ -6,6 +6,7 @@ import time, os, sys, re
 from datetime import datetime
 
 from src.utils import resource_path, get_logger
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 
 logger = get_logger()
@@ -22,8 +23,7 @@ class SAReportTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         # ── Header / intro card (pending-bills style) ──
-        self._create_header_card(self, "🛡️", "Social Audit Report",
-                                 "View and respond to social audit issues for the selected panchayat.",
+        self._create_header_card(self, "🛡️", tr("tab.SA_report.title"), tr("tab.SA_report.subtitle"),
                                  icon_key="emoji_social_audit")
 
         # Frame for all user input controls (settings card)
@@ -33,7 +33,7 @@ class SAReportTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # --- Input Fields for the NEW page ---
-        ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
+        ctk.CTkLabel(controls_frame, text=tr("common.panchayat_label")).grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
@@ -41,7 +41,7 @@ class SAReportTab(BaseAutomationTab):
         ctk.CTkLabel(controls_frame, text="On PO LOGIN, go to D23 > Social Audit View, then start the automation. Stay on that page.", text_color="gray50").grid(row=1, column=1, sticky='w', padx=15, pady=(0,10))
 
 
-        ctk.CTkLabel(controls_frame, text="Audit Conducted in:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("form.sa.audit_year")).grid(row=2, column=0, sticky='w', padx=15, pady=5)
         current_year = datetime.now().year
         years = [f"{year}-{year+1}" for year in range(current_year, current_year - 8, -1)]
         default_year = f"{current_year}-{current_year+1}" if datetime.now().month >= 4 else f"{current_year-1}-{current_year}"
@@ -49,7 +49,7 @@ class SAReportTab(BaseAutomationTab):
         self.year_menu = ctk.CTkOptionMenu(controls_frame, variable=self.year_var, values=years)
         self.year_menu.grid(row=2, column=1, sticky='ew', padx=15, pady=5)
 
-        ctk.CTkLabel(controls_frame, text="Issue Status:").grid(row=3, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("form.sa.issue_status")).grid(row=3, column=0, sticky='w', padx=15, pady=5)
         status_options = ["Pending", "Closed"]
         self.status_var = ctk.StringVar(value="Pending")
         self.status_menu = ctk.CTkOptionMenu(controls_frame, variable=self.status_var, values=status_options)
@@ -68,7 +68,7 @@ class SAReportTab(BaseAutomationTab):
         
         export_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         export_frame.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.export_button = ctk.CTkButton(export_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side="left")
 
         cols = ("SR#", "District", "Block", "Panchayat", "Issue Number", "Issue Type", "Forwarded To", "Status", "Issue Description")
@@ -106,7 +106,7 @@ class SAReportTab(BaseAutomationTab):
     def start_automation(self) -> None:
         for item in self.results_tree.get_children(): self.results_tree.delete(item)
         inputs = {'panchayat': self.panchayat_var.get().strip(), 'year': self.year_var.get(), 'status': self.status_var.get()}
-        if not all(inputs.values()): messagebox.showwarning("Input Error", "All fields are required."); return
+        if not all(inputs.values()): messagebox.showwarning(tr("errors.input_error"), tr("errors.input_required")); return
         
         self.app.update_history("location_panchayat", inputs['panchayat'])
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
@@ -152,8 +152,8 @@ class SAReportTab(BaseAutomationTab):
                 result_data = (sr_no, district, block, panchayat, issue_no, issue_type, forwarded_to, status, issue_description)
                 # Website ka SR# ignore — local serial auto-fill hota hai (_tree_insert)
                 self.app.after(0, lambda data=result_data: self._tree_insert(self.results_tree, data))
-        except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as e: error_msg = f"A browser error occurred: {str(e).splitlines()[0]}"; self.log_error(error_msg); messagebox.showerror("Automation Error", error_msg)
-        except Exception as e: self.log_error(f"An unexpected error occurred: {e}"); messagebox.showerror("Critical Error", f"An unexpected error occurred: {e}")
+        except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as e: error_msg = f"A browser error occurred: {str(e).splitlines()[0]}"; self.log_error(error_msg); messagebox.showerror(tr("base.automation_error.title"), error_msg)
+        except Exception as e: self.log_error(f"An unexpected error occurred: {e}"); messagebox.showerror(tr("dialogs.critical_error"), tr("dialogs.unexpected_error", error=e))
         finally:
             # Count results from tree
             issue_count = 0
@@ -179,10 +179,10 @@ class SAReportTab(BaseAutomationTab):
     def export_report(self):
         """Export results to professional Excel."""
         if not self.results_tree.get_children():
-            messagebox.showinfo("No Data", "There are no results to export.")
+            messagebox.showinfo(tr("errors.no_data"), "There are no results to export.")
             return
 
-        title = "Social Audit Status Report"
+        title = tr("form.sa.report_title")
         self.export_treeview_to_excel(
             tree=self.results_tree,
             default_filename="Social_Audit_Report.xlsx",

@@ -8,6 +8,7 @@ from datetime import datetime
 from src import config
 from .base_tab import BaseAutomationTab
 from src.utils import truncate_workcode
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
@@ -21,8 +22,7 @@ class AddActivityTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         # ── Header / intro card (pending-bills style) ──
-        self._create_header_card(self, "➕", "Add Activity",
-                                 "Add a new activity (unit price + quantity) for each pending work key.",
+        self._create_header_card(self, "➕", tr("tab.add_activity.title"), tr("tab.add_activity.subtitle"),
                                  icon_key="emoji_add_activity")
 
         # ── Settings card: Price & Quantity ──
@@ -37,14 +37,14 @@ class AddActivityTab(BaseAutomationTab):
         input_frame.grid_columnconfigure((1, 3), weight=1)
         
         defaults = config.ADD_ACTIVITY_CONFIG['defaults']
-        ctk.CTkLabel(input_frame, text=f"Default Activity Code: {defaults['activity_code']}", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=4, sticky="w", padx=15, pady=(0, 10))
+        ctk.CTkLabel(input_frame, text=tr("form.add_activity.default_code", code=defaults['activity_code']), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=4, sticky="w", padx=15, pady=(0, 10))
 
-        ctk.CTkLabel(input_frame, text="Unit Price (₹):").grid(row=1, column=0, sticky="w", padx=15)
+        ctk.CTkLabel(input_frame, text=tr("form.add_activity.unit_price")).grid(row=1, column=0, sticky="w", padx=15)
         self.unit_price_entry = ctk.CTkEntry(input_frame)
         self.unit_price_entry.grid(row=1, column=1, sticky="ew", padx=(0, 15))
         self.unit_price_entry.insert(0, defaults['unit_price'])
 
-        ctk.CTkLabel(input_frame, text="Quantity:").grid(row=1, column=2, sticky="w", padx=15)
+        ctk.CTkLabel(input_frame, text=tr("form.add_activity.quantity")).grid(row=1, column=2, sticky="w", padx=15)
         self.quantity_entry = ctk.CTkEntry(input_frame)
         self.quantity_entry.grid(row=1, column=3, sticky="ew", padx=(0, 15))
         self.quantity_entry.insert(0, defaults['quantity'])
@@ -68,10 +68,10 @@ class AddActivityTab(BaseAutomationTab):
         wc_controls_frame = ctk.CTkFrame(work_codes_frame, fg_color="transparent")
         wc_controls_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(5,0))
         
-        clear_button = ctk.CTkButton(wc_controls_frame, text="Clear", width=80, command=lambda: self.work_keys_text.delete("1.0", tkinter.END))
+        clear_button = ctk.CTkButton(wc_controls_frame, text=tr("common.clear"), width=80, command=lambda: self.work_keys_text.delete("1.0", tkinter.END))
         clear_button.pack(side='right', padx=(0, 5))
         
-        extract_button = ctk.CTkButton(wc_controls_frame, text="Extract from Text", width=120,
+        extract_button = ctk.CTkButton(wc_controls_frame, text=tr("common.extract_from_text"), width=120,
                                        command=lambda: self._extract_and_update_workcodes(self.work_keys_text))
         extract_button.pack(side='right', padx=(0, 5))
         # --- END NEW ---
@@ -85,7 +85,7 @@ class AddActivityTab(BaseAutomationTab):
 
         results_action_frame = ctk.CTkFrame(results_frame, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
-        self.export_csv_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="add_activity_results.xlsx", filter_mode="Export All"))
+        self.export_csv_button = ctk.CTkButton(results_action_frame, text=tr("common.export_excel"), command=lambda: self.export_treeview_to_excel(self.results_tree, default_filename="add_activity_results.xlsx", filter_mode="Export All"))
         self.export_csv_button.pack(side="left")
 
         cols = ("Work Key", "Status", "Details", "Timestamp")
@@ -113,7 +113,7 @@ class AddActivityTab(BaseAutomationTab):
     def start_automation(self) -> None:
         work_keys = [line.strip() for line in self.work_keys_text.get("1.0", tkinter.END).strip().splitlines() if line.strip()]
         if not work_keys:
-            messagebox.showwarning("Input Required", "Please provide at least one work key.")
+            messagebox.showwarning(tr("errors.input_required"), tr("dialogs.add_activity_need_key"))
             return
             
         # Get and validate the new inputs
@@ -121,13 +121,13 @@ class AddActivityTab(BaseAutomationTab):
         quantity = self.quantity_entry.get().strip()
 
         if not unit_price or not quantity:
-            messagebox.showwarning("Input Required", "Please enter a Unit Price and Quantity.")
+            messagebox.showwarning(tr("errors.input_required"), tr("dialogs.add_activity_need_price"))
             return
         
         # Pass the inputs to the automation logic
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(work_keys, unit_price, quantity))
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Clear all inputs and logs?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_logs")):
             self.work_keys_text.configure(state="normal")
             self.work_keys_text.delete("1.0", tkinter.END)
             # Reset price and quantity to defaults
@@ -167,7 +167,7 @@ class AddActivityTab(BaseAutomationTab):
             self.app.after(200, lambda: self._show_add_activity_summary(work_keys))
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
-            messagebox.showerror("Automation Error", f"An error occurred:\n\n{e}")
+            messagebox.showerror(tr("base.automation_error.title"), f"An error occurred:\n\n{e}")
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")

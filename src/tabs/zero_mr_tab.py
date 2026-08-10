@@ -7,6 +7,7 @@ import os, sys, subprocess, time
 from datetime import datetime
 from src import config
 from src.utils import truncate_workcode
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -23,8 +24,7 @@ class ZeroMrTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         # --- Header / intro card (P7.2: pending-bills style) ---
-        self._create_header_card(self, "🔢", "Zero MR",
-                                 "Generate a zero-value Muster Roll for works with no payments.",
+        self._create_header_card(self, "🔢", tr("tab.zero_mr.title"), tr("tab.zero_mr.subtitle"),
                                  icon_key="emoji_zero_mr")
 
         # Frame for all user input controls (bordered card)
@@ -34,7 +34,7 @@ class ZeroMrTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure((1, 3), weight=1)
 
         # --- Row 0: Financial Year ---
-        ctk.CTkLabel(controls_frame, text="Financial Year:").grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
+        ctk.CTkLabel(controls_frame, text=tr("form.zero_mr.financial_year")).grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
         # Get current year and create a list for the past few years
         current_year = datetime.now().year
         fin_year_list = [f"{year}-{year+1}" for year in range(current_year + 1, current_year - 5, -1)]
@@ -42,7 +42,7 @@ class ZeroMrTab(BaseAutomationTab):
         self.fin_year_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
 
         # --- Row 1: Panchayat Name ---
-        ctk.CTkLabel(controls_frame, text="Panchayat Name:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("common.panchayat_name_label")).grid(row=1, column=0, sticky='w', padx=15, pady=5)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
@@ -67,8 +67,8 @@ class ZeroMrTab(BaseAutomationTab):
         wc_controls_frame = ctk.CTkFrame(work_list_tab, fg_color="transparent")
         wc_controls_frame.grid(row=0, column=0, sticky='ew', padx=5, pady=(5,0))
         
-        ctk.CTkLabel(wc_controls_frame, text="Enter one item per line. Format: SearchKey,MSRNo").pack(side='left', padx=5)
-        clear_button = ctk.CTkButton(wc_controls_frame, text="Clear", width=80, command=lambda: self.work_list_text.delete("1.0", tkinter.END))
+        ctk.CTkLabel(wc_controls_frame, text=tr("form.zero_mr.format_hint")).pack(side='left', padx=5)
+        clear_button = ctk.CTkButton(wc_controls_frame, text=tr("common.clear"), width=80, command=lambda: self.work_list_text.delete("1.0", tkinter.END))
         clear_button.pack(side='right', padx=5)
 
         self.work_list_text = ctk.CTkTextbox(work_list_tab)
@@ -84,7 +84,7 @@ class ZeroMrTab(BaseAutomationTab):
         
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side='left')
 
         # --- Results Treeview ---
@@ -131,7 +131,7 @@ class ZeroMrTab(BaseAutomationTab):
         }
 
         if not inputs['panchayat_name'] or not inputs['work_list_raw']:
-            messagebox.showwarning("Input Error", "Panchayat Name and Work List are required.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.panchayat_worklist_required"))
             return
 
         # Parse the work list
@@ -150,11 +150,11 @@ class ZeroMrTab(BaseAutomationTab):
                     raise ValueError(f"Line {i+1} has missing data.")
                 work_items.append((work_key, msr_no))
         except Exception as e:
-            messagebox.showerror("Input Error", f"Failed to parse Work List:\n{e}")
+            messagebox.showerror(tr("errors.input_error"), tr("dialogs.failed_parse_worklist", error=e))
             return
 
         if not work_items:
-            messagebox.showwarning("Input Error", "No valid items found in the Work List.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.no_valid_items"))
             return
 
         inputs['work_items'] = work_items
@@ -256,7 +256,7 @@ class ZeroMrTab(BaseAutomationTab):
         except Exception as e:
             error_msg = f"A critical error occurred: {e}"
             self.log_error(error_msg)
-            messagebox.showerror("Critical Error", error_msg)
+            messagebox.showerror(tr("dialogs.critical_error"), error_msg)
             self.app.after(0, self.app.set_status, "Error")
         finally:
             # Count success/fail from results_tree
@@ -428,7 +428,7 @@ class ZeroMrTab(BaseAutomationTab):
         all_items = self.results_tree.get_children()
         
         if not all_items:
-            messagebox.showinfo("Retry", "No results found to retry.")
+            messagebox.showinfo(tr("base.error_tab.retry_btn"), tr("base.retry_no_results"))
             return
 
         for item_id in all_items:
@@ -444,11 +444,11 @@ class ZeroMrTab(BaseAutomationTab):
                     failed_keys.append(work_key)
         
         if not failed_keys:
-            messagebox.showinfo("Great!", "No failed items found.")
+            messagebox.showinfo(tr("dialogs.great"), tr("base.retry_no_fails"))
             return
 
         # Confirm before action
-        if not messagebox.askyesno("Retry Failed", f"Found {len(failed_keys)} failed work keys.\nDo you want to retry them now?"):
+        if not messagebox.askyesno(tr("base.retry_confirm_title"), tr("dialogs.retry_failed_keys", count=len(failed_keys))):
             return
 
         # 1. Update Input Widget (Switch to Manual/Bulk Mode for Retry)
@@ -458,12 +458,12 @@ class ZeroMrTab(BaseAutomationTab):
             self.work_list_text.insert("1.0", "\n".join(failed_keys))
             # Note: We keep it 'normal' here so start_automation can read it properly
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to update work list: {e}")
+            messagebox.showerror(tr("dialogs.error"), tr("dialogs.failed_update_worklist", error=e))
             return
 
         # 2. Reset CSV Data (Crucial: Forces logic to read from text box)
         self.csv_allocation_data = {} 
-        self.file_label.configure(text="Retry Mode (Text)", text_color="orange")
+        self.file_label.configure(text=tr("form.zero_mr.retry_mode"), text_color="orange")
         
         # 3. Clear Previous Results
         for item in all_items:
@@ -490,7 +490,7 @@ class ZeroMrTab(BaseAutomationTab):
 
     def _get_filtered_data_and_filepath(self, export_format):
         all_items = self.results_tree.get_children()
-        if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
+        if not all_items: messagebox.showinfo(tr("dialogs.no_data"), tr("dialogs.no_results_to_export")); return None, None
         
         filter_option = self.export_filter_menu.get()
         data_to_export = []
@@ -500,7 +500,7 @@ class ZeroMrTab(BaseAutomationTab):
             if filter_option == "Export All": data_to_export.append(row_values)
             elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)
-        if not data_to_export: messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
+        if not data_to_export: messagebox.showinfo(tr("dialogs.no_data"), tr("dialogs.no_records_for_filter", filter=filter_option)); return None, None
 
         safe_name = "".join(c for c in self.panchayat_var.get().strip() if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -522,13 +522,13 @@ class ZeroMrTab(BaseAutomationTab):
             success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
             
             if success:
-                if messagebox.askyesno("Success", f"PDF Report exported to:\n{file_path}\n\nDo you want to open the file?"):
+                if messagebox.askyesno(tr("dialogs.success"), tr("dialogs.pdf_report_exported", path=file_path)):
                     if sys.platform == "win32":
                         os.startfile(file_path)
                     else:
                         subprocess.call(['open', file_path])
         except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to create PDF file.\n\nError: {e}")
+            messagebox.showerror(tr("dialogs.export_error"), tr("dialogs.failed_create_pdf", error=e))
 
     def load_data_from_mr_tracking(self, data_list: list):
         """
@@ -537,7 +537,7 @@ class ZeroMrTab(BaseAutomationTab):
         processed panchayat-by-panchayat during the automation.
         """
         if not data_list:
-            messagebox.showwarning("No Data", "No data was received from the MR Tracking tab.", parent=self)
+            messagebox.showwarning(tr("dialogs.no_data"), tr("dialogs.no_data_from_mr_tracking"), parent=self)
             return
 
         self.log_info(f"Received {len(data_list)} items from MR Tracking.")
@@ -560,7 +560,7 @@ class ZeroMrTab(BaseAutomationTab):
             valid_items.append({"panchayat": panchayat, "work_code": work_code, "msr_no": msr_no})
 
         if not valid_items:
-            messagebox.showerror("Data Error", "Received data is missing Panchayat/Workcode/MSR details.", parent=self)
+            messagebox.showerror(tr("dialogs.data_error"), tr("dialogs.missing_panchayat_workcode_msr"), parent=self)
             return
 
         self._mr_tracking_panchayat_data = valid_items

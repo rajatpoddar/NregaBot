@@ -13,6 +13,7 @@ from io import StringIO
 from .base_tab import BaseAutomationTab
 from src import config
 from src.utils import get_logger
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, Alignment, Border, Font, PatternFill, Side, get_column_letter, import_pandas  # noqa: F401
 
@@ -50,8 +51,7 @@ class MisReportsTab(BaseAutomationTab):
         results_tab.grid_columnconfigure(0, weight=1)
 
         # ── Header / intro card (pending-bills style) ──
-        self._create_header_card(settings_tab, "📊", "MIS Reports",
-                                 "Download multiple NREGA MIS reports into a single formatted Excel file.",
+        self._create_header_card(settings_tab, "📊", tr("tab.mis_reports.title"), tr("tab.mis_reports.subtitle"),
                                  icon_key="emoji_mis_reports")
 
         # 1. Populate the "Settings" Tab
@@ -60,19 +60,19 @@ class MisReportsTab(BaseAutomationTab):
         settings_container.grid_columnconfigure(1, weight=1)
         
         # --- Create all entries first (no cross-references) ---
-        ctk.CTkLabel(settings_container, text="State:").grid(row=0, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(settings_container, text=tr("common.state_label")).grid(row=0, column=0, sticky='w', padx=15, pady=5)
         s_vals = self.app.history_manager.get_suggestions("location_state") or [""]
         self.state_var = ctk.StringVar()
         self.state_menu = ctk.CTkOptionMenu(settings_container, variable=self.state_var, values=s_vals)
         self.state_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=5)
 
-        ctk.CTkLabel(settings_container, text="District:").grid(row=1, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(settings_container, text=tr("common.district_label")).grid(row=1, column=0, sticky='w', padx=15, pady=5)
         d_vals = self.app.history_manager.get_suggestions("location_district") or [""]
         self.district_var = ctk.StringVar()
         self.district_menu = ctk.CTkOptionMenu(settings_container, variable=self.district_var, values=d_vals)
         self.district_menu.grid(row=1, column=1, sticky='ew', padx=15, pady=5)
 
-        ctk.CTkLabel(settings_container, text="Block:").grid(row=2, column=0, sticky='w', padx=15, pady=5)
+        ctk.CTkLabel(settings_container, text=tr("common.block_label")).grid(row=2, column=0, sticky='w', padx=15, pady=5)
         b_vals = self.app.history_manager.get_suggestions("location_block") or [""]
         self.block_var = ctk.StringVar()
         self.block_menu = ctk.CTkOptionMenu(settings_container, variable=self.block_var, values=b_vals)
@@ -101,12 +101,12 @@ class MisReportsTab(BaseAutomationTab):
         self.reports_header = ctk.CTkFrame(self.reports_frame, fg_color="transparent")
         self.reports_header.grid(row=0, column=0, sticky='ew', padx=10, pady=(5,0))
         
-        ctk.CTkLabel(self.reports_header, text="Reports to Download:", font=ctk.CTkFont(weight="bold")).pack(side="left")
+        ctk.CTkLabel(self.reports_header, text=tr("form.mis_reports.reports_to_download"), font=ctk.CTkFont(weight="bold")).pack(side="left")
         
         btn_frame = ctk.CTkFrame(self.reports_header, fg_color="transparent")
         btn_frame.pack(side="right")
-        ctk.CTkButton(btn_frame, text="Select All", width=100, command=self._toggle_all_checkboxes).pack(side="left", padx=5)
-        ctk.CTkButton(btn_frame, text="Deselect All", width=100, command=lambda: self._toggle_all_checkboxes(select=False)).pack(side="left")
+        ctk.CTkButton(btn_frame, text=tr("common.select_all"), width=100, command=self._toggle_all_checkboxes).pack(side="left", padx=5)
+        ctk.CTkButton(btn_frame, text=tr("common.deselect_all"), width=100, command=lambda: self._toggle_all_checkboxes(select=False)).pack(side="left")
         
         scrollable_frame = ctk.CTkScrollableFrame(self.reports_frame, label_text="")
         scrollable_frame.grid(row=1, column=0, sticky='nsew', padx=10, pady=5)
@@ -137,7 +137,7 @@ class MisReportsTab(BaseAutomationTab):
         # 2. Populate the "Results" Tab
         res_btn_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         res_btn_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=5, pady=(5, 0))
-        self.export_button = ctk.CTkButton(res_btn_frame, text="📥 Export to Excel", fg_color="#107C10", hover_color="#0B5E0B", command=self.export_report)
+        self.export_button = ctk.CTkButton(res_btn_frame, text=tr("common.export_excel"), fg_color="#107C10", hover_color="#0B5E0B", command=self.export_report)
         self.export_button.pack(side="right")
 
         cols = ("Report Name", "Status", "Details")
@@ -191,7 +191,7 @@ class MisReportsTab(BaseAutomationTab):
         inputs = {'state': self.state_var.get().strip(), 'district': self.district_var.get().strip(), 'block': self.block_var.get().strip(), 'reports': selected_reports}
         
         if not all([inputs['state'], inputs['reports']]):
-            messagebox.showwarning("Input Error", "State and at least one Report are required."); return
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.state_report_required")); return
         
         self.save_inputs({'state': inputs['state'], 'district': inputs['district'], 'block': inputs['block']})
         self.app.update_history("location_state", inputs['state']); self.app.update_history("location_district", inputs['district']); self.app.update_history("location_block", inputs['block'])
@@ -202,7 +202,7 @@ class MisReportsTab(BaseAutomationTab):
             today_str_file = datetime.now().strftime("%d-%m-%Y_%H%M%S")
             initial_filename = f"MIS_Reports_{today_str_file}.xlsx"
         except Exception as e:
-            messagebox.showerror("Folder Error", f"Could not create default save directory.\n{e}")
+            messagebox.showerror(tr("dialogs.folder_error"), tr("dialogs.could_not_create_save_dir", error=e))
             target_dir = self.app.get_user_downloads_path() # Fallback
             initial_filename = "MIS_Reports.xlsx"
         # --- END NEW ---
@@ -210,7 +210,7 @@ class MisReportsTab(BaseAutomationTab):
         save_path = filedialog.asksaveasfilename(
             defaultextension=".xlsx", 
             filetypes=[("Excel Workbook", "*.xlsx")], 
-            title="Save MIS Reports As", 
+            title=tr("form.mis_reports.save_as"), 
             initialdir=target_dir, # <-- Use new target dir
             initialfile=initial_filename # <-- Use new initial filename
         )
@@ -697,7 +697,7 @@ class MisReportsTab(BaseAutomationTab):
                         try: os.remove(save_path)
                         except: pass
         except Exception as e:
-            error_msg = str(e).split('\n')[0]; self.log_error(f"Critical error: {error_msg}"); messagebox.showerror("Critical Error", error_msg)
+            error_msg = str(e).split('\n')[0]; self.log_error(f"Critical error: {error_msg}"); messagebox.showerror(tr("dialogs.critical_error"), error_msg)
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.update_status, "Automation Finished", 1.0)

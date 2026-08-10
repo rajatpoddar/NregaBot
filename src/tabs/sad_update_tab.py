@@ -7,6 +7,7 @@ import os, time, csv, re
 import threading
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Keys, Select, WebDriverWait, EC, TimeoutException, openpyxl  # noqa: F401
 
@@ -35,8 +36,7 @@ class SadUpdateTab(BaseAutomationTab):
         # in a pack-managed container to avoid mixing geometry managers.
         header_wrap = ctk.CTkFrame(self.main_scroll, fg_color="transparent")
         header_wrap.pack(fill="x", padx=0, pady=0)
-        self._create_header_card(header_wrap, "🔄", "SAD Update Status",
-                                 "Update / dispose Sarkar Aapke Dwar applications in bulk.",
+        self._create_header_card(header_wrap, "🔄", tr("tab.sad_update.title"), tr("tab.sad_update.subtitle"),
                                  icon_key="emoji_update_outcome")
 
         # Action Selection (inside a small bordered row)
@@ -45,7 +45,7 @@ class SadUpdateTab(BaseAutomationTab):
         action_container.pack(fill="x", padx=12, pady=(0, 4))
         action_container.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(action_container, text="💡 Select Action:", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, padx=12, pady=8, sticky="w")
+        ctk.CTkLabel(action_container, text=tr("form.sad.select_action"), font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, padx=12, pady=8, sticky="w")
         self.action_var = ctk.StringVar(value="Dispose")
         self.action_menu = ctk.CTkOptionMenu(action_container, variable=self.action_var, values=["Dispose", "Reject", "In Progress", "Pending"], width=200)
         self.action_menu.grid(row=0, column=1, padx=12, pady=8, sticky="ew")
@@ -69,8 +69,8 @@ class SadUpdateTab(BaseAutomationTab):
         text_tab.grid_columnconfigure(0, weight=1)
         text_tab.grid_rowconfigure(1, weight=1)
         
-        ctk.CTkLabel(text_tab, text="Enter Acknowledgement Numbers (One per line):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        ctk.CTkButton(text_tab, text="Clear", width=60, height=20, 
+        ctk.CTkLabel(text_tab, text=tr("form.sad.ack_label")).grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        ctk.CTkButton(text_tab, text=tr("common.clear"), width=60, height=20, 
                       command=lambda: self.manual_text_area.delete("1.0", "end")).grid(row=0, column=1, sticky="e", padx=5)
         
         self.manual_text_area = ctk.CTkTextbox(text_tab)
@@ -80,12 +80,12 @@ class SadUpdateTab(BaseAutomationTab):
         file_tab = self.main_tabs.tab("Upload File")
         file_tab.grid_columnconfigure(1, weight=1)
         
-        ctk.CTkLabel(file_tab, text="Select Excel/CSV File:").grid(row=0, column=0, sticky="w", padx=10, pady=20)
-        self.file_entry = ctk.CTkEntry(file_tab, placeholder_text="Select .xlsx or .csv file")
+        ctk.CTkLabel(file_tab, text=tr("form.sad.select_file")).grid(row=0, column=0, sticky="w", padx=10, pady=20)
+        self.file_entry = ctk.CTkEntry(file_tab, placeholder_text=tr("form.sad.select_excel_csv"))
         self.file_entry.grid(row=0, column=1, sticky="ew", padx=10, pady=20)
-        ctk.CTkButton(file_tab, text="Browse", width=80, command=self.browse_file).grid(row=0, column=2, padx=10, pady=20)
+        ctk.CTkButton(file_tab, text=tr("common.browse"), width=80, command=self.browse_file).grid(row=0, column=2, padx=10, pady=20)
         
-        ctk.CTkLabel(file_tab, text="💡 Bot will scan all columns for pattern X/Y/Z/A automatically.", 
+        ctk.CTkLabel(file_tab, text=tr("form.sad.bot_scan_hint"), 
                      text_color="gray50").grid(row=1, column=0, columnspan=3, sticky="w", padx=10)
 
         # TAB 3: Results (Treeview)
@@ -96,9 +96,9 @@ class SadUpdateTab(BaseAutomationTab):
         cols = ("Ack Number", "Status", "Message")
         self.results_tree = ttk.Treeview(result_tab, columns=cols, show='headings', height=15)
         
-        self.results_tree.heading("Ack Number", text="Ack Number")
-        self.results_tree.heading("Status", text="Status")
-        self.results_tree.heading("Message", text="Message")
+        self.results_tree.heading("Ack Number", text=tr("form.sad.col_ack"))
+        self.results_tree.heading("Status", text=tr("form.sad.col_status"))
+        self.results_tree.heading("Message", text=tr("form.sad.col_message"))
         
         self.results_tree.column("Ack Number", width=150, anchor="w")
         self.results_tree.column("Status", width=100, anchor="center")
@@ -130,10 +130,10 @@ class SadUpdateTab(BaseAutomationTab):
             self.log_display.delete("1.0", tkinter.END)
             self.log_display.configure(state="disabled")
 
-        ctk.CTkButton(log_tools, text="🗑 Clear Logs", width=110,
+        ctk.CTkButton(log_tools, text=tr("common.clear_logs"), width=110,
                        fg_color=("#DC2626", "#EF4444"), hover_color=("#B91C1C", "#DC2626"),
                        command=clear_logs).pack(side="right", padx=5)
-        ctk.CTkButton(log_tools, text="📋 Copy Logs", width=110, command=self.copy_logs).pack(side="right", padx=5)
+        ctk.CTkButton(log_tools, text=tr("common.copy_logs"), width=110, command=self.copy_logs).pack(side="right", padx=5)
         
         self.log_display = ctk.CTkTextbox(log_tab, state="disabled", font=("Consolas", 12))
         self.log_display.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
@@ -164,9 +164,9 @@ class SadUpdateTab(BaseAutomationTab):
             log_content = self.log_display.get("1.0", "end")
             self.app.clipboard_clear()
             self.app.clipboard_append(log_content)
-            messagebox.showinfo("Copied", "Logs copied to clipboard!")
+            messagebox.showinfo(tr("status.copied"), tr("dialogs.logs_copied"))
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to copy: {e}")
+            messagebox.showerror(tr("dialogs.error"), tr("dialogs.failed_copy", error=e))
     def reset_ui(self) -> None:
         self.file_entry.delete(0, tkinter.END)
         self.manual_text_area.delete("1.0", tkinter.END)
@@ -246,13 +246,13 @@ class SadUpdateTab(BaseAutomationTab):
             elif self.file_entry.get().strip():
                 active_tab = "Upload File"
             else:
-                messagebox.showwarning("Input Needed", "Please go to 'Paste Text' or 'Upload File' tab and provide input.")
+                messagebox.showwarning(tr("errors.input_needed"), tr("dialogs.sad_provide_input"))
                 return
 
         if active_tab == "Paste Text":
             raw_text = self.manual_text_area.get("1.0", "end").strip()
             if not raw_text:
-                messagebox.showwarning("Input Error", "Text area is empty.")
+                messagebox.showwarning(tr("errors.input_error"), tr("dialogs.text_area_empty"))
                 return
             for line in raw_text.split('\n'):
                 val = self._parse_smart_ack_no(line)
@@ -261,17 +261,17 @@ class SadUpdateTab(BaseAutomationTab):
         elif active_tab == "Upload File":
             file_path = self.file_entry.get().strip()
             if not file_path or not os.path.exists(file_path):
-                messagebox.showerror("Error", "Invalid file path.")
+                messagebox.showerror(tr("dialogs.error"), tr("dialogs.invalid_file_path"))
                 return
             self.save_inputs({'csv_file': file_path})
             self.log(f"Scanning file: {os.path.basename(file_path)}...")
             found_items, err = self._scan_file_for_ack_numbers(file_path)
-            if err: messagebox.showerror("File Error", err); return
-            if not found_items: messagebox.showwarning("No Data", "No valid patterns found in file."); return
+            if err: messagebox.showerror(tr("dialogs.file_error"), err); return
+            if not found_items: messagebox.showwarning(tr("errors.no_data"), tr("dialogs.no_patterns_found")); return
             items_to_process = found_items
 
         if not items_to_process:
-             messagebox.showwarning("No Data", "No valid items found to process.")
+             messagebox.showwarning(tr("errors.no_data"), tr("dialogs.no_valid_items"))
              return
 
         self.safe_tree_clear()
@@ -458,7 +458,7 @@ class SadUpdateTab(BaseAutomationTab):
 
         except Exception as e:
             self.log(f"Critical Error: {e}")
-            self.app.after(0, lambda: messagebox.showerror("Error", str(e)))
+            self.app.after(0, lambda: messagebox.showerror(tr("dialogs.error"), str(e)))
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")

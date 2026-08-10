@@ -7,6 +7,7 @@ from datetime import datetime
 
 
 from src import config
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException, openpyxl  # noqa: F401
@@ -48,8 +49,7 @@ class DeleteApplicantTab(BaseAutomationTab):
         main.grid_rowconfigure(6, weight=1)  # notebook expands
 
         # ── Header / intro card (pending-bills style) ──
-        self._create_header_card(main, "🗑️", "Delete Applicant",
-                                 "Delete eKYC applicants from an Excel list — auto-match, select, and delete.",
+        self._create_header_card(main, "🗑️", tr("tab.delete_applicant.title"), tr("tab.delete_applicant.subtitle"),
                                  icon_key="emoji_delete_applicant")
 
         # ── Row 1: Two dropdowns side by side (bordered card) ──
@@ -256,7 +256,7 @@ class DeleteApplicantTab(BaseAutomationTab):
             all_rows = list(ws.iter_rows(values_only=True))
 
             if not all_rows or len(all_rows) < 2:
-                messagebox.showerror("Empty File", "No data rows found.", parent=self.app)
+                messagebox.showerror(tr("dialogs.empty_file"), tr("dialogs.no_data_rows"), parent=self.app)
                 wb.close(); return
 
             # ── Find header row ──
@@ -283,9 +283,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                     break
 
             if "jobcard" not in hdr_map or "name" not in hdr_map:
-                messagebox.showerror("Invalid Format",
-                    "Could not find 'Job Card No' and 'Applicant Name' columns.\n\n"
-                    "Please upload an eKYC Report Excel file.", parent=self.app)
+                messagebox.showerror(tr("dialogs.invalid_format"), tr("dialogs.ekyc_columns_required"), parent=self.app)
                 wb.close(); return
 
             # ── Clear ──
@@ -332,18 +330,17 @@ class DeleteApplicantTab(BaseAutomationTab):
                 self.excel_status_lbl.configure(text="❌ No valid records.", text_color=config.COLORS["red_error"])
 
         except ImportError:
-            messagebox.showerror("Library Missing",
-                "openpyxl required. Install: pip install openpyxl", parent=self.app)
+            messagebox.showerror(tr("dialogs.library_missing"), tr("dialogs.openpyxl_required"), parent=self.app)
         except Exception as e:
-            messagebox.showerror("Error", f"Could not read Excel:\n{e}", parent=self.app)
+            messagebox.showerror(tr("dialogs.error"), tr("dialogs.could_not_read_excel", error=e), parent=self.app)
 
     # ──────────────────────────────────────────────────
     #  Automation
     # ──────────────────────────────────────────────────
     def start_automation(self) -> None:
         if not self.selected_items:
-            messagebox.showwarning("No Selection",
-                "Select at least one applicant (✔) to delete.")
+            messagebox.showwarning(tr("dialogs.no_selection"),
+                tr("dialogs.no_applicant_selected"))
             return
 
         # ⭐ Extract Treeview data in MAIN THREAD (thread-safe)
@@ -363,8 +360,8 @@ class DeleteApplicantTab(BaseAutomationTab):
                     })
 
         if not selected_data:
-            messagebox.showwarning("No Data",
-                "Could not read selected applicant data. Try re-loading the Excel file.")
+            messagebox.showwarning(tr("dialogs.no_data"),
+                tr("dialogs.could_not_read_applicant"))
             return
 
         inputs = {
@@ -450,8 +447,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                     elif status == "selected":
                         self.log_info(f"📍 Selecting Panchayat: {panchayat}")
                         time.sleep(1.5)  # Brief wait for postback to begin
-                    elif status == "notfound":
-                        self.log_warning(f"📍 Panchayat '{panchayat}' dropdown me nahi mila.")
+                    elif status == "notfound":                         self.log_warning(f"📍 Panchayat '{panchayat}' not found in dropdown.")
                 # ── 2. Village (JS — fast) ──
                 try:
                     self.log_info("🏘️  Selecting village from jobcard code...")

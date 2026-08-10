@@ -7,6 +7,7 @@ import os, time, csv, re, sys
 from datetime import datetime
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, openpyxl  # noqa: F401
 
@@ -29,8 +30,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         # ── Header card ──
-        self._create_header_card(self, "🏛️", "Sarkar Aapke Dwar",
-                                 "Fill and submit Sarkar Aapke Dwar applications in bulk or monitor mode.",
+        self._create_header_card(self, "🏛️", tr("tab.sarkar_aapke_dwar.title"), tr("tab.sarkar_aapke_dwar.subtitle"),
                                  icon_key="emoji_sad_status")
 
         # --- Configuration Frame (bordered card) ---
@@ -46,7 +46,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
 
         self.backlog_switch = ctk.CTkSwitch(
             switch_row, 
-            text="Backlog Entry Mode", 
+            text=tr("form.sad.backlog_mode"), 
             variable=self.backlog_mode_var,
             onvalue=True, 
             offvalue=False,
@@ -59,17 +59,17 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         bulk_frame.grid(row=1, column=0, columnspan=3, sticky="ew", padx=10, pady=10)
         bulk_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(bulk_frame, text="Mode 1: Bulk Entry (via Excel or CSV)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=3, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(bulk_frame, text=tr("form.sad.mode1"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=3, sticky="w", padx=10, pady=5)
         
-        self.file_path_entry = ctk.CTkEntry(bulk_frame, placeholder_text="Select .xlsx or .csv file with Applicant Details...")
+        self.file_path_entry = ctk.CTkEntry(bulk_frame, placeholder_text=tr("form.sad.select_file_placeholder"))
         self.file_path_entry.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
         
         btn_frame = ctk.CTkFrame(bulk_frame, fg_color="transparent")
         btn_frame.grid(row=1, column=2, padx=5)
         
-        ctk.CTkButton(btn_frame, text="Browse", width=80, command=self.browse_file).pack(side="left", padx=2)
-        ctk.CTkButton(btn_frame, text="Get Template", width=100, fg_color="green", command=self.generate_demo_template).pack(side="left", padx=2)
-        ctk.CTkButton(btn_frame, text="Clear", width=60, fg_color="#C53030", hover_color="#9B2C2C", command=self.clear_file_selection).pack(side="left", padx=2)
+        ctk.CTkButton(btn_frame, text=tr("common.browse"), width=80, command=self.browse_file).pack(side="left", padx=2)
+        ctk.CTkButton(btn_frame, text=tr("common.get_template"), width=100, fg_color="green", command=self.generate_demo_template).pack(side="left", padx=2)
+        ctk.CTkButton(btn_frame, text=tr("common.clear"), width=60, fg_color="#C53030", hover_color="#9B2C2C", command=self.clear_file_selection).pack(side="left", padx=2)
         
         note_text = ("💡 Monitor Mode: Leave File empty. Bot auto-fills Scheme details when you open a new form.\n"
                      "💡 Bulk Mode: Select Excel/CSV. Bot fills Applicant + Scheme details and Extracts Ack No.\n"
@@ -83,22 +83,22 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         settings_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 10))
         settings_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(settings_frame, text="Common Settings", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(settings_frame, text=tr("form.sad.common_settings"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=5)
 
         # 1. Applicant Remarks
-        ctk.CTkLabel(settings_frame, text="Applicant Remarks:").grid(row=1, column=0, sticky="w", padx=10, pady=2)
-        self.app_remarks_entry = ctk.CTkEntry(settings_frame, placeholder_text="Default Applicant Remarks (if not in file)")
+        ctk.CTkLabel(settings_frame, text=tr("form.sad.applicant_remarks")).grid(row=1, column=0, sticky="w", padx=10, pady=2)
+        self.app_remarks_entry = ctk.CTkEntry(settings_frame, placeholder_text=tr("form.sad.default_applicant_remarks"))
         self.app_remarks_entry.grid(row=1, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
         # 2. Scheme Type Dropdown
-        ctk.CTkLabel(settings_frame, text="Scheme Type:").grid(row=2, column=0, sticky="w", padx=10, pady=2)
+        ctk.CTkLabel(settings_frame, text=tr("form.sad.scheme_type")).grid(row=2, column=0, sticky="w", padx=10, pady=2)
         scheme_types = ["Service Focus Area"] 
         self.scheme_type_var = ctk.StringVar(value="Service Focus Area")
         self.scheme_type_menu = ctk.CTkOptionMenu(settings_frame, variable=self.scheme_type_var, values=scheme_types, width=300, dynamic_resizing=False)
         self.scheme_type_menu.grid(row=2, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
         # 3. Scheme/Service Dropdown
-        ctk.CTkLabel(settings_frame, text="Scheme/Service:").grid(row=3, column=0, sticky="w", padx=10, pady=2)
+        ctk.CTkLabel(settings_frame, text=tr("form.sad.scheme_service")).grid(row=3, column=0, sticky="w", padx=10, pady=2)
         service_options = [
             "जाति प्रमाण पत्र (Caste Certificate)",
             "आय प्रमाण पत्र (Income Certificate)",
@@ -120,8 +120,8 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.service_menu.grid(row=3, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
         # 4. Scheme Remarks
-        ctk.CTkLabel(settings_frame, text="Scheme Remarks:").grid(row=4, column=0, sticky="w", padx=10, pady=2)
-        self.scheme_remarks_entry = ctk.CTkEntry(settings_frame, placeholder_text="Default Scheme Remarks (if not in file)")
+        ctk.CTkLabel(settings_frame, text=tr("form.sad.scheme_remarks")).grid(row=4, column=0, sticky="w", padx=10, pady=2)
+        self.scheme_remarks_entry = ctk.CTkEntry(settings_frame, placeholder_text=tr("form.sad.default_scheme_remarks"))
         self.scheme_remarks_entry.grid(row=4, column=1, columnspan=2, sticky="ew", padx=10, pady=2)
 
         # Action Buttons (OUTSIDE the card)
@@ -143,18 +143,18 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         export_frame = ctk.CTkFrame(res_tab, fg_color="transparent")
         export_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        self.export_button = ctk.CTkButton(export_frame, text="📥 Export to Excel", width=100, command=self.export_report)
+        self.export_button = ctk.CTkButton(export_frame, text=tr("common.export_excel"), width=100, command=self.export_report)
         self.export_button.pack(side="left", padx=(0, 5))
 
         # Treeview
         cols = ("Time", "Applicant Name", "Scheme Remarks", "Status", "Ack Number")
         self.results_tree = ttk.Treeview(res_tab, columns=cols, show='headings')
         
-        self.results_tree.heading("Time", text="Time")
-        self.results_tree.heading("Applicant Name", text="Applicant Name")
-        self.results_tree.heading("Scheme Remarks", text="Scheme Remarks") 
-        self.results_tree.heading("Status", text="Status")
-        self.results_tree.heading("Ack Number", text="Ack Number")
+        self.results_tree.heading("Time", text=tr("common.time_col"))
+        self.results_tree.heading("Applicant Name", text=tr("common.applicant_name_col"))
+        self.results_tree.heading("Scheme Remarks", text=tr("form.sad.scheme_remarks_col")) 
+        self.results_tree.heading("Status", text=tr("common.status_col"))
+        self.results_tree.heading("Ack Number", text=tr("form.sad.ack_number_col"))
 
         self.results_tree.column("Time", width=80, anchor="center")
         self.results_tree.column("Applicant Name", width=150, anchor="w")
@@ -174,7 +174,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         self.results_tree.tag_configure('Info', foreground='#2B6CB0')
 
         # Summary Label
-        self.summary_label = ctk.CTkLabel(res_tab, text="Success: 0 | Failed: 0", font=ctk.CTkFont(weight="bold"))
+        self.summary_label = ctk.CTkLabel(res_tab, text=tr("common.success_failed_default"), font=ctk.CTkFont(weight="bold"))
         self.summary_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
 
         # --- TAB 2: Logs ---
@@ -189,17 +189,17 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             logs = self.log_display.get("1.0", tkinter.END)
             if logs.strip():
                 self.app.clipboard_clear(); self.app.clipboard_append(logs)
-                messagebox.showinfo("Copied", "Logs copied to clipboard.", parent=self.app)
+                messagebox.showinfo(tr("status.copied"), tr("dialogs.logs_copied"), parent=self.app)
             else:
-                messagebox.showwarning("Empty", "There are no logs to copy.", parent=self.app)
+                messagebox.showwarning(tr("dialogs.empty"), tr("dialogs.no_logs_to_copy"), parent=self.app)
         
         def clear_logs():
             self.log_display.configure(state="normal")
             self.log_display.delete("1.0", tkinter.END)
             self.log_display.configure(state="disabled")
 
-        ctk.CTkButton(log_tools, text="📋 Copy Logs", width=110, command=copy_logs).pack(side="right", padx=(0, 5))
-        ctk.CTkButton(log_tools, text="🗑 Clear Logs", width=110,
+        ctk.CTkButton(log_tools, text=tr("common.copy_logs"), width=110, command=copy_logs).pack(side="right", padx=(0, 5))
+        ctk.CTkButton(log_tools, text=tr("common.clear_logs"), width=110,
                        fg_color=("#DC2626", "#EF4444"), hover_color=("#B91C1C", "#DC2626"),
                        command=clear_logs).pack(side="right", padx=(0, 5))
 
@@ -283,9 +283,9 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
             try:
                 with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
                     csv.writer(f).writerow(headers)
-                messagebox.showinfo("Success", "Template saved with Remark columns!")
+                messagebox.showinfo(tr("dialogs.success"), tr("dialogs.template_saved_remark"))
             except Exception as e:
-                messagebox.showerror("Error", f"Could not save file: {e}")
+                messagebox.showerror(tr("dialogs.error"), tr("dialogs.could_not_save_file", error=e))
     def start_automation(self) -> None:
         inputs = {
             'file_path': self.file_path_entry.get().strip(),
@@ -297,17 +297,17 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
         }
 
         if not inputs['scheme_type'] or not inputs['service']:
-            messagebox.showwarning("Input Error", "Please select 'Scheme Type' and 'Service'.")
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.select_scheme_service"))
             return
 
         if inputs['file_path'] and not os.path.exists(inputs['file_path']):
-            messagebox.showerror("File Error", "Selected file does not exist.")
+            messagebox.showerror(tr("dialogs.file_error"), tr("dialogs.selected_file_missing"))
             return
 
         self.save_inputs(inputs)
         self.success_count = 0
         self.fail_count = 0
-        self.summary_label.configure(text="Success: 0 | Failed: 0")
+        self.summary_label.configure(text=tr("common.success_failed_default"))
         self.safe_tree_clear()
             
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))

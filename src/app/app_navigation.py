@@ -15,6 +15,7 @@ from src import config
 from src.tab_config import get_tabs_definition
 from src.ui_components import CollapsibleFrame, SkeletonLoader
 from src.utils import resource_path, get_config, save_config, get_logger
+from src.i18n import tr
 
 
 logger = get_logger()
@@ -22,6 +23,14 @@ logger = get_logger()
 
 class NavMixin:
     """Mixin: navigation buttons, tab management, frame switching."""
+
+    def _nav_tab_name(self, name: str) -> str:
+        """Translated display name for a sidebar tab (internal key stays English)."""
+        return tr(f"nav.tab.{name}", default=name)
+
+    def _nav_cat_name(self, cat: str) -> str:
+        """Translated display name for a sidebar category (internal key stays English)."""
+        return tr(f"nav.cat.{cat}", default=cat)
 
     def _create_nav_buttons(self, header_parent: Any, content_parent: Any) -> None:
         self.app_state.nav_buttons.clear()
@@ -97,7 +106,7 @@ class NavMixin:
             logger.debug("Failed to load home icon: %s", e)
         self.home_nav_btn = ctk.CTkButton(
             header_parent,
-            text="  Home",
+            text=f"  {self._nav_tab_name('Home')}",
             image=_home_icon,
             compound="left",
             command=lambda: self.show_frame("Home"),
@@ -126,15 +135,22 @@ class NavMixin:
         if self.app_state.last_selected_category not in categories:
             self.app_state.last_selected_category = "All Automations"
         
+        # Display values are translated; internal keys stay English.
+        self._cat_display_map = {cat: self._nav_cat_name(cat) for cat in categories}
+        self._cat_internal_map = {disp: cat for cat, disp in self._cat_display_map.items()}
+        display_categories = [self._cat_display_map[c] for c in categories]
+        
         self.category_filter_var = ctk.StringVar()
         self.category_filter_menu = ctk.CTkOptionMenu(
             header_parent,
             variable=self.category_filter_var,
-            values=categories,
+            values=display_categories,
             command=self._on_category_filter_change,
             width=180, height=28,
         )
-        self.category_filter_var.set(self.app_state.last_selected_category)
+        self.category_filter_var.set(self._cat_display_map.get(
+            self.app_state.last_selected_category,
+            self._cat_display_map["All Automations"]))
         self.category_filter_menu.pack(fill="x", pady=(5, 5), padx=5)
 
         # Category colors matching the Home page card colors
@@ -152,7 +168,7 @@ class NavMixin:
             if cat == "Dashboard":
                 continue  # Skip Dashboard category — Home is pinned separately
 
-            cat_frame = CollapsibleFrame(content_parent, title=cat)
+            cat_frame = CollapsibleFrame(content_parent, title=self._nav_cat_name(cat))
             # Apply category background and border to the sidebar section
             colors = _CATEGORY_BG.get(cat)
             if colors:
@@ -173,7 +189,7 @@ class NavMixin:
                 # P5: Create button WITHOUT image (icon loaded lazily when category is shown)
                 btn = ctk.CTkButton(
                     cat_frame.content_frame, 
-                    text=f"{name}", 
+                    text=self._nav_tab_name(name), 
                     image=None, 
                     compound="left", 
                     command=lambda n=name: self.show_frame(n), 
@@ -200,7 +216,7 @@ class NavMixin:
                 if is_disabled:
                     btn.configure(
                         state="normal", 
-                        text=f"{name} ⚠️",
+                        text=f"{self._nav_tab_name(name)} ⚠️",
                         fg_color=("#FEF2F2", "#450A0A"), 
                         text_color=("#DC2626", "#F87171"), 
                         hover_color=("#FEE2E2", "#7F1D1D") 
@@ -349,7 +365,7 @@ class NavMixin:
         # --- Error Heading ---
         ctk.CTkLabel(
             container,
-            text="Failed to Load Tab",
+            text=tr("base.error_tab.title"),
             font=ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
             text_color=(config.COLORS["text_dark"], config.COLORS["text_white"])
         ).pack(pady=(5, 5))
@@ -357,7 +373,7 @@ class NavMixin:
         # --- Tab Name ---
         ctk.CTkLabel(
             container,
-            text=f"'{page_name}'",
+            text=f"'{self._nav_tab_name(page_name)}'",
             font=ctk.CTkFont(family="Segoe UI", size=14),
             text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
         ).pack(pady=(0, 15))
@@ -365,7 +381,7 @@ class NavMixin:
         # --- Explanation ---
         ctk.CTkLabel(
             container,
-            text="This tab encountered an error while loading.\nPlease check the details below or try again.",
+            text=tr("base.error_tab.subtitle"),
             font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color=(config.COLORS["text_medium"], config.COLORS["text_light"]),
             justify="center",
@@ -391,7 +407,7 @@ class NavMixin:
         # Retry button
         retry_btn = ctk.CTkButton(
             btn_row,
-            text="🔄 Retry",
+            text=tr("base.error_tab.retry_btn"),
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             fg_color=(config.COLORS["blue"], config.COLORS["blue"]),
             hover_color=(config.COLORS["blue_hover"], config.COLORS["blue_dark"]),
@@ -406,7 +422,7 @@ class NavMixin:
         # Go Home button
         home_btn = ctk.CTkButton(
             btn_row,
-            text="🏠 Go Home",
+            text=tr("base.error_tab.home_btn"),
             font=ctk.CTkFont(family="Segoe UI", size=13),
             fg_color=("#E2E8F0", "#334155"),
             hover_color=("#CBD5E1", "#475569"),
@@ -421,7 +437,7 @@ class NavMixin:
         # --- Expandable Error Details ---
         details_btn = ctk.CTkButton(
             container,
-            text="▼ Show Technical Details",
+            text=tr("base.error_tab.show_details"),
             font=ctk.CTkFont(family="Segoe UI", size=11),
             fg_color="transparent",
             hover_color=("gray90", "gray25"),
@@ -459,10 +475,10 @@ class NavMixin:
             _details_visible[0] = not _details_visible[0]
             if _details_visible[0]:
                 details_text.pack(pady=(0, 15), padx=20, fill="x")
-                details_btn.configure(text="▲ Hide Technical Details")
+                details_btn.configure(text=tr("base.error_tab.hide_details"))
             else:
                 details_text.pack_forget()
-                details_btn.configure(text="▼ Show Technical Details")
+                details_btn.configure(text=tr("base.error_tab.show_details"))
         
         details_btn.configure(command=toggle_details)
         
@@ -564,8 +580,10 @@ class NavMixin:
 
 
 
-    def _on_category_filter_change(self, selected_category: str):
+    def _on_category_filter_change(self, selected_display: str):
         self.play_sound("select")
+        # Map the translated dropdown value back to the internal English key.
+        selected_category = getattr(self, '_cat_internal_map', {}).get(selected_display, selected_display)
         save_config('last_selected_category', selected_category)
         self._filter_nav_menu(selected_category)
 
@@ -642,7 +660,7 @@ class NavMixin:
             try:
                 settings_instance = self.app_state.tab_instances.get("Settings")
                 if settings_instance and hasattr(settings_instance, 'tab_view'):
-                    settings_instance.tab_view.set("  📋 Activity Log  ")
+                    settings_instance.tab_view.set(f"  📋 {tr('settings.tab.activity')}  ")
                     if hasattr(settings_instance, '_refresh_activity_log'):
                         settings_instance._refresh_activity_log()
             except Exception as e:

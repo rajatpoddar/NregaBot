@@ -18,6 +18,7 @@ from src.utils import resource_path, get_logger
 logger = get_logger()
 from .base_tab import BaseAutomationTab
 from src import config  # <-- Make sure config is imported
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, StaleElementReferenceException, TimeoutException, Alignment, Border, Font, PatternFill, Side, import_pandas  # noqa: F401
 
@@ -47,15 +48,14 @@ class MrTrackingTab(BaseAutomationTab):
             "Panchayat Name", "Muster Roll No.", "Work Code", "Wagelist Number", "Labour Name", "Jobcard Number"
         ]
         
-        # Is tab ka apna driver nahi hoga — shared browser use karega (self.app.get_driver())
+        # This tab has no driver of its own — it uses the shared browser (self.app.get_driver())
         
         self._create_widgets()
         self.load_inputs()
     def _create_widgets(self) -> None:
 
         # ── Header card ──
-        self._create_header_card(self, "📍", "MR Tracking",
-                                 "Track muster-roll status, pendency and ABPS — with one-click actions.",
+        self._create_header_card(self, "📍", tr("tab.mr_tracking.title"), tr("tab.mr_tracking.subtitle"),
                                  icon_key="emoji_mr_tracking")
 
         # Frame for all user input controls
@@ -67,27 +67,27 @@ class MrTrackingTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure(3, weight=1)
 
         # --- Row 0: State & District ---
-        ctk.CTkLabel(controls_frame, text="State:").grid(row=0, column=0, sticky='w', padx=(15, 5), pady=10)
+        ctk.CTkLabel(controls_frame, text=tr("common.state_label")).grid(row=0, column=0, sticky='w', padx=(15, 5), pady=10)
         # --- Create all entries first (no cross-references) ---
         s_vals = self.app.history_manager.get_suggestions("location_state") or [""]
         self.state_var = ctk.StringVar()
         self.state_menu = ctk.CTkOptionMenu(controls_frame, variable=self.state_var, values=s_vals)
         self.state_menu.grid(row=0, column=1, sticky='ew', padx=5, pady=10)
 
-        ctk.CTkLabel(controls_frame, text="District:").grid(row=0, column=2, sticky='w', padx=(15, 5), pady=10)
+        ctk.CTkLabel(controls_frame, text=tr("common.district_label")).grid(row=0, column=2, sticky='w', padx=(15, 5), pady=10)
         d_vals = self.app.history_manager.get_suggestions("location_district") or [""]
         self.district_var = ctk.StringVar()
         self.district_menu = ctk.CTkOptionMenu(controls_frame, variable=self.district_var, values=d_vals)
         self.district_menu.grid(row=0, column=3, sticky='ew', padx=(5, 15), pady=10)
 
         # --- Row 1: Block & Panchayat ---
-        ctk.CTkLabel(controls_frame, text="Block:").grid(row=1, column=0, sticky='w', padx=(15, 5), pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("common.block_label")).grid(row=1, column=0, sticky='w', padx=(15, 5), pady=5)
         b_vals = self.app.history_manager.get_suggestions("location_block") or [""]
         self.block_var = ctk.StringVar()
         self.block_menu = ctk.CTkOptionMenu(controls_frame, variable=self.block_var, values=b_vals)
         self.block_menu.grid(row=1, column=1, sticky='ew', padx=5, pady=5)
 
-        ctk.CTkLabel(controls_frame, text="Panchayat:").grid(row=1, column=2, sticky='w', padx=(15, 5), pady=5)
+        ctk.CTkLabel(controls_frame, text=tr("common.panchayat_label")).grid(row=1, column=2, sticky='w', padx=(15, 5), pady=5)
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar(value=config.ALL_PANCHAYATS_LABEL)
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=self._all_panchayat_values(p_vals))
@@ -118,21 +118,21 @@ class MrTrackingTab(BaseAutomationTab):
 
         self.pending_only_var = tkinter.IntVar(value=0)
         self.pending_only_check = ctk.CTkCheckBox(filter_frame, 
-                                                  text="Pending for Filling", # Shortened
+                                                  text=tr("form.mr_tracking.pending_filling"), # Shortened
                                                   variable=self.pending_only_var,
                                                   command=self._on_filter_check_changed)
         self.pending_only_check.pack(side="left", padx=(5, 0))
 
         self.zero_mr_filter_var = tkinter.IntVar(value=0)
         self.zero_mr_filter_check = ctk.CTkCheckBox(filter_frame,
-                                                    text="T+8 to T+15 (Zero MR)", # Shortened
+                                                    text=tr("form.mr_tracking.t8_t15"), # Shortened
                                                     variable=self.zero_mr_filter_var,
                                                     command=self._on_filter_check_changed)
         self.zero_mr_filter_check.pack(side="left", padx=(15, 0))
 
         self.abps_pending_var = tkinter.IntVar(value=0)
         self.abps_pending_check = ctk.CTkCheckBox(filter_frame, 
-                                                  text="Pending for ABPS", # Shortened
+                                                  text=tr("form.mr_tracking.pending_abps"), # Shortened
                                                   variable=self.abps_pending_var,
                                                   command=self._on_filter_check_changed)
         self.abps_pending_check.pack(side="left", padx=(15, 0))
@@ -158,16 +158,16 @@ class MrTrackingTab(BaseAutomationTab):
         copy_frame = ctk.CTkFrame(workcode_tab, fg_color="transparent")
         copy_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
         
-        self.copy_wc_button = ctk.CTkButton(copy_frame, text="Copy Workcodes", command=self._copy_workcodes)
+        self.copy_wc_button = ctk.CTkButton(copy_frame, text=tr("form.mr_tracking.copy_workcodes"), command=self._copy_workcodes)
         self.copy_wc_button.pack(side="left")
 
-        self.run_mr_payment_button = ctk.CTkButton(copy_frame, text="Run MR Payment", command=self._run_mr_payment, fg_color="#108842", hover_color="#1A994C")
+        self.run_mr_payment_button = ctk.CTkButton(copy_frame, text=tr("form.mr_tracking.run_mr_payment"), command=self._run_mr_payment, fg_color="#108842", hover_color="#1A994C")
         self.run_mr_payment_button.pack_forget() 
         
-        self.run_emb_entry_button = ctk.CTkButton(copy_frame, text="Run eMB Entry", command=self._run_emb_entry, fg_color="#0A708C", hover_color="#0E95BA")
+        self.run_emb_entry_button = ctk.CTkButton(copy_frame, text=tr("form.mr_tracking.run_emb_entry"), command=self._run_emb_entry, fg_color="#0A708C", hover_color="#0E95BA")
         self.run_emb_entry_button.pack_forget() 
 
-        self.run_zero_mr_button = ctk.CTkButton(copy_frame, text="Forward to Zero MR", command=self._run_zero_mr, fg_color="#D9534F", hover_color="#C9302C")
+        self.run_zero_mr_button = ctk.CTkButton(copy_frame, text=tr("form.mr_tracking.forward_zero_mr"), command=self._run_zero_mr, fg_color="#D9534F", hover_color="#C9302C")
         self.run_zero_mr_button.pack_forget()
 
         self.workcode_textbox = ctk.CTkTextbox(workcode_tab, state="disabled")
@@ -180,10 +180,10 @@ class MrTrackingTab(BaseAutomationTab):
         export_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         export_frame.grid(row=0, column=0, sticky="w", padx=5, pady=5)
         
-        self.export_button = ctk.CTkButton(export_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side="left")
 
-        self.generate_pendency_btn = ctk.CTkButton(export_frame, text="Generate Pendency Report (T0-T8)", command=self._open_pendency_report_window, fg_color="#B45309", hover_color="#92400E")
+        self.generate_pendency_btn = ctk.CTkButton(export_frame, text=tr("form.mr_tracking.pendency_report"), command=self._open_pendency_report_window, fg_color="#B45309", hover_color="#92400E")
         self.generate_pendency_btn.pack(side="left", padx=15)
 
         self.results_tree = ttk.Treeview(results_tab, columns=self.report_headers, show='headings')
@@ -200,7 +200,7 @@ class MrTrackingTab(BaseAutomationTab):
         
         abps_export_frame = ctk.CTkFrame(abps_results_tab, fg_color="transparent")
         abps_export_frame.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.abps_export_button = ctk.CTkButton(abps_export_frame, text="Export ABPS Report", command=self._export_abps_report)
+        self.abps_export_button = ctk.CTkButton(abps_export_frame, text=tr("form.mr_tracking.export_abps"), command=self._export_abps_report)
         self.abps_export_button.pack(side="left")
         self.abps_export_format_menu = ctk.CTkOptionMenu(abps_export_frame, values=["Excel (.xlsx)"])
         self.abps_export_format_menu.pack(side="left", padx=5)
@@ -300,9 +300,9 @@ class MrTrackingTab(BaseAutomationTab):
         }
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['panchayat']]):
-            messagebox.showwarning("Input Error", "State, District, Block, and Panchayat are required."); return
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.state_district_block_panchayat_required")); return
         if inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL:
-            if not messagebox.askyesno("Confirm", "This will process ALL panchayats in the block. Continue?"):
+            if not messagebox.askyesno(tr("dialogs.confirm"), tr("dialogs.process_all_panchayats")):
                 return
         
         self.save_inputs(inputs)
@@ -314,8 +314,8 @@ class MrTrackingTab(BaseAutomationTab):
         
         driver = self.app.get_driver()
         if not driver:
-            self.log_error("ERROR: Pehle Launch Chrome karein.")
-            messagebox.showwarning("Browser Required", "Kripya pehle 'Launch Chrome' button se browser start karein.")
+            self.log_error("ERROR: Launch Chrome first.")
+            messagebox.showwarning(tr("errors.input_required"), tr("errors.browser_required"))
             return
         
         self.app.after(0, self.set_ui_state, True) 
@@ -351,11 +351,10 @@ class MrTrackingTab(BaseAutomationTab):
 
             def wait_for_dropdown(dropdown_id, step_name, progress):
                 """
-                Dropdown ke populate hone ka wait karta hai.
-                Asli postback ke liye 'onchange' event fire karna zaroori hai jo
-                __doPostBack trigger karta hai — lekin Selenium ka select_by_visible_text
-                woh event fire nahi karta. Isliye yahan select ke baad manually
-                dropdown ki option count check ki jaati hai.
+                Wait for the dropdown to populate.
+                The real postback needs the 'onchange' event, which Selenium's
+                select_by_visible_text does not fire. So after selecting, the
+                dropdown option count is checked manually here.
                 """
                 self.app.after(0, self.app.set_status, f"Waiting for {step_name}...")
                 self.app.after(0, self.update_status, f"Waiting for {step_name}...", progress)
@@ -367,7 +366,7 @@ class MrTrackingTab(BaseAutomationTab):
                     self.log_info(f"✅ '{step_name}' dropdown populated with options.")
                     time.sleep(0.5)
                 except TimeoutException:
-                    self.log_warning(f"'{step_name}' dropdown ({dropdown_id}) populate nahi hua (postback timeout).")
+                    self.log_warning(f"'{step_name}' dropdown ({dropdown_id}) did not populate (postback timeout).")
                     raise TimeoutException(f"Dropdown '{step_name}' ({dropdown_id}) did not populate after state selection.")
 
             def select_location(progress_start):
@@ -509,7 +508,7 @@ class MrTrackingTab(BaseAutomationTab):
                 if total_rows == 0:
                     if not all_mode:
                         self.log_warning("No records found for the selected criteria.")
-                        messagebox.showinfo("No Data", "No records found for the selected criteria.")
+                        messagebox.showinfo(tr("dialogs.no_data"), tr("dialogs.no_records_criteria"))
                         self.success_message = None
                         return
                     self.log_warning(f"No records found for {p_name}.")
@@ -638,23 +637,21 @@ class MrTrackingTab(BaseAutomationTab):
             err_text = str(e).splitlines()[0] if str(e).strip() else "Element not found on page"
             if driver and "Session Expired" in driver.page_source:
                 self.log_error("❌ Session expired. Please Login again and retry.")
-                messagebox.showerror("Session Expired", "Session expired. Please Login again and retry.")
+                messagebox.showerror(tr("dialogs.session_expired"), tr("dialogs.session_expired_msg"))
             else:
                 self.log_error(f"{err_text}")
-                messagebox.showerror("Automation Error",
-                    f"{err_text}\n\n"
-                    f"💡 Tip: Check if the page has changed. "
-                    f"Element IDs might need updating in the code.")
+                messagebox.showerror(tr("base.automation_error.title"),
+                    tr("dialogs.automation_error_tip", error=err_text))
                 
             self.app.after(0, self.app.set_status, "Error")
             self.success_message = None
         except Exception as e:
             self.log_error(f"An unexpected error occurred: {e}")
-            messagebox.showerror("Critical Error", f"An unexpected error occurred: {e}")
+            messagebox.showerror(tr("dialogs.critical_error"), tr("dialogs.unexpected_error", error=e))
             self.app.after(0, self.app.set_status, "Unexpected Error")
             self.success_message = None
         finally:
-            # Shared browser use kar rahe hain — isliye driver.quit() nahi karte
+            # Using the shared browser — so driver.quit() is not called
             self.app.after(0, self.set_ui_state, False) 
             
             final_app_status = "Automation Stopped" if self.is_stopped() else \
@@ -779,13 +776,13 @@ class MrTrackingTab(BaseAutomationTab):
         """Calculates and displays the Pendency Report based on current table data."""
         items = self.results_tree.get_children()
         if not items:
-            messagebox.showinfo("No Data", "Please run the MR Tracking automation first to get data.")
+            messagebox.showinfo(tr("dialogs.no_data"), tr("dialogs.run_automation_first"))
             return
 
         # --- Calculate Data ---
         summary_data = self._process_pendency_data(items)
         if not summary_data:
-            messagebox.showinfo("No Pendency Data", "Could not find any 'since X days' text in the current results.")
+            messagebox.showinfo(tr("dialogs.no_pendency_data"), tr("dialogs.no_since_days_text"))
             return
 
         # --- Create Popup Window ---
@@ -801,9 +798,9 @@ class MrTrackingTab(BaseAutomationTab):
         # Header
         header_frame = ctk.CTkFrame(win, fg_color="transparent")
         header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
-        ctk.CTkLabel(header_frame, text="Panchayat-wise Pendency Analysis", font=("Arial", 16, "bold")).pack(side="left")
+        ctk.CTkLabel(header_frame, text=tr("form.mr_tracking.pendency_analysis"), font=("Arial", 16, "bold")).pack(side="left")
         
-        export_btn = ctk.CTkButton(header_frame, text="Download Excel Report", 
+        export_btn = ctk.CTkButton(header_frame, text=tr("common.download_excel_report"), 
                                    command=lambda: self._export_pendency_excel(summary_data),
                                    fg_color="#108842", hover_color="#1A994C")
         export_btn.pack(side="right")
@@ -920,7 +917,7 @@ class MrTrackingTab(BaseAutomationTab):
             
         columns = ["SL NO", "Panchayat", "Total Pending", "T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8+"]
         
-        # File Dialog (filename me date+time → baar-baar export karne par overwrite nahi)
+        # File Dialog (date+time in filename → no overwrite on repeated exports)
         filename = f"Pendency_Report_{datetime.now().strftime('%d-%m-%Y_%H%M%S')}.xlsx"
         save_path = filedialog.asksaveasfilename(
             defaultextension=".xlsx", 
@@ -1040,13 +1037,13 @@ class MrTrackingTab(BaseAutomationTab):
                 for col_char in ['D','E','F','G','H','I','J','K','L']:
                     ws.column_dimensions[col_char].width = 8
 
-            messagebox.showinfo("Success", f"Report saved successfully:\n{save_path}")
+            messagebox.showinfo(tr("dialogs.success"), tr("dialogs.report_saved_path", path=save_path))
             try:
                 os.startfile(save_path) if os.name == 'nt' else subprocess.call(['open', save_path])
             except Exception as e: logger.debug("MRTracking: Could not open file: %s", e)
             
         except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to save Excel:\n{e}")
+            messagebox.showerror(tr("dialogs.export_error"), tr("dialogs.failed_save_excel", error=e))
 
     # --- END PENDENCY REPORT FEATURE ---
 
@@ -1062,7 +1059,7 @@ class MrTrackingTab(BaseAutomationTab):
         processed_list = []
         for code in workcodes_raw.splitlines():
             code = code.strip()
-            # Agar code me '/' hai to split karke last 6 digit nikalo
+            # If the code contains '/', split and take the last 6 digits
             if code and "/" in code:
                 try:
                     short_code = code.split('/')[-1][-6:]
@@ -1073,7 +1070,7 @@ class MrTrackingTab(BaseAutomationTab):
                 # Agar simple code hai to waisa hi lelo
                 processed_list.append(code)
         
-        # Duplicates hata kar list return karo
+        # Remove duplicates and return the list
         return list(set(processed_list))
 
     # --- UPDATED RUN METHODS (Replace existing ones with these) ---
@@ -1104,7 +1101,7 @@ class MrTrackingTab(BaseAutomationTab):
         """Send clean codes to MR Payment tab (multi-panchayat aware)."""
         grouped = self._get_grouped_workcodes()
         if not grouped:
-            messagebox.showwarning("No Data", "No valid workcodes found to transfer.", parent=self)
+            messagebox.showwarning(tr("dialogs.no_data"), tr("dialogs.no_valid_workcodes_transfer"), parent=self)
             return
 
         panchayat_name = self.panchayat_var.get().strip()
@@ -1123,7 +1120,7 @@ class MrTrackingTab(BaseAutomationTab):
         """Send clean codes to eMB Entry tab (multi-panchayat aware)."""
         grouped = self._get_grouped_workcodes()
         if not grouped:
-            messagebox.showwarning("No Data", "No valid workcodes found.", parent=self)
+            messagebox.showwarning(tr("dialogs.no_data"), tr("dialogs.no_valid_workcodes"), parent=self)
             return
 
         panchayat_name = self.panchayat_var.get().strip()
@@ -1138,13 +1135,13 @@ class MrTrackingTab(BaseAutomationTab):
     def _run_zero_mr(self):
         """Send clean codes to Zero MR tab"""
         if not hasattr(self, 'zero_mr_data') or not self.zero_mr_data:
-            messagebox.showwarning("No Data", "No Zero MR data found.", parent=self)
+            messagebox.showwarning(tr("dialogs.no_data"), tr("dialogs.no_zero_mr_data"), parent=self)
             return
             
         # Logic to clean Zero MR data
         processed_data = []
         for item in self.zero_mr_data:
-            # Code clean karo
+            # Clean the code
             original = item['work_code']
             short_wc = original.split('/')[-1][-6:] if "/" in original else original
             
@@ -1167,14 +1164,14 @@ class MrTrackingTab(BaseAutomationTab):
         if text:
             self.app.clipboard_clear()
             self.app.clipboard_append(text)
-            messagebox.showinfo("Copied", f"{len(text.splitlines())} workcodes copied to clipboard.", parent=self)
+            messagebox.showinfo(tr("status.copied"), tr("dialogs.workcodes_copied", count=len(text.splitlines())), parent=self)
         else:
-            messagebox.showwarning("Empty", "There are no workcodes to copy.", parent=self)
+            messagebox.showwarning(tr("dialogs.empty"), tr("dialogs.no_workcodes_to_copy"), parent=self)
 
     def export_report(self):
         """Export results to professional Excel."""
         if not self.results_tree.get_children():
-            messagebox.showinfo("No Data", "There are no results to export.")
+            messagebox.showinfo(tr("dialogs.no_data"), tr("dialogs.no_results_to_export"))
             return
             
         panchayat = self.panchayat_var.get().strip() or "Report"
@@ -1192,7 +1189,7 @@ class MrTrackingTab(BaseAutomationTab):
     def _export_abps_report(self):
         """Export ABPS results to professional Excel."""
         if not self.abps_results_tree.get_children():
-            messagebox.showinfo("No Data", "There are no ABPS results to export.")
+            messagebox.showinfo(tr("dialogs.no_data"), tr("dialogs.no_abps_results_export"))
             return
             
         panchayat = self.panchayat_var.get().strip() or "Report"
@@ -1287,7 +1284,7 @@ class MrTrackingTab(BaseAutomationTab):
             pdf.output(file_path)
             return True
         except Exception as e:
-            messagebox.showerror("PDF Export Error", f"Could not generate PDF report.\nError: {e}", parent=self)
+            messagebox.showerror(tr("dialogs.pdf_export_error"), tr("dialogs.could_not_gen_pdf", error=e), parent=self)
             return False
 
     def _wrap_text(self, text, font, max_width):

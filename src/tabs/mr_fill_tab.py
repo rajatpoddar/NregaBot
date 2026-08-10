@@ -9,6 +9,7 @@ from src import config
 from .base_tab import BaseAutomationTab
 
 from src.utils import get_logger, truncate_workcode
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoAlertPresentException, NoSuchElementException, TimeoutException  # noqa: F401
 
@@ -46,8 +47,7 @@ class MrFillTab(BaseAutomationTab):
         """Creates all the UI elements for the tab."""
 
         # --- Header / intro card (pending-bills style) ---
-        self._create_header_card(self, "📝", "MR Fill",
-                                 "Mark holiday columns and fill Muster Roll attendance for the selected Panchayat.",
+        self._create_header_card(self, "📝", tr("tab.mr_fill.title"), tr("tab.mr_fill.subtitle"),
                                  icon_key="emoji_mr_fill")
 
         # --- Configuration Card ---
@@ -59,25 +59,25 @@ class MrFillTab(BaseAutomationTab):
         # Panchayat Entry
         panchayat_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         panchayat_frame.grid(row=0, column=0, sticky='ew', padx=15, pady=(12,0))
-        ctk.CTkLabel(panchayat_frame, text="Panchayat Name", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
+        ctk.CTkLabel(panchayat_frame, text=tr("common.panchayat_name"), font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(panchayat_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.pack(fill='x', pady=(5,0))
-        ctk.CTkLabel(panchayat_frame, text="e.g., Palojori (skip if using GP login)", text_color="gray50").pack(anchor='w')
+        ctk.CTkLabel(panchayat_frame, text=tr("form.mr_fill.panchayat_placeholder"), text_color="gray50").pack(anchor='w')
         
         # Holiday Columns Entry
         holiday_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         holiday_frame.grid(row=0, column=1, sticky='ew', padx=15, pady=(12,0))
-        ctk.CTkLabel(holiday_frame, text="Mark Holiday Columns (comma-separated)", font=ctk.CTkFont(weight="bold")).pack(anchor='w')
+        ctk.CTkLabel(holiday_frame, text=tr("form.mr_fill.holiday_cols"), font=ctk.CTkFont(weight="bold")).pack(anchor='w')
         self.holiday_cols_entry = ctk.CTkEntry(holiday_frame, textvariable=self.holiday_cols_var) # Link to variable
         self.holiday_cols_entry.pack(fill='x', pady=(5,0))
-        ctk.CTkLabel(holiday_frame, text="e.g., 7, 14 (will mark 7th and 14th columns as holiday)", text_color="gray50").pack(anchor='w')
+        ctk.CTkLabel(holiday_frame, text=tr("form.mr_fill.holiday_placeholder"), text_color="gray50").pack(anchor='w')
 
         # Manual Mode Checkbox
         self.manual_mode_checkbox = ctk.CTkCheckBox(
             controls_frame, 
-            text="Manual Mode (Pause after marking holidays for you to mark absentees)",
+            text=tr("form.mr_fill.manual_mode"),
             variable=self.manual_mode_var # Link to variable
         )
         self.manual_mode_checkbox.grid(row=1, column=0, columnspan=2, sticky='w', padx=15, pady=(10,15))
@@ -98,10 +98,10 @@ class MrFillTab(BaseAutomationTab):
         wc_controls_frame = ctk.CTkFrame(work_codes_frame, fg_color="transparent")
         wc_controls_frame.grid(row=0, column=0, sticky='ew')
         
-        clear_button = ctk.CTkButton(wc_controls_frame, text="Clear", width=80, command=lambda: self.work_key_text.delete("1.0", tkinter.END))
+        clear_button = ctk.CTkButton(wc_controls_frame, text=tr("common.clear"), width=80, command=lambda: self.work_key_text.delete("1.0", tkinter.END))
         clear_button.pack(side='right', pady=(5,0), padx=(0,5))
         
-        extract_button = ctk.CTkButton(wc_controls_frame, text="Extract from Text", width=120,
+        extract_button = ctk.CTkButton(wc_controls_frame, text=tr("common.extract_from_text"), width=120,
                                        command=lambda: self._extract_and_update_workcodes(self.work_key_text))
         extract_button.pack(side='right', pady=(5,0), padx=(0, 5))
         
@@ -115,7 +115,7 @@ class MrFillTab(BaseAutomationTab):
         
         export_controls_frame = ctk.CTkFrame(results_action_frame, fg_color="transparent")
         export_controls_frame.pack(side='right', padx=(10, 0))
-        self.export_button = ctk.CTkButton(export_controls_frame, text="📥 Export to Excel", command=self.export_report)
+        self.export_button = ctk.CTkButton(export_controls_frame, text=tr("common.export_excel"), command=self.export_report)
         self.export_button.pack(side='left')
 
         # Results Treeview
@@ -184,7 +184,7 @@ class MrFillTab(BaseAutomationTab):
         self.export_button.configure(state=state)
     def reset_ui(self) -> None:
         """Resets the form to its default state."""
-        if messagebox.askokcancel("Reset Form?", "Clear all inputs, results, and logs?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_all")):
             self._load_inputs() # Load saved inputs
             # Clear text boxes and results
             self.work_key_text.configure(state="normal"); self.work_key_text.delete("1.0", tkinter.END); self.work_key_text.configure(state="disabled")
@@ -208,7 +208,7 @@ class MrFillTab(BaseAutomationTab):
         self.work_key_text.configure(state="disabled") # Disable again
 
         if not work_keys: 
-            messagebox.showerror("Input Error", "No work keys (Search Key) provided."); 
+            messagebox.showerror(tr("errors.input_error"), tr("dialogs.no_work_keys")); 
             return
             
         self._save_inputs(cfg) # Save the current inputs
@@ -259,7 +259,7 @@ class MrFillTab(BaseAutomationTab):
                 self.log_info("📊 Automation finished. Check the 'Results' tab for details.")        
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
-            messagebox.showerror("MR Fill Error", f"An error occurred: {e}")
+            messagebox.showerror(tr("dialogs.mr_fill_error"), tr("errors.an_error_occurred", error=e))
         
         finally:
             self.app.after(0, self.set_ui_state, False)
@@ -433,7 +433,7 @@ class MrFillTab(BaseAutomationTab):
         all_items = self.results_tree.get_children()
         
         if not all_items:
-            messagebox.showinfo("Retry", "No results found to retry.")
+            messagebox.showinfo(tr("base.error_tab.retry_btn"), tr("base.retry_no_results"))
             return
 
         for item_id in all_items:
@@ -446,10 +446,10 @@ class MrFillTab(BaseAutomationTab):
                 failed_items.append(work_code)
         
         if not failed_items:
-            messagebox.showinfo("Great!", "No failed items found.")
+            messagebox.showinfo(tr("dialogs.great"), tr("base.retry_no_fails"))
             return
 
-        if messagebox.askyesno("Retry Failed", f"Found {len(failed_items)} failed items.\nRetry now?"):
+        if messagebox.askyesno(tr("base.retry_confirm_title"), tr("dialogs.retry_failed_items", count=len(failed_items))):
             # 1. Update Input Box
             self.work_key_text.configure(state="normal")
             self.work_key_text.delete("1.0", tkinter.END)
@@ -505,9 +505,9 @@ class MrFillTab(BaseAutomationTab):
     def _get_filtered_data_and_filepath(self, export_format):
         """Filters data based on UI selection and gets a save file path from the user."""
         all_items = self.results_tree.get_children()
-        if not all_items: messagebox.showinfo("No Data", "There are no results to export."); return None, None
+        if not all_items: messagebox.showinfo(tr("errors.no_data"), tr("errors.no_results_export")); return None, None
         panchayat_name = self.panchayat_var.get() # Get from variable
-        if not panchayat_name: messagebox.showwarning("Input Needed", "Please enter a Panchayat Name for the report title."); return None, None
+        if not panchayat_name: messagebox.showwarning(tr("errors.input_needed"), tr("dialogs.panchayat_report_title")); return None, None
 
         filter_option = self.export_filter_menu.get()
         data_to_export = []
@@ -517,7 +517,7 @@ class MrFillTab(BaseAutomationTab):
             if filter_option == "Export All": data_to_export.append(row_values)
             elif filter_option == "Success Only" and "SUCCESS" in status: data_to_export.append(row_values)
             elif filter_option == "Failed Only" and "SUCCESS" not in status: data_to_export.append(row_values)
-        if not data_to_export: messagebox.showinfo("No Data", f"No records found for filter '{filter_option}'."); return None, None
+        if not data_to_export: messagebox.showinfo(tr("errors.no_data"), tr("dialogs.no_records_for_filter", filter=filter_option)); return None, None
 
         safe_name = "".join(c for c in panchayat_name if c.isalnum() or c in (' ', '_')).rstrip()
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -543,11 +543,11 @@ class MrFillTab(BaseAutomationTab):
             success = self.generate_report_pdf(data, headers, col_widths, title, report_date, file_path)
             
             if success:
-                if messagebox.askyesno("Success", f"PDF Report exported to:\n{file_path}\n\nDo you want to open the file?"):
+                if messagebox.askyesno(tr("status.success"), tr("dialogs.pdf_report_exported", path=file_path)):
                     if sys.platform == "win32":
                         os.startfile(file_path)
                     else:
                         subprocess.call(['open', file_path])
         except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to create PDF file.\n\nError: {e}")
+            messagebox.showerror(tr("dialogs.export_error"), tr("dialogs.failed_create_pdf", error=e))
 

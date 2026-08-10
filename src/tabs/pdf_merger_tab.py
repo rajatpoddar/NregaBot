@@ -1,4 +1,5 @@
 # tabs/pdf_merger_tab.py
+from src.i18n import tr
 import tkinter
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
@@ -33,8 +34,7 @@ class PDFMergerTab(BaseAutomationTab):
 
     def _create_widgets(self) -> None:
         # ── Header card ──
-        self._create_header_card(self, "🗂️", "PDF Merger",
-                                 "Merge multiple PDFs in order, name the output and save as one file.",
+        self._create_header_card(self, "🗂️", tr("tab.pdf_merger.title"), tr("tab.pdf_merger.subtitle"),
                                  icon_key="emoji_pdf_merger")
 
         # --- Controls Frame ---
@@ -48,10 +48,10 @@ class PDFMergerTab(BaseAutomationTab):
         select_button_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         select_button_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 5))
         
-        self.select_files_button = ctk.CTkButton(select_button_frame, text="Select PDF Files...", command=self.select_files)
+        self.select_files_button = ctk.CTkButton(select_button_frame, text=tr("common.select_pdf_files"), command=self.select_files)
         self.select_files_button.pack(side="left")
         
-        ctk.CTkLabel(select_button_frame, text="Select multiple PDFs. The order below is the merge order.").pack(side="left", padx=10)
+        ctk.CTkLabel(select_button_frame, text=tr("form.pdf_merger.select_hint")).pack(side="left", padx=10)
 
         # --- File List & Reordering ---
         list_frame = ctk.CTkFrame(controls_frame) 
@@ -83,13 +83,13 @@ class PDFMergerTab(BaseAutomationTab):
         reorder_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         reorder_frame.grid(row=1, column=1, sticky="ns", padx=(5, 10), pady=5)
         
-        self.move_up_button = ctk.CTkButton(reorder_frame, text="Move Up", command=self.move_up, width=100)
+        self.move_up_button = ctk.CTkButton(reorder_frame, text=tr("common.move_up"), command=self.move_up, width=100)
         self.move_up_button.pack(pady=5)
         
-        self.move_down_button = ctk.CTkButton(reorder_frame, text="Move Down", command=self.move_down, width=100)
+        self.move_down_button = ctk.CTkButton(reorder_frame, text=tr("common.move_down"), command=self.move_down, width=100)
         self.move_down_button.pack(pady=5)
         
-        self.remove_button = ctk.CTkButton(reorder_frame, text="Remove", command=self.remove_selected, fg_color="red", hover_color="#C70000", width=100)
+        self.remove_button = ctk.CTkButton(reorder_frame, text=tr("common.remove"), command=self.remove_selected, fg_color="red", hover_color="#C70000", width=100)
         self.remove_button.pack(pady=5)
         
         # --- Output File Name ---
@@ -98,16 +98,16 @@ class PDFMergerTab(BaseAutomationTab):
         output_name_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 6))
         output_name_frame.grid_columnconfigure(1, weight=1)
         
-        ctk.CTkLabel(output_name_frame, text="Output File Name:").grid(row=0, column=0, sticky="w", padx=15, pady=10)
-        self.file_name_entry = ctk.CTkEntry(output_name_frame, placeholder_text="e.g., Kasraydih")
+        ctk.CTkLabel(output_name_frame, text=tr("common.output_file_name")).grid(row=0, column=0, sticky="w", padx=15, pady=10)
+        self.file_name_entry = ctk.CTkEntry(output_name_frame, placeholder_text=tr("form.pdf_merger.name_placeholder"))
         self.file_name_entry.grid(row=0, column=1, sticky="ew", padx=(0, 15), pady=10)
 
         # --- Action Buttons ---
         action_frame = self._create_action_buttons(parent_frame=self)
         action_frame.grid(row=4, column=0, sticky="ew", padx=10, pady=(0, 6)) 
         
-        self.start_button.configure(text="Merge Selected PDFs")
-        self.reset_button.configure(text="Clear List")
+        self.start_button.configure(text=tr("form.pdf_merger.merge_btn"))
+        self.reset_button.configure(text=tr("common.clear_list"))
         
         # --- Logs ---
         notebook = ctk.CTkTabview(self)
@@ -132,7 +132,7 @@ class PDFMergerTab(BaseAutomationTab):
         mr_path = self.app.get_nregabot_path("PDF_Output/MR_Output")
         initial_dir = mr_path if os.path.isdir(mr_path) else None
         files = filedialog.askopenfilenames(
-            title="Select PDF files to merge",
+            title=tr("form.pdf_merger.select_title"),
             initialdir=initial_dir,
             filetypes=[("PDF files", "*.pdf")]
         )
@@ -176,12 +176,12 @@ class PDFMergerTab(BaseAutomationTab):
             self.update_listbox()
             self.log_info(f"Removed: {os.path.basename(removed_file)}")
         except IndexError:
-            messagebox.showwarning("No Selection", "Please select a file from the list to remove.", parent=self)
+            messagebox.showwarning(tr("dialogs.no_selection"), tr("dialogs.select_file_remove"), parent=self)
 
     def reset_ui(self) -> None:
         if not self.selected_files and not self.file_name_entry.get(): 
             return
-        if messagebox.askokcancel("Clear Form?", "Are you sure you want to clear all selected files and the file name?"):
+        if messagebox.askokcancel(tr("dialogs.clear_form"), tr("dialogs.clear_form_confirm")):
             self.selected_files.clear()
             self.update_listbox()
             self.file_name_entry.delete(0, tkinter.END) 
@@ -211,17 +211,17 @@ class PDFMergerTab(BaseAutomationTab):
             return output_path
         except Exception as e:
             self.log_error(f"Error creating output path: {e}")
-            messagebox.showerror("Path Error", f"Could not create output directory: {e}", parent=self)
+            messagebox.showerror(tr("dialogs.path_error"), tr("dialogs.could_not_create_out_dir", error=e), parent=self)
             return None
 
     def start_automation(self) -> None:
         if len(self.selected_files) < 2:
-            messagebox.showwarning("Not Enough Files", "Please select at least two PDF files to merge.", parent=self)
+            messagebox.showwarning(tr("dialogs.not_enough_files"), tr("dialogs.select_two_pdfs"), parent=self)
             return
 
         base_name = self.file_name_entry.get().strip()
         if not base_name:
-            messagebox.showwarning("Input Required", "Please enter an output file name (e.g., Kasraydih).", parent=self)
+            messagebox.showwarning(tr("errors.input_required"), tr("dialogs.enter_output_name"), parent=self)
             return
 
         output_path = self._get_output_path(base_name)
@@ -238,7 +238,7 @@ class PDFMergerTab(BaseAutomationTab):
     def run_automation_logic(self, file_list, output_path):
         if PdfWriter is None:
             self.log_error("PDF library (pypdf/PyPDF2) not installed. Please reinstall the latest version from nregabot.com.")
-            messagebox.showerror("PDF Library Missing", "PDF merge requires the 'pypdf' library.\n\nSmart updates cannot add new Python libraries — please download the latest full version from nregabot.com.", parent=self)
+            messagebox.showerror(tr("dialogs.pdf_lib_missing"), tr("dialogs.pdf_lib_missing_msg"), parent=self)
             return
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
@@ -283,14 +283,14 @@ class PDFMergerTab(BaseAutomationTab):
             writer.close()
             
             self.log_success("Merge complete!")
-            messagebox.showinfo("Success", f"Successfully merged {len(file_list)} files into:\n{output_path}", parent=self)
+            messagebox.showinfo(tr("status.success"), tr("dialogs.merged_files", count=len(file_list), path=output_path), parent=self)
             
-            if messagebox.askyesno("Open Location?", "Do you want to open the folder containing the merged file?", parent=self):
+            if messagebox.askyesno(tr("dialogs.open_location"), tr("dialogs.open_location_confirm"), parent=self):
                 self.app.open_folder(os.path.dirname(output_path))
 
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
-            messagebox.showerror("Merge Error", f"An error occurred during merging:\n\n{e}", parent=self)
+            messagebox.showerror(tr("dialogs.merge_error"), tr("dialogs.merge_failed", error=e), parent=self)
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")

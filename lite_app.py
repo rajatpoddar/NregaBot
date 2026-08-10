@@ -61,6 +61,7 @@ from src.utils import (
 # --- Shared automation display names for the footer's "▶ Running: ..."
 # indicator — single source of truth lives in src/app/app_automation.py.
 from src.app.app_automation import AUTOMATION_DISPLAY_NAMES, _automation_display_name
+from src.i18n import tr
 
 # --- Replace AutocompleteEntry with LiteDropdown for the lite app ---
 # Every tab that imports AutocompleteEntry from autocomplete_widget will get
@@ -652,7 +653,8 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                 # Pin Home button at top with emoji
                 for name, data in cat_tabs.items():
                     emoji = data.get("icon", "")
-                    btn_text = f"{emoji}  {name}" if emoji else name
+                    disp = tr(f"nav.tab.{name}", default=name)
+                    btn_text = f"{emoji}  {disp}" if emoji else disp
                     btn = ctk.CTkButton(
                         nav_parent, text=btn_text,
                         compound="left", anchor="w",
@@ -670,14 +672,15 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
             else:
                 # Category label
                 ctk.CTkLabel(
-                    nav_parent, text=cat_name,
+                    nav_parent, text=tr(f"nav.cat.{cat_name}", default=cat_name),
                     font=ctk.CTkFont(size=11, weight="bold"),
                     text_color=("gray50", "gray60")
                 ).pack(fill="x", padx=10, pady=(5, 2))
                 
                 for name, data in cat_tabs.items():
                     emoji = data.get("icon", "")
-                    btn_text = f"{emoji}  {name}" if emoji else name
+                    disp = tr(f"nav.tab.{name}", default=name)
+                    btn_text = f"{emoji}  {disp}" if emoji else disp
                     btn = ctk.CTkButton(
                         nav_parent, text=btn_text,
                         compound="left", anchor="w",

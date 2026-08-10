@@ -11,6 +11,7 @@ from .base_tab import BaseAutomationTab
 from .date_entry_widget import DateEntry
 from .demand_tab import CloudFilePicker 
 from src.utils import get_logger, truncate_workcode
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException  # noqa: F401
 
@@ -47,8 +48,7 @@ class WcGenTab(BaseAutomationTab):
         results_tab.grid_columnconfigure(0, weight=1)
 
         # ── Header card ──
-        self._create_header_card(settings_tab, "🧱", "Work Code Generation",
-                                 "Generate work codes on the NREGA portal from a CSV file.",
+        self._create_header_card(settings_tab, "🧱", tr("tab.wc_gen.title"), tr("tab.wc_gen.subtitle"),
                                  icon_key="emoji_wc_gen")
 
         # ── Settings card (bordered scrollable, pending-bills style) ──
@@ -60,44 +60,44 @@ class WcGenTab(BaseAutomationTab):
         step1_frame = ctk.CTkFrame(settings_container)
         step1_frame.grid(row=0, column=0, sticky='ew', pady=(0, 10))
         step1_frame.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(step1_frame, text="Step 1: Load Panchayat & Profile", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, padx=15, pady=(10, 5), sticky="w")
+        ctk.CTkLabel(step1_frame, text=tr("form.wc_gen.step1"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, padx=15, pady=(10, 5), sticky="w")
         
         profile_frame = ctk.CTkFrame(step1_frame, fg_color="transparent")
         profile_frame.grid(row=1, column=0, columnspan=2, sticky='ew', padx=10)
         profile_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(profile_frame, text="Config Profile:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        ctk.CTkLabel(profile_frame, text=tr("form.wc_gen.config_profile")).grid(row=0, column=0, padx=5, pady=5, sticky="w")
         self.profile_var = ctk.StringVar()
         self.profile_combobox = ctk.CTkOptionMenu(profile_frame, variable=self.profile_var, values=[], command=self._load_profile)
         self.profile_combobox.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        self.profile_name_entry = ctk.CTkEntry(profile_frame, placeholder_text="Enter new profile name to save")
+        self.profile_name_entry = ctk.CTkEntry(profile_frame, placeholder_text=tr("common.profile_name_placeholder"))
         self.profile_name_entry.grid(row=1, column=1, padx=5, pady=(5,10), sticky="ew")
         profile_actions = ctk.CTkFrame(profile_frame, fg_color="transparent")
         profile_actions.grid(row=1, column=0, padx=5, pady=(5,10))
-        self.save_profile_button = ctk.CTkButton(profile_actions, text="Save", width=70, command=self._save_profile)
+        self.save_profile_button = ctk.CTkButton(profile_actions, text=tr("common.save"), width=70, command=self._save_profile)
         self.save_profile_button.pack(side="left", padx=(0, 5))
-        self.delete_profile_button = ctk.CTkButton(profile_actions, text="Delete", width=70, fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self._delete_profile)
+        self.delete_profile_button = ctk.CTkButton(profile_actions, text=tr("common.delete"), width=70, fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self._delete_profile)
         self.delete_profile_button.pack(side="left")
         
         panchayat_frame = ctk.CTkFrame(step1_frame, fg_color="transparent")
         panchayat_frame.grid(row=2, column=0, columnspan=2, sticky='ew', padx=10, pady=(0,10))
         panchayat_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(panchayat_frame, text="Panchayat:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        ctk.CTkLabel(panchayat_frame, text=tr("common.panchayat_label")).grid(row=0, column=0, padx=5, pady=5, sticky="w")
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(panchayat_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        self.load_button = ctk.CTkButton(panchayat_frame, text="Load Categories from Website", command=self._start_category_loading_thread)
+        self.load_button = ctk.CTkButton(panchayat_frame, text=tr("form.wc_gen.load_categories"), command=self._start_category_loading_thread)
         self.load_button.grid(row=1, column=0, columnspan=2, padx=5, pady=(5,10), sticky="ew")
 
         integration_frame = ctk.CTkFrame(settings_container)
         integration_frame.grid(row=1, column=0, sticky='ew', pady=(0, 10))
-        self.send_to_if_edit_switch = ctk.CTkSwitch(integration_frame, text="Auto-send successful work codes to IF Editor")
+        self.send_to_if_edit_switch = ctk.CTkSwitch(integration_frame, text=tr("form.wc_gen.auto_send_if"))
         self.send_to_if_edit_switch.grid(row=0, column=0, padx=15, pady=10)
 
         self.step2_frame = ctk.CTkFrame(settings_container)
         self.step2_frame.grid(row=2, column=0, sticky='ew', pady=(0, 10))
         self.step2_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(self.step2_frame, text="Step 2: Configure Work Details", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, padx=15, pady=(10, 5), sticky="w")
+        ctk.CTkLabel(self.step2_frame, text=tr("form.wc_gen.step2"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, padx=15, pady=(10, 5), sticky="w")
         self._create_field(self.step2_frame, "master_category", "Master Category", 1, is_dropdown=True)
         self._create_field(self.step2_frame, "work_category", "Work Category", 2, is_dropdown=True)
         self._create_field(self.step2_frame, "beneficiary_type", "Beneficiary Type", 3, is_dropdown=True)
@@ -105,44 +105,44 @@ class WcGenTab(BaseAutomationTab):
         self._create_field(self.step2_frame, "work_type", "Work Type", 5, is_dropdown=True)
         self._create_field(self.step2_frame, "pro_status", "Proposal Status", 6, is_dropdown=True)
         self._create_field(self.step2_frame, "executing_agency", "Executing Agency", 7, is_dropdown=True)
-        ctk.CTkLabel(self.step2_frame, text="Proposal Date:").grid(row=8, column=0, sticky="w", padx=15, pady=5)
+        ctk.CTkLabel(self.step2_frame, text=tr("form.wc_gen.proposal_date")).grid(row=8, column=0, sticky="w", padx=15, pady=5)
         self.ui_fields['proposal_date'] = DateEntry(self.step2_frame)
         self.ui_fields['proposal_date'].grid(row=8, column=1, sticky="ew", padx=15, pady=5)
-        ctk.CTkLabel(self.step2_frame, text="Work Start Date:").grid(row=9, column=0, sticky="w", padx=15, pady=5)
+        ctk.CTkLabel(self.step2_frame, text=tr("form.wc_gen.work_start_date")).grid(row=9, column=0, sticky="w", padx=15, pady=5)
         self.ui_fields['start_date'] = DateEntry(self.step2_frame)
         self.ui_fields['start_date'].grid(row=9, column=1, sticky="ew", padx=15, pady=5)
         self._create_field(self.step2_frame, "est_labour_cost", "Est. Labour Cost (Lakhs)", 10)
         self._create_field(self.step2_frame, "est_material_cost", "Est. Material Cost (Lakhs)", 11)
 
-        ctk.CTkLabel(self.step2_frame, text="Undertaking PDF (Individual):").grid(row=12, column=0, sticky="w", padx=15, pady=5)
+        ctk.CTkLabel(self.step2_frame, text=tr("form.wc_gen.undertaking_pdf")).grid(row=12, column=0, sticky="w", padx=15, pady=5)
         self.pdf_frame = ctk.CTkFrame(self.step2_frame, fg_color="transparent")
         self.pdf_frame.grid(row=12, column=1, sticky="ew", padx=15, pady=5)
-        self.select_pdf_button = ctk.CTkButton(self.pdf_frame, text="Select PDF", width=100, command=self._select_undertaking_pdf)
+        self.select_pdf_button = ctk.CTkButton(self.pdf_frame, text=tr("common.select_pdf"), width=100, command=self._select_undertaking_pdf)
         self.select_pdf_button.pack(side="left")
-        self.pdf_label = ctk.CTkLabel(self.pdf_frame, text="No file selected", text_color="gray", font=("Arial", 11))
+        self.pdf_label = ctk.CTkLabel(self.pdf_frame, text=tr("errors.no_file_selected"), text_color="gray", font=("Arial", 11))
         self.pdf_label.pack(side="left", padx=10)
 
         step3_frame = ctk.CTkFrame(settings_container)
         step3_frame.grid(row=3, column=0, sticky='ew', pady=(0, 10))
         step3_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(step3_frame, text="Step 3: Select Data File", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=3, padx=15, pady=(10, 5), sticky="w")
+        ctk.CTkLabel(step3_frame, text=tr("form.wc_gen.step3"), font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=3, padx=15, pady=(10, 5), sticky="w")
         
         file_buttons_frame = ctk.CTkFrame(step3_frame, fg_color="transparent")
         file_buttons_frame.grid(row=1, column=0, columnspan=2, sticky="w", padx=15, pady=10)
 
-        self.select_button = ctk.CTkButton(file_buttons_frame, text="Select from Computer", command=self.select_csv_file)
+        self.select_button = ctk.CTkButton(file_buttons_frame, text=tr("common.select_from_computer"), command=self.select_csv_file)
         self.select_button.pack(side="left", padx=(0, 10))
         
-        self.cloud_csv_button = ctk.CTkButton(file_buttons_frame, text="Select from Cloud", command=self._select_csv_from_cloud, fg_color="teal", hover_color="#00695C")
+        self.cloud_csv_button = ctk.CTkButton(file_buttons_frame, text=tr("common.select_from_cloud"), command=self._select_csv_from_cloud, fg_color="teal", hover_color="#00695C")
         self.cloud_csv_button.pack(side="left", padx=(0, 10))
 
-        self.demo_csv_button = ctk.CTkButton(file_buttons_frame, text="Download Demo CSV", command=lambda: self.app.save_demo_csv("wc_gen"), fg_color="#2E8B57", hover_color="#257247")
+        self.demo_csv_button = ctk.CTkButton(file_buttons_frame, text=tr("common.download_demo_csv"), command=lambda: self.app.save_demo_csv("wc_gen"), fg_color="#2E8B57", hover_color="#257247")
         self.demo_csv_button.pack(side="left", padx=(0, 10))
 
-        self.online_csv_button = ctk.CTkButton(file_buttons_frame, text="Generate CSV Online", command=self._open_wc_tool_link, fg_color="#1F618D", hover_color="#154360")
+        self.online_csv_button = ctk.CTkButton(file_buttons_frame, text=tr("form.wc_gen.generate_csv_online"), command=self._open_wc_tool_link, fg_color="#1F618D", hover_color="#154360")
         self.online_csv_button.pack(side="left", padx=(0, 10)) 
         
-        self.file_label = ctk.CTkLabel(step3_frame, text="No file selected", text_color="gray")
+        self.file_label = ctk.CTkLabel(step3_frame, text=tr("errors.no_file_selected"), text_color="gray")
         self.file_label.grid(row=2, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 10))
 
         # ── Action buttons (OUTSIDE the card) ──
@@ -156,7 +156,7 @@ class WcGenTab(BaseAutomationTab):
 
         results_action_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         results_action_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(5, 10), padx=5)
-        self.export_button = ctk.CTkButton(results_action_frame, text="📥 Export to Excel", fg_color="#107C10", hover_color="#0B5E0B", command=self.export_report)
+        self.export_button = ctk.CTkButton(results_action_frame, text=tr("common.export_excel"), fg_color="#107C10", hover_color="#0B5E0B", command=self.export_report)
         self.export_button.pack(side="left")
         
         cols = ("Panchayat", "Work Code", "Job Card", "Beneficiary Type")
@@ -174,7 +174,7 @@ class WcGenTab(BaseAutomationTab):
         try:
             path = filedialog.askopenfilename(
                 parent=self, 
-                title="Select Undertaking PDF",
+                title=tr("form.wc_gen.select_undertaking_pdf"),
                 filetypes=[("PDF files", "*.pdf")]
             )
             if path:
@@ -184,7 +184,7 @@ class WcGenTab(BaseAutomationTab):
                 self.pdf_label.configure(text=display_name, text_color=("black", "white"))
                 self.log_info(f"Undertaking PDF selected: {filename}")
         except Exception as e:
-            messagebox.showerror("Error", f"Could not open file picker: {e}")
+            messagebox.showerror(tr("dialogs.error"), tr("dialogs.could_not_open_picker", error=e))
 
     def _open_wc_tool_link(self):
         webbrowser.open_new_tab("https://tools.nregabot.com/work_code_generator")
@@ -192,7 +192,7 @@ class WcGenTab(BaseAutomationTab):
     def _select_csv_from_cloud(self):
         token = self.app.license_info.get('key')
         if not token:
-            messagebox.showerror("Error", "You must be licensed to use cloud storage.")
+            messagebox.showerror(tr("dialogs.error"), tr("dialogs.licensed_cloud_required"))
             return
 
         picker = CloudFilePicker(parent=self, app_instance=self.app)
@@ -239,7 +239,7 @@ class WcGenTab(BaseAutomationTab):
             return temp_path
         except Exception as e:
             self.log_error(f"Cloud download failed: {e}")
-            messagebox.showerror("Download Failed", f"Could not download file: {e}")
+            messagebox.showerror(tr("dialogs.download_failed"), tr("dialogs.could_not_download", error=e))
             return None
 
     def _log_result(self, result_data):
@@ -328,7 +328,7 @@ class WcGenTab(BaseAutomationTab):
         if not is_autosave:
             profile_name = self.profile_name_entry.get().strip()
             if not profile_name:
-                messagebox.showwarning("Input Error", "Please enter a name for the profile.")
+                messagebox.showwarning(tr("errors.input_error"), tr("dialogs.enter_name_profile"))
                 return
         if not profile_name:
             return
@@ -346,10 +346,10 @@ class WcGenTab(BaseAutomationTab):
             self.profile_combobox.set(profile_name)
             if not is_autosave:
                 self.profile_name_entry.delete(0, tkinter.END)
-                messagebox.showinfo("Success", f"Profile '{profile_name}' saved successfully.")
+                messagebox.showinfo(tr("dialogs.success"), tr("dialogs.profile_saved", name=profile_name))
         except Exception as e:
             if not is_autosave:
-                messagebox.showerror("Error", f"Failed to save profile: {e}")
+                messagebox.showerror(tr("dialogs.error"), tr("dialogs.failed_save_profile", error=e))
 
     def _load_profile(self, profile_name):
         if not profile_name or not self.profiles:
@@ -387,9 +387,9 @@ class WcGenTab(BaseAutomationTab):
     def _delete_profile(self):
         profile_name = self.profile_combobox.get()
         if not profile_name or profile_name not in self.profiles or profile_name == "Last Used Config":
-            messagebox.showwarning("Selection Error", "Please select a valid, user-saved profile to delete.")
+            messagebox.showwarning(tr("dialogs.selection_error"), tr("dialogs.select_user_profile"))
             return
-        if not messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete the profile '{profile_name}'?"):
+        if not messagebox.askyesno(tr("dialogs.confirm_delete"), tr("dialogs.confirm_delete_profile", name=profile_name)):
             return
         del self.profiles[profile_name]
         try:
@@ -403,24 +403,24 @@ class WcGenTab(BaseAutomationTab):
             else:
                 self.profile_combobox.set("")
                 self._populate_defaults()
-            messagebox.showinfo("Success", f"Profile '{profile_name}' deleted.")
+            messagebox.showinfo(tr("dialogs.success"), tr("dialogs.profile_deleted", name=profile_name))
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to delete profile: {e}")
+            messagebox.showerror(tr("dialogs.error"), tr("dialogs.failed_delete_profile", error=e))
 
     def _start_category_loading_thread(self):
         panchayat = self.panchayat_var.get().strip()
         if not panchayat:
-            messagebox.showwarning("Input Required", "Please enter a Panchayat Name first.")
+            messagebox.showwarning(tr("dialogs.input_required"), tr("dialogs.enter_panchayat_first"))
             return
         self.app.update_history("location_panchayat", panchayat)
-        self.load_button.configure(state="disabled", text="Loading...")
+        self.load_button.configure(state="disabled", text=tr("common.loading"))
         threading.Thread(target=self._load_initial_categories, daemon=True).start()
 
     def _load_initial_categories(self):
         try:
             driver = self.app.get_driver()
             if not driver:
-                self.app.after(0, lambda: self.load_button.configure(state="normal", text="Load Categories from Website"))
+                self.app.after(0, lambda: self.load_button.configure(state="normal", text=tr("form.wc_gen.load_categories")))
                 return
             
             target_url = config.WC_GEN_CONFIG["url"]
@@ -452,11 +452,11 @@ class WcGenTab(BaseAutomationTab):
             if "Message:" in error_msg:
                  error_msg = error_msg.split("Stacktrace:")[0].strip()
             
-            self.app.after(0, lambda msg=error_msg: messagebox.showerror("Error", f"Failed to load categories:\n{msg}"))
+            self.app.after(0, lambda msg=error_msg: messagebox.showerror(tr("dialogs.error"), tr("dialogs.failed_load_categories", error=msg)))
             self.log_error(f"Error: {msg}")
 
         finally:
-            self.app.after(0, lambda: self.load_button.configure(state="normal", text="Load Categories from Website"))
+            self.app.after(0, lambda: self.load_button.configure(state="normal", text=tr("form.wc_gen.load_categories")))
 
     def _update_ui_after_load(self, master_cat_options, agency_options):
         # Optimized: Single pass to enable fields
@@ -686,14 +686,14 @@ class WcGenTab(BaseAutomationTab):
             self.log_warning("Row submitted, but URL did not change to the success page.")        
         return None
     def start_automation(self) -> None:
-        if not self.csv_path: messagebox.showwarning("Missing File", "Please select a CSV data file first."); return
+        if not self.csv_path: messagebox.showwarning(tr("dialogs.missing_file"), tr("dialogs.select_csv_first")); return
         form_config = {key: field.get() for key, field in self.ui_fields.items()}
         form_config["panchayat_name"] = self.panchayat_var.get().strip()
         form_config["undertaking_pdf"] = self.undertaking_pdf_path
 
         required_fields = ["panchayat_name", "master_category", "work_category", "beneficiary_type", "activity_type", "work_type", "pro_status", "executing_agency", "proposal_date", "start_date", "est_labour_cost", "est_material_cost"]
         if any(not form_config.get(key) for key in required_fields):
-            messagebox.showwarning("Input Error", "Please load categories and ensure all configuration fields are filled."); return
+            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.load_categories_config")); return
         
         self._save_profile(profile_name="Last Used Config", is_autosave=True)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(form_config,))
@@ -751,7 +751,7 @@ class WcGenTab(BaseAutomationTab):
                 self.app.after(0, self.app.switch_to_if_edit_with_data, self.successful_wcs_data)
             
     def select_csv_file(self):
-        path = filedialog.askopenfilename(title="Select your CSV data file", filetypes=[("CSV files", "*.csv")])
+        path = filedialog.askopenfilename(title=tr("form.wc_gen.select_csv"), filetypes=[("CSV files", "*.csv")])
         if path: self.csv_path = path; self.file_label.configure(text=os.path.basename(path))
         
     def set_ui_state(self, running: bool, force_disable_form=False):
@@ -781,13 +781,13 @@ class WcGenTab(BaseAutomationTab):
                  for child in self.step2_frame.winfo_children():
                     if isinstance(child, (ctk.CTkEntry, ctk.CTkOptionMenu, DateEntry)): child.configure(state="normal")
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "Are you sure?"):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.are_you_sure")):
             self.panchayat_var.set("")
-            self.file_label.configure(text="No file selected")
+            self.file_label.configure(text=tr("errors.no_file_selected"))
             self.csv_path = None
             
             self.undertaking_pdf_path = None
-            self.pdf_label.configure(text="No file selected", text_color="gray")
+            self.pdf_label.configure(text=tr("errors.no_file_selected"), text_color="gray")
             
             self.app.clear_log(self.log_display)
             self.send_to_if_edit_switch.deselect()

@@ -12,6 +12,7 @@ from datetime import datetime
 
 from .base_tab import BaseAutomationTab
 from src.utils import get_logger
+from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, TimeoutException, Alignment, Border, Font, PatternFill, Side, get_column_letter, import_pandas  # noqa: F401
 
@@ -85,8 +86,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         settings_tab.grid_rowconfigure(1, weight=1)
 
         # ── Header card (inside the Settings tab) ──
-        self._create_header_card(settings_tab, "📷", "NMMS Attendance",
-                                 "Record NMMS attendance with date, group photos and geo-coordinates.",
+        self._create_header_card(settings_tab, "📷", tr("tab.nmms_attendance.title"), tr("tab.nmms_attendance.subtitle"),
                                  icon_key="emoji_nmms_attendance")
 
         top = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
@@ -107,7 +107,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         date_row.grid(row=0, column=0, sticky="ew", pady=(0, 4))
         date_row.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(date_row, text="Attendance Date:",
+        ctk.CTkLabel(date_row, text=tr("form.nmms.attendance_date"),
                      font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 8))
         from tkcalendar import DateEntry as TKDateEntry
         try:
@@ -120,13 +120,13 @@ class NmmsAttendanceTab(BaseAutomationTab):
             self._date_picker.pack(side="left", padx=(0, 16))
 
         self._scrape_btn = ctk.CTkButton(
-            date_row, text="📅 Set Date & Scrape", width=190,
+            date_row, text=tr("form.nmms.set_date_scrape"), width=190,
             fg_color="#2E7D32", hover_color="#1B5E20", command=self._scrape_current_page_thread)
         self._scrape_btn.pack(side="left", padx=(0, 16))
 
         # Download photos checkbox — its own row so the half-width column never clips it
         self._save_photos_var = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(left_col, text="Download Group Photos",
+        ctk.CTkCheckBox(left_col, text=tr("form.nmms.download_photos"),
                         variable=self._save_photos_var).grid(row=1, column=0, sticky="w", pady=(0, 2))
 
         # Panchayat selection
@@ -137,11 +137,11 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         pan_hdr = ctk.CTkFrame(pan_outer, fg_color="transparent")
         pan_hdr.grid(row=0, column=0, sticky="ew")
-        ctk.CTkLabel(pan_hdr, text="Select Panchayats:", font=ctk.CTkFont(weight="bold")).pack(side="left")
-        ctk.CTkButton(pan_hdr, text="Select All", width=100,
+        ctk.CTkLabel(pan_hdr, text=tr("form.nmms.select_panchayats"), font=ctk.CTkFont(weight="bold")).pack(side="left")
+        ctk.CTkButton(pan_hdr, text=tr("common.select_all"), width=100,
                       fg_color="#1565C0", hover_color="#0D47A1",
                       command=self._select_all).pack(side="right", padx=(4, 0))
-        ctk.CTkButton(pan_hdr, text="Clear All", width=90, command=self._clear_all).pack(side="right")
+        ctk.CTkButton(pan_hdr, text=tr("common.clear_all"), width=90, command=self._clear_all).pack(side="right")
 
         self._pan_scroll = ctk.CTkScrollableFrame(pan_outer, height=170)
         self._pan_scroll.grid(row=1, column=0, sticky="nsew", pady=(4, 0))
@@ -158,7 +158,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         howto.grid(row=0, column=1, sticky="nsew", padx=(4, 8), pady=8)
         howto.grid_columnconfigure(0, weight=1)
         howto.grid_rowconfigure(1, weight=1)
-        ctk.CTkLabel(howto, text="💡 How to Use",
+        ctk.CTkLabel(howto, text=tr("form.nmms.how_to_use"),
                      font=ctk.CTkFont(size=13, weight="bold"),
                      text_color=("#1565C0", "#64B5F6")).grid(row=0, column=0, sticky="w", padx=14, pady=(10, 4))
         instr = (
@@ -180,10 +180,10 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         toolbar = ctk.CTkFrame(tab, fg_color="transparent")
         toolbar.grid(row=0, column=0, columnspan=2, sticky="w", padx=5, pady=5)
-        ctk.CTkButton(toolbar, text="📊 Export Excel Report",
+        ctk.CTkButton(toolbar, text=tr("form.nmms.export_report"),
                       fg_color="#2E7D32", hover_color="#1B5E20",
                       command=self._export_excel).pack(side="left", padx=(0, 8))
-        ctk.CTkButton(toolbar, text="Clear Results", width=100,
+        ctk.CTkButton(toolbar, text=tr("form.nmms.clear_results"), width=100,
                       fg_color=("gray70", "#4A4A4A"), text_color="white",
                       command=self._clear_results).pack(side="left")
 
@@ -211,7 +211,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         toolbar = ctk.CTkFrame(tab, fg_color="transparent")
         toolbar.grid(row=0, column=0, columnspan=2, sticky="w", padx=5, pady=5)
-        ctk.CTkButton(toolbar, text="📥 Export Workers Excel",
+        ctk.CTkButton(toolbar, text=tr("form.nmms.export_workers"),
                       command=lambda: self.export_treeview_to_excel(
                           self.workers_tree, default_filename="NMMS_Workers_Detail.xlsx", filter_mode="Export All")).pack(side="left")
 
@@ -269,8 +269,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         driver = self.app.get_driver()
         if not driver:
             messagebox.showwarning(
-                "Browser Not Connected",
-                "No browser found.\n\nPlease launch Chrome/Edge from the app and log in to NREGA portal first.")
+                tr("dialogs.browser_not_connected"), tr("dialogs.no_browser_found"))
         return driver
 
     # PHASE 2 — SCRAPE CURRENT PAGE
@@ -278,7 +277,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         driver = self._get_driver()
         if not driver:
             return
-        self._scrape_btn.configure(state="disabled", text="Scraping...")
+        self._scrape_btn.configure(state="disabled", text=tr("form.nmms.scraping"))
         threading.Thread(target=self._scrape_current_page_logic, args=(driver,), daemon=True).start()
 
     def _scrape_current_page_logic(self, driver):
@@ -293,11 +292,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
             except TimeoutException:
                 body = driver.find_element(By.TAG_NAME, "body").text[:400]
                 self.app.after(0, lambda t=body: messagebox.showwarning(
-                    "No Table Found",
-                    "No data table found on the current browser page.\n\n"
-                    "Please navigate to the panchayat list in your browser first,\n"
-                    "then click 'Scrape Current Page' again.\n\n"
-                    f"Page preview:\n{t}"))
+                    tr("dialogs.no_table_found"), tr("dialogs.no_table_found_msg", preview=t)))
                 return
 
             rows = driver.find_elements(By.XPATH, "//table//tr")
@@ -331,9 +326,9 @@ class NmmsAttendanceTab(BaseAutomationTab):
             self.app.after(0, lambda d=data: self._populate_panchayat_checkboxes(d))
         except Exception as e:
             self.log_error(f"Scrape error: {e}")
-            self.app.after(0, lambda err=str(e): messagebox.showerror("Scrape Error", f"Could not read the page:\n{err}"))
+            self.app.after(0, lambda err=str(e): messagebox.showerror(tr("dialogs.scrape_error"), tr("dialogs.could_not_read_page", error=err)))
         finally:
-            self.app.after(0, lambda: self._scrape_btn.configure(state="normal", text="🔍 Scrape Current Page"))
+            self.app.after(0, lambda: self._scrape_btn.configure(state="normal", text=tr("form.nmms.scrape_current")))
 
     def _populate_panchayat_checkboxes(self, data: list):
         for w in self._pan_scroll.winfo_children(): w.destroy()
@@ -341,7 +336,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
         self._panchayat_data = data
 
         if not data:
-            self._pan_info_lbl.configure(text="No panchayats found. Make sure panchayat list is visible in browser.")
+            self._pan_info_lbl.configure(text=tr("dialogs.nmms_no_panchayats"))
             self.log_warning("No panchayats found on page.")
             return
 
@@ -358,7 +353,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
     def start_automation(self) -> None:
         selected = [n for n, v in self._pan_checkboxes.items() if v.get()]
         if not selected:
-            messagebox.showwarning("No Selection", "Please select at least one panchayat.")
+            messagebox.showwarning(tr("dialogs.no_selection"), tr("dialogs.select_one_panchayat"))
             return
         self._save_inputs()
         self.log_info(f"Starting for {len(selected)} panchayat(s)...")
@@ -462,7 +457,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
 
         except Exception as e:
             self.log_error(f"Critical error: {e}")
-            self.app.after(0, lambda err=str(e): messagebox.showerror("Error", f"Scraping failed:\n{err}"))
+            self.app.after(0, lambda err=str(e): messagebox.showerror(tr("dialogs.error"), tr("dialogs.scraping_failed", error=err)))
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")
@@ -1092,7 +1087,7 @@ class NmmsAttendanceTab(BaseAutomationTab):
     def _export_excel(self):
         """Export professional multi-sheet Excel with embedded photos."""
         if not self.results_tree.get_children():
-            messagebox.showinfo("No Data", "No results to export. Run the scrape first.")
+            messagebox.showinfo(tr("errors.no_data"), "No results to export. Run the scrape first.")
             return
 
         date_safe = datetime.now().strftime("%d-%m-%Y")
@@ -1103,18 +1098,18 @@ class NmmsAttendanceTab(BaseAutomationTab):
             initialfile=default_fn,
             defaultextension=".xlsx",
             filetypes=[("Excel Files", "*.xlsx")],
-            title="Save NMMS Attendance Report")
+            title=tr("form.nmms.save_report"))
         if not file_path:
             return
 
         try:
             self._write_excel(file_path, date_safe)
-            messagebox.showinfo("Exported", f"Report saved!\\n\\n{file_path}")
+            messagebox.showinfo(tr("status.exported"), tr("dialogs.report_saved", path=file_path))
             if os.name == "nt":
                 try: os.startfile(file_path)
                 except Exception: pass
         except Exception as e:
-            messagebox.showerror("Export Error", f"Could not save report:\\n{e}")
+            messagebox.showerror(tr("dialogs.export_error"), tr("dialogs.could_not_save_report", error=e))
 
     def _write_excel(self, path: str, date_str: str):
         """Write multi-sheet Excel with MR Summary, Workers Detail, Block Overview, and embedded photos."""

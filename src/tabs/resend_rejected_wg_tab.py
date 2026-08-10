@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 
 from src import config
+from src.i18n import tr
 from .base_tab import BaseAutomationTab
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -23,8 +24,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
     def _create_widgets(self) -> None:
 
         # ── Header card ──
-        self._create_header_card(self, "📤", "Resend Rejected Wagelist",
-                                 "Resend wagelists that were rejected by the portal, for the selected year.",
+        self._create_header_card(self, "📤", tr("tab.resend_rejected_wg.title"), tr("tab.resend_rejected_wg.subtitle"),
                                  icon_key="emoji_resend_wg")
 
         # Frame for user controls (bordered card)
@@ -34,7 +34,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
         controls_frame.grid_columnconfigure(1, weight=1)
 
         # Financial Year
-        ctk.CTkLabel(controls_frame, text="Financial Year:").grid(row=0, column=0, padx=15, pady=10, sticky="w")
+        ctk.CTkLabel(controls_frame, text=tr("common.financial_year")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
         current_year = datetime.now().year
         year_options = [f"{year}-{year+1}" for year in range(current_year + 1, current_year - 10, -1)]
         default_year = f"{current_year}-{current_year+1}" if datetime.now().month >= 4 else f"{current_year-1}-{current_year}"
@@ -43,7 +43,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
         self.fin_year_menu.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
 
         # Panchayat Selection
-        ctk.CTkLabel(controls_frame, text="Panchayat (optional):").grid(row=1, column=0, padx=15, pady=(5,0), sticky="w")
+        ctk.CTkLabel(controls_frame, text=tr("form.resend_wg.panchayat_optional")).grid(row=1, column=0, padx=15, pady=(5,0), sticky="w")
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
@@ -52,7 +52,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
         self.process_all_var = tkinter.BooleanVar()
         self.process_all_checkbox = ctk.CTkCheckBox(
             controls_frame, 
-            text="Process for ALL available Panchayats", 
+            text=tr("form.resend_wg.process_all"), 
             variable=self.process_all_var,
             command=self._toggle_panchayat_entry
         )
@@ -102,7 +102,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
         if running:
              self.panchayat_menu.configure(state="disabled")
     def reset_ui(self) -> None:
-        if messagebox.askokcancel("Reset Form?", "This will clear all inputs and results."):
+        if messagebox.askokcancel(tr("dialogs.reset_form"), "This will clear all inputs and results."):
             self.panchayat_var.set("")
             self.process_all_var.set(False)
             self._toggle_panchayat_entry()
@@ -120,10 +120,10 @@ class ResendRejectedWgTab(BaseAutomationTab):
         }
 
         if not inputs['fin_year']:
-            messagebox.showerror("Input Error", "Please select a Financial Year.")
+            messagebox.showerror(tr("errors.input_error"), "Please select a Financial Year.")
             return
         if not inputs['process_all'] and not inputs['panchayat']:
-            messagebox.showerror("Input Error", "Please enter a Panchayat name or check the 'Process all' option.")
+            messagebox.showerror(tr("errors.input_error"), "Please enter a Panchayat name or check the 'Process all' option.")
             return
 
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
@@ -159,7 +159,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
                     panchayats_to_process = [inputs['panchayat']]
                     self.app.update_history("location_panchayat", inputs['panchayat'])
                 else:
-                    messagebox.showerror("Panchayat Not Found", f"The Panchayat '{inputs['panchayat']}' was not found for the selected year.")
+                    messagebox.showerror(tr("dialogs.panchayat_not_found"), tr("dialogs.panchayat_not_found_msg", panchayat=inputs['panchayat']))
                     return
 
             total_panchayats = len(panchayats_to_process)
@@ -175,7 +175,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
 
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")
-            messagebox.showerror("Automation Error", f"An unexpected error occurred: {e}")
+            messagebox.showerror(tr("base.automation_error.title"), tr("dialogs.unexpected_error", error=e))
         finally:
             # Count results from tree
             success_count = 0
