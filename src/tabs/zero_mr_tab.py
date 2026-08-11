@@ -177,7 +177,7 @@ class ZeroMrTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
             
             self.log_info(f"Navigating to Zero MR page...")
-            driver.get(config.ZERO_MR_CONFIG["url"])
+            driver.get(self.resolve_portal_url(config.ZERO_MR_CONFIG["url"]))
 
             # --- FIX: Add explicit wait for page to be fully interactive ---
             self.log_info("Waiting for page elements to load...")

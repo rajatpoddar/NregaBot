@@ -489,7 +489,7 @@ class MisReportsTab(BaseAutomationTab):
             # PHASE 1: Solve CAPTCHA + Select State (ONCE)
             # ═══════════════════════════════════════════════
             self.log_info("Navigating to MIS portal...")
-            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+            driver.get(self.resolve_portal_url(config.MIS_REPORTS_CONFIG["base_url"]))
             self._solve_captcha(driver, wait)
             
             self.log_info(f"Selecting state: {inputs['state']}")

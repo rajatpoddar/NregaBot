@@ -423,7 +423,7 @@ class WcGenTab(BaseAutomationTab):
                 self.app.after(0, lambda: self.load_button.configure(state="normal", text=tr("form.wc_gen.load_categories")))
                 return
             
-            target_url = config.WC_GEN_CONFIG["url"]
+            target_url = self.resolve_portal_url(config.WC_GEN_CONFIG["url"])
             self.log_info(f"Navigating to: {target_url}")
             driver.get(target_url)
             
@@ -578,7 +578,7 @@ class WcGenTab(BaseAutomationTab):
             self.log_error("ERROR: CSV row has incorrect number of columns. Expected 11.")
             return None
 
-        driver.get(config.WC_GEN_CONFIG["url"])
+        driver.get(self.resolve_portal_url(config.WC_GEN_CONFIG["url"]))
         wait = WebDriverWait(driver, 25)
 
         def select_and_wait(element_id, value):

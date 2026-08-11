@@ -306,7 +306,7 @@ class DuplicateMrTab(BaseAutomationTab):
 
     def _process_single_work_code(self, driver, work_code, action, panchayat, orientation, scale):
         wait = WebDriverWait(driver, 40)
-        url = config.DUPLICATE_MR_CONFIG["url"]
+        url = self.resolve_portal_url(config.DUPLICATE_MR_CONFIG["url"])
         try:
             msr_options = self._get_msr_list(driver, wait, work_code, panchayat, url)
             if not msr_options: return

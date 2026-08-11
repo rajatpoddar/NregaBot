@@ -438,7 +438,7 @@ class MusterrollGenTab(BaseAutomationTab):
             panchayats_to_process = []
             if all_mode:
                 self.log_info("🌐 Fetching all panchayats from the website...")
-                driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
+                driver.get(self.resolve_portal_url(config.MUSTER_ROLL_CONFIG["base_url"]))
                 agency_select = Select(wait.until(EC.presence_of_element_located((By.ID, "exe_agency"))))
                 prefix = config.AGENCY_PREFIX
                 for t in self._get_select_option_texts(agency_select):
@@ -527,7 +527,7 @@ class MusterrollGenTab(BaseAutomationTab):
         messagebox."""
         try:
             self.log_info("Validating Panchayat name...")
-            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
+            driver.get(self.resolve_portal_url(config.MUSTER_ROLL_CONFIG["base_url"]))
             # Central helper — GP login has no agency/panchayat dropdown;
             # skip validation and return True (continue).
             status, _ = self._select_panchayat_or_skip(
@@ -570,7 +570,7 @@ class MusterrollGenTab(BaseAutomationTab):
         full_work_code_text = ""
         try:
             self.log_info("   - Navigating to MR page...")
-            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
+            driver.get(self.resolve_portal_url(config.MUSTER_ROLL_CONFIG["base_url"]))
             
             self.log_info("   - Selecting Panchayat...")
             status, _ = self._select_panchayat_or_skip(

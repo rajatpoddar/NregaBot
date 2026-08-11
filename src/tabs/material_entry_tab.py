@@ -410,7 +410,7 @@ class MaterialEntryTab(BaseAutomationTab):
                 self.update_status(f"Processing {work_key} (Bill {bill_no})", (i + 1) / total_tasks)
                 self.log_info(f"▶ Processing Work Key: {work_key} | Bill: {bill_no}")
                 try:
-                    driver.get(config.MATERIAL_ENTRY_CONFIG["url"])
+                    driver.get(self.resolve_portal_url(config.MATERIAL_ENTRY_CONFIG["url"]))
                     # Wait for page to fully load before interacting
                     wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
                     time.sleep(1.5)  # Brief wait for postback to begin

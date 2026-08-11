@@ -43,6 +43,24 @@ PANCHAYAT_KEYS = ["location_panchayat", "panchayat_name", "panchayat",
 VILLAGE_KEYS = ["location_village", "village_name"]
 
 
+def _state_aware_demand_url(app) -> str:
+    """State-aware demand page URL — saved location_state (Settings/license)
+    ke hisaab se host resolve karta hai (Rajasthan → vbgramgde3).
+
+    Module-level (not a method) kyunki run_panchayat_scrape bhi ise use
+    karta hai aur usme `self` nahi hota.
+    """
+    state = ""
+    try:
+        sugg = app.history_manager.get_suggestions("location_state") or []
+        if sugg:
+            state = str(sugg[0]).strip()
+    except Exception:
+        pass
+    return config.get_state_portal_url(
+        "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx", state)
+
+
 def run_panchayat_scrape(app, on_status=None, on_success=None, on_failed=None):
     """Scrape ALL Panchayats and their villages from the live NREGA website.
 
@@ -72,7 +90,7 @@ def run_panchayat_scrape(app, on_status=None, on_success=None, on_failed=None):
 
             _emit(on_status, "⏳ Demand page par ja rahe hain...")
 
-            demand_url = "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx"
+            demand_url = _state_aware_demand_url(app)
             driver.get(demand_url)
             wait = WebDriverWait(driver, 15)
 
@@ -190,6 +208,13 @@ def run_panchayat_scrape(app, on_status=None, on_success=None, on_failed=None):
             _emit(on_failed, f"Website ka structure change ho gaya? Element nahi mila: {e}")
         except Exception as e:
             _emit(on_failed, str(e))
+        finally:
+            # Scrape khatam (success/fail dono) → focus wapas app par lao,
+            # user Chrome window pe na atak jaye.
+            try:
+                app.after(0, app.bring_to_front)
+            except Exception:
+                pass
 
     import threading
     threading.Thread(target=_run, daemon=True).start()
@@ -905,6 +930,11 @@ class SettingsTab(ctk.CTkFrame):
             pass
         return sorted(blocks, key=str.lower)
 
+    def _state_aware_demand_url(self) -> str:
+        """State-aware demand page URL — delegates to the module-level helper
+        (run_panchayat_scrape bhi same logic use karta hai)."""
+        return _state_aware_demand_url(self.app)
+
     def _detect_user_level_now(self) -> None:
         """Open the demand page in the browser and detect whether the user is
         GP level or PO level (Program Officer / Block level).
@@ -937,7 +967,7 @@ class SettingsTab(ctk.CTkFrame):
                 if not driver:
                     err = tr("settings.detect_level.err_no_driver")
                 else:
-                    demand_url = "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx"
+                    demand_url = self._state_aware_demand_url()
                     driver.get(demand_url)
                     try:
                         # Panchayat dropdown mila → Block/PO login

@@ -261,7 +261,7 @@ class DelWorkAllocTab(BaseAutomationTab):
                 return
 
             auto_mode = not bool(jobcard_list)
-            url = config.DEL_WORK_ALLOC_CONFIG["url"]
+            url = self.resolve_portal_url(config.DEL_WORK_ALLOC_CONFIG["url"])
             wait = WebDriverWait(driver, 20)
 
             # Determine which panchayats to process
@@ -495,7 +495,7 @@ class DelWorkAllocTab(BaseAutomationTab):
             
             # Attempt Recovery (Reload page to reset state)
             try:
-                driver.get(config.DEL_WORK_ALLOC_CONFIG["url"])
+                driver.get(self.resolve_portal_url(config.DEL_WORK_ALLOC_CONFIG["url"]))
                 # We need to re-select Panchayat here because page reloaded to start fresh
                 
                 wait.until(EC.visibility_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpanchayat_code")))

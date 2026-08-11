@@ -250,7 +250,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
     def _process_single_work_code(self, driver, inputs, work_code):
         wait = WebDriverWait(driver, 20)
-        url = config.PHYSICAL_COMPLETE_CONFIG["url"]
+        url = self.resolve_portal_url(config.PHYSICAL_COMPLETE_CONFIG["url"])
         
         try:
             driver.get(url)

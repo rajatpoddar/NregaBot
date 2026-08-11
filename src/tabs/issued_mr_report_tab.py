@@ -394,7 +394,7 @@ class IssuedMrReportTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
 
             self.app.after(0, self.app.set_status, "Navigating to MIS portal...")
-            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+            driver.get(self.resolve_portal_url(config.MIS_REPORTS_CONFIG["base_url"]))
 
             self._solve_captcha(driver, wait)
 
@@ -431,7 +431,7 @@ class IssuedMrReportTab(BaseAutomationTab):
 
             def _reopen_report():
                 """Re-navigate to the issued MR summary page (all panchayats of the block)."""
-                driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+                driver.get(self.resolve_portal_url(config.MIS_REPORTS_CONFIG["base_url"]))
                 self._solve_captcha(driver, wait)
                 state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))
                 self._select_by_text_case_insensitive(Select(state_select), inputs['state'])
@@ -638,7 +638,7 @@ class IssuedMrReportTab(BaseAutomationTab):
 
             # 1. Navigate to Block Dashboard (Reuse logic)
             self.log_info("Navigating to Dashboard...")
-            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+            driver.get(self.resolve_portal_url(config.MIS_REPORTS_CONFIG["base_url"]))
             self._solve_captcha(driver, wait)
 
             state_select = wait.until(EC.element_to_be_clickable((By.ID, "ContentPlaceHolder1_ddl_States")))

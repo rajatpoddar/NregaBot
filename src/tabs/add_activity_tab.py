@@ -375,7 +375,7 @@ class AddActivityTab(BaseAutomationTab):
         """
         wait = WebDriverWait(driver, 20)
         activity_code = config.ADD_ACTIVITY_CONFIG['defaults']['activity_code']
-        url = config.ADD_ACTIVITY_CONFIG["url"]
+        url = self.resolve_portal_url(config.ADD_ACTIVITY_CONFIG["url"])
         work_name_dd_id = 'ctl00_ContentPlaceHolder1_ddlworkName'
         activity_dd_id = 'ctl00_ContentPlaceHolder1_ddlAct'
         grid_id = 'ctl00_ContentPlaceHolder1_grdDisplayAct'

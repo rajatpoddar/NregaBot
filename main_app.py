@@ -473,13 +473,35 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
             self.after(1500, _show_delayed)
 
     def run_onboarding_if_needed(self) -> None:
-        """Runs the onboarding tour for first-time users.
-        The guide itself writes the .first_run_complete flag when the user
-        finishes (or skips) the tour — replay from About never rewrites it.
+        """Runs the onboarding tour for first-time users, and re-shows it
+        (at the Panchayat step) whenever no panchayat/village is saved yet —
+        jab tak setup complete na ho (tour + panchayat), onboarding nag karta
+        hai. The guide itself writes the .first_run_complete flag when the
+        user finishes (or skips) the tour — replay from About never rewrites it.
         """
         flag_path = get_data_path('.first_run_complete')
         if not os.path.exists(flag_path):
             OnboardingGuide(self)
+            return
+        # Tour pehle complete ho chuki hai, par panchayat/villages abhi add
+        # nahi hue → full tour dobara mat chalao, seedha Panchayat step kholo.
+        if not self._has_saved_panchayats():
+            OnboardingGuide(self, start_step=3)
+
+    def _has_saved_panchayats(self) -> bool:
+        """True jab Settings > Location Data me koi panchayat/village saved ho
+        (history me). Panchayat add hone par hi onboarding nag karna band.
+        Keys settings_tab.PANCHAYAT_KEYS/VILLAGE_KEYS se aati hain — single
+        source of truth (lazy import, tab module heavy nahi hai)."""
+        try:
+            from src.tabs.settings_tab import PANCHAYAT_KEYS, VILLAGE_KEYS
+            hm = self.history_manager
+            for k in (*PANCHAYAT_KEYS, *VILLAGE_KEYS):
+                if hm.get_suggestions(k):
+                    return True
+        except Exception as e:
+            logger.warning("Could not check saved panchayats: %s", e)
+        return False
 
     def _gc_collection_loop(self) -> None:
         """P6: Periodic garbage collection to prevent memory fragmentation.
@@ -865,7 +887,15 @@ del "%~f0" & exit
                 logger.debug("Failed to update About tab server status: %s", e)
 
     def bring_to_front(self):
-        self.lift()
+        """Brings the app window to the front (and de-minimizes it).
+        Panchayat scrape / automation ke baad focus wapas app par laane ke
+        liye use hota hai — user Chrome pe na atak jaye."""
+        try:
+            self.deiconify()
+            self.lift()
+            self.focus_force()
+        except Exception:
+            pass
 
     def _get_work_area(self) -> Tuple[int, int, int, int]:
         if config.OS_SYSTEM == "Windows":

@@ -464,7 +464,7 @@ class IfEditTab(BaseAutomationTab):
         try:
             current_year, wait = datetime.now().year, WebDriverWait(driver, 20)
             mode = cfg.get('automation_mode')
-            driver.get(config.IF_EDIT_CONFIG["url"])
+            driver.get(self.resolve_portal_url(config.IF_EDIT_CONFIG["url"]))
             # Element wait handled by WebDriverWait below
 
             work_code_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txtwrksearchkey")))

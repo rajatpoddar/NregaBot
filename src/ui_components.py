@@ -905,6 +905,24 @@ class ToastNotification(ctk.CTkToplevel):
         ToastNotification._reflow()
 
 # --- 6. ONBOARDING GUIDE (Modern interactive wizard) ---
+def _is_chrome_running(timeout: float = 0.4) -> bool:
+    """True if a Chrome instance with the app's debug port (9222) is already
+    running — i.e. we can connect to it instead of launching a new one."""
+    try:
+        import socket
+        with socket.create_connection(("127.0.0.1", 9222), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+def _state_portal_host(state: str) -> str:
+    """Portal host for the given state key (case-insensitive), falling back to
+    the default host. Delegates to config.get_state_portal_host() — same
+    lookup get_state_portal_url() uses, so dono kabhi mismatch nahi karte."""
+    return config.get_state_portal_host(state) or config.DEFAULT_PORTAL_HOST
+
+
 class OnboardingGuide(ctk.CTkToplevel):
     """Modern first-run wizard that actually SETS UP the user:
 
@@ -922,11 +940,13 @@ class OnboardingGuide(ctk.CTkToplevel):
 
     STEPS = 7
 
-    def __init__(self, parent: Any, replay: bool = False) -> None:
+    def __init__(self, parent: Any, replay: bool = False, start_step: int = 0) -> None:
         super().__init__(parent)
         self.parent = parent
         self.replay = replay
-        self.current_step = 0
+        # start_step: tour ko kisi specific step se kholo (e.g. panchayat step
+        # jab tour complete hai par panchayat abhi add nahi hua).
+        self.current_step = max(0, min(int(start_step), self.STEPS - 1))
         self._browser_launched = False
         self._panchayat_added = False
         self._language_note = ""
@@ -1004,7 +1024,7 @@ class OnboardingGuide(ctk.CTkToplevel):
                                       command=self._go_next)
         self.next_btn.grid(row=0, column=3)
 
-        self._render_step(0)
+        self._render_step(self.current_step)
         self.after(120, self.focus_force)
 
     # ── Navigation ───────────────────────────────────────────────────
@@ -1181,26 +1201,87 @@ class OnboardingGuide(ctk.CTkToplevel):
                                             text_color=("#16A34A", "#4ADE80"))
         self._browser_status.pack(pady=(0, 10))
 
+        def _update_status(running: bool):
+            try:
+                if running:
+                    self._browser_launched = True
+                    self._browser_status.configure(text=tr("onboarding.browser.connected"),
+                                                   text_color=("#16A34A", "#4ADE80"))
+                    if hasattr(self, '_browser_btn'):
+                        self._browser_btn.configure(text=tr("onboarding.browser.connect_btn"))
+                else:
+                    self._browser_status.configure(text=tr("onboarding.browser.not_running"),
+                                                   text_color=("gray50", "gray60"))
+            except Exception:
+                pass
+
+        def _check_running():
+            # Background thread — port check is fast but must never freeze UI.
+            try:
+                running = _is_chrome_running()
+                self.after(0, lambda: _update_status(running))
+            except Exception:
+                pass
+
+        def _connect_existing():
+            """Already-running Chrome se REAL driver session establish karo
+            (sirf port-check nahi) — get_driver() khud detect + connect karta
+            hai. Fail hone par clear error dikhao."""
+            try:
+                driver = self.parent.get_driver()
+                if driver is not None:
+                    _update_status(True)
+                else:
+                    self._browser_status.configure(
+                        text=tr("onboarding.browser.connect_failed"),
+                        text_color=("#DC2626", "#F87171"))
+            except Exception as e:
+                self._browser_status.configure(text=f"❌ {e}",
+                                               text_color=("#DC2626", "#F87171"))
+
         def _launch():
+            # Pehle se Chrome chal raha hai → naya launch nahi, bas connect.
+            if _is_chrome_running():
+                _connect_existing()
+                return
             try:
                 self.parent.launch_chrome_detached()
                 self._browser_launched = True
                 self._browser_status.configure(text=tr("onboarding.browser.launched"),
                                                text_color=("#16A34A", "#4ADE80"))
+                if hasattr(self, '_browser_btn'):
+                    self._browser_btn.configure(text=tr("onboarding.browser.connect_btn"))
             except Exception as e:
                 self._browser_status.configure(text=f"❌ {e}", text_color=("#DC2626", "#F87171"))
 
-        ctk.CTkButton(inner, text=tr("onboarding.browser.launch_btn"), width=240, height=40,
-                      fg_color=("#DC2626", "#DC2626"), text_color="white",
-                      hover_color=("#B91C1C", "#B91C1C"),
-                      font=ctk.CTkFont(size=14, weight="bold"),
-                      command=_launch).pack(pady=(6, 10))
+        self._browser_btn = ctk.CTkButton(inner, text=tr("onboarding.browser.launch_btn"),
+                                          width=240, height=40,
+                                          fg_color=("#DC2626", "#DC2626"), text_color="white",
+                                          hover_color=("#B91C1C", "#B91C1C"),
+                                          font=ctk.CTkFont(size=14, weight="bold"),
+                                          command=_launch)
+        self._browser_btn.pack(pady=(6, 10))
+
+        # State-aware login hint — saved state ke hisaab se host dikhao
+        # (Rajasthan → vbgramgde3.dord.gov.in).
+        _host_state = ""
+        try:
+            _sugg = self.parent.history_manager.get_suggestions("location_state") or []
+            if _sugg:
+                _host_state = str(_sugg[0]).strip()
+        except Exception:
+            pass
+        _host = _state_portal_host(_host_state)
+        _login_hint = tr("onboarding.browser.login_hint").replace("vbgramgde2.dord.gov.in", _host)
 
         login_box = ctk.CTkFrame(inner, corner_radius=10, fg_color=("gray90", "gray25"))
         login_box.pack(fill="x", padx=30, pady=(4, 4))
-        ctk.CTkLabel(login_box, text=tr("onboarding.browser.login_hint"),
+        ctk.CTkLabel(login_box, text=_login_hint,
                      font=ctk.CTkFont(size=12), text_color=("gray40", "gray75"),
                      wraplength=460, justify="center").pack(padx=14, pady=10)
+
+        # Already-running Chrome ko turant detect karo aur user ko dikhao.
+        threading.Thread(target=_check_running, daemon=True).start()
 
     def _step_panchayat(self) -> None:
         inner = self._card_inner()
@@ -1244,6 +1325,13 @@ class OnboardingGuide(ctk.CTkToplevel):
                         self._panch_status.configure(
                             text=tr("onboarding.panch.none"),
                             text_color=("#D97706", "#FBBF24"))
+                    # Chrome par scrape khatam → focus wapas guide/app par.
+                    self.lift()
+                    # settings_tab ka finally block app.bring_to_front() bhi
+                    # queue karta hai (after(0)) — wo lift/focus_force ke baad
+                    # chalta hai, isliye guide apna focus yahan thodi der baad
+                    # wapas assert karta hai taaki guide hi focused rahe.
+                    self.after(100, self.focus_force)
                 except Exception:
                     pass
 

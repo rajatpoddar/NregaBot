@@ -258,7 +258,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             driver = self.app.get_driver()
             if not driver: return
             wait = WebDriverWait(driver, 20)
-            url = config.JOBCARD_VERIFY_CONFIG["url"]
+            url = self.resolve_portal_url(config.JOBCARD_VERIFY_CONFIG["url"])
             driver.get(url)
             
             all_mode = inputs.get('all_panchayats', False) or inputs['panchayat'] in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)

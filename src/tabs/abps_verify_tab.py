@@ -159,7 +159,7 @@ class AbpsVerifyTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
             short_wait = WebDriverWait(driver, 5)
             
-            driver.get(config.ABPS_VERIFY_CONFIG["url"])
+            driver.get(self.resolve_portal_url(config.ABPS_VERIFY_CONFIG["url"]))
             
             current_url = driver.current_url
             if "login" in current_url.lower():
@@ -190,7 +190,7 @@ class AbpsVerifyTab(BaseAutomationTab):
                     break
                 self.log_info(f"===== Panchayat {p_idx+1}/{total_p}: {p_name} =====")
                 self.app.after(0, self.update_status, f"{p_name}: selecting...", p_idx / max(total_p, 1))
-                driver.get(config.ABPS_VERIFY_CONFIG["url"])
+                driver.get(self.resolve_portal_url(config.ABPS_VERIFY_CONFIG["url"]))
 
                 # --- 1. Select Panchayat ---
                 self.log_info(f"Selecting Panchayat: {p_name}")

@@ -317,7 +317,7 @@ class WorkAllocationTab(BaseAutomationTab):
             save_wait = WebDriverWait(driver, 90)  # long wait for the Save confirmation
 
             self.log_info("Navigating to Work Allocation page...")
-            driver.get(config.WORK_ALLOCATION_CONFIG["url"])
+            driver.get(self.resolve_portal_url(config.WORK_ALLOCATION_CONFIG["url"]))
 
             self._setup_page(driver, wait, inputs)
 
@@ -495,7 +495,7 @@ class WorkAllocationTab(BaseAutomationTab):
             self._log_result(self.panchayat_var.get().strip(), work_key,
                              selected_work_code_text, "Failed", error_msg)
             try:
-                driver.get(config.WORK_ALLOCATION_CONFIG["url"])
+                driver.get(self.resolve_portal_url(config.WORK_ALLOCATION_CONFIG["url"]))
                 self.log_info("   - Refreshing page...")
             except Exception:
                 pass

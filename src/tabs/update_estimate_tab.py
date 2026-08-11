@@ -140,7 +140,7 @@ class UpdateEstimateTab(BaseAutomationTab):
             if not driver: return
 
             wait = WebDriverWait(driver, 15)
-            driver.get(config.UPDATE_ESTIMATE_CONFIG["url"])
+            driver.get(self.resolve_portal_url(config.UPDATE_ESTIMATE_CONFIG["url"]))
             
             total_tasks = len(work_codes)
             for i, work_code in enumerate(work_codes, 1):

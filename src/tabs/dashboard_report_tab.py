@@ -314,7 +314,7 @@ class DashboardReportTab(BaseAutomationTab):
 
             # --- STANDARD FLOW ONLY (Accordion + Drilldown) ---
             self.log_info("Navigating to MIS portal...")
-            driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+            driver.get(self.resolve_portal_url(config.MIS_REPORTS_CONFIG["base_url"]))
             self._solve_captcha(driver, wait)
 
             self.update_status("Selecting State...", 0.15)
@@ -397,7 +397,7 @@ class DashboardReportTab(BaseAutomationTab):
 
             def _reopen_dashboard():
                 """Re-navigate to the dashboard page and land on the panchayat summary table."""
-                driver.get(config.MIS_REPORTS_CONFIG["base_url"])
+                driver.get(self.resolve_portal_url(config.MIS_REPORTS_CONFIG["base_url"]))
                 self._solve_captcha(driver, wait)
                 state_select = wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddl_States")))
                 driver.execute_script("""

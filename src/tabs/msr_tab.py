@@ -204,8 +204,8 @@ class MsrTab(BaseAutomationTab):
                 return
             
             wait = WebDriverWait(driver, 15)
-            if driver.current_url != config.MSR_CONFIG["url"]:
-                driver.get(config.MSR_CONFIG["url"])
+            if driver.current_url != self.resolve_portal_url(config.MSR_CONFIG["url"]):
+                driver.get(self.resolve_portal_url(config.MSR_CONFIG["url"]))
             
             if grouped_data:
                 # ═══ Multi-panchayat run (from MR Tracking) — every panchayat's
@@ -337,7 +337,7 @@ class MsrTab(BaseAutomationTab):
     def _recover_page(self, driver, wait, panchayat_name=""):
         """Reloads the MSR page (and re-selects the panchayat) after a transient error."""
         try:
-            driver.get(config.MSR_CONFIG["url"])
+            driver.get(self.resolve_portal_url(config.MSR_CONFIG["url"]))
             try:
                 WebDriverWait(driver, 10).until(
                     lambda d: d.execute_script('return document.readyState') == 'complete'

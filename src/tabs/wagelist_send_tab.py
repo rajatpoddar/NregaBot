@@ -150,7 +150,7 @@ class WagelistSendTab(BaseAutomationTab):
             if not driver: return
             wait = WebDriverWait(driver, 15)
 
-            driver.get(config.WAGELIST_SEND_CONFIG["url"])
+            driver.get(self.resolve_portal_url(config.WAGELIST_SEND_CONFIG["url"]))
             
             self.log_info(f"Selecting Financial Year: {fin_year}")
             Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlfin")))).select_by_value(fin_year)

@@ -1934,6 +1934,35 @@ class BaseAutomationTab(ctk.CTkFrame):
         vals = [v for v in (raw_vals or []) if v and v not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)]
         return [config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL] + vals
 
+    # ------------------------------------------------------------------
+    # State-aware portal URL resolution (har vbgramg transaction tab use
+    # karta hai — Rajasthan → vbgramgde3 host, page overrides bhi)
+    # ------------------------------------------------------------------
+    def get_state_for_url(self) -> str:
+        """Best-known state for URL resolution: the tab's own state dropdown
+        (Demand has one), else the saved location_state (Settings/license)."""
+        try:
+            if hasattr(self, 'state_var'):
+                s = (self.state_var.get() or "").strip()
+                if s:
+                    return s
+        except Exception:
+            pass
+        try:
+            sugg = self.app.history_manager.get_suggestions("location_state") or []
+            if sugg:
+                return str(sugg[0]).strip()
+        except Exception:
+            pass
+        return ""
+
+    def resolve_portal_url(self, url: str) -> str:
+        """State-aware portal URL: vbgramg transaction URLs ko user ke state
+        ke host par re-host karta hai (Rajasthan → vbgramgde3, ...).
+        Report/MIS/public URLs aur unknown states unchanged rehte hain
+        (get_state_portal_url khud hi har failure par URL wapas deta hai)."""
+        return config.get_state_portal_url(url, self.get_state_for_url())
+
     def _get_saved_panchayats(self) -> List[str]:
         """All unique panchayat names saved in the app (Settings > Location Data).
 

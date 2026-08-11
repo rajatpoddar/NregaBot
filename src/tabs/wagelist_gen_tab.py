@@ -186,7 +186,7 @@ class WagelistGenTab(BaseAutomationTab):
             # --- ALL / MY SAVED PANCHAYATS MODE: fetch the panchayat list from the website ---
             if len(agency_list) == 1 and agency_list[0] in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
                 saved_mode = agency_list[0] == config.MY_PANCHAYATS_LABEL
-                driver.get(config.WAGELIST_GEN_CONFIG["base_url"])
+                driver.get(self.resolve_portal_url(config.WAGELIST_GEN_CONFIG["base_url"]))
                 try:
                     agency_select = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_exe_agency')))
                     prefix = config.AGENCY_PREFIX
@@ -240,7 +240,7 @@ class WagelistGenTab(BaseAutomationTab):
                         loaded = False
                         for _ in range(3):
                             try:
-                                driver.get(config.WAGELIST_GEN_CONFIG["base_url"])
+                                driver.get(self.resolve_portal_url(config.WAGELIST_GEN_CONFIG["base_url"]))
                                 loaded = True; break
                             except Exception: time.sleep(2)
                         

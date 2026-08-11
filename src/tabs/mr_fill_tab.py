@@ -238,8 +238,8 @@ class MrFillTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 15)
             
             # --- 2. Navigate to Page FIRST ---
-            if driver.current_url != config.MR_FILL_CONFIG["url"]:
-                driver.get(config.MR_FILL_CONFIG["url"])
+            if driver.current_url != self.resolve_portal_url(config.MR_FILL_CONFIG["url"]):
+                driver.get(self.resolve_portal_url(config.MR_FILL_CONFIG["url"]))
             
             # --- 3. Initial Panchayat Selection ---
             self._ensure_panchayat_selected(driver, wait, panchayat_name)
@@ -292,7 +292,7 @@ class MrFillTab(BaseAutomationTab):
             
             # 1. URL & Panchayat Safety Check
             if "Mustroll_Fill.aspx" not in driver.current_url:
-                driver.get(config.MR_FILL_CONFIG["url"])
+                driver.get(self.resolve_portal_url(config.MR_FILL_CONFIG["url"]))
                 self._ensure_panchayat_selected(driver, wait, panchayat_name)
             
             self._ensure_panchayat_selected(driver, wait, panchayat_name)

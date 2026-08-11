@@ -336,7 +336,7 @@ class MrTrackingTab(BaseAutomationTab):
                 
             wait = WebDriverWait(driver, 20)
             
-            url = config.MR_TRACKING_CONFIG["url"]
+            url = self.resolve_portal_url(config.MR_TRACKING_CONFIG["url"])
             main_window_handle = driver.current_window_handle
 
             # VB-G-RAM-G portal uses IDs WITHOUT the ctl00 prefix

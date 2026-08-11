@@ -478,7 +478,7 @@ class MateMrGenTab(BaseAutomationTab):
             return True
         try:
             self.log_info("Validating Panchayat name...")
-            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
+            driver.get(self.resolve_portal_url(config.MUSTER_ROLL_CONFIG["base_url"]))
             # Central helper — GP login has no agency/panchayat dropdown;
             # skip validation and return True (continue).
             status, _ = self._select_panchayat_or_skip(
@@ -583,7 +583,7 @@ class MateMrGenTab(BaseAutomationTab):
         full_work_code_text = ""
         try:
             self.log_info("   - Navigating to MR page...")
-            driver.get(config.MUSTER_ROLL_CONFIG["base_url"])
+            driver.get(self.resolve_portal_url(config.MUSTER_ROLL_CONFIG["base_url"]))
 
             # 1. Select Panchayat (optional — skip if not provided; GP login
             # par no-dropdown skip central helper se)

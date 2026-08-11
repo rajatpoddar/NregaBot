@@ -431,7 +431,7 @@ class DeleteApplicantTab(BaseAutomationTab):
                 self.log_info(f"Jobcard {jc_idx+1}/{total_jc}: {jobcard}")
 
                 self.log_info("🌐 Opening Delete Applicant page...")
-                driver.get(config.DELETE_APPLICANT_CONFIG["url"])
+                driver.get(self.resolve_portal_url(config.DELETE_APPLICANT_CONFIG["url"]))
 
                 # Track whether we found this jobcard on the portal
                 # If yes but applicant processing fails → mark for reg deletion
@@ -732,7 +732,7 @@ class DeleteApplicantTab(BaseAutomationTab):
         try:
             # Navigate
             self.log_info("🌐 Opening Registration Delete page...")
-            driver.get(config.DEL_REG_CONFIG["url"])
+            driver.get(self.resolve_portal_url(config.DEL_REG_CONFIG["url"]))
 
             # ── Select Panchayat ──
             if panchayat:

@@ -548,6 +548,87 @@ UPDATE_ESTIMATE_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/Update_proposedstatus.aspx"
 }
 
+# --- State-aware VB-G-RAM-G portal (transaction server) rules ---
+# Har state ka apna portal host ho sakta hai (e.g. Rajasthan = vbgramgde3,
+# Jharkhand = vbgramgde2). Ye host-map har vbgramg transaction tab (Demand,
+# Work Allocation, MR Fill, MSR, MB Entry, WC Gen, ...) ke URLs ko state ke
+# hisaab se re-host karta hai via get_state_portal_url(). Jo states yahan
+# listed nahi hain wo DEFAULT_PORTAL_HOST use karte hain.
+STATE_PORTAL_HOSTS: Dict[str, str] = {
+    "Jharkhand": "vbgramgde2.dord.gov.in",
+    "Rajasthan": "vbgramgde3.dord.gov.in",
+    "Karnataka": "vbgramgde2.dord.gov.in",
+}
+
+# Per-state page overrides: default page file (from *_CONFIG URL) -> page file
+# used by that state. States not listed use the default page on their host.
+# e.g. Rajasthan ka MR Fill page 'fillprintedmsr.aspx' hai (default config me
+# 'mustrollattend.aspx').
+STATE_PAGE_OVERRIDES: Dict[str, Dict[str, str]] = {
+    "Rajasthan": {
+        "mustrollattend.aspx": "fillprintedmsr.aspx",
+    },
+}
+
+# Default portal host jab state map me na ho (display/suggestions ke liye).
+DEFAULT_PORTAL_HOST: str = "vbgramgde2.dord.gov.in"
+
+
+def get_state_portal_host(state: str = "") -> str:
+    """Portal host for the given state key (case-insensitive).
+
+    Returns '' when the state is not in STATE_PORTAL_HOSTS — callers then
+    leave URLs unchanged. DEFAULT_PORTAL_HOST use karne ke liye caller
+    fallback karta hai (see ui_components._state_portal_host).
+    """
+    s = (state or "").strip()
+    for k, h in STATE_PORTAL_HOSTS.items():
+        if k.upper() == s.upper():
+            return h
+    return ""
+
+
+def get_state_portal_url(url: str, state: str = "") -> str:
+    """Re-hosts a VB-G-RAM-G transaction-server URL for the given state.
+
+    e.g. 'https://vbgramgde2.dord.gov.in/vbgramg/workalloc.aspx' + 'Rajasthan'
+         -> 'https://vbgramgde3.dord.gov.in/vbgramg/workalloc.aspx'
+
+    Per-state page overrides (STATE_PAGE_OVERRIDES) bhi apply hote hain.
+    Unknown states aur non-transaction URLs (vbgramgrep report server,
+    mnregaweb public pages, FTO login) unchanged rehte hain — taaki kisi
+    aur automation par asar na pade.
+    """
+    s = (state or "").strip()
+    if not s:
+        return url
+    state_key = ""
+    for k in STATE_PORTAL_HOSTS:
+        if k.upper() == s.upper():
+            state_key = k
+            break
+    if not state_key:
+        return url
+    host = STATE_PORTAL_HOSTS[state_key]
+    try:
+        import re as _re
+        from urllib.parse import urlsplit, urlunsplit
+        parts = urlsplit(url)
+        hostname = (parts.hostname or "").lower()
+        # Sirf transaction servers (vbgramgde2/3/4, nregadeX) re-host hote
+        # hain — report/MIS (vbgramgrep) aur public (mnregaweb) untouched.
+        if not _re.match(r"^(vbgramgde\d+|nregade\d+)\.dord\.gov\.in$", hostname):
+            return url
+        path = parts.path or ""
+        page = path.rsplit("/", 1)[-1] if path else ""
+        override = (STATE_PAGE_OVERRIDES.get(state_key) or {}).get(page)
+        if override:
+            path = path.rsplit("/", 1)[0] + "/" + override
+        return urlunsplit((parts.scheme, host, path, parts.query, parts.fragment))
+    except Exception:
+        return url
+
+
 # --- ADD THIS NEW DICTIONARY ---
 # Config for state-specific demand URLs and logic
 STATE_DEMAND_CONFIG: Dict[str, Dict[str, str]] = {
@@ -557,7 +638,10 @@ STATE_DEMAND_CONFIG: Dict[str, Dict[str, str]] = {
         "village_code_logic": "jh"
     },
     "Rajasthan": {
-        "base_url": "https://nregade2.dord.gov.in/netnrega/demand_new.aspx",
+        # de3 host — Rajasthan ka VB-G-RAM-G server (old nregade2/netnrega
+        # URL ab use nahi hota). DemandTab is URL ko state-host se resolve
+        # karta hai, isliye base_url host map se match karta hai.
+        "base_url": "https://vbgramgde3.dord.gov.in/vbgramg/demand_new.aspx",
         # Logic to parse village code from 'RJ-270200209000394400/00022652' -> '400'
         "village_code_logic": "rj"
     },

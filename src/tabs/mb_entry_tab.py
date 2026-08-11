@@ -402,7 +402,7 @@ class MbEntryTab(BaseAutomationTab):
                 all_mode = panchayat_target in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
                 saved_mode = panchayat_target == config.MY_PANCHAYATS_LABEL
                 if all_mode:
-                    driver.get(config.MB_ENTRY_CONFIG["url"])
+                    driver.get(self.resolve_portal_url(config.MB_ENTRY_CONFIG["url"]))
                     # Central helper — GP login has no dropdown; ⭐ My
                     # Saved mode me Settings ke saved panchayats directly use.
                     panchayats_to_process, _is_gp = self._fetch_panchayats_from_website(
@@ -495,7 +495,7 @@ class MbEntryTab(BaseAutomationTab):
         
         try:
             self.app.after(0, self.app.set_status, f"Navigating for {work_code}...")
-            if "MustorRoll/MeasurementBook.aspx" not in driver.current_url: driver.get(config.MB_ENTRY_CONFIG["url"])
+            if "MustorRoll/MeasurementBook.aspx" not in driver.current_url: driver.get(self.resolve_portal_url(config.MB_ENTRY_CONFIG["url"]))
 
             try:
                 # Central helper — GP login (no panchayat dropdown) par
@@ -582,7 +582,7 @@ class MbEntryTab(BaseAutomationTab):
         # Step 1: Navigate to page & set panchayat
         self.app.after(0, self.app.set_status, "Navigating to MB Entry page...")
         if "MustorRoll/MeasurementBook.aspx" not in driver.current_url:
-            driver.get(config.MB_ENTRY_CONFIG["url"])
+            driver.get(self.resolve_portal_url(config.MB_ENTRY_CONFIG["url"]))
 
         try:
             status, _ = self._select_panchayat_or_skip(

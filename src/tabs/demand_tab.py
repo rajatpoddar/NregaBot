@@ -1327,7 +1327,9 @@ class DemandTab(BaseAutomationTab):
         try:
             cfg = config.STATE_DEMAND_CONFIG[state]
             logic_key = cfg.get("village_code_logic", "jh")
-            url = cfg["base_url"]
+            # State-aware: base_url ko user ke state ke portal host par resolve
+            # karo (Rajasthan → vbgramgde3). Same-state me koi change nahi.
+            url = self.resolve_portal_url(cfg["base_url"])
         except KeyError:
             messagebox.showerror(tr("dialogs.config_error"), tr("dialogs.config_missing_state", state=state)); return
 

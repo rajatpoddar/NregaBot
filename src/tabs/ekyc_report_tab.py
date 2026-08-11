@@ -295,7 +295,7 @@ class EKycReportTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
             
             self.update_status("Opening Website...")
-            driver.get(config.EKYC_REPORT_CONFIG["url"])
+            driver.get(self.resolve_portal_url(config.EKYC_REPORT_CONFIG["url"]))
 
             # 1. Uncheck Pending — simple checkbox toggle, no postback on this page
             try:

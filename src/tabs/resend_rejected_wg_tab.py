@@ -139,7 +139,7 @@ class ResendRejectedWgTab(BaseAutomationTab):
             if not driver: return
             wait = WebDriverWait(driver, 20)
 
-            driver.get(config.REJECTED_WL_CONFIG["RESEND_REJECTED_WG"])
+            driver.get(self.resolve_portal_url(config.REJECTED_WL_CONFIG["RESEND_REJECTED_WG"]))
             
             self.log_info(f"Selecting Financial Year: {inputs['fin_year']}")
             Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlstFinyear")))).select_by_value(inputs['fin_year'])

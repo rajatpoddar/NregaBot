@@ -163,7 +163,8 @@ class DelDemandTab(BaseAutomationTab):
             if not driver: return
 
             wait = WebDriverWait(driver, 15)
-            url = config.DEL_DEMAND_CONFIG.get("url", "https://nregade4.dord.gov.in/Netnrega/deletedemand.aspx")
+            url = self.resolve_portal_url(
+                config.DEL_DEMAND_CONFIG.get("url", "https://nregade4.dord.gov.in/Netnrega/deletedemand.aspx"))
             
             # Determine which panchayats to process
             all_mode = target_panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)

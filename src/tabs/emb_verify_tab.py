@@ -195,7 +195,7 @@ class EmbVerifyTab(BaseAutomationTab):
             saved_mode = panchayat == config.MY_PANCHAYATS_LABEL
             panchayats_to_process = []
             if all_mode:
-                driver.get(config.EMB_VERIFY_CONFIG["url"])
+                driver.get(self.resolve_portal_url(config.EMB_VERIFY_CONFIG["url"]))
                 # Central helper — GP login has no dropdown; ⭐ My Saved
                 # mode uses the panchayats saved in Settings directly.
                 panchayats_to_process, _is_gp = self._fetch_panchayats_from_website(
@@ -218,7 +218,7 @@ class EmbVerifyTab(BaseAutomationTab):
                 self.log_info(f"=== Panchayat {p_idx+1}/{total_p}: {p_name} ===")
                 self.app.after(0, self.update_status, f"{p_name}: selecting...", p_idx / max(total_p, 1))
 
-                driver.get(config.EMB_VERIFY_CONFIG["url"])
+                driver.get(self.resolve_portal_url(config.EMB_VERIFY_CONFIG["url"]))
                 self.log_info(f"Selecting Panchayat: {p_name}")
                 # Central helper — GP login (no dropdown) par selection skip
                 status, _ = self._select_panchayat_or_skip(
@@ -263,7 +263,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
                     if use_search and i < len(work_codes_to_process) - 1:
                         self.log_info("Navigating back for next work code...")
-                        driver.get(config.EMB_VERIFY_CONFIG["url"])
+                        driver.get(self.resolve_portal_url(config.EMB_VERIFY_CONFIG["url"]))
                         panchayat_select = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_panch"))))
                         self._select_by_text_case_insensitive(panchayat_select, p_name)
                         wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
