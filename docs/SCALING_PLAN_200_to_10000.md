@@ -7,7 +7,26 @@
 >
 > **Date:** August 2026 · **Current version:** 3.2.3 · **Audience:** Product owner (Rajat) + future team
 
----
+> ## 📌 PROGRESS UPDATE — 11 Aug 2026: PHASE 1 COMPLETE ✅
+>
+> **"Multi-State + Visibility" phase ke saare core items ship ho chuke hain** (server-side built,
+> deploy backlog baki — section 13 dekho):
+>
+> - ✅ **State Registry (DB-driven)** — `portal_states` table (migration 024) + admin page
+>   (`/admin/portal-states`) + desktop heartbeat refresh. Naya state = **admin se add, koi release nahi**.
+> - ✅ **Revenue Dashboard** (`/admin/revenue`) — MRR ₹2081/4378, churn 35%, LTV, expiry forecast 7/30/60/90 + CSV
+> - ✅ **State Analytics** (`/admin/state-analytics`) — per-state users/activity/fail-rate/revenue/MRR,
+>   registry-aware (unregistered states amber banner)
+> - ✅ **Error-Spike Alerts** — per-automation fail >10% → admin WhatsApp (cooldown + test button)
+> - ✅ **Feature Popularity** (usage_stats sync → server) · ✅ **Tab search + keyboard shortcuts**
+> - ⏸️ **Bihar portal config** — defer kiya tha; ab registry ke through admin se hi add ho sakta hai (release ki zaroorat nahi)
+>
+> **➡️ Abhi ka sabse logical next step:** (1) Deploy backlog ship karo, (2) **churn prevention —
+> WhatsApp renewal reminders** (revenue dashboard ne churn 35% + 30 din me ~15 licenses expiring dikhaya
+> — ye sabse bada business leak hai). Phase 2 infra (CDN/canary/managed PG) tab tak wait kare jab users
+> ~1000-2000 cross karein.
+>
+> ---
 
 ## 📋 Table of Contents
 
@@ -66,8 +85,8 @@ ka license 3 din me expire hone wala hai — tab tak scale karna andha hona hai.
 | Macro manager (sequential queue) | ✅ | `workflow_manager.py` |
 | WhatsApp notifications + daily report | ✅ | Evolution API + 6 AM daily report |
 | Onboarding tour, factory reset, theme | ✅ | v3.2.2+ |
-| Per-state portal configs | ⚠️ | Sirf 3 states hardcoded in `src/config.py` |
-| Feature usage stats | ⚠️ | `usage_stats` SQLite **local-only** — server pe NAHI jaata |
+| Per-state portal configs | ✅ | `portal_states` DB registry (migration 024) + admin page — naya state bina release ke |
+| Feature usage stats | ✅ | `usage_stats` sync → server + Feature Popularity admin page |
 
 ### 2.2 Server (jo hai)
 
@@ -92,28 +111,37 @@ ka license 3 din me expire hone wala hai — tab tak scale karna andha hona hai.
 
 | Missing | Severity |
 |---|---|
-| **Multi-state expansion** (Bihar/UP/MP/other states ke portal configs) | 🔴 Critical |
-| **Feature telemetry to server** (`usage_stats` local-only) | 🔴 High |
-| **Revenue/MRR analytics** in admin | 🔴 High |
-| **Retention / cohort / funnel analytics** (trial→paid) | 🟠 High |
-| **State-wise breakdown** in admin (users/errors/activity per state) | 🟠 High |
-| **Offline-first + queue + auto-resume** (rural internet) | 🟠 High |
-| **Scheduled automations** (roz ka task bina user ke chale) | 🟡 Medium |
-| **Tab search + keyboard shortcuts** (55 tabs me navigation) | 🟡 Medium |
-| **In-app notification center** (sirf popup announcement hai abhi) | 🟡 Medium |
-| **Canary updates + auto-rollback** | 🟡 Medium |
-| **Push notifications** (license expiry, replies, new features) | 🟡 Medium |
-| **API documentation** (public) | 🟢 Low |
-| **Mobile companion app / PWA** | 🟢 Low |
-| **Team/collaborator mode** | 🟢 Low |
+| Missing | Severity | Status |
+|---|---|---|
+| **Multi-state expansion** (Bihar/UP/MP/other states ke portal configs) | 🔴 Critical | ✅ DONE — `portal_states` registry, admin se add |
+| **Feature telemetry to server** (`usage_stats`) | 🔴 High | ✅ DONE — sync + Feature Popularity page |
+| **Revenue/MRR analytics** in admin | 🔴 High | ✅ DONE — `/admin/revenue` |
+| **State-wise breakdown** in admin | 🟠 High | ✅ DONE — `/admin/state-analytics` |
+| **Error-spike alerts** (auto → WhatsApp) | 🟠 High | ✅ DONE — `error_spike_monitor.py` |
+| **Tab search + keyboard shortcuts** | 🟡 Medium | ✅ DONE |
+| **Retention / cohort / funnel analytics** (trial→paid) | 🟠 High | ✅ DONE (12 Aug 2026 — `/admin/funnel`, cohorts + drop-off) |
+| **WhatsApp renewal reminders + expiry offers** | 🔴 High | ⬜ **NEXT BEST** — churn 35% se direct fight |
+| **Offline-first + queue + auto-resume** (rural internet) | 🟠 High | ⬜ |
+| **Scheduled automations** (roz ka task bina user ke chale) | 🟡 Medium | ⬜ |
+| **In-app notification center** | 🟡 Medium | ⬜ |
+| **Canary updates + auto-rollback** | 🟡 Medium | ⬜ (Phase 2, ~1000 users par) |
+| **Push notifications** (license expiry, replies, new features) | 🟡 Medium | ⬜ (renewal reminders ke saath) |
+| **API documentation** (public) | 🟢 Low | ⬜ |
+| **Mobile companion app / PWA** | 🟢 Low | ⬜ |
+| **Team/collaborator mode** | 🟢 Low | ⬜ |
 
 ---
 
 ## 3. Sector Gap Analysis
 
-### 3.1 Naya State Add Karna (abhi ka sabse urgent)
+### 3.1 Naya State Add Karna ✅ DONE (DB-driven State Registry)
 
-**Problem:** `src/config.py` me sirf 3 states hardcoded hain:
+> **11 Aug 2026:** Solution implement ho chuka hai — `portal_states` table (migration 024) + admin
+> page `/admin/portal-states` + desktop `update_state_registry()` (heartbeat se ~2 min me refresh).
+> Bihar/UP/MP add karna ab = admin panel se ek form — **koi code change, koi release nahi**.
+> `src/config.py` ke built-in dicts sirf fallback hain (server unreachable par app chalti hai).
+
+**Problem (history):** `src/config.py` me sirf 3 states hardcoded hain:
 
 ```python
 STATE_PORTAL_HOSTS = {
@@ -128,13 +156,13 @@ Bihar (and upcoming states) ke liye har naya state add karna = code change + nay
 **10,000 users ke liye ye kabhi nahi chalega** — states slow roll out honge aur har state ke
 portal ke alag host/page-overrides/APIs honge.
 
-**Solution (P0): State Registry — config-file/DB-driven**
-- `STATE_DEMAND_CONFIG` pattern ko generalize karo → ek `state_registry.json` (ya `state_configs`
-  DB table) jisme har state ka: `host`, `page_overrides`, `jobcard_prefix`, `demand_urls`,
-  `muster_urls`, `login_url`, `selectors_overrides`, `portal_version`.
-- Desktop app boot par registry fetch kare (`/api/state-configs`, cached, versioned) → naya state
-  add karna = server-side config change, **koi app release nahi chahiye**.
-- `get_state_portal_url()` / `get_state_portal_host()` inhe read karein (fallback = built-in JSON).
+**Solution (P0): State Registry — DB-driven ✅**
+- `portal_states` DB table (migration 024) — state_key, portal_host, job_card_prefix,
+  demand_base_url, village_code_logic, is_active, sort_order.
+- Admin page `/admin/portal-states` — add/edit (UPSERT), activate/deactivate, delete.
+- Desktop `/api/app-config` se registry fetch (heartbeat ~2 min) → `update_state_registry()` →
+  `get_state_portal_host()/get_state_portal_url()/get_state_demand_config()` registry-aware.
+- **Naya state = admin se add, koi app release nahi chahiye** ✅ (tested end-to-end).
 
 ### 3.2 Missing Automation Sectors (features jo nahi hain)
 
@@ -223,7 +251,7 @@ portal ke alag host/page-overrides/APIs honge.
 | 4 | **2nd app node + LB** | 2nd VPS par Flask; nginx LB; sticky sessions off (stateless API) | 🟠 |
 | 5 | **Auto-scaling Gunicorn** | Workers = f(load): `gunicorn --workers 8 --threads 4 --max-requests 1000`; horizontal = 2 nodes | 🟠 |
 | 6 | **Object storage for user_uploads** | `user_uploads/` NAS local → R2 primary (abhi R2 pe bhi jaata hai — primary banao) | 🟠 |
-| 7 | **Alerting + APM** | Sentry (server) + uptime external probe (UptimeRobot guide already hai) + error spike alerts | 🟠 |
+| 7 | **Alerting + APM** | Error-spike alerts ✅ done; baki: Sentry (server) + uptime external probe (UptimeRobot guide already hai) | 🟠 |
 
 ### 5.3 Desktop App Scale-Safety (10k clients)
 
@@ -254,16 +282,16 @@ portal ke alag host/page-overrides/APIs honge.
 > Abhi admin me 25+ sections hain ✅ — ye list uske **upar** ka hai: jo data abhi collect hota
 > hai par dikhta nahi, ya jo collect karna chahiye.
 
-### 6.1 🔴 Must-add (pehle 2 months)
+### 6.1 🔴 Must-add (pehle 2 months) — ✅ 4/6 DONE
 
-| # | Admin Section | Data Source | Kya dikhe |
-|---|---|---|---|
-| 1 | **📈 Revenue Dashboard** | `payments` + `licenses` tables | MRR, new/renewed/churned licenses, LTV estimate, plan breakdown, payment failures, refunds, subscription churn rate, revenue forecast (next 30/60/90 days) |
-| 2 | **🗺️ State-Wise Analytics** | `licenses.user_state` + `activity_logs` | Per-state: users, active (24h/7d), error rate, top automations, top failing automation — ek click me |
-| 3 | **🔥 Feature Popularity** | NEW: `usage_stats` sync from desktop (§8) | Kaunsa tab kitni baar start hua, success rate per tab, top 10 features, least-used (delete/improve) |
-| 4 | **🔄 Funnel / Retention** | `licenses.created_at` + `payments` + heartbeats | Trial→paid conversion %, daily/weekly active, cohort retention (30/60/90 day), churn alerts |
-| 5 | **⏳ License Expiry Forecast** | `licenses.expires_at` | Next 7/30/60 days me kitne licenses expire honge, renewal-reminder queue, expiring-soon CSV export |
-| 6 | **🚨 Error Spike Alerts** | `activity_logs` | Per-automation error rate threshold (e.g. >10%) → WhatsApp/email alert to admin — **automatic**, page dekhne ka wait nahi |
+| # | Admin Section | Data Source | Kya dikhe | Status |
+|---|---|---|---|---|
+| 1 | **📈 Revenue Dashboard** | `payments` + `licenses` tables | MRR, new/renewed/churned licenses, LTV estimate, plan breakdown, payment failures, refunds, subscription churn rate, revenue forecast (next 30/60/90 days) | ✅ `/admin/revenue` |
+| 2 | **🗺️ State-Wise Analytics** | `licenses.user_state` + `activity_logs` | Per-state: users, active (24h/7d), error rate, top automations, top failing automation — ek click me | ✅ `/admin/state-analytics` |
+| 3 | **🔥 Feature Popularity** | `usage_stats` sync from desktop (§8) | Kaunsa tab kitni baar start hua, success rate per tab, top 10 features, least-used (delete/improve) | ✅ `/admin/feature-popularity` |
+| 4 | **🔄 Funnel / Retention** | `licenses.created_at` + `payments` + heartbeats | Trial→paid conversion %, daily/weekly active, cohort retention (30/60/90 day), churn alerts | ⬜ NEXT (renewal reminders ke saath) |
+| 5 | **⏳ License Expiry Forecast** | `licenses.expires_at` | Next 7/30/60 days me kitne licenses expire honge, renewal-reminder queue, expiring-soon CSV export | ✅ forecast part; ⬜ **auto reminder queue** (churn prevention) |
+| 6 | **🚨 Error Spike Alerts** | `activity_logs` | Per-automation error rate threshold (e.g. >10%) → WhatsApp/email alert to admin — **automatic**, page dekhne ka wait nahi | ✅ `error_spike_monitor.py` |
 
 ### 6.2 🟠 Should-add (3-6 months)
 
@@ -423,7 +451,7 @@ Admin Dashboard               ◀── aggregated queries + Redis cache (patter
 |---|---|---|
 | Server up | `/healthz` + UptimeRobot (guide already ✅) | WhatsApp |
 | DB/Redis/Evo/WebDAV | `uptime_monitor.py` (already ✅) | WhatsApp |
-| Error rate spike | NEW: per-automation threshold in `ops.py` | WhatsApp |
+| Error rate spike | ✅ DONE — `error_spike_monitor.py` (per-automation fail >10% → WhatsApp) | WhatsApp |
 | Crash spike per version | NEW: canary monitor | WhatsApp |
 | Disk space NAS | `df` cron + alert | WhatsApp |
 | R2/bandwidth cost | R2 metrics + monthly review | Email |
@@ -447,29 +475,36 @@ Admin Dashboard               ◀── aggregated queries + Redis cache (patter
 
 ## 11. Prioritized Roadmap
 
-### Phase 1 — "Multi-State + Visibility" (Week 1-4) 🔴
+### Phase 1 — "Multi-State + Visibility" 🔴 → ✅ **COMPLETE (11 Aug 2026)**
 
-| # | Task | Where |
+| # | Task | Where | Status |
+|---|---|---|---|
+| 1 | **Bihar portal config** (host/page-overrides/demand URLs/jobcard prefix `BR-`) | registry (admin se add) | ⏸️ Deferred — ab admin se hi add hota hai, release nahi |
+| 2 | **State registry (DB-driven)** — migration 024 + admin page + desktop refresh | `portal_states`, `src/config.py` | ✅ DONE (plan se better: DB, release-free) |
+| 3 | **Revenue Dashboard** (MRR, churn, forecast) | `nrega-server/app/routes/admin/revenue.py` | ✅ DONE |
+| 4 | **State-wise analytics** in admin | `admin/state_analytics.py` + `admin_state_analytics.html` | ✅ DONE |
+| 5 | **`usage_stats` sync** + Feature Popularity admin page | desktop + `admin/usage_stats.py` | ✅ DONE |
+| 6 | **Error-spike alerts** (per-automation threshold → WhatsApp) | `error_spike_monitor.py` + Uptime page | ✅ DONE |
+| 7 | **Tab search + keyboard shortcuts** | `app_navigation.py` | ✅ DONE |
+
+> **Phase 1 done. Abhi ka next step:** Deploy backlog ship karo (section 13) → **churn prevention
+> (WhatsApp renewal reminders)** — sabse bada business leak (churn 35%, 30d me ~15 licenses expiring).
+
+### Phase 2 — "Scale Infrastructure" 🟠 (tab shuru karo jab users ~1000-2000 cross karein)
+
+> Abhi (234 users) infra upgrades premature hain — NAS ~2-3k users tak chalega. Pehle business
+> retention (Phase 1.5) pakdo. **Phase 2 ka sabse pehla item CDN nahi, CANARY ho sakta hai** —
+> kyunki har release ab 234+ users ko risk deta hai, canary crash-spike par auto-hold karta hai.
+
+| # | Task | Trigger |
 |---|---|---|
-| 1 | **Bihar portal config** (host/page-overrides/demand URLs/jobcard prefix `BR-`) | `src/config.py` + testing |
-| 2 | **State registry (JSON)** — 4 states migrate, `get_state_portal_url` reads registry | `src/config.py`, tabs |
-| 3 | **Revenue Dashboard** (MRR, churn, forecast) | `nrega-server/app/routes/admin/` |
-| 4 | **State-wise analytics** in admin | admin + `activity_logs.user_state` backfill |
-| 5 | **`usage_stats` sync** to server + Feature Popularity admin page | desktop + server |
-| 6 | **Error-spike alerts** (per-automation threshold → WhatsApp) | `ops.py` + `uptime_monitor` |
-| 7 | **Tab search + keyboard shortcuts** | `app_navigation.py` |
-
-### Phase 2 — "Scale Infrastructure" (Week 5-12) 🟠
-
-| # | Task |
-|---|---|
-| 8 | CDN for core zips/installers (R2 + Cloudflare CDN) |
-| 9 | Canary updates + auto-rollback (loader + version.json) |
-| 10 | Managed Postgres migration plan (or replica for dashboards) |
-| 11 | 2nd app node + load balancer (VPS) |
-| 12 | Locust load test (target 10k) + Gunicorn tuning |
-| 13 | Offline queue + backoff (desktop) |
-| 14 | In-app notification center + expiry reminders |
+| 8 | CDN for core zips/installers (R2 + Cloudflare CDN) | ~1000 users |
+| 9 | Canary updates + auto-rollback (loader + version.json) | aaj bhi kar sakte ho (release risk kam) |
+| 10 | Managed Postgres migration plan (or replica for dashboards) | ~2000 users |
+| 11 | 2nd app node + load balancer (VPS) | ~2000 users |
+| 12 | Locust load test (target 10k) + Gunicorn tuning | ~1500 users |
+| 13 | Offline queue + backoff (desktop) | rural users feedback |
+| 14 | In-app notification center + expiry reminders | Phase 1.5 churn ke saath (desktop release) |
 
 ### Phase 3 — "Business & Retention" (Month 4-6) 🟡
 
@@ -530,5 +565,65 @@ Admin Dashboard               ◀── aggregated queries + Redis cache (patter
 
 ---
 
-*Ye document living hai — har quarter me update karo. 200 → 10,000 tak ka rasta visibility, state
-support, aur revenue model se hokar jaata hai. Pehla phase (4 hafte) sabse important hai.*
+## 13. 📌 Progress Log (update har implementation ke baad)
+
+### 11 Aug 2026 — Phase 1 COMPLETE
+
+**Ship ho gaya (server, deploy backlog baki):**
+
+| Item | Files | Deploy note |
+|---|---|---|
+| State Registry (DB + admin) | `migrations/024_state_registry.sql`, `app/routes/admin/states.py`, `admin_portal_states.html`, `src/config.py` (client), `app_license.py` (heartbeat) | Server push + desktop release |
+| Revenue Dashboard | `app/routes/admin/revenue.py`, `admin_revenue.html` | Server-only |
+| State Analytics | `app/routes/admin/state_analytics.py`, `admin_state_analytics.html` | Server-only |
+| Error-Spike Alerts | `app/error_spike_monitor.py`, `run.py`, `admin/uptime.py`, `admin_uptime.html` | Server-only (env: `ERROR_SPIKE_ALERT_WHATSAPP`) |
+| Feature Popularity | (pehle se ship) | — |
+
+**Validation done:** migration 024 applied ✅ · revenue dashboard real-DB build ✅ · state analytics
+real-DB build (Jharkhand 229 users) ✅ · error-spike synthetic spike 87.5% detect ✅ · sab render
+200 + auth 302 + CSV export ✅ · code reviews ×3 ✅
+
+**Deploy checklist (baaki kaam):**
+1. `git -C nrega-server push` → NAS deploy (server-only items turant live)
+2. Desktop changes next release ke saath (registry client code) — version bump patch-level, hashes `""`
+3. `.env` par: `ERROR_SPIKE_ALERT_WHATSAPP` (ya `UPTIME_ALERT_WHATSAPP`) — Uptime page se test button
+
+**Next implement (recommended):**
+1. ✅ **Churn prevention — WhatsApp renewal reminders DONE** (below entry dekho)
+2. ✅ Funnel/retention analytics (trial→paid) — DONE 12 Aug 2026 (`/admin/funnel`: stages 172→164→61, cohorts, drop-off). Baaki: daily/weekly active + cohort retention (30/60/90d) charts.
+3. 🟠 Scheduled automations (Phase 3 #18) ya Canary (Phase 2 #9).
+
+### 11 Aug 2026 (2) — Churn prevention: WhatsApp renewal reminders ✅
+
+`whatsapp_automator.py::check_expiry_reminders()` ab production-ready (migration 025):
+
+| Feature | Kya |
+|---|---|
+| 7/3/1 din reminders | Pehle se tha (`send_before_days`); ab hardened |
+| **Dedup** | `renewal_reminders` table (PK license_key+stage) — scheduler multiple runs par bhi ek baar |
+| **Already-renewed skip** | Window me payment ho to reminder nahi (window = max stage + 1 din) |
+| **Early-bird offer** | `{early_bird_line}` placeholder — env `RENEWAL_EARLY_BIRD_PCT` (10) + `RENEWAL_EARLY_BIRD_COUPON` |
+| **Coupon validity** | Invalid/expired coupon → code omit (kabhi checkout par reject nahi) |
+| **Admin visibility** | WhatsApp Automation page — Renewal Reminders card (upcoming 7/3/1d + sent today/total) |
+
+**Validation:** migration 025 applied ✅ · 7d fires ✅ · dedup (2nd run 0 sends) ✅ · renewed-skip ✅ ·
+3d stage ✅ · invalid-coupon omit ✅ · stats API + page render 200 ✅ · code review ×1 ✅
+
+**Deploy:** server-only — `git -C nrega-server push` (migration 025 auto-applies). `.env` par
+`RENEWAL_EARLY_BIRD_COUPON` tab tak mat dalo jab tak Coupons page par code create na ho.
+
+### 11 Aug 2026 (3) — Admin panel cleanup + server push ✅
+
+- Sidebar 29 → 24 links, 5 clean sections (Overview / User Management / Messaging / Finance &
+  Sales / Database & Ops).
+- Merges: Broadcast→WhatsApp Automation hub, Email Templates→Mailing, Reseller Requests→Resellers,
+  Rate Limits→Uptime, Find Duplicates→DB Maintenance (true merge, `cleanup.py`).
+- Dead template `nrega-license-server-new.html` deleted. Saare 28 admin pages render 200 verified.
+- **Server pushed** — is session ke saare changes (registry, revenue, state-analytics, error-spike,
+  renewal reminders, admin cleanup) NAS deploy ho gaye (migrations 024+025 auto-apply).
+
+---
+
+*Ye document living hai — har implementation ke baad section 13 update karo. 200 → 10,000 tak ka
+rasta visibility (✅ done), state support (✅ done), retention (abhi), aur revenue model se hokar
+jaata hai. Phase 1 complete — ab churn prevention + deploy backlog pakdo.*

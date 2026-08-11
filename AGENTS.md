@@ -33,6 +33,7 @@ Ye project **do alag git repos** hai. Galti se galat repo me commit/deploy karna
 
 - **Nested repo, submodule NAHI:** `nrega-server/` ka apna `.git` hai; main repo use ignore karta hai (`.gitignore` line ~43). Dono ke commits/status/branches bilkul alag hain. `git status` root me = sirf desktop app ka status.
 - **Server commands:** hamesha `git -C nrega-server <cmd>` ya `cd nrega-server && git <cmd>` use karo — kabhi root se `git add nrega-server/...` mat karo (ignore hai, kuch nahi hoga).
+- **NAS SSH state (12 Aug 2026):** SSH + **key auth WORKING** (user `rajat` → account `Rajat`, home `/var/services/homes/Rajat`, DSM case-insensitive). Mac key `~/.ssh/id_ed25519` (`rajatpoddar-macbook`) NAS ke `authorized_keys` mein hai; `~/.ssh/config` entry (`IdentityFile` + `UseKeychain`) bani hai → push bina password. **⚠️ GOTCHA:** NAS home folder world/group-writable ho to OpenSSH key auth reject karta hai (`Permission denied (publickey,password)`) — fix: NAS par `chmod 755 ~`. DSM kabhi-kabhi home perms 775/777 reset kar deta hai (SMB/reboot ke baad) — tab key auth dobara fail ho to yahi fix. Ye sab changes sirf USER karta hai — agent sirf commands batata hai.
 - **Parallel development:** desktop changes → GitHub push; server changes → NAS push + deploy. Dono independently ship hote hain, ek dusre par block nahi.
 - **Server local dev:** `nrega-server/run_local.sh` (Flask). Server deploy flow: `deploy.sh` / `deploy_quick.sh`.
 - **Server credentials:** `nrega-server/` me service-account JSON files hain — ye kabhi main repo/GitHub par mat bhejna!
@@ -89,6 +90,7 @@ venv/bin/python scripts/check_imports.py         # compile + import everything (
    3. `venv/bin/python scripts/build_locales.py` run karo → **exit 0** hona chahiye. `{placeholder}` tokens sab languages me **identical** hone chahiye (CI check karta hai).
    JSON me direct key edit karke CI fail hota hai — ye 3.2.3 release me hua tha (missing 6 keys).
 10. **Version bump — CHHOTA bump + hashes KHAALI (deploy user ka kaam hai):** version bump sirf patch level karo (e.g. 3.2.2 → 3.2.3), feature bump nahi. `src/config.py` + `config/version.json` (latest_version, URLs, core_update version, changelog entry English me) update karo, aur `core_update.hash` / `hash_windows` / `hash_macos` teeno ko `""` set karo. **Kabhi `scripts/build_update.py` run mat karo aur hashes mat fill karo** — ye user khud `scripts/deploy_version.sh` se karta hai (Windows hash GitHub se auto-fill, Mac hash `build_macos.sh` se).
+11. **NAS commands / server push — SIRF USER (HARD RULE, see §1.5):** NAS (`192.168.29.101`) par koi command execute mat karo aur `nrega-server` remote par kabhi push mat karo — chahe SSH kaam kar raha ho ya nahi, chahe push fail ho raha ho. Sirf copy-paste commands batao aur user ke confirm karne ka wait karo. (Incident: 11 Aug 2026 — agent ke SSH attempts se DSM Auto Block ne Mac IP block kar diya, deploy ruk gaya.)
 
 ## 4.5. 🗺️ State Registry (server-driven) — naya state add karna
 
@@ -121,6 +123,108 @@ fetch karke built-in `STATE_*` dicts par override karta hai.
   apna state map (state_code/seed_digest). Iska registry integration baad ka
   kaam hai, abhi manual edit se add hota hai.
 
+## 4.6. 🚨 Error-Spike Alerts (per-automation fail-rate watchdog)
+
+`app/error_spike_monitor.py` activity_logs se har `ERROR_SPIKE_CHECK_INTERVAL`
+(default 300s) par last `ERROR_SPIKE_WINDOW_MINUTES` (60) ki per-automation
+fail rate nikalta hai — `>ERROR_SPIKE_THRESHOLD_PCT` (10%) aur
+`>=ERROR_SPIKE_MIN_RUNS` (5) hone par admin ko WhatsApp alert (triage ke
+liye top affected states ke saath). Per-automation `ERROR_SPIKE_COOLDOWN`
+(3600s) spam guard; `ERROR_SPIKE_ALERT_WHATSAPP` (fallback
+`UPTIME_ALERT_WHATSAPP`) unset ho to alerts skip.
+
+| Piece | File |
+|---|---|
+| Monitor (fcntl lock, in-memory cooldown, bounded query) | `nrega-server/app/error_spike_monitor.py` |
+| Startup registration | `nrega-server/run.py` (uptime monitor ke saath) |
+| Admin config card + last-check + test button | `nrega-server/app/routes/admin/uptime.py` + `app/templates/admin/admin_uptime.html` |
+
+**Note:** Monitor in-memory cooldown use karta hai (uptime_monitor pattern —
+fcntl lock single-worker guarantee) — Redis API dependency nahi. Koi migration
+nahi. Yahan alert-message template edit karo agar format badalna ho.
+
+## 4.7. 📊 State Analytics (per-state health)
+
+`app/routes/admin/state_analytics.py` — `/admin/state-analytics` page har state
+ka health check dikhata hai (5-min cache, `admin:state-analytics`):
+
+| Metric | Source |
+|---|---|
+| Users / Active Paid / Trials (30d) | `licenses.user_state` |
+| Runs (30d) / Fail Rate | `activity_logs` (30d window, `success`/`failed`/`error`) |
+| Revenue / Tx / Est. MRR | `payments` + plan prices (`FIRST_TIME_PRICES`) |
+| Registry status (✅/⚠️) | `portal_states` — unregistered states amber banner + `State Registry` link |
+
+**Rules:**
+1. `user_state` messy hota hai (`JH`, `jharkhand`, `WEST BENGAL`) — `_STATE_ALIASES`
+   casefold + abbreviation mapping se canonical name banata hai (duplicate rows nahi).
+   Naya state add karte waqt alias bhi check karo.
+2. `payments` table empty ho to revenue 0 dikhta hai — query sahi hai.
+3. CSV export `/export-state-analytics` cached data se (5-min stale OK).
+4. Reuse: `_pct`/`_PLAN_MONTHS`/`_PLAN_KEYS` revenue.py se, `_IST_TZ` dashboard.py se.
+
+## 4.8. 🔔 Renewal Reminders (churn prevention)
+
+`whatsapp_automator.py::check_expiry_reminders()` — expiry se 7/3/1 din pehle
+(`whatsapp_templates.send_before_days`, default `[7, 3, 1]`) user ko WhatsApp
+reminder + **early-bird offer** bhejta hai. Daily scheduler `ai_autopilot.py`
+se chalta hai (`run_all_automation_checks`).
+
+**Rules:**
+1. **Dedup** — `renewal_reminders` table (migration 025), PK `(license_key, stage)`.
+   Har stage per license sirf EK baar; send SUCCESS ke baad hi mark hota hai
+   (fail → agli baar retry). Scheduler din me multiple baar chale to bhi
+   duplicate nahi.
+2. **Already-renewed skip** — pichhle 8 din me payment (`payments` table) aayi
+   ho to reminder nahi jaata.
+3. **Early-bird offer** — env: `RENEWAL_EARLY_BIRD_PCT` (default `10`),
+   `RENEWAL_EARLY_BIRD_COUPON` (default empty). Placeholders `{early_bird_discount}`,
+   `{early_bird_coupon}`, `{early_bird_line}` (`whatsapp_placeholders.py` se).
+   Template ka offer line migration 025 se add hota hai (sirf agar `early_bird`
+   pehle se template me nahi — admin custom message preserve hota hai).
+4. **Admin visibility** — WhatsApp Automation page par "Renewal Reminders" card
+   (upcoming 7/3/1d + sent today/total) — `automation_config.py::
+   whatsapp_automation_stats_api` se.
+5. Naya reminder stage add: template ke `send_before_days` se (admin editable).
+
+## 4.9. 🧹 Admin sidebar (cleanup — 11 Aug 2026)
+
+Admin panel ko solo-admin friendly banaya gaya: sidebar me 5 links merge/hide kiye (routes
+**hatae NAHI** — sirf sidebar se hataye + cross-links daale):
+
+| Page | Kahan gaya |
+|---|---|
+| WhatsApp Broadcast | WhatsApp Automation page par **Manual Broadcast** button |
+| Manage Templates (email) | Mailing Center page par **Email Templates** button |
+| Reseller Requests | Resellers page par **Reseller Requests** button |
+| Rate Limits | Uptime page par **Rate Limits** button |
+| Find Duplicates | DB Maintenance page par **Duplicate Users** section (true merge — `cleanup.py` ab duplicates bhi query karta hai) |
+
+Dead template `nrega-license-server-new.html` delete kiya. Naya section header: Messaging /
+Database & Ops / DB Maintenance. Naya page add karte waqt sidebar ke inhi sections me daalo.
+
+## 4.10. 🔀 Trial Funnel (trial→paid conversion) — 12 Aug 2026
+
+`app/routes/admin/funnel_analytics.py` — `/admin/funnel` page. **⚠️ CRITICAL
+DATA MODEL (live-DB discovery): trial users upgrade hone par SAME key rehti
+hai, sirf `key_type` badalta hai (trial → monthly/paid/...).** Isliye trial
+population `key_type='trial'` se NAHI, key prefix `NREGABOT-TRIAL-%` se
+define hoti hai (172 keys, 61 upgraded). Ye `revenue.py` ke trial→paid email-join
+query ko bhi affect karta hai — wo query bhi cross-key conversions hi pakadti
+hai (in-place upgrades miss karti hai) — funnel page iska sahi alternative hai.
+
+| Stage | Signal |
+|---|---|
+| Trial Registered | `key LIKE 'NREGABOT-TRIAL-%'` (trial-origin, upgrade-proof) |
+| Activated | `last_seen NOT NULL` (app launch/heartbeat) ya activity_logs |
+| Converted | `key_type <> 'trial'` (in-place upgrade) ya payments par key |
+| Renewed (KPI only) | 2+ payments on key — `payments` table abhi sparse (1 row) isliye 0 dikhega, future metric |
+
+Cohort table (trial month × trials/activated/converted), drop-off analysis
+(sabse bada drop + actionable msg), 5-min Redis cache (`admin:funnel-analytics`),
+CSV export. Funnel stages strictly nested hain (converted counted sirf activated
+keys par). Agar key generation format kabhi badle to `_TRIAL_PREFIX` update karo.
+
 ## 5. Common tasks → where to edit
 
 | Task | Files |
@@ -132,6 +236,7 @@ fetch karke built-in `STATE_*` dicts par override karta hai.
 | Update flow | `loader.py`, `lite_loader.py`, `src/managers/services.py`, `scripts/build_update.py`, `config/version.json` |
 | Macro / multi-tab workflow | `src/managers/workflow_manager.py` |
 | Add/edit a VB-G-RAM-G state (no release) | Admin → **State Registry** (`/admin/portal-states`); data flow: `024_state_registry.sql` → `auth.py app_config()` → `src/config.py` registry → heartbeat fetch |
+| Revenue / MRR / churn / expiry forecast | Admin → **Revenue Dashboard** (`/admin/revenue`); `nrega-server/app/routes/admin/revenue.py` + `admin_revenue.html`. Prices ka source of truth: `app/services/license_service.py` (`FIRST_TIME_PRICES`/`RENEWAL_PRICES`) — dono sync rakho |
 | Theme / colors | `src/config.py` (`COLORS`), `config/theme.json` |
 | Translations | **`en.json` + `hi.json` directly edit karo; `kn.json`/`bn.json`/`hinglish.json` GENERATED hain — unhe kabhi directly edit mat karo.** Source of truth = `scripts/translations_{kn,bn,hing}_{1..5}.py` part files. Naya key add: en.json (+ hi.json) + teeno part files (last part `_5` me) me add karo → `venv/bin/python scripts/build_locales.py` run karo (CI yahi chalta hai; exit 0 chahiye) → generated JSON khud update ho jata hai. Helpers: `check_missing_keys.py` (code vs locales), `add_missing_keys.py`. |
 | Release a new version | **CHHOTA bump** (patch, e.g. 3.2.2 → 3.2.3) — `APP_VERSION` (config.py) + `config/version.json` (latest_version, URLs, core_update version, changelog) → **core_update ke teeno hashes (`hash`, `hash_windows`, `hash_macos`) ko `""` KHAALI karo** → commit + push (CI builds). **Agent hashes fill/build_update.py kabhi NAHI chalaata** — user khud `scripts/deploy_version.sh` chala ke hashes + deploy karta hai (wo script Windows hash GitHub se auto-fill karti hai; Mac hash `build_macos.sh` banata hai). |
