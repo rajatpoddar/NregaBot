@@ -1,5 +1,6 @@
-# NREGA Bot - Demand CSV (simple format)
-# Add one row per labourer below the header line. Work Code is optional (blank = skip auto-allocation). After uploading, select the panchayat in the Demand tab.
+# NREGA Bot - Demand CSV (simple format),,
+# Add one row per labourer below the header line. Work Code is optional (blank = skip auto-allocation). After uploading, select the panchayat in the Demand tab.,
+# ⚠️ IMPORTANT: Hindi/regional names ke liye file ko Excel me 'CSV UTF-8 (Comma delimited)' format me save karein — 'CSV (Comma delimited)' (ANSI) me save karne par names '?' ban jate hain. Safest: .xlsx me save karke yahi file select karein, wo bhi chalega.,
 Job Card Number,Name of Applicant,Work Code
 JH-22-003-008-001/1,MANOJ KUMAR SINGH,
 JH-22-003-008-001/101,SALIM MIYA,

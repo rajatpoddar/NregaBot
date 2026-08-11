@@ -254,6 +254,8 @@
   "demand.file_missing_msg": "Report file ab exist nahi karti:\n{path}\n\nKripya dobara upload karein.",
   "demand.failures_msg": "{count} mazdoor ki demand fail hui:\n{sample}{more}\n\nPehle unhe retry karein, ya unke bina allocation jaari rakhein?",
   "demand.failures_title": "Demand me failures hain",
+  "demand.encoding_warn_title": "CSV me names kharab hain",
+  "demand.encoding_warn_msg": "Aapki CSV me {count} name(s) me '?' mark hain (jaise: {sample})।\n\nYe tab hota hai jab file Excel me 'CSV (Comma delimited)' (ANSI) me save hoti hai aur names Hindi/regional me hote hain — '?' unhe hamesha ke liye badal deta hai.\n\nFile ko Excel me 'CSV UTF-8 (Comma delimited)' format me dobara save karke upload karein. Jab tak ye theek nahi hota, demand portal ke names se match nahi hogi.",
   "demand.failures_suffix": "\n\n(Yes = Failed mazdooro ko retry karein | No = Unke bina allocation karein)",
   "demand.retry_title": "Failed Retry Karein",
   "demand.retry_no_failed": "Results me koi failed applicants nahi mile.",

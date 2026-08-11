@@ -9,7 +9,7 @@ APP_TAGLINE: str = "Your NREGA Task Management Companion"
 APP_DESCRIPTION: str = "A comprehensive tool for managing NREGA tasks efficiently."
 APP_AUTHOR: str = "Rajat Poddar"
 APP_AUTHOR_EMAIL: str = "Rajatpoddar@outlook.com"
-APP_VERSION: str = "3.2.2"
+APP_VERSION: str = "3.2.3"
 import os
 LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://nregabot.com')
 
@@ -565,9 +565,10 @@ STATE_PORTAL_HOSTS: Dict[str, str] = {
 # e.g. Rajasthan ka MR Fill page 'fillprintedmsr.aspx' hai (default config me
 # 'mustrollattend.aspx').
 STATE_PAGE_OVERRIDES: Dict[str, Dict[str, str]] = {
-    "Rajasthan": {
-        "mustrollattend.aspx": "fillprintedmsr.aspx",
-    },
+    # ⚠️ Currently EMPTY by design — user verified that page names are the SAME
+    # across states (Rajasthan bhi same page names use karta hai, sirf host
+    # alag hai). Koi state-specific page override confirm hone par hi yahan
+    # entry add karein, warna URLs waise hi rahte hain.
 }
 
 # Default portal host jab state map me na ho (display/suggestions ke liye).

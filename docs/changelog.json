@@ -1,4 +1,12 @@
 {
+  "3.2.3": [
+    "🌐 **Multi-State Portal Support:** All automation tabs now resolve the correct portal server per state — Rajasthan (vbgramgde3) and Jharkhand/Karnataka (de2) are supported. Every tab's URL is state-aware (Demand, Work Allocation, MR Fill, MSR, MB Entry, Wagelist, eKYC, and 20+ more).",
+    "🇮🇳 **Rajasthan Demand Fixed:** Demand + Work Allocation now work perfectly in Rajasthan — they use the correct portal host (vbgramgde3) with the right RJ jobcard village-code logic. Demand via eKYC report is verified working in Rajasthan.",
+    "📋 **CSV Encoding Fix:** Hindi/regional names in Demand CSVs are no longer silently corrupted — the app warns immediately when '?' marks are found on upload (with guidance to re-save as CSV UTF-8 or .xlsx), and the reader now smartly sniffs UTF-16/UTF-8/ANSI encodings.",
+    "🎯 **Better Name Matching:** Portal grid and CSV names are now compared with Unicode normalization (NFKC), so Devanagari matras match correctly. When a match fails, the actual grid names are logged so the issue is instantly visible.",
+    "🎓 **Onboarding Improvements:** The browser step now detects an already-running Chrome and connects instantly (verified real session), and onboarding stays visible until the tour + Panchayat/Village setup is complete. Focus returns to the app after adding Panchayat.",
+    "🐞 **Bug Fixes:** Fixed the 'name self is not defined' crash in Add Panchayat, removed STATE_PAGE_OVERRIDES (page names are the same across states), and converted demand macro helper prints to proper logging."
+  ],
   "3.2.2": [
     "🎓 **Naya Onboarding (Welcome Tour):** Pehli baar app kholne par ab ek interactive 7-step setup wizard milta hai — language choose karo, browser launch karke login karo, Panchayat & Villages yahin se add karo, Emergency Stop button ka kaam samjho, aur app kaise use karna hai wo bhi. About tab me 'Replay Welcome Tour' button se kabhi bhi dobara dekh sakte hain.",
     "🌐 **Nayi Language — Hinglish:** Ab app Roman Hindi (Hinglish) me bhi chala sakte hain — Hindi-speaking states ke users ke liye auto-suggest hoti hai. Total 5 languages: English, Hindi, Kannada, Bengali, Hinglish.",

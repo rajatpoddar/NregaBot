@@ -3,6 +3,7 @@ import tkinter
 from tkinter import ttk, messagebox, filedialog, Toplevel
 import customtkinter as ctk
 import os, csv, time, threading, json, re, requests
+import unicodedata
 from datetime import datetime
 
 from src import config
@@ -667,6 +668,29 @@ class DemandTab(BaseAutomationTab):
             loaded_count = len(self.all_applicants_data)
             self.log_info(f"Loaded {loaded_count} applicants from '{os.path.basename(path)}'.")
 
+            # ── '?' corruption check ──
+            # Excel me 'CSV (Comma delimited)' (ANSI) me save karne se Devanagari/
+            # regional names '?' ban jate hain — wo data file me hi corrupt hai,
+            # app se recover nahi hota. User ko turant clear message do taaki wo
+            # file ko 'CSV UTF-8' me re-save kare. Sath hi '?' wale names ko
+            # skip/match na karne ki wajah samajh aaye.
+            q_names = []
+            for a in self.all_applicants_data:
+                nm = (a.get('Name of Applicant') or '').strip()
+                if nm and '?' in nm:
+                    q_names.append(nm)
+            if q_names:
+                sample = ", ".join(sorted(set(q_names))[:3])
+                self.log_warning(
+                    f"⚠️ CSV me {len(q_names)} name(s) me '?' mila (e.g. {sample}). "
+                    "Ye tab hota hai jab file Excel me 'CSV (Comma delimited)' (ANSI) "
+                    "me save ki gayi ho aur names Hindi/regional hoon. File ko Excel me "
+                    "'CSV UTF-8 (Comma delimited)' format me re-save karke dobara upload karein "
+                    "— portal grid se name match nahi hoga jab tak names sahi na hoon.")
+                self.app.after(0, lambda: messagebox.showwarning(
+                    tr("demand.encoding_warn_title"),
+                    tr("demand.encoding_warn_msg", count=len(q_names), sample=sample)))
+
             # Legacy demand CSVs carry a per-worker 'Allocation Work Code' column —
             # when present, auto-allocation after demand uses those specific codes.
             try:
@@ -744,7 +768,18 @@ class DemandTab(BaseAutomationTab):
                 raise ValueError(f"Excel file could not be opened ({e}).")
         else:
             raw_rows = []
-            for enc in ("utf-8-sig", "utf-8", "latin-1"):
+            # Encoding sniffing: BOM wali files (UTF-8 BOM / UTF-16) pehle;
+            # phir UTF-8; phir Windows ANSI (cp1252) — Excel 'CSV (Comma
+            # delimited)' yehi use karta hai; last me latin-1 (catch-all).
+            # NOTE: agar file Excel ANSI me save hui hai aur names Devanagari
+            # hain, to '?' file me hi aa chuke hote hain — wo recover nahi
+            # hote, isliye _process_input_file me '?' warning diya jata hai.
+            with open(path, "rb") as f:
+                head = f.read(4)
+            encodings = ["utf-8-sig", "utf-8", "cp1252", "latin-1"]
+            if head[:2] in (b"\xff\xfe", b"\xfe\xff"):
+                encodings = ["utf-16"] + encodings
+            for enc in encodings:
                 try:
                     with open(path, mode="r", encoding=enc, newline="") as f:
                         reader = csv.reader(f)
@@ -1274,22 +1309,39 @@ class DemandTab(BaseAutomationTab):
             # Data store karne ke liye list
             self.work_data = [] 
 
-            with open(file_path, newline='', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    # Row clean karein
-                    clean_row = {k.strip(): v.strip() for k, v in row.items() if k}
-                    self.work_data.append(clean_row)
-                    
-                    # Treeview me dikhayein (Optional, visual confirmation ke liye)
-                    if hasattr(self, 'tree'):
-                        # Sirf values extract karke tree me dalein
-                        self.tree.insert("", "end", values=list(clean_row.values()))
+            # Encoding sniffing — _read_table_file jaisa hi (utf-16 BOM,
+            # UTF-8, cp1252/ANSI, latin-1). Nahi to ANSI-saved CSV me
+            # Devanagari names silently '?' ban jate hain.
+            # NOTE: work_data ko har attempt me fresh karo — ek encoding beech
+            # me UnicodeDecodeError de to partial rows duplicate na ho jayein.
+            with open(file_path, "rb") as f:
+                _head = f.read(4)
+            _encodings = ["utf-8-sig", "utf-8", "cp1252", "latin-1"]
+            if _head[:2] in (b"\xff\xfe", b"\xfe\xff"):
+                _encodings = ["utf-16"] + _encodings
+            for _enc in _encodings:
+                _batch = []
+                try:
+                    with open(file_path, newline='', encoding=_enc) as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            # Row clean karein
+                            clean_row = {k.strip(): v.strip() for k, v in row.items() if k}
+                            _batch.append(clean_row)
+                            
+                            # Treeview me dikhayein (Optional, visual confirmation ke liye)
+                            if hasattr(self, 'tree'):
+                                # Sirf values extract karke tree me dalein
+                                self.tree.insert("", "end", values=list(clean_row.values()))
+                    self.work_data = _batch
+                    break
+                except (UnicodeDecodeError, UnicodeError):
+                    continue
             
-            print(f"Success: Loaded {len(self.work_data)} rows from {file_path}")
+            self.log_info(f"Loaded {len(self.work_data)} rows from {file_path} (macro)")
 
         except Exception as e:
-            print(f"Error loading CSV data: {e}")
+            self.log_warning(f"Error loading CSV data: {e}")
             # Error aane par bhi kam se kam path variable set rakhein
             self.selected_file_path = file_path
     
@@ -1298,7 +1350,7 @@ class DemandTab(BaseAutomationTab):
         Updated: Loads CSV and selects applicants IMMEDIATELY (Synchronously).
         Removes timing delays to prevent 'Select applicants' error.
         """
-        print(f"Auto-Setup: Panchayat={panchayat_name}, File={file_path}")
+        self.log_info(f"Auto-Setup: Panchayat={panchayat_name}, File={file_path}")
         
         # 1. Panchayat Name Set
         self.panchayat_var.set(panchayat_name)
@@ -1312,9 +1364,8 @@ class DemandTab(BaseAutomationTab):
             # यह सुनिश्चित करता है कि start_automation चलने से पहले डेटा तैयार है
             self._select_all_applicants()
             
-            print(f"Auto-Setup: Loaded & Selected {len(self.all_applicants_data)} applicants.")
+            self.log_info(f"Auto-Setup: Loaded & Selected {len(self.all_applicants_data)} applicants.")
         else:
-            print(f"Error: File path not found: {file_path}")
             self.log_error(f"Macro Error: File not found {file_path}")
     def start_automation(self) -> None:
         """
@@ -1717,17 +1768,28 @@ class DemandTab(BaseAutomationTab):
                 rows = driver.find_elements(By.CSS_SELECTOR, f"table[id='{grid_id}'] > tbody > tr")
             except Exception:
                 return -1
+            grid_names = []
             for i, r in enumerate(rows):
                 if i == 0:
                     continue
                 try:
                     span = r.find_element(By.CSS_SELECTOR, "span[id*='_job']")
-                    if self._names_equal(span.get_attribute("innerText"), name_target):
+                    nm = (span.get_attribute("innerText") or "").strip()
+                    grid_names.append(nm)
+                    if self._names_equal(nm, name_target):
                         return i
                 except (StaleElementReferenceException, NoSuchElementException):
                     continue
                 except Exception:
                     continue
+            # Match nahi hua — grid me actual names log karo. '?' wala CSV name
+            # ya Devanagari-vs-English mismatch ki wajah se hota hai; user ko
+            # dono side dikh jaye to fix karna aasan ho jata hai.
+            if grid_names:
+                self.app.after(0, self.app.log_message, self.log_display,
+                               f"   ⚠️ Name '{name_target}' grid me nahi mila. "
+                               f"Grid names: {grid_names[:6]}{'...' if len(grid_names) > 6 else ''}",
+                               "warning")
             return -1
 
         try:
@@ -1959,9 +2021,16 @@ class DemandTab(BaseAutomationTab):
     # ------------------------------------------------------------------
 
     @staticmethod
+    def _names_key(name):
+        # NFKC: Devanagari matras/composed forms normalize karta hai — portal
+        # ka naam aur CSV ka naam visually same par Unicode code points alag
+        # hone par bhi match ho jaye. Whitespace/case hatao.
+        return "".join(unicodedata.normalize("NFKC", (name or "")).lower().split())
+
+    @staticmethod
     def _names_equal(a, b):
-        """Compares two names ignoring case and whitespace."""
-        return "".join((a or "").lower().split()) == "".join((b or "").lower().split())
+        """Compares two names ignoring case, whitespace and Unicode form."""
+        return DemandTab._names_key(a) == DemandTab._names_key(b)
 
     def _clear_stale_grid_rows(self, driver, grid_id, keep_names):
         """Clears dates/days on every grid row whose worker is NOT one of the
@@ -2005,10 +2074,6 @@ class DemandTab(BaseAutomationTab):
                     continue
                 except Exception:
                     continue
-
-    @staticmethod
-    def _names_key(name):
-        return "".join((name or "").lower().split())
 
     def _grid_has_any_worker(self, driver, grid_ids, apps_in_jc):
         """True if any of the JC's workers appears in the current grid rows.
@@ -2399,7 +2464,8 @@ class DemandTab(BaseAutomationTab):
     def save_inputs(self, inputs):
         try:
             self.app.history_manager.save_tab_inputs_batch("demand", inputs)
-        except Exception as e: print(f"Err saving demand inputs: {e}")
+        except Exception as e:
+            self.log_warning(f"Could not save demand inputs: {e}")
 
     def load_inputs(self):
         """

@@ -254,6 +254,8 @@
   "demand.file_missing_msg": "Report file no longer exists:\n{path}\n\nPlease upload again.",
   "demand.failures_msg": "{count} labourer(s) demand failed:\n{sample}{more}\n\nRetry them first, or continue allocation without them?",
   "demand.failures_title": "Demand has failures",
+  "demand.encoding_warn_title": "Names in CSV are corrupted",
+  "demand.encoding_warn_msg": "{count} name(s) in your CSV contain '?' marks (e.g. {sample}).\n\nThis happens when the file is saved in Excel as 'CSV (Comma delimited)' (ANSI) while names are in Hindi/regional script — the '?' replaces them permanently.\n\nRe-save the file in Excel as 'CSV UTF-8 (Comma delimited)' and upload again. Demand will not match the portal names until this is fixed.",
   "demand.failures_suffix": "\n\n(Yes = Retry failed labourers | No = Allocate without them)",
   "demand.retry_title": "Retry Failed",
   "demand.retry_no_failed": "No failed applicants found in results.",
