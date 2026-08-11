@@ -1,0 +1,26 @@
+{
+	// NREGA Bot — Multi-Root Workspace
+	// ------------------------------------------------------------
+	// Dono repos ek saath kholo:
+	//   1. Desktop App  (.)           — GitHub repo, branch main
+	//   2. nrega-server (nrega-server/) — NAS self-hosted git, branch master
+	// VS Code ka Source Control panel dono repos ko ALAG-alag dikhata hai.
+	//
+	// Open karne ka tarika: VS Code → File → Open Workspace from File…
+	// → NregaBot.code-workspace chuno. (Ya double-click file par)
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "nrega-server"
+		}
+	],
+	"settings": {
+		// ⚠️ Kuch bhi AUTOMATIC nahi chalega:
+		// - Koi task apne aap nahi chalta (folder kholte hi terminals nahi khulte)
+		"task.allowAutomaticTasks": "off",
+		// - Terminal panel startup par chhupa rahta hai
+		"terminal.integrated.hideOnStartup": "always"
+	}
+}

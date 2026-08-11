@@ -285,8 +285,10 @@ class DemandTab(BaseAutomationTab):
 
         ctk.CTkLabel(controls_frame, text=tr("common.panchayat_label")).grid(row=0, column=2, padx=(0, 5), pady=5, sticky="w")
         # ALL panchayats saved in Settings > Location Data (merged across keys),
-        # like every other tab — NOT just the 'location_panchayat' key.
-        p_vals = self._get_saved_panchayats() or [""]
+        # like every other tab — NOT just the 'location_panchayat' key. The
+        # 'All Panchayats'/'My Saved Panchayats' labels are filtered out (they
+        # are dropdown entries from other tabs, not real panchayats).
+        p_vals = self._demand_panchayat_options() or [""]
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
@@ -469,27 +471,22 @@ class DemandTab(BaseAutomationTab):
         self._setup_results_treeview()
 
     def _select_all_applicants(self):
-        """Selects all valid (no *) applicants, up to a safe batch limit (400).
+        """Selects ALL valid (no *) applicants from the loaded report/CSV.
 
-        eKYC reports can hold 1000+ rows, so instead of blocking, the first
-        400 valid applicants are selected and the rest can be added via
-        Quick Select / Search.
+        A demand CSV contains exactly the job cards the user wants demand for,
+        so Select All selects every row — no batch cap (the old 400 limit made
+        big CSVs silently skip job cards).
         """
         if not self.all_applicants_data:
             return
         selected_count = 0
         for app_data in self.all_applicants_data:
-            if selected_count >= 400:
-                break
             if "*" not in app_data.get('Name of Applicant', ''):
                 app_data['_selected'] = True
                 selected_count += 1
-        if len(self.all_applicants_data) > 400:
-            self.log_warning(f"Selected first {selected_count} applicants (report has {len(self.all_applicants_data)}). Use Quick Select/Search for more.")
-            messagebox.showinfo(tr("dialogs.batch_limit"), tr("dialogs.batch_limit_msg", count=selected_count, total=len(self.all_applicants_data)))
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
-        self.log_info(f"Selected {selected_count} valid applicants.")
+        self.log_info(f"Selected {selected_count} valid applicants (of {len(self.all_applicants_data)} loaded).")
     def _select_custom_number(self):
         """
         Selects a custom number of applicants from the top of the list.
@@ -571,16 +568,29 @@ class DemandTab(BaseAutomationTab):
         self._update_jc_header_counters()
 
     def _select_csv_from_computer(self):
-        """Opens a file dialog to select an eKYC report (Excel/CSV) and processes it."""
+        """Opens a file dialog to select an eKYC report or a simple Demand CSV
+        (Excel/CSV) and processes it."""
         path = filedialog.askopenfilename(
             title=tr("form.demand.select_ekyc_report"),
-            filetypes=[("eKYC Report / Excel", "*.xlsx *.csv"),
+            filetypes=[("eKYC Report / Demand CSV", "*.xlsx *.csv"),
                        ("Excel Workbook", "*.xlsx"),
                        ("CSV", "*.csv")]
         )
         if not path:
             return
         self._process_input_file(path)
+
+    def _demand_panchayat_options(self) -> List[str]:
+        """Saved panchayats for the Demand dropdown, minus the special
+        'All Panchayats' / 'My Saved Panchayats' labels. Those labels are real
+        dropdown entries in other tabs and can end up saved in history — they
+        are NOT selectable panchayats and would fail as 'Panchayat Not Found'
+        if chosen here."""
+        labels = {str(getattr(config, 'ALL_PANCHAYATS_LABEL', '')),
+                  str(getattr(config, 'MY_PANCHAYATS_LABEL', ''))}
+        labels.discard('')
+        return [p for p in (self._get_saved_panchayats() or [])
+                if p and str(p).strip() not in labels]
 
     def _process_input_file(self, path):
         """
@@ -674,7 +684,7 @@ class DemandTab(BaseAutomationTab):
             if pans:
                 try:
                     cur = self.panchayat_var.get().strip()
-                    merged = list(dict.fromkeys([p for p in pans + self._get_saved_panchayats() if p]))
+                    merged = list(dict.fromkeys([p for p in pans + self._demand_panchayat_options() if p]))
                     self.panchayat_menu.configure(values=merged or pans)
                     # Report ka panchayat auto-select karo — purana saved value
                     # (jaise MATIYARA) ko override karo jab report dusre panchayat
@@ -780,7 +790,13 @@ class DemandTab(BaseAutomationTab):
         try:
             pans = [a.get('panchayat') for a in self.all_applicants_data if a.get('panchayat')]
             if not pans:
-                return
+                # Simple demand CSVs carry no panchayat column — fall back to
+                # the panchayat the user picks in the UI dropdown (if any).
+                cur = self.panchayat_var.get().strip()
+                if cur:
+                    pans = [cur]
+                else:
+                    return
             panchayat = max(set(pans), key=pans.count)
             try:
                 date_str = datetime.fromtimestamp(os.path.getmtime(path)).strftime("%d-%m-%Y")
@@ -1093,7 +1109,13 @@ class DemandTab(BaseAutomationTab):
                          text_color="gray", justify="left").pack(padx=10, pady=20)
             return
 
-        for jc, members in selected_by_jc.items():
+        # Render cap: a Select All on a very large CSV/ekyc report can select
+        # 1000+ job cards — building a widget row for each would freeze the UI.
+        # The selection itself is complete; only the summary panel is capped.
+        RENDER_CAP = 150
+        for idx, (jc, members) in enumerate(selected_by_jc.items()):
+            if idx >= RENDER_CAP:
+                break
             row_frame = ctk.CTkFrame(self.selected_jc_frame,
                                      fg_color=("gray88", "gray22"), corner_radius=6)
             row_frame.pack(fill="x", padx=4, pady=2)
@@ -1117,6 +1139,12 @@ class DemandTab(BaseAutomationTab):
                 text_color=("gray30", "gray80"),
                 command=lambda j=jc: self._deselect_jc(j)
             ).grid(row=0, column=1, padx=(0, 4), pady=4)
+
+        if len(selected_by_jc) > RENDER_CAP:
+            ctk.CTkLabel(
+                self.selected_jc_frame,
+                text=f"... +{len(selected_by_jc) - RENDER_CAP} more selected job cards",
+                text_color="gray", justify="left").pack(padx=10, pady=6)
 
     def _deselect_jc(self, jc):
         """Removes all selections for a given job card."""
@@ -1348,6 +1376,16 @@ class DemandTab(BaseAutomationTab):
             "days": days_str, 
             "work_key_for_allocation": work_key_for_allocation
         })
+
+        # Simple demand CSVs carry no panchayat column — the panchayat is only
+        # known once the user picks it in the UI, so store the uploaded report
+        # in history NOW (run ke baad save) for the 'Previous' button. Reports
+        # that already have their own panchayat column were stored at upload.
+        try:
+            if self.csv_path:
+                self._store_report_in_history(self.csv_path)
+        except Exception:
+            pass
 
         # Group selected applicants by Panchayat -> Village -> Job Card.
         # Village names come straight from the eKYC report; legacy CSVs fall

@@ -10,8 +10,8 @@
     "url_macos": "https://nregabot.com/updates/core_mac_v3.2.2.zip",
     "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "",
-    "hash_macos": ""
+    "hash_windows": "db6d7fdd31212593347074e004f4c573f94f8e092cebc5d1c72e5a1b0d71d8c1",
+    "hash_macos": "10e5ccc672721c73187628c7f793a47378111c7b5fc6db566b3ef2d030512369"
   },
   "changelog": {
     "3.2.2": [
