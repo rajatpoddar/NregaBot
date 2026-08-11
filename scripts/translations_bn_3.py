@@ -15,8 +15,6 @@ BN3 = {
     "dialogs.automation_stopped": "অটোমেশন বন্ধ: {error}",
     "dialogs.backup_server": "সার্ভারে ব্যাকআপ",
     "dialogs.backup_server_msg": "স্থানীয় সংরক্ষিত ডেটার স্ন্যাপশট সার্ভারে আপলোড করবেন?\n\nএটি আপনার ডেটা নতুন PC বা ফ্যাক্টরি রিসেটের পরে পুনরুদ্ধারের জন্য নিরাপদ রাখে।",
-    "dialogs.batch_limit": "ব্যাচ সীমা",
-    "dialogs.batch_limit_msg": "প্রথম {count} জন আবেদনকারী নির্বাচিত হয়েছে (রিপোর্টে {total} আছে)।\nআরও যোগ করতে কুইক সিলেক্ট বা সার্চ ব্যবহার করুন।",
     "dialogs.browser_error": "ব্রাউজার ত্রুটি",
     "dialogs.browser_not_connected": "ব্রাউজার সংযুক্ত নয়",
     "dialogs.browser_ready": "ব্রাউজার প্রস্তুত",

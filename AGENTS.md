@@ -83,6 +83,12 @@ venv/bin/python scripts/check_imports.py         # compile + import everything (
 6. **Logging:** `get_logger()` use karo; user-facing logs me `print` nahi (sirf debug me).
 7. **New tab:** `src/tab_config.py` me register karo (unique `automation_key`) + `AUTOMATION_DISPLAY_NAMES` (`src/app/app_automation.py`) me friendly name. Lite tabs → `lite_tab_config.py`.
 8. **UI reuse:** naye widget banane se pehle `src/ui_components.py`, `src/tabs/autocomplete_widget.py`, `src/tabs/date_picker_popup.py` check karo — don't re-invent.
+9. **Translations — JSON GENERATED hai (CI build breaker ⚠️):** `src/locales/kn.json`, `bn.json`, `hinglish.json` are **build artifacts** — CI me `scripts/build_locales.py` unhe `scripts/translations_{kn,bn,hing}_{1..5}.py` se regenerate karta hai aur **missing/unused/placeholder-mismatch par exit 1** karta hai (release fail). Naye i18n key add karne ka SAHI tarika:
+   1. `en.json` (+ `hi.json`) me key add karo — ye dono directly edited hain.
+   2. **Teeno part files** (`translations_kn_5.py`, `translations_bn_5.py`, `translations_hing_5.py` — last part) me bhi wahi key add karo (translated).
+   3. `venv/bin/python scripts/build_locales.py` run karo → **exit 0** hona chahiye. `{placeholder}` tokens sab languages me **identical** hone chahiye (CI check karta hai).
+   JSON me direct key edit karke CI fail hota hai — ye 3.2.3 release me hua tha (missing 6 keys).
+10. **Version bump — CHHOTA bump + hashes KHAALI (deploy user ka kaam hai):** version bump sirf patch level karo (e.g. 3.2.2 → 3.2.3), feature bump nahi. `src/config.py` + `config/version.json` (latest_version, URLs, core_update version, changelog entry English me) update karo, aur `core_update.hash` / `hash_windows` / `hash_macos` teeno ko `""` set karo. **Kabhi `scripts/build_update.py` run mat karo aur hashes mat fill karo** — ye user khud `scripts/deploy_version.sh` se karta hai (Windows hash GitHub se auto-fill, Mac hash `build_macos.sh` se).
 
 ## 5. Common tasks → where to edit
 
@@ -95,8 +101,8 @@ venv/bin/python scripts/check_imports.py         # compile + import everything (
 | Update flow | `loader.py`, `lite_loader.py`, `src/managers/services.py`, `scripts/build_update.py`, `config/version.json` |
 | Macro / multi-tab workflow | `src/managers/workflow_manager.py` |
 | Theme / colors | `src/config.py` (`COLORS`), `config/theme.json` |
-| Translations | `src/locales/*.json` (saare 5 files me key add karo; scripts: `check_missing_keys.py`, `add_missing_keys.py`) |
-| Release a new version | bump `APP_VERSION` (config.py) + `config/version.json` → `scripts/build_update.py` → hash copy → push (CI builds) |
+| Translations | **`en.json` + `hi.json` directly edit karo; `kn.json`/`bn.json`/`hinglish.json` GENERATED hain — unhe kabhi directly edit mat karo.** Source of truth = `scripts/translations_{kn,bn,hing}_{1..5}.py` part files. Naya key add: en.json (+ hi.json) + teeno part files (last part `_5` me) me add karo → `venv/bin/python scripts/build_locales.py` run karo (CI yahi chalta hai; exit 0 chahiye) → generated JSON khud update ho jata hai. Helpers: `check_missing_keys.py` (code vs locales), `add_missing_keys.py`. |
+| Release a new version | **CHHOTA bump** (patch, e.g. 3.2.2 → 3.2.3) — `APP_VERSION` (config.py) + `config/version.json` (latest_version, URLs, core_update version, changelog) → **core_update ke teeno hashes (`hash`, `hash_windows`, `hash_macos`) ko `""` KHAALI karo** → commit + push (CI builds). **Agent hashes fill/build_update.py kabhi NAHI chalaata** — user khud `scripts/deploy_version.sh` chala ke hashes + deploy karta hai (wo script Windows hash GitHub se auto-fill karti hai; Mac hash `build_macos.sh` banata hai). |
 
 ## 6. Project state (current)
 
@@ -107,6 +113,11 @@ venv/bin/python scripts/check_imports.py         # compile + import everything (
 
 ## 7. Delivery-model gotcha (release ke waqt yaad rakho)
 
-Source-level changes users tak pahunchane ke liye `scripts/build_update.py` run karke
-`config/version.json` ka `hash_windows`/`hash_macos` update karna padta hai (same version
-+ different hash = hotfix re-download). Dev me seedha `python main_app.py` chalta hai.
+- **Agent hashes kabhi fill mat karo:** `config/version.json → core_update` ke `hash`,
+  `hash_windows`, `hash_macos` — ye user khud bharता hai. Version bump karte waqt inhe
+  `""` (empty) karo. `scripts/build_update.py` / `scripts/build_macos.sh` agent run nahi
+  karta — sirf user deploy karta hai (`scripts/deploy_version.sh`).
+- Deploy flow (user ke liye): `build_macos.sh` → `git push` (CI Windows/Linux builds) →
+  `deploy_version.sh` (hash_windows auto-fill + NAS upload + verify).
+- Same version + different hash = hotfix re-download mechanism.
+- Dev me seedha `python main_app.py` chalta hai.

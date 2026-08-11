@@ -171,4 +171,10 @@ BN5 = {
     "onboarding.done.panch": "পঞ্চায়েত ও গ্রাম যোগ হয়েছে",
     "onboarding.done.restart": "🔄 নতুন পঞ্চায়েত সব ট্যাবে দেখাতে অ্যাপ এখন রিস্টার্ট হবে।",
     "about.replay_tour": "🎓 ওয়েলকাম ট্যুর আবার দেখুন",
+    "onboarding.browser.connected": "✅ Chrome ইতিমধ্যে চলছে — সংযুক্ত! লগইন করে 'Next' চাপুন।",
+    "onboarding.browser.not_running": "Chrome লঞ্চ হয়নি — নিচের বাটন দিয়ে খুলুন।",
+    "onboarding.browser.connect_btn": "🔗 Chrome-এর সাথে সংযুক্ত হোন",
+    "onboarding.browser.connect_failed": "Chrome-এর সাথে সংযুক্ত হওয়া যায়নি — ব্রাউজার আবার খুলে চেষ্টা করুন।",
+    "demand.encoding_warn_title": "CSV-তে নাম নষ্ট হয়েছে",
+    "demand.encoding_warn_msg": "আপনার CSV-তে {count}টি নামে '?' চিহ্ন আছে (যেমন: {sample})।\n\nএটি তখন ঘটে যখন ফাইলটি Excel-এ 'CSV (Comma delimited)' (ANSI) হিসেবে সংরক্ষিত হয় এবং নাম হিন্দি/আঞ্চলিক ভাষায় থাকে — '?' সেগুলো স্থায়ীভাবে প্রতিস্থাপন করে।\n\nExcel-এ ফাইলটি 'CSV UTF-8 (Comma delimited)' হিসেবে আবার সংরক্ষণ করে পুনরায় আপলোড করুন। এটি ঠিক না হওয়া পর্যন্ত ডিমান্ড পোর্টালের নামের সাথে মিলবে না।",
 }

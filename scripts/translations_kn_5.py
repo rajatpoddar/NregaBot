@@ -171,4 +171,10 @@ KN5 = {
     "onboarding.done.panch": "ಪಂಚಾಯತ್ ಮತ್ತು ಗ್ರಾಮಗಳು ಸೇರಿದವು",
     "onboarding.done.restart": "🔄 ಹೊಸ ಪಂಚಾಯತ್ ಎಲ್ಲಾ ಟ್ಯಾಬ್‌ಗಳಲ್ಲಿ ಕಾಣಲು ಅಪ್ಲಿಕೇಶನ್ ಮರುಪ್ರಾರಂಭವಾಗುತ್ತದೆ.",
     "about.replay_tour": "🎓 ವೆಲ್ಕಮ್ ಟೂರ್ ಮತ್ತೆ ನೋಡಿ",
+    "onboarding.browser.connected": "✅ Chrome ಈಗಾಗಲೇ ಚಾಲನೆಯಲ್ಲಿದೆ — ಕನೆಕ್ಟ್ ಆಗಿದೆ! ಲಾಗಿನ್ ಮಾಡಿ 'Next' ಒತ್ತಿರಿ.",
+    "onboarding.browser.not_running": "Chrome ಲಾಂಚ್ ಆಗಿಲ್ಲ — ಕೆಳಗಿನ ಬಟನ್‌ನಿಂದ ತೆರೆಯಿರಿ.",
+    "onboarding.browser.connect_btn": "🔗 Chrome ಗೆ ಕನೆಕ್ಟ್ ಆಗಿ",
+    "onboarding.browser.connect_failed": "Chrome ಗೆ ಕನೆಕ್ಟ್ ಆಗಲಾಗಲಿಲ್ಲ — ಬ್ರೌಸರ್ ಮತ್ತೆ ತೆರೆದು ಪ್ರಯತ್ನಿಸಿ.",
+    "demand.encoding_warn_title": "CSV ಯಲ್ಲಿ ಹೆಸರುಗಳು ಹಾಳಾಗಿವೆ",
+    "demand.encoding_warn_msg": "ನಿಮ್ಮ CSV ಯಲ್ಲಿ {count} ಹೆಸರು(ಗಳು) '?' ಗುರುತು ಹೊಂದಿವೆ (ಉದಾ: {sample})।\n\nಫೈಲ್ ಅನ್ನು Excel ನಲ್ಲಿ 'CSV (Comma delimited)' (ANSI) ಆಗಿ ಉಳಿಸಿದಾಗ ಮತ್ತು ಹೆಸರುಗಳು ಹಿಂದಿ/ಪ್ರಾದೇಶಿಕ ಭಾಷೆಯಲ್ಲಿದ್ದಾಗ ಇದು ಸಂಭವಿಸುತ್ತದೆ — '?' ಅವುಗಳನ್ನು ಶಾಶ್ವತವಾಗಿ ಬದಲಾಯಿಸುತ್ತದೆ.\n\nಫೈಲ್ ಅನ್ನು Excel ನಲ್ಲಿ 'CSV UTF-8 (Comma delimited)' ಆಗಿ ಮತ್ತೆ ಉಳಿಸಿ ಮತ್ತು ಮತ್ತೆ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ. ಇದನ್ನು ಸರಿಪಡಿಸುವವರೆಗೆ ಡಿಮ್ಯಾಂಡ್ ಪೋರ್ಟಲ್ ಹೆಸರುಗಳಿಗೆ ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ.",
 }

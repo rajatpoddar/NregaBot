@@ -15,8 +15,6 @@ KN3 = {
     "dialogs.automation_stopped": "ಆಟೊಮೇಷನ್ ನಿಲ್ಲಿಸಲಾಗಿದೆ: {error}",
     "dialogs.backup_server": "ಸರ್ವರ್ಗೆ ಬ್ಯಾಕಪ್",
     "dialogs.backup_server_msg": "ಸ್ಥಳೀಯ ಉಳಿಸಿದ ಡೇಟಾದ ಸ್ನ್ಯಾಪ್ಶಾಟ್ ಅನ್ನು ಸರ್ವರ್ಗೆ ಅಪ್‌ಲೋಡ್ ಮಾಡುವುದೇ?\n\nಹೊಸ PC ಅಥವಾ ಫ್ಯಾಕ್ಟರಿ ರೀಸೆಟ್ ನಂತರ ಮರುಸ್ಥಾಪಿಸಲು ಇದು ನಿಮ್ಮ ಡೇಟಾವನ್ನು ಸುರಕ್ಷಿತವಾಗಿರಿಸುತ್ತದೆ.",
-    "dialogs.batch_limit": "ಬ್ಯಾಚ್ ಮಿತಿ",
-    "dialogs.batch_limit_msg": "ಮೊದಲ {count} ಅರ್ಜಿದಾರರನ್ನು ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ (ವರದಿಯಲ್ಲಿ {total} ಇವೆ).\nಹೆಚ್ಚು ಸೇರಿಸಲು ಕ್ವಿಕ್ ಸೆಲೆಕ್ಟ್ ಅಥವಾ ಸರ್ಚ್ ಬಳಸಿ.",
     "dialogs.browser_error": "ಬ್ರೌಸರ್ ದೋಷ",
     "dialogs.browser_not_connected": "ಬ್ರೌಸರ್ ಸಂಪರ್ಕಿಸಿಲ್ಲ",
     "dialogs.browser_ready": "ಬ್ರೌಸರ್ ಸಿದ್ಧವಾಗಿದೆ",
