@@ -574,19 +574,109 @@ STATE_PAGE_OVERRIDES: Dict[str, Dict[str, str]] = {
 # Default portal host jab state map me na ho (display/suggestions ke liye).
 DEFAULT_PORTAL_HOST: str = "vbgramgde2.dord.gov.in"
 
+# ---------------------------------------------------------------------------
+# SERVER-DRIVEN STATE REGISTRY
+# ---------------------------------------------------------------------------
+# Admin panel (/admin/portal-states) se states manage hote hain; desktop app
+# unhe /api/app-config ke 'states' field se fetch karta hai (heartbeat loop,
+# har ~2 min) aur yahan rakhta hai. Naye states (Bihar, UP, ...) bina app
+# release ke add ho sakte hain — built-in STATE_* dicts sirf fallback hain.
+#
+# Registry sanitized form me store hota hai (sirf strings, limited keys), isliye
+# server response kabhi bhi app ko crash nahi kar sakta. Worker threads se
+# update hota hai, readers se padha jata hai — single dict replacement is
+# atomic under GIL, koi lock nahi chahiye.
+#
+# Structure: {state_key: {portal_host, job_card_prefix, demand_base_url,
+#                          village_code_logic}}
+_STATE_REGISTRY: Dict[str, Dict[str, str]] = {}
+
+
+def update_state_registry(states: Any) -> None:
+    """Replace the server-driven state registry (sanitized). Never raises.
+
+    ``states`` is the raw 'states' list from /api/app-config — har entry:
+    {"state_key", "portal_host", "job_card_prefix", "demand_base_url",
+    "village_code_logic"}. Unknown/empty keys skip ho jate hain.
+    """
+    global _STATE_REGISTRY
+    try:
+        reg: Dict[str, Dict[str, str]] = {}
+        if isinstance(states, list):
+            for s in states:
+                if not isinstance(s, dict):
+                    continue
+                key = str(s.get("state_key") or "").strip()[:100]
+                if not key:
+                    continue
+                reg[key] = {
+                    "portal_host": str(s.get("portal_host") or "").strip()[:255],
+                    "job_card_prefix": str(s.get("job_card_prefix") or "").strip()[:50],
+                    "demand_base_url": str(s.get("demand_base_url") or "").strip()[:500],
+                    "village_code_logic": str(s.get("village_code_logic") or "").strip()[:50],
+                }
+        _STATE_REGISTRY = reg
+    except Exception:
+        pass  # registry update kabhi fatal nahi hota
+
 
 def get_state_portal_host(state: str = "") -> str:
     """Portal host for the given state key (case-insensitive).
 
-    Returns '' when the state is not in STATE_PORTAL_HOSTS — callers then
-    leave URLs unchanged. DEFAULT_PORTAL_HOST use karne ke liye caller
-    fallback karta hai (see ui_components._state_portal_host).
+    Server-driven registry (admin-managed) pehle check hota hai, phir
+    built-in STATE_PORTAL_HOSTS fallback. Returns '' when the state is not
+    found — callers then leave URLs unchanged. DEFAULT_PORTAL_HOST use karne
+    ke liye caller fallback karta hai (see ui_components._state_portal_host).
     """
     s = (state or "").strip()
+    if not s:
+        return ""
+    su = s.upper()
+    for k, entry in _STATE_REGISTRY.items():
+        if k.upper() == su:
+            host = (entry or {}).get("portal_host") or ""
+            if host:
+                return host
     for k, h in STATE_PORTAL_HOSTS.items():
-        if k.upper() == s.upper():
+        if k.upper() == su:
             return h
     return ""
+
+
+def get_state_demand_config() -> Dict[str, Dict[str, str]]:
+    """Merged demand config: server registry (admin-managed) built-in
+    STATE_DEMAND_CONFIG par override hota hai. Registry entry tabhi use
+    hoti hai jab demand_base_url AUR village_code_logic dono present hain.
+    """
+    merged: Dict[str, Dict[str, str]] = {}
+    try:
+        merged = {k: dict(v) for k, v in STATE_DEMAND_CONFIG.items()}
+    except Exception:
+        merged = dict(STATE_DEMAND_CONFIG)
+    try:
+        for key, entry in _STATE_REGISTRY.items():
+            base = (entry or {}).get("demand_base_url") or ""
+            logic = (entry or {}).get("village_code_logic") or ""
+            if base and logic:
+                merged[key] = {"base_url": base, "village_code_logic": logic}
+    except Exception:
+        pass
+    return merged
+
+
+def get_state_job_card_prefixes() -> Dict[str, str]:
+    """Merged job-card prefix map: registry prefixes built-in
+    STATE_JOB_CARD_PREFIXES par add/override hote hain.
+    """
+    merged = dict(STATE_JOB_CARD_PREFIXES)
+    try:
+        for key, entry in _STATE_REGISTRY.items():
+            pfx = (entry or {}).get("job_card_prefix") or ""
+            if pfx:
+                merged[pfx] = key
+    except Exception:
+        pass
+    return merged
 
 
 def get_state_portal_url(url: str, state: str = "") -> str:
@@ -603,14 +693,23 @@ def get_state_portal_url(url: str, state: str = "") -> str:
     s = (state or "").strip()
     if not s:
         return url
+    su = s.upper()
     state_key = ""
-    for k in STATE_PORTAL_HOSTS:
-        if k.upper() == s.upper():
+    # Server registry keys bhi match hote hain (naye states yahan se aate hain)
+    for k in _STATE_REGISTRY:
+        if k.upper() == su:
             state_key = k
             break
     if not state_key:
+        for k in STATE_PORTAL_HOSTS:
+            if k.upper() == su:
+                state_key = k
+                break
+    if not state_key:
         return url
-    host = STATE_PORTAL_HOSTS[state_key]
+    host = get_state_portal_host(state_key)
+    if not host:
+        return url
     try:
         import re as _re
         from urllib.parse import urlsplit, urlunsplit

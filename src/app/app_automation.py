@@ -535,6 +535,15 @@ class AutomationMixin:
                 lic = getattr(self.app_state, 'license_info', {}) or {}
                 server_license_key = lic.get('key', '')
                 self.history_manager.sync_activity_log_to_server(license_key=server_license_key)
+
+                # ── Sync feature-usage telemetry (Feature Popularity) ──
+                # usage_stats (automation_key -> count) server par — admin
+                # panel ko batata hai kaunsa tab kitni baar chala. PII-free,
+                # background thread, kabhi raise nahi karta.
+                try:
+                    self.history_manager.sync_usage_stats_to_server(license_key=server_license_key)
+                except Exception as e:
+                    logger.debug("Usage stats sync failed for %s: %s", key, e)
             except Exception as e:
                 logger.error(f"Failed to sync for {key}: {e}")
 

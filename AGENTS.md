@@ -90,6 +90,37 @@ venv/bin/python scripts/check_imports.py         # compile + import everything (
    JSON me direct key edit karke CI fail hota hai — ye 3.2.3 release me hua tha (missing 6 keys).
 10. **Version bump — CHHOTA bump + hashes KHAALI (deploy user ka kaam hai):** version bump sirf patch level karo (e.g. 3.2.2 → 3.2.3), feature bump nahi. `src/config.py` + `config/version.json` (latest_version, URLs, core_update version, changelog entry English me) update karo, aur `core_update.hash` / `hash_windows` / `hash_macos` teeno ko `""` set karo. **Kabhi `scripts/build_update.py` run mat karo aur hashes mat fill karo** — ye user khud `scripts/deploy_version.sh` se karta hai (Windows hash GitHub se auto-fill, Mac hash `build_macos.sh` se).
 
+## 4.5. 🗺️ State Registry (server-driven) — naya state add karna
+
+**Naya state (Bihar, UP, ...) ab app-release ke bina add hota hai** — admin panel
+(`/admin/portal-states`) se. Desktop app har ~2 min `/api/app-config` se `states`
+fetch karke built-in `STATE_*` dicts par override karta hai.
+
+| Data flow | File |
+|---|---|
+| Registry table + seed | `nrega-server/migrations/024_state_registry.sql` (`portal_states`) |
+| `/api/app-config` → `states` field | `nrega-server/app/routes/api/auth.py` (`app_config()`) |
+| Admin manage page | `nrega-server/app/routes/admin/states.py` + `app/templates/admin/admin_portal_states.html` |
+| Client registry (sanitized) | `src/config.py` — `update_state_registry()`, `get_state_portal_host()`, `get_state_demand_config()`, `get_state_job_card_prefixes()`, `get_state_portal_url()` |
+| Registry fetch in heartbeat | `src/app/app_license.py` (`_ping_server_in_background`, app-config block) |
+| Demand-tab consumers | `src/tabs/demand_tab.py` (`_get_state_options`, `_detect_state_from_report`, `start_automation`) |
+
+**Per-state fields:** `state_key`, `portal_host` (VB-G-RAM-G host), `job_card_prefix`
+(e.g. `BR-` — job-card auto-detect), `demand_base_url`, `village_code_logic`
+(`jh`/`rj`/`ka`), `is_active`, `sort_order`.
+
+**Rules:**
+- Built-in `STATE_PORTAL_HOSTS` / `STATE_DEMAND_CONFIG` / `STATE_JOB_CARD_PREFIXES`
+  **sirf fallback** hain — seed values unse match karte hain. Registry entry override
+  karti hai.
+- Registry tabhi use hoti hai jab entry sanitized hai (strings only) — invalid
+  server payload kabhi crash nahi karta.
+- `get_state_portal_url()` sirf `vbgramgde\d+`/`nregade\d+.dord.gov.in` hosts
+  re-host karta hai — report/MIS (vbgramgrep) aur public (mnregaweb) untouched.
+- `PENDING_BILLS_CONFIG` (src/config.py) alag hai — liability-report scraper ka
+  apna state map (state_code/seed_digest). Iska registry integration baad ka
+  kaam hai, abhi manual edit se add hota hai.
+
 ## 5. Common tasks → where to edit
 
 | Task | Files |
@@ -100,13 +131,42 @@ venv/bin/python scripts/check_imports.py         # compile + import everything (
 | License / activation | `src/app/app_license.py`, `src/managers/services.py` |
 | Update flow | `loader.py`, `lite_loader.py`, `src/managers/services.py`, `scripts/build_update.py`, `config/version.json` |
 | Macro / multi-tab workflow | `src/managers/workflow_manager.py` |
+| Add/edit a VB-G-RAM-G state (no release) | Admin → **State Registry** (`/admin/portal-states`); data flow: `024_state_registry.sql` → `auth.py app_config()` → `src/config.py` registry → heartbeat fetch |
 | Theme / colors | `src/config.py` (`COLORS`), `config/theme.json` |
 | Translations | **`en.json` + `hi.json` directly edit karo; `kn.json`/`bn.json`/`hinglish.json` GENERATED hain — unhe kabhi directly edit mat karo.** Source of truth = `scripts/translations_{kn,bn,hing}_{1..5}.py` part files. Naya key add: en.json (+ hi.json) + teeno part files (last part `_5` me) me add karo → `venv/bin/python scripts/build_locales.py` run karo (CI yahi chalta hai; exit 0 chahiye) → generated JSON khud update ho jata hai. Helpers: `check_missing_keys.py` (code vs locales), `add_missing_keys.py`. |
 | Release a new version | **CHHOTA bump** (patch, e.g. 3.2.2 → 3.2.3) — `APP_VERSION` (config.py) + `config/version.json` (latest_version, URLs, core_update version, changelog) → **core_update ke teeno hashes (`hash`, `hash_windows`, `hash_macos`) ko `""` KHAALI karo** → commit + push (CI builds). **Agent hashes fill/build_update.py kabhi NAHI chalaata** — user khud `scripts/deploy_version.sh` chala ke hashes + deploy karta hai (wo script Windows hash GitHub se auto-fill karti hai; Mac hash `build_macos.sh` banata hai). |
+| Feature telemetry (usage_stats) | Client: `history_manager.py` (sync method) + `app_automation.py` (trigger). Server: migration → repo → `/api/usage-stats/sync` → admin page. |
+| Tab search / keyboard shortcuts | `src/app/app_navigation.py` (`_on_nav_search_change`, `_shortcut_*`). |
 
 ## 6. Project state (current)
 
-- **Version:** 3.2.2 — `config/version.json` is source of truth; `src/config.py` me `APP_VERSION` (dono sync rakho).
+- **Version:** 3.2.3 — `config/version.json` is source of truth; `src/config.py` me `APP_VERSION` (dono sync rakho).
+- **Users:** ~200+ active (Jharkhand base) — Rajasthan, Karnataka, Bihar users aa rahe hain. **Production.** Scaling roadmap: `docs/SCALING_PLAN_200_to_10000.md` (living doc — naya kaam wahi se phase-wise pick karo).
+
+## 6.5. 📡 Feature Telemetry (Feature Popularity) — 3.2.3+ / server deploy 023
+
+Desktop app har automation finish par apni local `usage_stats` (automation_key → count, SQLite `nrega_local_db.sqlite`) ko server par bhejta hai:
+
+```
+history_manager.sync_usage_stats_to_server()  (called from on_automation_finished)
+        │  POST /api/usage-stats/sync   (PII-free: sirf key+count+app_version)
+        ▼
+usage_stats table (migration 023)  →  admin /admin/feature-popularity
+```
+
+- **Client:** `src/tabs/history_manager.py` → `get_usage_stats_all()` + `sync_usage_stats_to_server()`. Trigger: `src/app/app_automation.py` `on_automation_finished()` (activity-log sync ke saath). Background daemon thread, kabhi raise nahi karta, silent retry next cycle.
+- **Server:** `nrega-server/migrations/023_usage_stats.sql` (table: `license_key, automation_key, count, app_version, last_synced_at`, PK = (license_key, automation_key)), `nrega-server/app/repositories/usage_stats_repo.py`, `nrega-server/app/routes/api/usage_stats.py` (rate-limited: `USAGE_STATS_SYNC_PER_KEY_RATE` default 60/hr, per-IP 600/hr — `rate_limit_config.py` me registered).
+- **Admin:** `nrega-server/app/routes/admin/usage_stats.py` → `/admin/feature-popularity` (top automations, state-wise, version-wise). Sidebar: **Feature Popularity** (Database & Files section).
+- **Naya telemetry type add karna ho to:** API route + migration + repo + admin page — activity_log/usage_stats pattern copy karo.
+
+## 6.6. ⌨️ Tab Search + Keyboard Shortcuts — 3.2.3
+
+- **Tab Search:** sidebar me search box (Ctrl+K focus) — 55 tabs me case-insensitive dhundho. Code: `src/app/app_navigation.py` `_on_nav_search_change()` / `_clear_nav_search()` / `_focus_nav_search()`. Placeholder i18n: `nav.search_placeholder` (`tr()` default fallback, locale key optional).
+- **Shortcuts (global, guarded — entry/text focus me nahi chalti):**
+  - `Ctrl+Enter` → current tab automation **start** (`_shortcut_start`)
+  - `Ctrl+S` → current tab **stop** (`_shortcut_stop`)
+  - `Ctrl+R` → current tab **retry failed** (`_shortcut_retry`)
+- **Bindings `bind_all` + `add="+"` + one-time flag** (`_nav_search_shortcut_bound` / `_automation_shortcuts_bound`) — nav rebuild par duplicate bind nahi hote.
 - **Repo layout:** project root = desktop app; `nrega-server/` = Flask backend (alag deployable, has own Dockerfile).
 - **`.vscode/tasks.json`:** tasks ab **manual** hain — `runOn: folderOpen` hata diya gaya hai (user demand). Folder kholte hi koi terminal nahi khulta; kabhi wapas mat add karna.
 - **`config/theme.json`** + `assets/` fonts/sounds/icons — UI assets ka central home.

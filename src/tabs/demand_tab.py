@@ -1247,7 +1247,8 @@ class DemandTab(BaseAutomationTab):
         key 'location_state', stored UPPERCASE). Falls back to ALL configured
         states when nothing has been saved yet.
         """
-        upper_to_key = {k.upper(): k for k in config.STATE_DEMAND_CONFIG.keys()}
+        demand_config = config.get_state_demand_config()
+        upper_to_key = {k.upper(): k for k in demand_config.keys()}
         opts: List[str] = []
         try:
             for s in (self.app.history_manager.get_suggestions("location_state") or []):
@@ -1256,7 +1257,7 @@ class DemandTab(BaseAutomationTab):
                     opts.append(key)
         except Exception:
             pass
-        return opts or list(config.STATE_DEMAND_CONFIG.keys())
+        return opts or list(demand_config.keys())
 
     def _detect_state_from_report(self):
         """
@@ -1264,11 +1265,12 @@ class DemandTab(BaseAutomationTab):
         (e.g. 'JH-22-003-008-001/1' -> 'Jharkhand'). Returns a STATE_DEMAND_CONFIG
         key, or None.
         """
-        prefixes = getattr(config, 'STATE_JOB_CARD_PREFIXES', {})
+        prefixes = config.get_state_job_card_prefixes()
+        demand_config = config.get_state_demand_config()
         for app_data in self.all_applicants_data:
             jc = (app_data.get('Job card number') or '').strip().upper()
             for prefix, state_key in prefixes.items():
-                if jc.startswith(prefix.upper()) and state_key in config.STATE_DEMAND_CONFIG:
+                if jc.startswith(prefix.upper()) and state_key in demand_config:
                     return state_key
         return None
 
@@ -1376,7 +1378,7 @@ class DemandTab(BaseAutomationTab):
         state = self.state_var.get()
         if not state: messagebox.showerror(tr("errors.input_error"), tr("dialogs.select_state")); return
         try:
-            cfg = config.STATE_DEMAND_CONFIG[state]
+            cfg = config.get_state_demand_config()[state]
             logic_key = cfg.get("village_code_logic", "jh")
             # State-aware: base_url ko user ke state ke portal host par resolve
             # karo (Rajasthan → vbgramgde3). Same-state me koi change nahi.

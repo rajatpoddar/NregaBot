@@ -520,6 +520,80 @@ class HistoryManager:
             except:
                 return 0
 
+    def get_usage_stats_all(self) -> Dict[str, int]:
+        """Return ALL usage stats as {automation_key: count}.
+
+        Used by the server telemetry sync (/api/usage-stats/sync) — the
+        admin panel's Feature Popularity page ke liye. PII-free: sirf
+        automation_key + count bheje jaate hain.
+        """
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT automation_key, count FROM usage_stats")
+                return {r[0]: r[1] for r in cursor.fetchall()}
+            except Exception:
+                return {}
+
+    # ────────────────────────────────────────────────────────────────
+    # SERVER SYNC — Feature popularity telemetry (usage_stats)
+    # ────────────────────────────────────────────────────────────────
+
+    def sync_usage_stats_to_server(self, license_key: str = "") -> int:
+        """
+        Local usage_stats (automation_key -> count) ko server par bhejo.
+
+        Admin panel ki 'Feature Popularity' page isi se dikhti hai — kaunsa
+        tab kitni baar use hua, kis state me, kis version me. Yeh sirf
+        aggregated counts bhejta hai (PII-free) — koi panchayat/village/
+        worker data nahi.
+
+        Safe-by-design:
+          - License key required (nahi to skip)
+          - Background daemon thread me — UI kabhi block nahi
+          - Server unreachable / 4xx-5xx → silent skip, next cycle retry
+          - Kabhi raise nahi karta
+
+        Returns number of features queued for sync (0 = nothing to sync).
+        """
+        if not license_key:
+            return 0
+        stats = self.get_usage_stats_all()
+        if not stats:
+            return 0
+
+        from src.config import LICENSE_SERVER_URL
+        server_url = LICENSE_SERVER_URL
+        if not server_url:
+            return 0
+
+        def _do_sync():
+            try:
+                import requests as req_lib
+                payload = {
+                    "license_key": license_key,
+                    "app_version": getattr(config, 'APP_VERSION', ''),
+                    "stats": stats,
+                }
+                resp = req_lib.post(
+                    f"{server_url}/api/usage-stats/sync",
+                    json=payload,
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    result = resp.json()
+                    logger.info("✅ Usage stats sync: %s features synced to server.",
+                                result.get('synced_features', len(snapshot)))
+                else:
+                    logger.debug("⚠️ Usage stats sync: HTTP %s (%s)",
+                                 resp.status_code, resp.text[:200])
+            except Exception as e:
+                logger.debug("⚠️ Usage stats sync failed (retry next cycle): %s", e)
+
+        threading.Thread(target=_do_sync, daemon=True).start()
+        return len(stats)
+
     def _delete_file_if_exists(self, filepath: str):
         try:
             if os.path.exists(filepath):

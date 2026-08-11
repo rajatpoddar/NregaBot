@@ -1803,6 +1803,15 @@ class LicenseMixin:
                         _cookie_req_count += 1
                         if resp.status_code == 200:
                             data = resp.json()
+                            # Server-driven state registry (admin /portal-states)
+                            # — naye states release ke bina add ho sakte hain.
+                            # Registry built-in STATE_* dicts par override hota
+                            # hai; koi bhi invalid payload silently ignore hota
+                            # hai (update_state_registry sanitize karta hai).
+                            try:
+                                config.update_state_registry(data.get("states"))
+                            except Exception:
+                                pass
                             msg = data.get("global_announcement", "")
                             final_msg = msg if msg else "Welcome to NREGA Bot! Ready to automate."
                             try:

@@ -153,6 +153,40 @@ class NavMixin:
             self._cat_display_map["All Automations"]))
         self.category_filter_menu.pack(fill="x", pady=(5, 5), padx=5)
 
+        # ── Tab Search (55 tabs me se turant dhundho — Ctrl+K focus) ──
+        self.nav_search_var = ctk.StringVar()
+        self.nav_search_entry = ctk.CTkEntry(
+            header_parent,
+            placeholder_text=tr("nav.search_placeholder", default="🔍 Search tabs..."),
+            textvariable=self.nav_search_var,
+            height=28,
+            corner_radius=6,
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            border_width=1,
+            border_color=("#D1D5DB", "#4B5563"),
+        )
+        self.nav_search_entry.pack(fill="x", pady=(0, 5), padx=5)
+        self.nav_search_entry.bind("<KeyRelease>", self._on_nav_search_change)
+        self.nav_search_entry.bind("<Escape>", lambda e: self._clear_nav_search())
+        # Ctrl+K → sidebar search par focus (global shortcut)
+        try:
+            if not getattr(self, '_nav_search_shortcut_bound', False):
+                self._nav_search_shortcut_bound = True
+                self.bind_all("<Control-k>", lambda e: self._focus_nav_search(), add="+")
+        except Exception:
+            pass
+
+        # ── Automation keyboard shortcuts (global, guarded) ──
+        # Ctrl+Enter → current tab start · Ctrl+S → stop · Ctrl+R → retry
+        try:
+            if not getattr(self, '_automation_shortcuts_bound', False):
+                self._automation_shortcuts_bound = True
+                self.bind_all("<Control-Return>", lambda e: self._shortcut_start(), add="+")
+                self.bind_all("<Control-s>", lambda e: self._shortcut_stop(), add="+")
+                self.bind_all("<Control-r>", lambda e: self._shortcut_retry(), add="+")
+        except Exception:
+            pass
+
         # Category colors matching the Home page card colors
         _CATEGORY_BG = {
             "MR & Wage Management": {"bg": ("#EFF6FF", "#1E3A5F"), "border": ("#BFDBFE", "#3B82F6"), "accent": ("#3B82F6", "#60A5FA")},
@@ -585,6 +619,21 @@ class NavMixin:
         # Map the translated dropdown value back to the internal English key.
         selected_category = getattr(self, '_cat_internal_map', {}).get(selected_display, selected_display)
         save_config('last_selected_category', selected_category)
+        # Search active ho to pehle clear karo — warna search se chhupe
+        # buttons category filter ke baad bhi hidden rahenge.
+        try:
+            if getattr(self, 'nav_search_var', None) is not None and self.nav_search_var.get().strip():
+                self.nav_search_var.set("")
+                for name, btn in self.app_state.nav_buttons.items():
+                    if name == "Home":
+                        continue
+                    try:
+                        if btn.winfo_manager() != "pack":
+                            btn.pack(fill="x", padx=5, pady=1)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
         self._filter_nav_menu(selected_category)
 
 
@@ -641,6 +690,164 @@ class NavMixin:
                     if frame.winfo_manager() == "pack":
                         frame.pack_forget()
         
+        self.nav_scroll_frame.update_idletasks()
+
+    # ────────────────────────────────────────────────────────────────
+    # TAB SEARCH — sidebar me 55 tabs me se dhundho
+    # ────────────────────────────────────────────────────────────────
+
+    def _current_tab_instance(self):
+        """Currently active tab ka instance (ya None)."""
+        try:
+            name = getattr(self.app_state, 'current_active_tab', None)
+            if not name:
+                return None
+            return self.app_state.tab_instances.get(name)
+        except Exception:
+            return None
+
+    def _shortcut_start(self) -> None:
+        """Ctrl+Enter → current tab ki automation start karo (agar tab start
+        kar sakta hai). Keyboard focus entry/text me ho to skip (typing me
+        dastak nahi)."""
+        try:
+            inst = self._current_tab_instance()
+            if inst is None or not hasattr(inst, 'start_automation'):
+                return
+            # Text entry me typing ho to shortcut trigger na ho
+            w = self.focus_get()
+            if w is not None:
+                cls = w.winfo_class()
+                if cls in ("Entry", "Text", "TEntry", "TText"):
+                    return
+            # Already running ho to double-start mat karo (app-level tracker)
+            key = getattr(inst, 'automation_key', None)
+            running = getattr(self.app_state, 'active_automations', set())
+            if key and key in running:
+                return
+            inst.start_automation()
+        except Exception:
+            pass
+
+    def _shortcut_stop(self) -> None:
+        """Ctrl+S → current tab ka automation stop karo (agar chal raha hai)."""
+        try:
+            inst = self._current_tab_instance()
+            if inst is None or not hasattr(inst, 'stop_automation'):
+                return
+            w = self.focus_get()
+            if w is not None:
+                cls = w.winfo_class()
+                if cls in ("Entry", "Text", "TEntry", "TText"):
+                    return
+            inst.stop_automation()
+        except Exception:
+            pass
+
+    def _shortcut_retry(self) -> None:
+        """Ctrl+R → current tab ke failed entries retry karo."""
+        try:
+            inst = self._current_tab_instance()
+            if inst is None or not hasattr(inst, 'retry_logic_handler'):
+                return
+            w = self.focus_get()
+            if w is not None:
+                cls = w.winfo_class()
+                if cls in ("Entry", "Text", "TEntry", "TText"):
+                    return
+            inst.retry_logic_handler()
+        except Exception:
+            pass
+
+    def _focus_nav_search(self) -> None:
+        """Focus the sidebar search box (Ctrl+K shortcut)."""
+        entry = getattr(self, 'nav_search_entry', None)
+        try:
+            if entry is not None and entry.winfo_exists():
+                entry.focus_set()
+                entry.select_range(0, 'end')  # select all so typing replaces
+        except Exception:
+            pass
+
+    def _clear_nav_search(self) -> None:
+        """Clear search + restore the saved category filter view.
+
+        IMPORTANT: search ke dauran pack_forget() kiye gaye buttons ko pehle
+        wapas pack karo — `_filter_nav_menu` sirf category FRAMES manage karta
+        hai, buttons nahi. Ye restore na karne par cleared search ke baad
+        sidebar ka aadha hissa gayab rehta (until nav rebuild).
+        """
+        try:
+            if getattr(self, 'nav_search_var', None) is not None:
+                self.nav_search_var.set("")
+            # Search mode me chhupe hue buttons ko wapas pack karo
+            for name, btn in self.app_state.nav_buttons.items():
+                if name == "Home":
+                    continue
+                try:
+                    if btn.winfo_manager() != "pack":
+                        btn.pack(fill="x", padx=5, pady=1)
+                except Exception:
+                    pass
+            self._filter_nav_menu(getattr(self.app_state, 'last_selected_category', 'All Automations'))
+        except Exception:
+            pass
+
+    def _on_nav_search_change(self, event=None) -> None:
+        """
+        Sidebar search box ke typing par saare nav buttons filter karo.
+
+        - Query match (case-insensitive) translated name par hota hai
+          (aur English internal key par bhi — translated tab dhundhna
+          easy ho).
+        - Match hone par button pack, warna pack_forget.
+        - Category frames jo completely empty ho jaate hain wo hide ho
+          jaate hain taaki sidebar clean rahe.
+        - Query empty → saved category filter restore hota hai.
+        """
+        query = self.nav_search_var.get().strip().lower()
+        if not query:
+            self._clear_nav_search()
+            return
+
+        # Filter mode: saare categories show karo (jisse matches kahin bhi dikhe)
+        for cat, frame in self.app_state.category_frames.items():
+            if frame.winfo_exists() and frame.winfo_manager() != "pack":
+                frame.pack(fill="x", pady=5, padx=2)
+                self._load_category_icons(cat)
+
+        for name, btn in self.app_state.nav_buttons.items():
+            if name == "Home":
+                continue  # Home hamesha pinned rahta hai
+            try:
+                display = self._nav_tab_name(name)
+                match = (query in display.lower()
+                         or query in name.lower())
+                if match:
+                    if btn.winfo_manager() != "pack":
+                        btn.pack(fill="x", padx=5, pady=1)
+                else:
+                    if btn.winfo_manager() == "pack":
+                        btn.pack_forget()
+            except Exception:
+                pass
+
+        # Empty ho jaane wale category frames ko hide karo
+        for cat, frame in self.app_state.category_frames.items():
+            if not frame.winfo_exists():
+                continue
+            has_visible = False
+            for name, btn in self.app_state.nav_buttons.items():
+                if self.app_state.button_to_category_frame.get(name) is frame:
+                    try:
+                        if btn.winfo_manager() == "pack":
+                            has_visible = True
+                            break
+                    except Exception:
+                        pass
+            if not has_visible and frame.winfo_manager() == "pack":
+                frame.pack_forget()
+
         self.nav_scroll_frame.update_idletasks()
 
 
