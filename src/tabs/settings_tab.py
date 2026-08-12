@@ -116,14 +116,21 @@ def run_panchayat_scrape(app, on_status=None, on_success=None, on_failed=None):
             if gp_mode:
                 _emit(on_status, tr("settings.scrape.gp_scraping"))
 
+                # GP/GB (Panchayat-level) login: panchayat ka dropdown nahi
+                # hota — naam page par TEXT me milta hai. Ek se zyada element
+                # IDs try karte hain (state ke hisaab se id badal sakti hai).
                 panch_name = ""
                 for lid in ("ctl00_ContentPlaceHolder1_panch",
-                            "ctl00_ContentPlaceHolder1_panch_lbl"):
+                            "ctl00_ContentPlaceHolder1_panch_lbl",
+                            "ctl00_ContentPlaceHolder1_lbl_panch",
+                            "ctl00_ContentPlaceHolder1_lblpanch"):
                     try:
                         el = driver.find_element(By.ID, lid)
                         txt = (el.text or "").strip()
                         if txt and txt.upper() not in ("PANCHAYAT",
-                                                       "GRAM PANCHAYAT"):
+                                                       "GRAM PANCHAYAT",
+                                                       "SELECT",
+                                                       "---SELECT---"):
                             panch_name = txt
                             break
                     except Exception:
@@ -132,15 +139,22 @@ def run_panchayat_scrape(app, on_status=None, on_success=None, on_failed=None):
                     _emit(on_failed, "GP login par panchayat ka naam page par nahi mila. Login check karein.")
                     return
 
-                v_el = wait.until(EC.presence_of_element_located(
-                    (By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
-                v_select = Select(v_el)
+                # Villages dropdown mile to scrape karo; na mile to bhi
+                # panchayat save ho jaye (villages khali) — GB user tab bhi
+                # aage badh sake aur baad me villages add kar sake.
                 villages = []
-                for opt in v_select.options:
-                    v_val = opt.get_attribute("value")
-                    v_text = opt.text.strip()
-                    if v_val and v_val != "00" and v_text and v_text != "---Select---":
-                        villages.append(v_text.upper())
+                try:
+                    v_el = WebDriverWait(driver, 5).until(
+                        EC.presence_of_element_located(
+                            (By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
+                    v_select = Select(v_el)
+                    for opt in v_select.options:
+                        v_val = opt.get_attribute("value")
+                        v_text = opt.text.strip()
+                        if v_val and v_val != "00" and v_text and v_text != "---Select---":
+                            villages.append(v_text.upper())
+                except Exception:
+                    pass
                 all_panch_villages[panch_name.upper()] = villages
 
             else:
@@ -240,9 +254,18 @@ def restart_application(app):
             cmd = [sys.executable] + list(sys.argv)
 
         if os.name == "nt":
+            # Windows auto-restart FIX: poora command string ek arg ke roop me
+            # dene par subprocess use outer quotes me wrap kar deta hai aur
+            # andar ke quotes ko \" me escape kar deta hai. cmd.exe backslash
+            # escape nahi samajhta — wo sirf quotes count karta hai aur >2
+            # quotes par first/last strip kar deta hai. Isse `start` ka title/
+            # path toot jata hai aur "Windows cannot find '...'" error aata
+            # hai. Har token ALAG argument pass karo — subprocess khud sahi
+            # quote karega:
+            #   cmd /c ping 127.0.0.1 -n 3 > NUL & start "" "C:\...\App.exe"
             subprocess.Popen(
-                ["cmd", "/c",
-                 "ping 127.0.0.1 -n 3 > NUL & start \"\" " + subprocess.list2cmdline(cmd)],
+                ["cmd", "/c", "ping", "127.0.0.1", "-n", "3", ">", "NUL", "&",
+                 "start", "", *cmd],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
@@ -430,16 +453,9 @@ class SettingsTab(ctk.CTkFrame):
         )
         self._fix_loc_btn.pack(side="left", padx=(8, 0))
 
-        # ── Detect Login Level button — GP (Panchayat level) ya PO (Block
-        # level / Program Officer) browser se detect karke save karta hai ──
-        self._detect_level_btn = ctk.CTkButton(
-            srv_btn_row, text="👤 Detect Login Level", width=150, height=26,
-            font=ctk.CTkFont(size=11, weight="bold"),
-            fg_color=("#7C3AED", "#8B5CF6"), text_color="white",
-            hover_color=("#6D28D9", "#7C3AED"),
-            command=self._detect_user_level_now,
-        )
-        self._detect_level_btn.pack(side="left", padx=(8, 0))
+        # 👤 User level (GP/PO) ab onboarding scrape ya kisi bhi automation ke
+        # time automatically detect + server par save hota hai — alag se
+        # 'Detect Login Level' button ki zaroorat nahi (badge neeche dikhta hai).
 
         self._srv_sync_status = ctk.CTkLabel(srv_btn_row, text="",
                                                font=ctk.CTkFont(size=10),
@@ -929,100 +945,6 @@ class SettingsTab(ctk.CTkFrame):
         except Exception:
             pass
         return sorted(blocks, key=str.lower)
-
-    def _state_aware_demand_url(self) -> str:
-        """State-aware demand page URL — delegates to the module-level helper
-        (run_panchayat_scrape bhi same logic use karta hai)."""
-        return _state_aware_demand_url(self.app)
-
-    def _detect_user_level_now(self) -> None:
-        """Open the demand page in the browser and detect whether the user is
-        GP level or PO level (Program Officer / Block level).
-
-        Detection: a panchayat <select> dropdown on the page → PO (block
-        level). No dropdown (name shown as text) → GP (panchayat level).
-        The result is saved in license_info and sent with the server
-        heartbeat, so the web ADMIN PANEL can show the user type.
-        """
-        # Agar koi automation chal rahi hai to driver hijack nahi karte —
-        # dono ek hi browser share karte hain.
-        running = getattr(self.app, 'active_automations', None) or \
-            getattr(getattr(self.app, 'app_state', None),
-                    'active_automations', None)
-        if running:
-            messagebox.showwarning(
-                tr("base.automation_error.title"),
-                tr("settings.detect_level.running_warning"),
-                parent=self.winfo_toplevel())
-            return
-        self._detect_level_btn.configure(state="disabled", text=tr("settings.detect_level.detecting"))
-        self._srv_sync_status.configure(text=tr("settings.detect_level.in_progress"))
-
-        def _run_detect() -> None:
-            """Background thread — UI freeze nahi hota aur driver.get() ke
-            waqt app responsive rehta hai."""
-            level, label, err = None, None, None
-            try:
-                driver = self.app.get_driver()
-                if not driver:
-                    err = tr("settings.detect_level.err_no_driver")
-                else:
-                    demand_url = self._state_aware_demand_url()
-                    driver.get(demand_url)
-                    try:
-                        # Panchayat dropdown mila → Block/PO login
-                        WebDriverWait(driver, 5).until(
-                            EC.presence_of_element_located(
-                                (By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
-                        level, label = "PO", "PO — Block Level (Program Officer)"
-                    except TimeoutException:
-                        # Dropdown nahi mila — ya to GP login (panchayat naam
-                        # text me) ya login-page redirect. Village dropdown
-                        # se confirm karte hain taaki GP ki jagah galat
-                        # 'login karo' na bole / login page ko GP na samjhe.
-                        try:
-                            WebDriverWait(driver, 3).until(
-                                EC.presence_of_element_located(
-                                    (By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")))
-                            level, label = "GP", "GP — Panchayat Level"
-                        except TimeoutException:
-                            err = tr("settings.detect_level.err_no_dropdown")
-            except Exception as e:
-                err = str(e)
-            self.after(0, lambda: self._finish_detect(level, label, err))
-
-        import threading
-        threading.Thread(target=_run_detect, daemon=True).start()
-
-    def _finish_detect(self, level: Optional[str], label: Optional[str],
-                       err: Optional[str]) -> None:
-        """Detection result UI par dikhata hai (main thread par)."""
-        try:
-            self._detect_level_btn.configure(state="normal",
-                                             text=tr("settings.detect_level.btn"))
-        except Exception:
-            pass
-        if err:
-            try:
-                self._srv_sync_status.configure(text="")
-            except Exception:
-                pass
-            messagebox.showerror(tr("settings.detect_level.result_title"), err,
-                                 parent=self.winfo_toplevel())
-            return
-        try:
-            self.app.set_user_level(level)
-        except Exception:
-            pass
-        try:
-            self._refresh_server_data_card()
-            self._srv_sync_status.configure(text=tr("settings.detect_level.success", label=label))
-        except Exception:
-            pass
-        messagebox.showinfo(
-            tr("settings.detect_level.result_title"),
-            f"{tr('settings.detect_level.result_msg', label=label)}",
-            parent=self.winfo_toplevel())
 
     def _scrape_from_website(self) -> None:
         """

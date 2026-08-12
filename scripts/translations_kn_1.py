@@ -70,6 +70,10 @@ KN1 = {
     "app.welcome_loading": "NREGA ಬಾಟ್‌ಗೆ ಸ್ವಾಗತ! ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
     "app.welcome_login_prompt": "ಲಾಗಿನ್ ಮಾಡಿ, ನಂತರ ಕಾರ್ಯವನ್ನು ಆಯ್ಕೆ ಮಾಡಿ.",
     "app.welcome_prefix": "ಸ್ವಾಗತ,",
+    "app.portal.gp": "GP ಲಾಗಿನ್",
+    "app.portal.po": "PO ಲಾಗಿನ್",
+    "app.portal.online": "ಆನ್‌ಲೈನ್",
+    "app.portal.expired": "ಸೆಷನ್ ಅವಧಿ ಮುಗಿದಿದೆ",
     # ── activity_log ──
     "activity_log.clear_btn": "ಲಾಗ್‌ಗಳನ್ನು ಅಳಿಸಿ",
     "activity_log.clear_confirm_msg": "ಎಲ್ಲಾ ಚಟುವಟಿಕೆ ಇತಿಹಾಸವನ್ನು ಅಳಿಸುವುದೇ?\n\nಈ ಕ್ರಿಯೆಯನ್ನು ಹಿಂಪಡೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ.",

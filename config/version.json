@@ -1,19 +1,28 @@
 {
-  "latest_version": "3.2.3",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.3-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.3-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.3-Linux.tar.gz",
+  "latest_version": "3.2.4",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.4-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.4-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.4-Linux.tar.gz",
   "core_update": {
-    "version": "3.2.3",
-    "url": "https://nregabot.com/updates/core_v3.2.3.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.2.3.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.3.zip",
+    "version": "3.2.4",
+    "url": "https://nregabot.com/updates/core_v3.2.4.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.4.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.4.zip",
     "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "4ca1325ad9d9237cafff443b65d9b9c1fdb9cff0a491d1c4944c1278304d821a",
-    "hash_macos": "64ddf7393a319558fd7420186d4472b5a76954935c0a94fea1bb6a348dbe9ebf"
+    "hash_windows": "",
+    "hash_macos": ""
   },
   "changelog": {
+    "3.2.4": [
+      "🔄 **Windows Auto-Restart Fixed:** Panchayat/Village add karne, language badalne ya Factory Reset ke baad app ab Windows par bhi reliably restart hota hai — pehle cmd quoting issue se 'Windows cannot find' error aata tha. Lite app ka macOS update-restart bhi fix kiya (order bug).",
+      "👤 **Detect Login Level Button Removed:** User level (GP/PO) ab onboarding scrape ya kisi bhi automation ke time automatically detect hota hai aur server par save hota hai — Settings me alag button ki zaroorat nahi.",
+      "🏘️ **GP/GB Login Scrape Improved:** Panchayat-level (GP/GB) users ke liye panchayat + villages add karna ab zyada robust hai — village dropdown na mile to bhi panchayat save ho jata hai, aur zyada element IDs try hoti hain (state-wise).",
+      "🌐 **Onboarding Language Polish:** Language apply karne par button '✓ Applied' ho jata hai; dropdown badalne par dobara apply kar sakte hain. GP login par panchayat add hone par clear success note dikhta hai.",
+      "🔍 **Onboarding Login Check:** Add Panchayat step me ab background me login status check hota hai (spinner ke saath) — logged-out ho to 'Please login to continue' message dikhta hai, GP/PO login detect hone par clear guidance milti hai (GP: demand automation panchayat/villages khud add karega, bas Next dabao). Session expire hone par 'Session Expired!' page bhi smartly detect hota hai.",
+      "🟢 **Live Login Status (Header):** Header me ab aapke portal login ka live status dot dikhta hai — green dot = GP login live, red dot = PO login live, grey = session expired/logged out. Har 5 minute me background me silent session check hota hai jo portal session ko alive bhi rakhta hai — session expire nahi hoga aur aapke automations beech me fail nahi honge.",
+      "🖱️ **Focus Fix:** Background login/session checks ke baad app ab browser se focus wapas apne app par le aati hai — user ko har baar manually app par click nahi karna padta."
+    ],
     "3.2.3": [
       "🌐 **Multi-State Portal Support:** All automation tabs now resolve the correct portal server per state — Rajasthan (vbgramgde3) and Jharkhand/Karnataka (de2) are supported. Every tab's URL is state-aware (Demand, Work Allocation, MR Fill, MSR, MB Entry, Wagelist, eKYC, and 20+ more).",
       "🇮🇳 **Rajasthan Demand Fixed:** Demand + Work Allocation now work perfectly in Rajasthan — they use the correct portal host (vbgramgde3) with the right RJ jobcard village-code logic. Demand via eKYC report is verified working in Rajasthan.",

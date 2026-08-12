@@ -70,6 +70,10 @@ BN1 = {
     "app.welcome_loading": "NREGA বটে স্বাগতম! লোড হচ্ছে...",
     "app.welcome_login_prompt": "লগইন করুন, তারপর একটি কাজ নির্বাচন করুন।",
     "app.welcome_prefix": "স্বাগতম,",
+    "app.portal.gp": "GP লগইন",
+    "app.portal.po": "PO লগইন",
+    "app.portal.online": "অনলাইন",
+    "app.portal.expired": "সেশন শেষ",
     # ── activity_log ──
     "activity_log.clear_btn": "লগ মুছুন",
     "activity_log.clear_confirm_msg": "সমস্ত অ্যাক্টিভিটি ইতিহাস মুছবেন?\n\nএই কাজটি ফিরিয়ে আনা যাবে না।",

@@ -68,6 +68,14 @@ class UIMixin:
         self.header_welcome_name_label.pack(side="left")
         self.header_welcome_suffix_label = ctk.CTkLabel(welcome_sub_frame, text="", font=ctk.CTkFont(size=11))
         self.header_welcome_suffix_label.pack(side="left")
+        # ── Portal login status dot — GP=green, PO=red, Session Expired=amber ──
+        self.portal_status_indicator = ctk.CTkFrame(welcome_sub_frame, width=10, height=10,
+                                                    corner_radius=5, fg_color=("gray60", "gray50"))
+        self.portal_status_indicator.pack(side="left", padx=(8, 4))
+        self.portal_status_label = ctk.CTkLabel(welcome_sub_frame, text="",
+                                                font=ctk.CTkFont(size=11),
+                                                text_color=("gray50", "gray60"))
+        self.portal_status_label.pack(side="left")
 
         announcement_frame = ctk.CTkFrame(header, fg_color="transparent", height=30)
         announcement_frame.grid(row=0, column=1, sticky="ew", padx=20)
@@ -653,6 +661,31 @@ class UIMixin:
             return result
         except Exception:
             return self.icon_images.get("sound_on")
+
+    def _update_header_portal_status(self):
+        """Header me portal login status dot — GP=live green, PO=dead red,
+        Session Expired=amber, Online=green (level unknown). Automations,
+        onboarding aur 5-min session monitor se update hota hai."""
+        try:
+            if not hasattr(self, 'portal_status_indicator') or self.portal_status_indicator is None:
+                return
+            level = (getattr(self.app_state, 'portal_level', '') or '').strip().upper()
+            if level not in ("GP", "PO", "ONLINE", "EXPIRED"):
+                level = (self.app_state.license_info.get('user_level') or '').strip().upper()
+            if level == "GP":
+                color, label = ("#16A34A", "#16A34A"), tr("app.portal.gp")
+            elif level == "PO":
+                color, label = ("#DC2626", "#DC2626"), tr("app.portal.po")
+            elif level == "EXPIRED":
+                color, label = ("#D97706", "#FBBF24"), tr("app.portal.expired")
+            elif level == "ONLINE":
+                color, label = ("#16A34A", "#16A34A"), tr("app.portal.online")
+            else:
+                color, label = ("gray60", "gray50"), ""
+            self.portal_status_indicator.configure(fg_color=color)
+            self.portal_status_label.configure(text=label)
+        except Exception as e:
+            logger.debug("Portal status update failed: %s", e)
 
     def _update_header_welcome_message(self):
         if not self.header_welcome_prefix_label:

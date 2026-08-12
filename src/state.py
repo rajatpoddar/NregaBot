@@ -34,6 +34,10 @@ class AppState:
     license_info: Dict[str, Any] = field(default_factory=dict)
     """License metadata: key, expires_at, user_name, key_type, total_usage, …"""
 
+    portal_level: str = ""
+    """Portal login level indicator (header dot) — 'GP' | 'PO' | 'ONLINE' |
+    'EXPIRED' | '' (unknown). set_user_level / session monitor update karte hain."""
+
     is_validating_license: bool = False
     """True while a background license validation is in progress."""
 

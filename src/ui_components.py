@@ -939,6 +939,7 @@ class OnboardingGuide(ctk.CTkToplevel):
     """
 
     STEPS = 7
+    SPINNER_FRAMES = ("⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷")
 
     def __init__(self, parent: Any, replay: bool = False, start_step: int = 0) -> None:
         super().__init__(parent)
@@ -950,6 +951,9 @@ class OnboardingGuide(ctk.CTkToplevel):
         self._browser_launched = False
         self._panchayat_added = False
         self._language_note = ""
+        self._lang_applied = False
+        self._spinner_after = None
+        self._login_epoch = 0
 
         self.title(tr("onboarding.title"))
         w, h = 640, 580
@@ -1078,6 +1082,7 @@ class OnboardingGuide(ctk.CTkToplevel):
                 pass
 
     def _render_step(self, idx: int) -> None:
+        self._spinner_stop()  # purane step ka spinner turant band (widgets destroy hone se pehle)
         self._clear_content()
         self.current_step = idx
         self.progress_bar.set((idx + 1) / self.STEPS)
@@ -1121,7 +1126,7 @@ class OnboardingGuide(ctk.CTkToplevel):
                      font=ctk.CTkFont(size=22, weight="bold")).pack()
         ctk.CTkLabel(inner, text=tr("onboarding.lang.desc"),
                      font=ctk.CTkFont(size=13), text_color=("gray35", "gray70"),
-                     wraplength=480, justify="center").pack(pady=(10, 16))
+                     wraplength=480, justify="center").pack(pady=(10, 12))
 
         available = [c for c in get_available_languages() if c in LANGUAGES]
         current = get_language()
@@ -1142,47 +1147,79 @@ class OnboardingGuide(ctk.CTkToplevel):
         except Exception:
             pass
 
-        self._lang_status = ctk.CTkLabel(inner, text=self._language_note, font=ctk.CTkFont(size=12),
-                                         text_color=("#16A34A", "#4ADE80"))
-        self._lang_status.pack(pady=(14, 0))
+        # Revisit (navigate away/back) par bhi applied message dikhe — status
+        # empty na rahe jab language pehle apply ho chuki ho.
+        self._lang_status = ctk.CTkLabel(
+            inner,
+            text=self._language_note if getattr(self, '_lang_applied', False) else "",
+            font=ctk.CTkFont(size=12),
+            text_color=("#16A34A", "#4ADE80"),
+            wraplength=440, justify="center")
+        self._lang_status.pack(pady=(12, 0))
 
         def _apply():
             display = lang_var.get()
             code = next((c for c, n in LANGUAGES.items() if n == display), None)
-            if code:
-                set_language(code)
-                self._language_note = tr("onboarding.lang.applied")
-                self._refresh_labels()
-                # Rebuild the current step so its own title/desc/dropdown/button
-                # also switch to the newly selected language.
-                self._render_step(self.current_step)
-                try:
-                    self._lang_status.configure(text=tr("onboarding.lang.applied"),
-                                                text_color=("#16A34A", "#4ADE80"))
-                except Exception:
-                    pass
-                try:  # live-refresh the most visible app surfaces
-                    if hasattr(self.parent, '_create_nav_buttons'):
-                        self.parent._create_nav_buttons(self.parent.sidebar_header,
-                                                        self.parent.nav_scroll_frame)
-                except Exception:
-                    pass
-                try:
-                    if hasattr(self.parent, 'announcement_label') and self.parent.announcement_label:
-                        self.parent.announcement_label.configure(text=tr("app.welcome_loading"))
-                except Exception:
-                    pass
-                try:
-                    if hasattr(self.parent, 'status_label') and self.parent.status_label:
-                        self.parent.status_label.configure(text=tr("app.status_ready"))
-                except Exception:
-                    pass
+            if not code:
+                return
+            set_language(code)
+            self._language_note = tr("onboarding.lang.applied")
+            self._lang_applied = True
+            self._refresh_labels()
+            # Rebuild the current step so its own title/desc/dropdown/button
+            # also switch to the newly selected language.
+            self._render_step(self.current_step)
+            try:
+                self._lang_status.configure(text=tr("onboarding.lang.applied"),
+                                            text_color=("#16A34A", "#4ADE80"))
+            except Exception:
+                pass
+            try:  # live-refresh the most visible app surfaces
+                if hasattr(self.parent, '_create_nav_buttons'):
+                    self.parent._create_nav_buttons(self.parent.sidebar_header,
+                                                    self.parent.nav_scroll_frame)
+            except Exception:
+                pass
+            try:
+                if hasattr(self.parent, 'announcement_label') and self.parent.announcement_label:
+                    self.parent.announcement_label.configure(text=tr("app.welcome_loading"))
+            except Exception:
+                pass
+            try:
+                if hasattr(self.parent, 'status_label') and self.parent.status_label:
+                    self.parent.status_label.configure(text=tr("app.status_ready"))
+            except Exception:
+                pass
 
-        ctk.CTkButton(inner, text=tr("onboarding.lang.apply"), width=200, height=38,
-                      fg_color=("#0284C7", "#0284C7"), text_color="white",
-                      hover_color=("#0369A1", "#0369A1"),
-                      font=ctk.CTkFont(size=13, weight="bold"),
-                      command=_apply).pack(pady=(16, 0))
+        apply_btn = ctk.CTkButton(inner, text=tr("onboarding.lang.apply"), width=200, height=38,
+                                  fg_color=("#0284C7", "#0284C7"), text_color="white",
+                                  hover_color=("#0369A1", "#0369A1"),
+                                  font=ctk.CTkFont(size=13, weight="bold"),
+                                  command=_apply)
+
+        def _sync_apply_state(*_args):
+            """Dropdown me nayi language chunne par apply button wapas enable —
+            kyunki nayi selection abhi apply nahi hui hai."""
+            try:
+                if getattr(self, '_lang_applied', False):
+                    self._lang_applied = False
+                    apply_btn.configure(state="normal",
+                                        text=tr("onboarding.lang.apply"),
+                                        fg_color=("#0284C7", "#0284C7"),
+                                        hover_color=("#0369A1", "#0369A1"))
+                    self._lang_status.configure(text="")
+            except Exception:
+                pass
+
+        lang_var.trace_add("write", _sync_apply_state)
+
+        apply_btn.pack(pady=(16, 0))
+        if getattr(self, '_lang_applied', False):
+            # Language apply ho chuki hai — button locked green, clear feedback
+            apply_btn.configure(state="disabled",
+                                text=tr("onboarding.lang.applied_btn"),
+                                fg_color=("#16A34A", "#16A34A"),
+                                hover_color=("#15803D", "#15803D"))
 
     def _step_browser(self) -> None:
         inner = self._card_inner()
@@ -1283,6 +1320,186 @@ class OnboardingGuide(ctk.CTkToplevel):
         # Already-running Chrome ko turant detect karo aur user ko dikhao.
         threading.Thread(target=_check_running, daemon=True).start()
 
+    # ── Spinner (processing indicator) ──────────────────────────────────
+    def _spinner_start(self, step: int = 0) -> None:
+        """Rotating braille spinner — processing ke time gol-gol ghumta hua
+        indicator dikhata hai (same style app ke loading icon ki tarah)."""
+        try:
+            if not self.winfo_exists():
+                return
+            spin = getattr(self, "_panch_spinner", None)
+            if spin is None or not spin.winfo_exists():
+                return
+            spin.configure(text=self.SPINNER_FRAMES[step % len(self.SPINNER_FRAMES)])
+            self._spinner_after = self.after(120, lambda: self._spinner_start(step + 1))
+        except Exception:
+            pass
+
+    def _spinner_stop(self) -> None:
+        """Spinner band karo aur label clear karo (agar step destroy ho gaya ho
+        to safely ignore)."""
+        try:
+            if getattr(self, "_spinner_after", None):
+                self.after_cancel(self._spinner_after)
+                self._spinner_after = None
+        except Exception:
+            pass
+        spin = getattr(self, "_panch_spinner", None)
+        if spin is not None:
+            try:
+                if spin.winfo_exists():
+                    spin.configure(text="")
+            except Exception:
+                pass
+
+    # ── Background login check (Add Panchayat step) ────────────────────
+    def _check_login_background(self) -> None:
+        """Step khulte hi background me login status check — user ko bina
+        kisi button dabaye pata chale ki browser me login hai ya nahi.
+
+        Logged-in (GP) → demand automation khud panchayat/villages add kar
+        dega, to bas 'Next' dabana hai. Logged-out → clear 'login karo'
+        message dikhta hai.
+        """
+        try:
+            self._panch_btn.configure(state="disabled")
+        except Exception:
+            pass
+        try:
+            self._panch_status.configure(text=tr("onboarding.panch.login_checking"),
+                                         text_color=("gray50", "gray60"))
+        except Exception:
+            pass
+        self._spinner_start()
+        self._login_epoch += 1
+        threading.Thread(target=self._check_login_thread,
+                         args=(self._login_epoch,), daemon=True).start()
+
+    def _check_login_thread(self, epoch: int) -> None:
+        """Background thread: browser connect + demand page par login check.
+
+        UI kabhi touch nahi hota — result main thread par after(0) se
+        update hota hai. Selenium imports function-level (startup slow na ho).
+        Epoch guard: agar user step se bahar jaa kar wapas aaya (nayi check
+        start hui), purane thread ka result ignore ho jata hai.
+        """
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from src.tabs.settings_tab import _state_aware_demand_url
+
+        status, level = None, None
+        try:
+            driver = self.parent.get_driver()
+            if not driver:
+                status = "no_browser"
+            else:
+                try:
+                    cur = (driver.current_url or "").lower()
+                    body = (driver.page_source or "").lower()
+                except Exception:
+                    cur, body = "", ""
+                if "session expired" in body:
+                    # Portal ka session expiry trick — demand page logged-out
+                    # par sirf 'Session Expired!' dikhata hai. Bina navigate
+                    # kiye hi pata chal gaya.
+                    status = "not_logged_in"
+                elif "login" in cur:
+                    # User abhi login form par hai — navigate NAHI karte
+                    # (login input kharab na ho jaye), bas guide kar dete hain.
+                    status = "on_login_page"
+                else:
+                    demand_url = _state_aware_demand_url(self.parent)
+                    driver.get(demand_url)
+                    # Demand page (PO/GP), 'Session Expired!' ya Login redirect
+                    # — jo pehle settle ho jaye
+                    WebDriverWait(driver, 15).until(lambda d: (
+                        "session expired" in (d.page_source or "").lower()
+                        or "login" in (d.current_url or "").lower()
+                        or d.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
+                        or d.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
+                    ))
+                    cur = (driver.current_url or "").lower()
+                    body = (driver.page_source or "").lower()
+                    if "session expired" in body or "login" in cur:
+                        status = "not_logged_in"
+                    elif driver.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat"):
+                        status, level = "logged_in", "PO"
+                    elif driver.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"):
+                        status, level = "logged_in", "GP"
+                    else:
+                        status = "unknown"
+        except Exception:
+            status = "error"
+        try:
+            # Guide destroy ho chuka ho (user ne onboarding band kiya) to
+            # after() TclError de sakta hai — safely ignore.
+            self.after(0, lambda: self._apply_login_check(status, level, epoch))
+        except Exception:
+            pass
+
+    def _apply_login_check(self, status: Optional[str], level: Optional[str],
+                           epoch: int) -> None:
+        """Login check result UI par dikhata hai (main thread par).
+
+        Epoch guard: purane check ka result naye step ke status ko overwrite
+        na kare (user step chhod kar wapas aaya ho to nayi check chalti hai).
+        """
+        if epoch != self._login_epoch:
+            return  # stale result — nayi check chalu ho chuki hai
+        self._spinner_stop()
+        try:
+            self._panch_btn.configure(state="normal")
+        except Exception:
+            pass
+        try:
+            if status == "logged_in" and level in ("GP", "PO"):
+                # Level persist + header dot update (automation detect jaisa hi)
+                try:
+                    self.parent.set_user_level(level)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            if status == "logged_in":
+                if level == "GP":
+                    self._panch_status.configure(
+                        text=tr("onboarding.panch.login_ok_gp"),
+                        text_color=("#16A34A", "#4ADE80"))
+                else:
+                    self._panch_status.configure(
+                        text=tr("onboarding.panch.login_ok_po"),
+                        text_color=("#16A34A", "#4ADE80"))
+            elif status == "on_login_page":
+                self._panch_status.configure(
+                    text=tr("onboarding.panch.on_login_page"),
+                    text_color=("#D97706", "#FBBF24"))
+            elif status == "not_logged_in":
+                self._panch_status.configure(
+                    text=tr("onboarding.panch.login_needed"),
+                    text_color=("#DC2626", "#F87171"))
+            elif status == "no_browser":
+                self._panch_status.configure(
+                    text=tr("onboarding.panch.no_browser"),
+                    text_color=("#D97706", "#FBBF24"))
+            else:
+                self._panch_status.configure(
+                    text=tr("onboarding.panch.login_check_failed"),
+                    text_color=("gray50", "gray60"))
+        except Exception:
+            pass
+        # Browser navigate hua → focus wapas app/guide par (user browser me
+        # na atak jaye).
+        try:
+            self.parent.bring_to_front()
+        except Exception:
+            pass
+        try:
+            self.lift()
+            self.after(100, self.focus_force)
+        except Exception:
+            pass
+
     def _step_panchayat(self) -> None:
         inner = self._card_inner()
         icon = self.parent.icon_images.get("onboarding_select") if hasattr(self.parent, 'icon_images') else None
@@ -1296,16 +1513,25 @@ class OnboardingGuide(ctk.CTkToplevel):
                      font=ctk.CTkFont(size=13), text_color=("gray35", "gray70"),
                      wraplength=490, justify="center").pack(pady=(10, 14))
 
-        self._panch_status = ctk.CTkLabel(inner, text="", font=ctk.CTkFont(size=12),
+        # Status row: rotating spinner + message
+        status_row = ctk.CTkFrame(inner, fg_color="transparent")
+        status_row.pack(pady=(0, 10))
+        self._panch_spinner = ctk.CTkLabel(status_row, text="",
+                                           font=ctk.CTkFont(size=14),
+                                           text_color=("#0284C7", "#38BDF8"))
+        self._panch_spinner.pack(side="left", padx=(0, 6))
+        self._panch_status = ctk.CTkLabel(status_row, text="",
+                                          font=ctk.CTkFont(size=12),
                                           text_color=("gray50", "gray60"),
-                                          wraplength=480, justify="center")
-        self._panch_status.pack(pady=(0, 10))
+                                          wraplength=460, justify="left")
+        self._panch_status.pack(side="left")
 
         def _start():
             from src.tabs.settings_tab import run_panchayat_scrape
             self._panch_btn.configure(state="disabled", text=tr("onboarding.panch.scraping"))
             self._panch_status.configure(text=tr("onboarding.panch.connecting"),
                                          text_color=("gray50", "gray60"))
+            self._spinner_start()
 
             def _status(msg):
                 try:
@@ -1314,12 +1540,16 @@ class OnboardingGuide(ctk.CTkToplevel):
                     pass
 
             def _done(saved_panch, saved_vill, all_panch_villages, gp_mode):
+                self._spinner_stop()
                 try:
                     self._panch_btn.configure(state="normal", text=tr("onboarding.panch.btn"))
                     if saved_panch:
                         self._panchayat_added = True
+                        done_txt = tr("onboarding.panch.done", panch=saved_panch, vill=saved_vill)
+                        if gp_mode:
+                            done_txt += "\n" + tr("onboarding.panch.gp_note")
                         self._panch_status.configure(
-                            text=tr("onboarding.panch.done", panch=saved_panch, vill=saved_vill),
+                            text=done_txt,
                             text_color=("#16A34A", "#4ADE80"))
                     else:
                         self._panch_status.configure(
@@ -1336,6 +1566,7 @@ class OnboardingGuide(ctk.CTkToplevel):
                     pass
 
             def _failed(msg):
+                self._spinner_stop()
                 try:
                     self._panch_btn.configure(state="normal", text=tr("onboarding.panch.btn"))
                     self._panch_status.configure(text=f"❌ {msg}",
@@ -1355,6 +1586,11 @@ class OnboardingGuide(ctk.CTkToplevel):
         ctk.CTkLabel(inner, text=tr("onboarding.panch.skip_hint"),
                      font=ctk.CTkFont(size=11), text_color=("gray45", "gray60"),
                      wraplength=440, justify="center").pack()
+
+        # ── Background login check — step khulte hi chalta hai. GP login ho to
+        # demand automation panchayat/villages khud add kar dega (bas 'Next'
+        # dabana hai); logged-out ho to clear 'login karo' message dikhta hai. ──
+        self._check_login_background()
 
     def _step_stop(self) -> None:
         inner = self._card_inner()

@@ -106,6 +106,14 @@ class LicenseMixin:
         self._preload_and_update_about_tab()
         self._ping_server_in_background()
         try:
+            self._start_portal_session_monitor()
+        except Exception:
+            pass
+        try:
+            self._update_header_portal_status()
+        except Exception:
+            pass
+        try:
             self.show_frame("Home" if not is_expiring else "About")
         except Exception as e:
             logger.warning("Failed to show default frame: %s", e)
@@ -2212,15 +2220,187 @@ class LicenseMixin:
         if level not in ('GP', 'PO'):
             return
         lic = self.app_state.license_info
-        if str(lic.get('user_level', '')).strip().upper() == level:
-            return  # already stored — no repeated disk writes
+        changed = str(lic.get('user_level', '')).strip().upper() != level
         lic['user_level'] = level
+        # Header dot + state — hamesha refresh (same level ho to bhi, kyunki
+        # pehli baar set hone par UI abhi ban chuka hota hai).
+        try:
+            self.app_state.portal_level = level
+            self.after(0, self._update_header_portal_status)
+        except Exception:
+            pass
+        if not changed:
+            return  # already stored — no repeated disk writes
         try:
             from src.utils import get_data_path
             with open(get_data_path('license.dat'), 'w') as f:
                 json.dump(lic, f)
         except Exception:
             logger.debug("Failed to persist user_level", exc_info=True)
+
+    # ------------------------------------------------------------------
+    # PORTAL SESSION MONITOR — har 5 min login check + silent keep-alive
+    # ------------------------------------------------------------------
+    # Portal (VB-G-RAM-G) logged-out par demand page sirf "Session Expired!"
+    # dikhata hai (body me bas ye text). Ye check bina kisi complex parsing
+    # ke session status batata hai. Har 5 min par:
+    #   • current page portal page hai → silent XHR keep-alive inject (session
+    #     timer reset, bina navigation/focus change ke) + read-only status check
+    #   • current page portal nahi → demand page par jaakar check (ye request
+    #     khud session ko bhi fresh karti hai), phir focus wapas app par
+    # Header dot: GP=green, PO=red, Session Expired=amber.
+
+    PORTAL_SESSION_CHECK_MS = 5 * 60 * 1000   # 5 min
+    PORTAL_KEEPALIVE_MS = 3.5 * 60 * 1000     # silent XHR interval (210s)
+
+    def _start_portal_session_monitor(self) -> None:
+        """Portal session monitor start karo (full app me — header indicator
+        wala). Lite app ke liye skip (no header / no portal UI)."""
+        if not hasattr(self, '_create_header'):
+            return
+        try:
+            self.after(60_000, self._portal_session_check_loop)
+        except Exception:
+            pass
+
+    def _portal_session_check_loop(self) -> None:
+        """Main thread par scheduled loop — worker thread actual check karta
+        hai. Automation chal rahi ho ya driver na ho to browser disturb nahi
+        karte (automations khud session alive rakhti hain)."""
+        try:
+            if self.winfo_exists():
+                busy = getattr(self.app_state, 'active_automations', None)
+                driver = getattr(self.app_state, 'driver', None)
+                if not busy and driver:
+                    threading.Thread(target=self._portal_session_check_worker,
+                                     daemon=True).start()
+        except Exception:
+            pass
+        try:
+            if self.winfo_exists():
+                self.after(self.PORTAL_SESSION_CHECK_MS, self._portal_session_check_loop)
+        except Exception:
+            pass
+
+    def _portal_session_check_worker(self) -> None:
+        """Background thread: session status check (Session Expired trick).
+        UI update + focus wapas app par — main thread par after(0) se.
+        Selenium imports function-level (startup slow na ho)."""
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from src.tabs.settings_tab import _state_aware_demand_url
+
+        # Race guard: thread spawn ke baad user ne automation start kiya ho
+        # to driver ko disturb mat karo (Selenium thread-safe nahi hai).
+        if getattr(self.app_state, 'active_automations', None):
+            return
+        state = None
+        try:
+            driver = getattr(self.app_state, 'driver', None)
+            if not driver:
+                return
+            try:
+                cur = (driver.current_url or '').lower()
+                body = (driver.page_source or '').lower()
+            except Exception:
+                cur, body = '', ''
+
+            if "dord.gov.in" in cur:
+                # Portal page khula hai → silent keep-alive inject + read-only
+                # check (koi navigation/focus change nahi).
+                self._inject_portal_keepalive(driver)
+                if "session expired" in body:
+                    state = "expired"
+                elif "ctl00_contentplaceholder1_ddl_panchayat" in body:
+                    state = "po"
+                elif "ctl00_contentplaceholder1_ddl_village" in body:
+                    state = "gp"
+                else:
+                    state = "alive"
+            else:
+                # Portal page nahi hai → demand page par jaakar check karo
+                # (ye navigation khud bhi session ko fresh karti hai). Sirf
+                # tabhi navigate karo jab state change hui ho — warna har 5
+                # min browser tab + app focus disturb hota hai.
+                last = getattr(self, '_last_portal_session_state', '')
+                if last and last not in ("expired",):
+                    # Same state poll — silent (keepalive pehle inject ho
+                    # chuka hai, page par persist karta hai).
+                    self._last_portal_session_state = last
+                    return
+                demand_url = _state_aware_demand_url(self)
+                driver.get(demand_url)
+                try:
+                    WebDriverWait(driver, 15).until(lambda d: (
+                        "session expired" in (d.page_source or '').lower()
+                        or "login" in (d.current_url or '').lower()
+                        or d.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
+                        or d.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
+                    ))
+                except Exception:
+                    pass
+                body = (driver.page_source or '').lower()
+                cur = (driver.current_url or '').lower()
+                if "session expired" in body or "login" in cur:
+                    state = "expired"
+                elif "ctl00_contentplaceholder1_ddl_panchayat" in body:
+                    state = "po"
+                elif "ctl00_contentplaceholder1_ddl_village" in body:
+                    state = "gp"
+                else:
+                    state = "alive"
+                try:
+                    # Navigate kiya → focus wapas app par (user browser me na
+                    # atak jaye).
+                    self.after(0, self.bring_to_front)
+                except Exception:
+                    pass
+        except Exception:
+            return
+        if state:
+            try:
+                self._last_portal_session_state = state
+                self.after(0, lambda: self._apply_portal_session_state(state))
+            except Exception:
+                pass
+
+    def _inject_portal_keepalive(self, driver: Any) -> None:
+        """Page par silent XHR keep-alive — har 3.5 min same-origin GET se
+        portal session timer reset hota hai, bina navigation ya focus change
+        ke (navigation par ye script reset ho jati hai — agli 5-min check par
+        dobara inject ho jati hai). Benign query param append karte hain taaki
+        kisi action/delete-type GET URL par kabhi re-execute na ho."""
+        try:
+            driver.execute_script("""
+                if (!window.__nregabot_keepalive) {
+                    window.__nregabot_keepalive = setInterval(function () {
+                        try {
+                            var x = new XMLHttpRequest();
+                            x.open('GET', location.pathname + '?__nregabot_keepalive=' + Date.now(), true);
+                            x.send();
+                        } catch (e) {}
+                    }, %d);
+                }
+            """ % self.PORTAL_KEEPALIVE_MS)
+        except Exception:
+            pass
+
+    def _apply_portal_session_state(self, state: str) -> None:
+        """Session check result apply karo (main thread). gp/po → level save +
+        header dot; expired → amber 'Session Expired'; alive → green 'Online'
+        (agar level pehle se pata hai to wo hi dikhao)."""
+        try:
+            if state in ("gp", "po"):
+                self.set_user_level("GP" if state == "gp" else "PO")
+            elif state == "expired":
+                self.app_state.portal_level = "EXPIRED"
+                self._update_header_portal_status()
+            elif state == "alive":
+                known = (self.app_state.license_info.get('user_level') or '').strip().upper()
+                self.app_state.portal_level = known if known in ("GP", "PO") else "ONLINE"
+                self._update_header_portal_status()
+        except Exception:
+            pass
 
     def _apply_feature_flags(self) -> None:
         current_ver = parse_version(config.APP_VERSION)

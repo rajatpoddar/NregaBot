@@ -1508,8 +1508,17 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
                 messagebox.showinfo("Update Ready",
                                     "Update applied successfully.\nThe application will now restart.")
+                # IMPORTANT ORDER: on_closing(force=True) → os._exit(0) turant
+                # process khatam kar deta hai, isliye relaunch PEHLE schedule
+                # karna padta hai — warna Popen kabhi nahi chalta (main_app
+                # me same bug pehle fix ho chuka tha).
+                try:
+                    subprocess.Popen(
+                        ["sh", "-c", f'sleep 2; exec "{sys.executable}"'],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    subprocess.Popen([sys.executable])
                 self.on_closing(force=True)
-                subprocess.Popen([sys.executable])
                 sys.exit(0)
 
             except Exception as e:
