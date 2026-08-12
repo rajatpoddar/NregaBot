@@ -1379,12 +1379,13 @@ class OnboardingGuide(ctk.CTkToplevel):
         """Background thread: browser connect + demand page par login check.
 
         UI kabhi touch nahi hota — result main thread par after(0) se
-        update hota hai. Selenium imports function-level (startup slow na ho).
-        Epoch guard: agar user step se bahar jaa kar wapas aaya (nayi check
-        start hui), purane thread ka result ignore ho jata hai.
+        update hota hai. Login detection shared helper
+        (src.portal_login.detect_portal_login) use karta hai — wahi
+        Session Expired trick. Epoch guard: agar user step se bahar jaa kar
+        wapas aaya (nayi check start hui), purane thread ka result ignore
+        ho jata hai.
         """
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
+        from src.portal_login import detect_portal_login
         from src.tabs.settings_tab import _state_aware_demand_url
 
         status, level = None, None
@@ -1409,25 +1410,8 @@ class OnboardingGuide(ctk.CTkToplevel):
                     status = "on_login_page"
                 else:
                     demand_url = _state_aware_demand_url(self.parent)
-                    driver.get(demand_url)
-                    # Demand page (PO/GP), 'Session Expired!' ya Login redirect
-                    # — jo pehle settle ho jaye
-                    WebDriverWait(driver, 15).until(lambda d: (
-                        "session expired" in (d.page_source or "").lower()
-                        or "login" in (d.current_url or "").lower()
-                        or d.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")
-                        or d.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
-                    ))
-                    cur = (driver.current_url or "").lower()
-                    body = (driver.page_source or "").lower()
-                    if "session expired" in body or "login" in cur:
-                        status = "not_logged_in"
-                    elif driver.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat"):
-                        status, level = "logged_in", "PO"
-                    elif driver.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village"):
-                        status, level = "logged_in", "GP"
-                    else:
-                        status = "unknown"
+                    detected, level = detect_portal_login(driver, demand_url=demand_url)
+                    status = "logged_in" if detected in ("po", "gp") else detected
         except Exception:
             status = "error"
         try:

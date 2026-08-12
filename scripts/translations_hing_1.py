@@ -91,7 +91,7 @@ HING1 = {
     "settings.factory.title": "Factory Reset",
     "settings.factory.info": "Ye saara saved data delete kar dega (location, staff mappings, defaults, activity log aur autocomplete suggestions). Aapka license key par koi asar nahi hoga.",
     "settings.factory.confirm_title": "Factory Reset Confirm Karein",
-    "settings.factory.confirm_msg": "Kya aap saara app data delete karna chahte hain?\n\nYe action wapas nahi ho sakta.\n\nData jo delete hoga:\n- Location data (Panchayats, Villages)\n- Staff mappings\n- Default values\n- Activity log\n- Autocomplete suggestions\n\nLicense aur settings safe rahengi.",
+    "settings.factory.confirm_msg": "Kya aap saara app data delete karna chahte hain?\n\nYe action wapas nahi ho sakta.\nLicense activation safe rahega.",
     "settings.factory.reset_btn": "Saara Data Reset Karein",
     "settings.factory.success": "Saara app data safalta se reset ho gaya.",
     "settings.factory.failed": "Factory reset fail hua: {error}",

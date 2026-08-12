@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import customtkinter as ctk
 
 from src import config
+from src import portal_login
 from src.utils import get_data_path, get_logger, get_config, save_config
 from src.ui_components import AfterTracker
 from src.location_hierarchy import get_hierarchy, HIERARCHY_TYPES, TYPE_TO_PREFIX
@@ -103,7 +104,7 @@ def run_panchayat_scrape(app, on_status=None, on_success=None, on_failed=None):
             gp_mode = False
             try:
                 WebDriverWait(driver, 3).until(EC.presence_of_element_located(
-                    (By.ID, "ctl00_ContentPlaceHolder1_DDL_panchayat")))
+                    (By.ID, portal_login.PANCHAYAT_DROPDOWN_ID)))
             except TimeoutException:
                 gp_mode = True
             try:
@@ -1670,70 +1671,26 @@ class SettingsTab(ctk.CTkFrame):
         bg = ctk.ThemeManager.theme["CTkFrame"]["fg_color"]
         scroll = ctk.CTkScrollableFrame(c, fg_color=bg)
         scroll.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        scroll.grid_columnconfigure(1, weight=1)
+        scroll.grid_columnconfigure(0, weight=1)
 
         # ── Header ──
         ctk.CTkLabel(scroll, text="🏭 Restore Factory Settings",
                      font=ctk.CTkFont(size=18, weight="bold"),
-                     ).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 5))
+                     ).grid(row=0, column=0, sticky="w", padx=10, pady=(10, 5))
         ctk.CTkLabel(scroll,
             text=tr("settings.factory_reset_hint"),
             font=ctk.CTkFont(size=12), text_color=("gray50", "gray60"),
             wraplength=650, justify="left",
-                     ).grid(row=1, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 15))
+                     ).grid(row=1, column=0, sticky="w", padx=10, pady=(0, 15))
 
         # ── Data usage summary cards ──
         self._fr_stats_frame = ctk.CTkFrame(scroll, fg_color="transparent")
-        self._fr_stats_frame.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 15))
+        self._fr_stats_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 15))
         self._refresh_fr_stats()
-
-        # ── What will be reset ──
-        reset_frame = ctk.CTkFrame(scroll, fg_color=("#FEF2F2", "#450A0A"), corner_radius=10)
-        reset_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
-        ctk.CTkLabel(reset_frame, text="🗑️  Ye Sab DELETE Ho Jayega:",
-                     font=ctk.CTkFont(size=14, weight="bold"),
-                     text_color=("#DC2626", "#F87171"),
-                     ).pack(anchor="w", padx=15, pady=(12, 5))
-        reset_items = [
-            "📝 Saari autocomplete suggestions aur history",
-            "📊 Usage stats aur 'Most Used' section",
-            "🏘️ Location data (Panchayat, Village)",
-            "👥 Staff aur Mate mappings",
-            "⚙️ Default values (₹ 300, pit count, page no., etc.)",
-            "📁 Location hierarchy relationships",
-            "📋 Activity log",
-            "🔧 App config (theme, browser preference) — defaults par reset",
-            "📄 Sabhi saved tab inputs aur form data",
-        ]
-        for item in reset_items:
-            ctk.CTkLabel(reset_frame, text=item, font=ctk.CTkFont(size=12),
-                         text_color=("#991B1B", "#FCA5A5"),
-                         anchor="w", justify="left",
-                         ).pack(anchor="w", padx=25, pady=1)
-        ctk.CTkLabel(reset_frame, text="", font=ctk.CTkFont(size=4)).pack()
-
-        # ── What will be kept ──
-        keep_frame = ctk.CTkFrame(scroll, fg_color=("#F0FDF4", "#14532D"), corner_radius=10)
-        keep_frame.grid(row=4, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 15))
-        ctk.CTkLabel(keep_frame, text="✅  Ye Safe Rahega:",
-                     font=ctk.CTkFont(size=14, weight="bold"),
-                     text_color=("#16A34A", "#4ADE80"),
-                     ).pack(anchor="w", padx=15, pady=(12, 5))
-        keep_items = [
-            "🔑 Aapka license activation (dubara activate nahi karna padega)",
-            "🖥️ App version aur program files",
-            "📂 ~/Downloads/NregaBot/ folder mein saved reports aur files",
-        ]
-        for item in keep_items:
-            ctk.CTkLabel(keep_frame, text=item, font=ctk.CTkFont(size=12),
-                         text_color=("#166534", "#86EFAC"),
-                         anchor="w", justify="left",
-                         ).pack(anchor="w", padx=25, pady=1)
-        ctk.CTkLabel(keep_frame, text="", font=ctk.CTkFont(size=4)).pack()
 
         # ── Action button + status ──
         btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
-        btn_frame.grid(row=5, column=0, columnspan=2, sticky="ew", padx=10, pady=(5, 10))
+        btn_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(5, 10))
         btn_frame.grid_columnconfigure(0, weight=1)
 
         self._fr_status = ctk.CTkLabel(btn_frame, text="", font=ctk.CTkFont(size=12),
@@ -1748,13 +1705,6 @@ class SettingsTab(ctk.CTkFrame):
             command=self._perform_factory_reset,
         )
         self._fr_button.pack(side="right", padx=(5, 0))
-
-        # ── Note ──
-        ctk.CTkLabel(scroll, text="💡  Restore karne ke baad app ko restart karne ki salah di jaati hai taake sab changes effect mein aayein.",
-                     font=ctk.CTkFont(size=11),
-                     text_color=("gray50", "gray60"),
-                     wraplength=600, justify="left",
-                     ).grid(row=6, column=0, columnspan=2, sticky="w", padx=10, pady=(5, 0))
 
     def _refresh_fr_stats(self) -> None:
         """Refresh the summary stats cards."""
@@ -1790,31 +1740,11 @@ class SettingsTab(ctk.CTkFrame):
                    ("#FEFCE8", "#422006"))
 
     def _perform_factory_reset(self) -> None:
-        """Execute full factory reset with confirmation."""
-        # ── Step 1: Double confirmation ──
+        """Execute full factory reset with a single confirmation."""
+        # ── Single confirmation (destructive action) ──
         if not messagebox.askyesno(
-            "⚠️ Confirm Factory Reset",
-            "Kya aap sach mein app ko factory settings par reset karna chahte hain?\n\n"
-            "ISSE: \n"
-            "• Saari history, suggestions, aur saved data DELETE ho jayega\n"
-            "• Location data aur staff mappings DELETE ho jayega\n"
-            "• Default values ₹ 300 par reset ho jayenge\n"
-            "• Theme aur settings default par reset ho jayenge\n\n"
-            "Sirf aapka license activation safe rahega.\n\n"
-            "Kya aap sure hain?",
-            icon="warning",
-            parent=self.winfo_toplevel()
-        ):
-            return
-
-        if not messagebox.askyesno(
-            "🛑 Final Confirmation",
-            "YEH LAST WARNING HAI!\n\n"
-            "Factory reset ke baad aapka saara saved data hamesha ke liye delete ho jayega.\n"
-            "Isse wapas nahi laaya ja sakta.\n\n"
-            "Agar aapke paas koi important location data ya mapping hai, "
-            "to pehle unhe note kar lein.\n\n"
-            "Kya aap sach mein proceed karna chahte hain?",
+            tr("settings.factory.confirm_title"),
+            tr("settings.factory.confirm_msg"),
             icon="warning",
             parent=self.winfo_toplevel()
         ):
@@ -1926,27 +1856,22 @@ class SettingsTab(ctk.CTkFrame):
             # ── 8. Refresh UI ──
             self._refresh_fr_stats()
 
-            # ── Show result ──
-            result_msg = f"✅ Factory reset complete!\n\n"
-            result_msg += f"🗑️ {len(deleted_files)} items cleared successfully.\n"
-            for f in deleted_files:
-                result_msg += f"  ✅ {f}\n"
+            # ── Show result (short — details log me) ──
+            logger.info("Factory reset complete: %d items cleared, %d failed",
+                        len(deleted_files), len(failed_files))
             if failed_files:
-                result_msg += f"\n⚠️ {len(failed_files)} items had errors:\n"
-                for f in failed_files:
-                    result_msg += f"  ❌ {f}\n"
-            result_msg += "\n\n🔄 App abhi restart ho raha hai — fresh state apply hone ke liye."
+                logger.warning("Factory reset partial failures: %s", failed_files)
 
-            messagebox.showinfo("✅ Factory Reset Complete", result_msg,
-                                parent=self.winfo_toplevel())
+            messagebox.showinfo(
+                tr("settings.factory.title"),
+                f"{tr('settings.factory.success')}\n\n🔄 {tr('settings.factory.restart_note')}",
+                parent=self.winfo_toplevel()
+            )
 
             # Restart so the app boots into the fresh, reset state.
             self._restart_application()
 
-            self._set_fr_status(
-                f"✅ Reset complete! {len(deleted_files)} items cleared. App restart suggested.",
-                "green"
-            )
+            self._set_fr_status(tr("settings.factory.success"), "green")
 
         except Exception as e:
             logger.error("Factory reset failed: %s", e)

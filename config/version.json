@@ -20,8 +20,7 @@
       "🏘️ **GP/GB Login Scrape Improved:** Panchayat-level (GP/GB) users ke liye panchayat + villages add karna ab zyada robust hai — village dropdown na mile to bhi panchayat save ho jata hai, aur zyada element IDs try hoti hain (state-wise).",
       "🌐 **Onboarding Language Polish:** Language apply karne par button '✓ Applied' ho jata hai; dropdown badalne par dobara apply kar sakte hain. GP login par panchayat add hone par clear success note dikhta hai.",
       "🔍 **Onboarding Login Check:** Add Panchayat step me ab background me login status check hota hai (spinner ke saath) — logged-out ho to 'Please login to continue' message dikhta hai, GP/PO login detect hone par clear guidance milti hai (GP: demand automation panchayat/villages khud add karega, bas Next dabao). Session expire hone par 'Session Expired!' page bhi smartly detect hota hai.",
-      "🟢 **Live Login Status (Header):** Header me ab aapke portal login ka live status dot dikhta hai — green dot = GP login live, red dot = PO login live, grey = session expired/logged out. Har 5 minute me background me silent session check hota hai jo portal session ko alive bhi rakhta hai — session expire nahi hoga aur aapke automations beech me fail nahi honge.",
-      "🖱️ **Focus Fix:** Background login/session checks ke baad app ab browser se focus wapas apne app par le aati hai — user ko har baar manually app par click nahi karna padta."
+      "🖱️ **Focus Fix:** Background login check ke baad app ab browser se focus wapas apne app par le aati hai — user ko har baar manually app par click nahi karna padta."
     ],
     "3.2.3": [
       "🌐 **Multi-State Portal Support:** All automation tabs now resolve the correct portal server per state — Rajasthan (vbgramgde3) and Jharkhand/Karnataka (de2) are supported. Every tab's URL is state-aware (Demand, Work Allocation, MR Fill, MSR, MB Entry, Wagelist, eKYC, and 20+ more).",
