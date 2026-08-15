@@ -1420,7 +1420,12 @@ class SettingsTab(ctk.CTkFrame):
                                             text_color=("gray50", "gray60"))
 
     def _on_whatsapp_notify_toggle(self) -> None:
-        """Toggle daily WhatsApp report — subah 6 baje previous day ka combined report."""
+        """Toggle daily WhatsApp report — subah 6 baje previous day ka combined report.
+
+        UNIVERSAL: setting user-level hai — local config ke saath server par
+        bhi turant set hota hai (/api/notify-settings), taaki kisi bhi device
+        par toggle karne se sab devices same ON/OFF dikhayein.
+        """
         val = self._whatsapp_notify_var.get()
         save_config("whatsapp_automation_notify", val)
         # Legacy key bhi sync — purane versions / cloud backup whitelist ke liye
@@ -1430,6 +1435,39 @@ class SettingsTab(ctk.CTkFrame):
             self._set_fr_status("📱 Daily WhatsApp report enabled (subah 6 baje)", "green")
         else:
             self._set_fr_status("📱 Daily WhatsApp report disabled", "gray")
+        self._push_daily_report_setting(bool(val))
+
+    def _push_daily_report_setting(self, enabled: bool) -> None:
+        """User-level daily-report setting ko server par set karo (background).
+
+        Ye chiz device-local nahi hai — kisi bhi device par ON/OFF karo, server
+        flag update hota hai aur har device ~2 min me sync karke same state
+        dikhata hai (subah ka report hamesha milega agar kahin ON hai).
+        """
+        try:
+            import threading
+            lic = getattr(self.app, "license_info", {}) or {}
+            lk = (lic.get("key") or "").strip()
+            if not lk:
+                return
+
+            def _push():
+                try:
+                    import requests
+                    server_url = config.LICENSE_SERVER_URL
+                    if not server_url:
+                        return
+                    requests.post(
+                        f"{server_url}/api/notify-settings",
+                        json={"license_key": lk, "daily_report_enabled": enabled},
+                        timeout=10,
+                    )
+                except Exception as e:
+                    logger.debug("Notify-settings push failed: %s", e)
+
+            threading.Thread(target=_push, daemon=True).start()
+        except Exception:
+            pass
 
     def _update_notif_status_badge(self) -> None:
         """Update the WhatsApp report status badge ON/OFF."""

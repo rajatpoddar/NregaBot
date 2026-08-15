@@ -1798,7 +1798,12 @@ class LicenseMixin:
                 # 2. Fetch App Config (Every 120s -> 6 loops of 20s)
                 if ping_counter % 6 == 0:
                     try:
+                        # license_key query param se server user-level daily
+                        # WhatsApp report setting bhi return karta hai — sab
+                        # devices same ON/OFF rakhte hain (universal).
                         url = f"{config.LICENSE_SERVER_URL}/api/app-config"
+                        if hb_key:
+                            url += f"?license_key={hb_key}"
                         resp = self.app_state.http_session.get(url, timeout=10)
                         _cookie_req_count += 1
                         if resp.status_code == 200:
@@ -1842,6 +1847,16 @@ class LicenseMixin:
                                 except Exception:
                                     _shutdown = True
                                     break
+
+                            # ── Universal daily WhatsApp report setting ──
+                            # Server (user-level) se aayi value → local config +
+                            # Settings tab toggle me reflect karo (main thread).
+                            wdr = data.get("whatsapp_daily_report")
+                            if wdr is not None:
+                                try:
+                                    self.after(0, lambda w=bool(wdr): self._apply_daily_report_setting(w))
+                                except Exception:
+                                    pass
                     except Exception as e:
                         logger.error("Config Fetch Error: %s", e)
                     ping_counter = 0
@@ -1859,6 +1874,28 @@ class LicenseMixin:
                 time.sleep(20)
 
         threading.Thread(target=sync_worker, daemon=True).start()
+
+    def _apply_daily_report_setting(self, enabled: bool) -> None:
+        """Server se mila user-level daily-report setting apply karo (main thread).
+
+        Config file + Settings tab ka toggle dono update — taaki kisi bhi
+        device par ON/OFF kiya ho, sab devices wahi state dikhayein.
+        """
+        try:
+            from src.utils import save_config
+            save_config("whatsapp_automation_notify", enabled)
+            save_config("whatsapp_excel_send", enabled)
+        except Exception:
+            pass
+        try:
+            tabs = getattr(self.app_state, "tab_instances", {}) or {}
+            st = tabs.get("Settings")
+            if st is not None and hasattr(st, "_whatsapp_notify_var"):
+                st._whatsapp_notify_var.set(enabled)
+                if hasattr(st, "_update_notif_status_badge"):
+                    st._update_notif_status_badge()
+        except Exception:
+            pass
 
     def _fetch_app_config(self):
         pass  # Deprecated: merged into _ping_server_in_background
