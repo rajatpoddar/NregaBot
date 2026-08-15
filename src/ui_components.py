@@ -954,6 +954,7 @@ class OnboardingGuide(ctk.CTkToplevel):
         self._lang_applied = False
         self._spinner_after = None
         self._login_epoch = 0
+        self._pool_epoch = 0
 
         self.title(tr("onboarding.title"))
         w, h = 640, 580
@@ -1352,6 +1353,66 @@ class OnboardingGuide(ctk.CTkToplevel):
             except Exception:
                 pass
 
+    # ── Background location-pool fetch (Add Panchayat step) ─────────────
+    def _fetch_pool_background(self) -> None:
+        """Step khulte hi server location pool se same-block ka data check
+        karo. Data mila → hierarchy me merge + green tick + Next ready.
+
+        User ke block ke hisaab se panchayat serve hote hain — isliye jab
+        PO/GP portal login na ho to bhi onboarding aaram se aage badh sakta
+        hai ("Add Panchayat" complex rules se mukt).
+        """
+        self._pool_epoch += 1
+        epoch = self._pool_epoch
+        try:
+            threading.Thread(target=self._fetch_pool_thread,
+                             args=(epoch,), daemon=True).start()
+        except Exception:
+            pass
+
+    def _fetch_pool_thread(self, epoch: int) -> None:
+        """Background thread: block data fetch + apply. UI kabhi touch nahi —
+        result main thread par after(0) se update hota hai (epoch guard)."""
+        from src.location_sync import (get_license_key, get_user_location,
+                                       fetch_block_from_server, apply_server_data)
+        p_added = v_added = 0
+        try:
+            lic = get_license_key(self.parent)
+            state, district, block = get_user_location(self.parent)
+            if lic and state and district and block:
+                data = fetch_block_from_server(lic, state, district, block)
+                if data:
+                    p_added, v_added = apply_server_data(block, data, app=self.parent)
+        except Exception:
+            p_added = v_added = 0
+        try:
+            self.after(0, lambda: self._apply_pool_result(p_added, v_added, epoch))
+        except Exception:
+            pass
+
+    def _apply_pool_result(self, p_added: int, v_added: int, epoch: int) -> None:
+        """Pool fetch result UI par dikhata hai (main thread par).
+
+        Sirf tab update karta hai jab kuch NA YA add hua — warna login-check
+        guidance message ko overwrite nahi karta.
+        """
+        if epoch != self._pool_epoch:
+            return  # stale result — nayi check chalu ho chuki hai
+        if not (p_added or v_added):
+            return
+        self._spinner_stop()
+        try:
+            self._panch_btn.configure(state="normal")
+        except Exception:
+            pass
+        try:
+            self._panch_status.configure(
+                text=tr("onboarding.panch.server_loaded", panch=p_added, vill=v_added),
+                text_color=("#16A34A", "#4ADE80"))
+            self._panchayat_added = True
+        except Exception:
+            pass
+
     # ── Background login check (Add Panchayat step) ────────────────────
     def _check_login_background(self) -> None:
         """Step khulte hi background me login status check — user ko bina
@@ -1575,6 +1636,10 @@ class OnboardingGuide(ctk.CTkToplevel):
         # demand automation panchayat/villages khud add kar dega (bas 'Next'
         # dabana hai); logged-out ho to clear 'login karo' message dikhta hai. ──
         self._check_login_background()
+        # ── Background location-pool fetch — same-block ke shared panchayat/
+        # villages server se milte hain to green tick + Next ready (bina
+        # PO/GP login ke bhi). ──
+        self._fetch_pool_background()
 
     def _step_stop(self) -> None:
         inner = self._card_inner()

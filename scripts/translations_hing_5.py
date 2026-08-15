@@ -247,6 +247,7 @@ HING5 = {
     "onboarding.panch.on_login_page": "🔐 Login form khula hai — browser me login complete karo. Login ke baad step wapas kholo ya 'Add Panchayat & Village' dabao.",
     "onboarding.panch.no_browser": "🚀 Browser launch nahi hua — pehle browser step me Chrome launch karo, phir yahan aao.",
     "onboarding.panch.login_check_failed": "Login check nahi ho paya — 'Add Panchayat & Village' dabao, kaam chal jayega.",
+    "onboarding.panch.server_loaded": "✅ Aapke block ke {panch} panchayat(s) / {vill} village(s) server se mil gaye — Next dabao, sab ready hai!",
     "onboarding.stop.title": "Emergency Stop Button",
     "onboarding.stop.desc": "Footer me ye red STOP button hamesha saath hota hai. Jab koi automation chalti hai, ye button red ho jata hai — click karte hi SAB kuch ruk jata hai.",
     "onboarding.stop.caption": "(Footer me ye button dikhta hai — red dot ke saath)",

@@ -2269,6 +2269,13 @@ class BaseAutomationTab(ctk.CTkFrame):
                 for k in ("location_village", "village_name"):
                     hm.save_entry(k, v)
                 hier.add_child("Panchayat", panchayat, "Village", v)
+            # ── Location pool: auto-add hua data same-block users ke liye
+            # server par bhejo (silent, throttled) ──
+            try:
+                from src.location_sync import sync_current_location
+                sync_current_location(self.app)
+            except Exception:
+                pass
         except Exception as e:
             logger.debug(f"Failed to save panchayat/villages to settings: {e}")
 

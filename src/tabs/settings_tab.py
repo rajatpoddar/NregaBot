@@ -23,6 +23,7 @@ from src.utils import get_data_path, get_logger, get_config, save_config
 from src.ui_components import AfterTracker
 from src.location_hierarchy import get_hierarchy, HIERARCHY_TYPES, TYPE_TO_PREFIX
 from src.location_data import STATE_DISTRICT_MAP
+from src import location_sync
 from src.tabs.activity_log_tab import ActivityLogTab
 from src.i18n import tr, get_language, get_available_languages, set_language, suggest_language_for_state, LANGUAGES
 
@@ -453,6 +454,19 @@ class SettingsTab(ctk.CTkFrame):
             command=self._fix_location_now,
         )
         self._fix_loc_btn.pack(side="left", padx=(8, 0))
+
+        # ── Block Data Download (location pool) ──
+        # Same-block users ke shared panchayat/villages server se fetch karke
+        # merge karta hai (sirf missing) — bina PO/GP portal login ke bhi
+        # dropdowns ready ho jate hain.
+        self._pool_dl_btn = ctk.CTkButton(
+            srv_btn_row, text=tr("settings.location.pool_download_btn"), width=150, height=26,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color=("#0284C7", "#0284C7"), text_color="white",
+            hover_color=("#0369A1", "#0369A1"),
+            command=self._download_block_data,
+        )
+        self._pool_dl_btn.pack(side="left", padx=(8, 0))
 
         # 👤 User level (GP/PO) ab onboarding scrape ya kisi bhi automation ke
         # time automatically detect + server par save hota hai — alag se
@@ -1015,6 +1029,14 @@ class SettingsTab(ctk.CTkFrame):
         self._refresh_loc_list()
         self.after(8000, lambda: self._scrape_status.configure(text=""))
 
+        # ── Location pool: scrape kiya hua data same-block users ke liye
+        # server par bhejo (silent background, kabhi crash nahi) ──
+        if saved_panch:
+            try:
+                location_sync.sync_current_location(self.app, force=True)
+            except Exception as e:
+                logger.debug("Location pool sync error: %s", e)
+
         # Restart so the newly added panchayats appear in every tab's dropdowns.
         if saved_panch:
             self._restart_application()
@@ -1030,6 +1052,62 @@ class SettingsTab(ctk.CTkFrame):
             tr("dialogs.scrape_failed_msg", error=error_msg),
             parent=self.winfo_toplevel())
         self.after(8000, lambda: self._scrape_status.configure(text=""))
+
+    def _download_block_data(self) -> None:
+        """🌐 Server location pool se same-block panchayat + villages fetch
+        karke merge karo (sirf missing — local edits kabhi overwrite nahi).
+
+        Un users ke liye jo portal par na PO na GP login kar paate hain —
+        server par same block ka data ho to dropdowns ready ho jate hain,
+        bina "Add Panchayat & Village" scrape ke.
+        """
+        import threading
+        try:
+            self._pool_dl_btn.configure(state="disabled", text="⏳…")
+            self._srv_sync_status.configure(text=tr("settings.location.pool_download_checking"),
+                                            text_color=("gray50", "gray60"))
+        except Exception:
+            pass
+
+        def _worker():
+            from src.location_sync import (get_license_key, get_user_location,
+                                           fetch_block_from_server, apply_server_data)
+            lic = get_license_key(self.app)
+            state, district, block = get_user_location(self.app)
+            data = []
+            if lic and state and district and block:
+                data = fetch_block_from_server(lic, state, district, block)
+            p_added = v_added = 0
+            if data:
+                p_added, v_added = apply_server_data(block, data, app=self.app)
+
+            def _done():
+                try:
+                    self._pool_dl_btn.configure(state="normal",
+                                                text=tr("settings.location.pool_download_btn"))
+                    if p_added or v_added:
+                        self._srv_sync_status.configure(
+                            text=tr("settings.location.pool_download_done",
+                                    panch=p_added, vill=v_added),
+                            text_color=("#16A34A", "#4ADE80"))
+                        self._refresh_loc_list()
+                    elif data:
+                        self._srv_sync_status.configure(
+                            text=tr("settings.location.pool_download_empty", block=block or "?"),
+                            text_color=("#D97706", "#FBBF24"))
+                    else:
+                        self._srv_sync_status.configure(
+                            text=tr("settings.location.pool_download_fail"),
+                            text_color=("#DC2626", "#F87171"))
+                except Exception:
+                    pass
+
+            try:
+                self.after(0, _done)
+            except Exception:
+                pass
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def _refresh_server_data_card(self) -> None:
         """Refresh the server synced data badges in the card."""
