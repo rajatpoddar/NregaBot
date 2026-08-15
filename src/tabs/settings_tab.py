@@ -1258,8 +1258,15 @@ class SettingsTab(ctk.CTkFrame):
                      ).grid(row=0, column=0, sticky="w", padx=(5, 10))
 
         self.map_staff_entry = ctk.CTkEntry(row1, font=ctk.CTkFont(size=13),
-                                             placeholder_text=f"Enter {type_label} name...")
+                                             placeholder_text=f"Enter {type_label} name(s) — comma separated...")
         self.map_staff_entry.grid(row=0, column=1, sticky="ew", padx=(0, 5))
+
+        # 💡 Multiple names hint — 1-1 karke Save dabao ya comma se likho,
+        # dono tarike se add hote hain; automation har entry par random use karega.
+        ctk.CTkLabel(row1, text="💡 Multiple " + ("mates" if type_label == "MB Mate" else "staff") +
+                     "? 1-1 karke Save dabao ya comma se likho — dono add honge. Automation random rotate karega.",
+                     text_color="gray50", font=ctk.CTkFont(size=11)
+                     ).grid(row=1, column=1, sticky="w", padx=(0, 5), pady=(2, 0))
 
         # ── Action buttons ──
         btn_row = ctk.CTkFrame(editor, fg_color="transparent")
@@ -1354,8 +1361,8 @@ class SettingsTab(ctk.CTkFrame):
 
     def _save_map_entry(self) -> None:
         panch = self._get_current_map_panchayat()
-        staff = self.map_staff_entry.get().strip()
-        if not panch or not staff:
+        new_names = [n.strip() for n in self.map_staff_entry.get().split(',') if n.strip()]
+        if not panch or not new_names:
             messagebox.showwarning(tr("errors.input_error"), tr("dialogs.fill_both_fields"),
                                    parent=self.winfo_toplevel())
             return
@@ -1364,12 +1371,22 @@ class SettingsTab(ctk.CTkFrame):
         # save mappings, so auto-fill works regardless of where it was set.
         key = self._normalize_map_key(panch)
         old_key = self._find_map_key(data, panch)
+        # MERGE instead of overwrite: 1-1 karke ya comma se — dono add hote
+        # hain, duplicate names (case-insensitive) hata ke order preserve hota hai.
+        existing = data.get(old_key or key, "")
+        existing_names = [n.strip() for n in existing.split(',') if n.strip()]
+        seen, merged = set(), []
+        for n in existing_names + new_names:
+            nk = n.lower()
+            if nk not in seen:
+                seen.add(nk)
+                merged.append(n)
         if old_key is not None and old_key != key:
             del data[old_key]
-        data[key] = staff
+        data[key] = ", ".join(merged)
         if self._save_map_data(data):
             self._refresh_map_tree()
-            self.map_status_label.configure(text=f"✅ Saved: {panch} → {staff}",
+            self.map_status_label.configure(text=f"✅ Saved: {panch} → {', '.join(merged)}",
                                             text_color=("#16A34A", "#4ADE80"))
         else:
             self.map_status_label.configure(text="❌ Save failed", text_color=("#DC2626", "#F87171"))

@@ -113,7 +113,7 @@ class MbEntryTab(BaseAutomationTab):
         self.unit_cost_entry = self._create_field(config_frame, "unit_cost", "Unit Cost (₹)", 2, 0)
         self.pit_count_entry = self._create_field(config_frame, "default_pit_count", "Pit Count", 2, 2)
         
-        self.mate_name_entry = self._create_option_field(config_frame, "mate_name", "Mate Names (comma-separated)", 3, 0)
+        self.mate_name_entry = self._create_field(config_frame, "mate_name", "Mate Names (comma-separated)", 3, 0)
         self._on_panchayat_change()
 
         # ── 💡 Usage Notes info card (pending-bills style) ──
@@ -244,19 +244,13 @@ class MbEntryTab(BaseAutomationTab):
 
     def _on_panchayat_change(self):
         if self.panchayat_after_id: self.after_cancel(self.panchayat_after_id); self.panchayat_after_id = None
-        mate_key = self._get_current_mate_key()
-        new_suggestions = self.app.history_manager.get_suggestions(mate_key)
         if self.mate_name_entry:
-            mate_vals = new_suggestions if new_suggestions else [""]
-            self.mate_name_entry.configure(values=mate_vals)
+            # Typeable entry (comma-separated names allowed) — mapping se
+            # saved list auto-fill hota hai, user manually bhi edit kar sakta hai.
             current_panchayat = self.config_vars["location_panchayat"].get().strip().lower()
             if current_panchayat in self.mapping_data:
                 saved_mate = self.mapping_data[current_panchayat]
                 if self.config_vars["mate_name"].get().strip() != saved_mate:
-                    # Make sure the mapped mate is visible in the dropdown options
-                    if saved_mate not in mate_vals:
-                        mate_vals = [v for v in mate_vals if v != "" and v != saved_mate] + [saved_mate]
-                        self.mate_name_entry.configure(values=mate_vals)
                     self.config_vars["mate_name"].set(saved_mate)
 
     def set_ui_state(self, running: bool):

@@ -278,6 +278,9 @@ Yes — a special **Lite build** is available for low-end PCs with a reduced fea
 - 🔄 **Windows Auto-Restart Fixed** — the app now restarts reliably on Windows after adding Panchayat/Villages, changing language, or Factory Reset (previously a cmd quoting issue showed 'Windows cannot find').
 - 🔍 **Onboarding Login Check** — the Add Panchayat step now checks login status in the background: logged-out users see a clear 'login karo' message, GP/PO logins get smart guidance, and expired sessions are detected automatically.
 - 🏘️ **GP/GB Login Scrape Improved** — panchayat + villages scraping is now more robust for panchayat-level users (saves the panchayat even without a village dropdown, more element IDs tried state-wise).
+- 🐛 **Add Activity — Duplicate Fix** — if a work code already has the activity, it's now skipped: the bot waits for the activity grid to settle and checks each row's ACT code precisely, so no more double entries.
+- 🔔 **Universal WhatsApp Daily Report** — the daily 6 AM report setting is now user-level: toggle it on any device and all your devices sync the same state within ~2 minutes. One device being off no longer cancels your morning report.
+- 👥 **Multiple Mates per Panchayat (Mate Map)** — add several mates for one panchayat in Settings → Mate Map: save them one by one or type comma-separated (both merge, no duplicates), and the list shows all names. eMB Entry now rotates a random mate per measurement, so the same name isn't used everywhere; MR Gen staff mapping gets the same comma + rotation treatment.
 
 ### 🆕 What's New in v3.2.2
 

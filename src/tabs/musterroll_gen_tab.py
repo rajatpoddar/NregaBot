@@ -2,7 +2,7 @@
 import tkinter
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
-import os, json, time, base64, sys, subprocess, requests, threading
+import os, json, time, base64, sys, subprocess, requests, threading, random
 from datetime import datetime
 # pypdf may be missing on installs that predate v3.0.0 (smart code-only
 # updates cannot add new Python deps). Fall back to PyPDF2, and if neither
@@ -596,11 +596,23 @@ class MusterrollGenTab(BaseAutomationTab):
             wait.until(EC.presence_of_element_located((By.XPATH, "//select[@id='ddlstaff']/option[position()>1]")))
             
             staff_dropdown = Select(driver.find_element(By.ID, "ddlstaff"))
+            # Comma-separated staff names (Settings > Staff Mapping) — pick a
+            # random one so the same name isn't used for every entry.
+            staff_candidates = [s.strip() for s in inputs['staff'].split(',') if s.strip()]
+            if not staff_candidates:
+                raise ValueError(f"Staff name '{inputs['staff']}' not found. Check spelling.")
+            if len(staff_candidates) > 1:
+                self.log_info(f"   → Multiple staff mapped — rotating: {staff_candidates}")
+            # Random order — har entry par alag staff, fallback me baaki sab try hote hain.
+            random.shuffle(staff_candidates)
             staff_found = False
-            for opt in staff_dropdown.options:
-                if inputs['staff'].lower() == opt.text.lower():
-                    staff_dropdown.select_by_visible_text(opt.text)
-                    staff_found = True
+            for candidate in staff_candidates:
+                for opt in staff_dropdown.options:
+                    if candidate.lower() == opt.text.lower():
+                        staff_dropdown.select_by_visible_text(opt.text)
+                        staff_found = True
+                        break
+                if staff_found:
                     break
             
             if not staff_found:
