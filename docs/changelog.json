@@ -1,4 +1,17 @@
 {
+  "3.2.5": [
+    "🌐 **Location Data Pool (Block Sharing):** Aapke Block ke Panchayat & Villages ab server par safely share hote hain — same block ke doosre users bina PO/GP portal login ke bhi ye data directly download kar sakte hain (Settings → 'Block Data Download'). Sirf panchayat/village names share hote hain (public MGNREGA data) — koi personal info nahi.",
+    "🏘️ **Add Panchayat — Login Not Required:** Onboarding ke 'Add Panchayat' step me ab PO/GP login ke bina bhi aapke block ke panchayat/villages server se auto-load hote hain — green tick ke saath seedha Next dabayein. Na PO na GP login wale users ab atakte nahi.",
+    "🌍 **Server-Driven State Registry:** Naye states (Bihar, UP, ...) ab bina app update ke admin panel se add kiye ja sakte hain — app har ~2 minute me nayi configuration automatically fetch karta hai.",
+    "📊 **Feature Usage Stats:** Har automation ka usage ab server par sync hota hai — admin panel me 'Feature Popularity' se pata chalta hai kaunsi features use ho rahi hain (kaunsa tab, kis state me).",
+    "🔄 **Factory Reset Simplified:** Factory reset ab single confirmation ke saath — ek click, koi confusing steps nahi.",
+    "🔄 **Windows Auto-Restart Fixed:** Panchayat/Village add karne, language badalne ya Factory Reset ke baad app ab Windows par bhi reliably restart hota hai — pehle cmd quoting issue se 'Windows cannot find' error aata tha. Lite app ka macOS update-restart bhi fix kiya (order bug).",
+    "👤 **Detect Login Level Button Removed:** User level (GP/PO) ab onboarding scrape ya kisi bhi automation ke time automatically detect hota hai aur server par save hota hai — Settings me alag button ki zaroorat nahi.",
+    "🏘️ **GP/GB Login Scrape Improved:** Panchayat-level (GP/GB) users ke liye panchayat + villages add karna ab zyada robust hai — village dropdown na mile to bhi panchayat save ho jata hai, aur zyada element IDs try hoti hain (state-wise).",
+    "🌐 **Onboarding Language Polish:** Language apply karne par button '✓ Applied' ho jata hai; dropdown badalne par dobara apply kar sakte hain. GP login par panchayat add hone par clear success note dikhta hai.",
+    "🔍 **Onboarding Login Check:** Add Panchayat step me ab background me login status check hota hai (spinner ke saath) — logged-out ho to 'Please login to continue' message dikhta hai, GP/PO login detect hone par clear guidance milti hai (GP: demand automation panchayat/villages khud add karega, bas Next dabao). Session expire hone par 'Session Expired!' page bhi smartly detect hota hai.",
+    "🖱️ **Focus Fix:** Background login check ke baad app ab browser se focus wapas apne app par le aati hai — user ko har baar manually app par click nahi karna padta."
+  ],
   "3.2.3": [
     "🌐 **Multi-State Portal Support:** All automation tabs now resolve the correct portal server per state — Rajasthan (vbgramgde3) and Jharkhand/Karnataka (de2) are supported. Every tab's URL is state-aware (Demand, Work Allocation, MR Fill, MSR, MB Entry, Wagelist, eKYC, and 20+ more).",
     "🇮🇳 **Rajasthan Demand Fixed:** Demand + Work Allocation now work perfectly in Rajasthan — they use the correct portal host (vbgramgde3) with the right RJ jobcard village-code logic. Demand via eKYC report is verified working in Rajasthan.",

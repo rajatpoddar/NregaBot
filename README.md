@@ -4,9 +4,9 @@
 
 # 🚜 NREGA Bot
 
-**v3.2.2** — Powerful NREGA Automation for Windows, macOS & Linux
+**v3.2.5** — Powerful NREGA Automation for Windows, macOS & Linux
 
-[![Version](https://img.shields.io/badge/version-3.2.2-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
+[![Version](https://img.shields.io/badge/version-3.2.5-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f?style=flat-square)](https://nregabot.com/#downloads)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)]()
 [![Updates](https://img.shields.io/badge/updates-Smart%20SHA--256%20Verified-4c1?style=flat-square)]()
@@ -108,6 +108,7 @@
 | 🗑️ **Delete Applicant** | Bulk-delete jobcard applicants via eKYC Report Excel or CSV |
 | ✂️ **Workcode Extractor** | Parse & extract clean lists of work codes |
 | 📎 **PDF Merger** | Standalone utility to merge multiple PDFs |
+| 🌐 **Block Data Download** | Load your block's Panchayat & Villages from the server (Location Pool) — works even without PO/GP portal login |
 
 ### 📊 Reporting
 
@@ -266,6 +267,17 @@ Yes — a special **Lite build** is available for low-end PCs with a reduced fea
 ---
 
 ## 📜 Changelog
+
+### 🆕 What's New in v3.2.5
+
+- 🌐 **Location Data Pool (Block Sharing)** — your Block's Panchayat & Villages now sync to the server and are shared with same-block users. Anyone in the block can download them directly (Settings → **Block Data Download**) — even without a PO/GP portal login. Only public panchayat/village names are shared, no personal data.
+- 🏘️ **Add Panchayat — Login Not Required** — the onboarding "Add Panchayat" step now auto-loads your block's Panchayat & Villages from the server with a green tick — just press Next, even if you have neither PO nor GP login.
+- 🌍 **Server-Driven State Registry** — new states (Bihar, UP, ...) can now be added from the admin panel without an app update; the app auto-fetches the new configuration every ~2 minutes.
+- 📊 **Feature Usage Stats** — every automation's usage now syncs to the server, so admins can see which features are used most (per tab, per state) in the Feature Popularity page.
+- 🔄 **Factory Reset Simplified** — factory reset now needs a single confirmation — one click, no confusing steps.
+- 🔄 **Windows Auto-Restart Fixed** — the app now restarts reliably on Windows after adding Panchayat/Villages, changing language, or Factory Reset (previously a cmd quoting issue showed 'Windows cannot find').
+- 🔍 **Onboarding Login Check** — the Add Panchayat step now checks login status in the background: logged-out users see a clear 'login karo' message, GP/PO logins get smart guidance, and expired sessions are detected automatically.
+- 🏘️ **GP/GB Login Scrape Improved** — panchayat + villages scraping is now more robust for panchayat-level users (saves the panchayat even without a village dropdown, more element IDs tried state-wise).
 
 ### 🆕 What's New in v3.2.2
 

@@ -336,16 +336,93 @@ class AddActivityTab(BaseAutomationTab):
             return "Success", msg
         return None, ""
 
+    def _grid_activity_codes(self, driver, grid_id):
+        """Grid me currently present ACT CODES — row-level, precise.
+
+        Har data row ke 'Act Code' cell ka text nikalta hai (span id
+        `..._lblActCode`). Substring match se better: activity NAAM ya partial
+        code (e.g. ACT105 vs ACT1050) kabhi galat match nahi karta.
+        """
+        try:
+            grid = driver.find_element(By.ID, grid_id)
+        except NoSuchElementException:
+            return []
+        codes = []
+        try:
+            # Precise: har row ka Act Code span (id suffix _lblActCode)
+            spans = grid.find_elements(By.XPATH, ".//span[contains(@id, 'lblActCode')]")
+            for s in spans:
+                txt = (s.get_attribute("innerText") or "").strip().upper()
+                if txt:
+                    codes.append(txt)
+        except Exception:
+            pass
+        if not codes:
+            # Fallback: Act Code column = 2nd cell (1-indexed) of har data row
+            try:
+                rows = grid.find_elements(By.XPATH, ".//tr")
+                for r in rows:
+                    tds = r.find_elements(By.XPATH, "./td")
+                    if len(tds) >= 2:
+                        txt = (tds[1].get_attribute("innerText") or "").strip().upper()
+                        if txt and txt != "ACT CODE":
+                            codes.append(txt)
+            except Exception:
+                pass
+        return codes
+
+    def _wait_for_grid_decided(self, driver, grid_id, timeout=15):
+        """Grid ka content 'decided' hone tak wait karo — async UpdatePanel
+        populate khatam hone ka.
+
+        Work select ke baad activity section UpdatePanel ke andar hota hai —
+        grid element page render hote hi DOM me aa jata hai, par uski content
+        (existing activities) async postback se aati hai. Agar check isse pehle
+        chale to grid khali/'No Activity Found' dikhata hai → bot duplicate add
+        kar deta hai. Ye tab tak wait karta hai jab tak content stable na ho:
+        ya to 'No Activity Found' (sach me khali), ya populated content jo 2
+        consecutive reads me same rahe.
+
+        Returns: grid ka innerText ('' = grid abhi bhi missing/khali).
+        """
+        last = None
+        stable_since = time.time()
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                grid = driver.find_element(By.ID, grid_id)
+                inner = (grid.get_attribute("innerText") or "").strip()
+            except Exception:
+                inner = ""
+            if not inner:
+                # Element hai par abhi khali — async populate chal raha hai
+                last = inner
+                stable_since = time.time()
+            elif "No Activity Found" in inner:
+                return inner  # decided: sach me khali
+            elif inner == last:
+                if time.time() - stable_since >= 1.5:
+                    return inner  # 2 reads same → populate khatam
+            else:
+                last = inner
+                stable_since = time.time()
+            time.sleep(0.8)
+        # Timeout — best effort
+        try:
+            return (driver.find_element(By.ID, grid_id).get_attribute("innerText") or "").strip()
+        except Exception:
+            return ""
+
     def _activity_in_grid(self, driver, grid_id, activity_code):
         """Ground truth: did the activity row actually land in the grid?"""
         try:
             grid = driver.find_element(By.ID, grid_id)
-            inner = grid.get_attribute("innerText")
+            inner = grid.get_attribute("innerText") or ""
             if "No Activity Found" in inner:
                 return False
-            return activity_code in inner
         except NoSuchElementException:
             return False
+        return any(c == activity_code for c in self._grid_activity_codes(driver, grid_id))
 
     def _process_single_work_key(self, driver, work_key, unit_price, quantity):
         """
@@ -452,17 +529,21 @@ class AddActivityTab(BaseAutomationTab):
                 self._log_result(work_key, "Failed", "Activity section not found after selecting work.")
                 return
 
-            # Skip if this activity is already present on the work
-            try:
-                activity_table = driver.find_element(By.ID, grid_id)
-                inner = activity_table.get_attribute("innerText")
-                if "No Activity Found" not in inner:
-                    if activity_code in inner:
-                        self.log_warning("Activity already exists. Skipping.")
-                        self._log_result(work_key, "Skipped", "An activity is already present.")
-                        return
+            # Skip if this activity is already present on the work.
+            # Grid ke content ke 'decided' hone ka wait (async UpdatePanel
+            # populate) — warna grid khali dekh kar duplicate add ho jata.
+            grid_inner = self._wait_for_grid_decided(driver, grid_id, timeout=15)
+            if grid_inner:
+                codes = self._grid_activity_codes(driver, grid_id)
+                if any(c == activity_code for c in codes):
+                    self.log_warning("Activity already exists. Skipping.")
+                    self._log_result(work_key, "Skipped", "An activity is already present.")
+                    return
+                if codes:
                     self.log_info("Work has other activities; adding the default one.")
-            except NoSuchElementException:
+                else:
+                    self.log_info("Grid present but no activity rows; proceeding to add.")
+            else:
                 self.log_info("No activity grid; proceeding to add.")
 
             # --- 4. Select the activity code (fires an async postback — settle) ---

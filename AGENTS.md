@@ -123,6 +123,29 @@ fetch karke built-in `STATE_*` dicts par override karta hai.
   apna state map (state_code/seed_digest). Iska registry integration baad ka
   kaam hai, abhi manual edit se add hota hai.
 
+## 4.11. 🌐 Location Data Pool (block-wise panchayat/village sharing) — 3.2.5+
+
+Users jinke paas portal par na PO na GP login milta hai wo panchayat/village
+select nahi kar paate. Iska fix: har user apne saved block data
+(`location_hierarchy.json` → panchayat→villages) ko server par sync karta hai;
+same-block ke doosre users wo data directly fetch karke dropdowns ready kar
+lete hain — bina scrape ke.
+
+| Data flow | File |
+|---|---|
+| Pool table | `nrega-server/migrations/027_location_data_pool.sql` (`location_data_pool` — state/district/block/panchayat + villages JSONB + source_keys sha256 hashes) |
+| Sync endpoint | `nrega-server/app/routes/api/location_data.py` — `POST /api/location-data/sync`, `GET /api/location-data/get` (rate limits: `rate_limit_config.py` → `location_data` / `location_data_get`) |
+| Repo | `nrega-server/app/repositories/location_data_repo.py` |
+| Client module | `src/location_sync.py` — `sync_current_location(app)` (silent, 10-min throttle), `fetch_block_from_server()`, `apply_server_data()` (sirf missing merge — local edits kabhi overwrite nahi) |
+| Sync triggers | `settings_tab._scrape_success` (force), `base_tab._save_panchayat_villages_to_settings` (GP auto-add), automation finish |
+| Download UI | `settings_tab._download_block_data` — "🌐 Block Data Download" button |
+| Onboarding | `ui_components.py` `_fetch_pool_background/_apply_pool_result` — server data mile → green tick → Next (bina login ke bhi) |
+
+**Rules:**
+- Names UPPER-normalized; DPDP: server par sirf `sha256(license_key)` jata hai (raw key kabhi nahi).
+- Merge sirf missing — user ke local edits kabhi overwrite nahi.
+- Sab kuch silent background — kabhi crash nahi; server down ho to next cycle retry.
+
 ## 4.6. 🚨 Error-Spike Alerts (per-automation fail-rate watchdog)
 
 `app/error_spike_monitor.py` activity_logs se har `ERROR_SPIKE_CHECK_INTERVAL`
@@ -245,7 +268,7 @@ keys par). Agar key generation format kabhi badle to `_TRIAL_PREFIX` update karo
 
 ## 6. Project state (current)
 
-- **Version:** 3.2.3 — `config/version.json` is source of truth; `src/config.py` me `APP_VERSION` (dono sync rakho).
+- **Version:** 3.2.5 — `config/version.json` is source of truth; `src/config.py` me `APP_VERSION` (dono sync rakho).
 - **Users:** ~200+ active (Jharkhand base) — Rajasthan, Karnataka, Bihar users aa rahe hain. **Production.** Scaling roadmap: `docs/SCALING_PLAN_200_to_10000.md` (living doc — naya kaam wahi se phase-wise pick karo).
 
 ## 6.5. 📡 Feature Telemetry (Feature Popularity) — 3.2.3+ / server deploy 023

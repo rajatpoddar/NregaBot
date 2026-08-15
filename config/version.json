@@ -1,20 +1,25 @@
 {
-  "latest_version": "3.2.4",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.4-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.4-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.4-Linux.tar.gz",
+  "latest_version": "3.2.5",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.5-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.5-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.5-Linux.tar.gz",
   "core_update": {
-    "version": "3.2.4",
-    "url": "https://nregabot.com/updates/core_v3.2.4.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.2.4.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.4.zip",
+    "version": "3.2.5",
+    "url": "https://nregabot.com/updates/core_v3.2.5.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.5.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.5.zip",
     "force_full_reinstall": false,
     "hash": "",
     "hash_windows": "",
     "hash_macos": ""
   },
   "changelog": {
-    "3.2.4": [
+    "3.2.5": [
+      "🌐 **Location Data Pool (Block Sharing):** Aapke Block ke Panchayat & Villages ab server par safely share hote hain — same block ke doosre users bina PO/GP portal login ke bhi ye data directly download kar sakte hain (Settings → 'Block Data Download'). Sirf panchayat/village names share hote hain (public MGNREGA data) — koi personal info nahi.",
+      "🏘️ **Add Panchayat — Login Not Required:** Onboarding ke 'Add Panchayat' step me ab PO/GP login ke bina bhi aapke block ke panchayat/villages server se auto-load hote hain — green tick ke saath seedha Next dabayein. Na PO na GP login wale users ab atakte nahi.",
+      "🌍 **Server-Driven State Registry:** Naye states (Bihar, UP, ...) ab bina app update ke admin panel se add kiye ja sakte hain — app har ~2 minute me nayi configuration automatically fetch karta hai.",
+      "📊 **Feature Usage Stats:** Har automation ka usage ab server par sync hota hai — admin panel me 'Feature Popularity' se pata chalta hai kaunsi features use ho rahi hain (kaunsa tab, kis state me).",
+      "🔄 **Factory Reset Simplified:** Factory reset ab single confirmation ke saath — ek click, koi confusing steps nahi.",
       "🔄 **Windows Auto-Restart Fixed:** Panchayat/Village add karne, language badalne ya Factory Reset ke baad app ab Windows par bhi reliably restart hota hai — pehle cmd quoting issue se 'Windows cannot find' error aata tha. Lite app ka macOS update-restart bhi fix kiya (order bug).",
       "👤 **Detect Login Level Button Removed:** User level (GP/PO) ab onboarding scrape ya kisi bhi automation ke time automatically detect hota hai aur server par save hota hai — Settings me alag button ki zaroorat nahi.",
       "🏘️ **GP/GB Login Scrape Improved:** Panchayat-level (GP/GB) users ke liye panchayat + villages add karna ab zyada robust hai — village dropdown na mile to bhi panchayat save ho jata hai, aur zyada element IDs try hoti hain (state-wise).",
