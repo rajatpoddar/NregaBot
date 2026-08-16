@@ -464,6 +464,17 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
         self.lift()
         self.focus_force()
 
+        # ── Startup crash-loop detection (see loader.py boot counter) ──
+        # The main window is now fully rendered — this is the signal the
+        # loader waits for to reset its boot counter. Any crash before this
+        # point counts as a startup failure and may trigger a rollback to the
+        # previous version on the next launch.
+        try:
+            from src.utils import mark_clean_boot
+            mark_clean_boot(config.APP_VERSION)
+        except Exception:
+            pass
+
         if getattr(self, 'state', None) and self.app_state.expiry_alert_message:
             def _show_delayed():
                 self.play_sound("error")
@@ -616,6 +627,15 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
                 version_file = os.path.join(local_dir, "core_version.json")
 
                 self.play_sound("update")
+
+                # Keep the currently-installed zip as core_prev.zip BEFORE it
+                # is overwritten, so a crash-looping update can be rolled back
+                # by the loader (see src/utils.py promote_current_zip_to_prev).
+                try:
+                    from src.utils import promote_current_zip_to_prev
+                    promote_current_zip_to_prev()
+                except Exception:
+                    pass
 
                 if os.path.exists(core_zip_path):
                     os.remove(core_zip_path)

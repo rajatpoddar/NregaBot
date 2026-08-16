@@ -783,6 +783,19 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
         self.lift()
         self._window_shown = True
 
+        # ── Startup crash-loop detection (see lite_loader.py boot counter) ──
+        # The main window is fully rendered — reset the boot counter so a
+        # crash before this point (import error, UI build) can trigger a
+        # rollback to the previous version on the next launch.
+        try:
+            from appdirs import user_data_dir
+            boot_path = os.path.join(
+                user_data_dir("NREGA Bot Lite", "PoddarSolutions"), "boot_state.json")
+            if os.path.exists(boot_path):
+                os.remove(boot_path)
+        except Exception:
+            pass
+
     def _on_licensed(self) -> None:
         """Set up UI for licensed user.
         Show Home directly — no About preload that could cause flicker.

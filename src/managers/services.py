@@ -155,6 +155,19 @@ class ServiceManager:
                 resp = requests.get(f"{config.MAIN_WEBSITE_URL}/version.json", timeout=15)
                 data = resp.json()
                 lat = data.get("latest_version")
+
+                # ── Known-bad version skip (rollback guard) ──
+                # If a version crash-looped and the loader rolled back, the
+                # About-tab check must not re-offer it — only a NEWER release
+                # clears the ban (see src/utils.py is_bad_version).
+                try:
+                    from src.utils import is_bad_version
+                    if lat and is_bad_version(lat):
+                        self.app.update_info = {"status": "updated", "version": lat}
+                        return  # finally below still refreshes the About tab
+                except Exception:
+                    pass
+
                 core_upd = data.get("core_update", {}) or {}
                 # Platform-specific hash (Windows/macOS core zips differ). Each
                 # platform verifies against ITS OWN hash only — never fall back to

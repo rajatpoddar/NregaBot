@@ -13,6 +13,19 @@ import traceback
 from appdirs import user_data_dir
 # Add import config for COLORS
 from src import config
+# Rollback helpers — boot-counter crash detection + core_prev.zip management.
+# Shared with main_app.py / services.py via src/utils.py.
+from src.utils import (
+    record_boot_attempt,
+    reset_boot_state,
+    should_rollback_boot,
+    promote_current_zip_to_prev,
+    is_bad_version,
+    remember_bad_version,
+    read_boot_state,
+    get_core_prev_zip_path,
+    get_core_prev_meta_path,
+)
 
 # --- Try importing CustomTkinter for Modern UI ---
 try:
@@ -175,6 +188,11 @@ class ModernSplashScreen(ctk.CTk):
         # old code ("stuck state" — version matches server so no re-download).
         self._pending_version = None
         self._pending_hash = ""
+
+        # Boot-counter flag: True in production (record a boot attempt before
+        # launching the app so a crash-looping update can be rolled back),
+        # False in dev mode (running from source — no update/rollback logic).
+        self._boot_state_enabled = False
 
         # ---------- BACKGROUND UPDATE THREAD ----------
         threading.Thread(target=self.run_update_process, daemon=True).start()
@@ -389,12 +407,34 @@ class ModernSplashScreen(ctk.CTk):
 
             # --- DEV MODE CHECK ---
             if os.path.exists(os.path.join(os.path.abspath("."), "main_app.py")):
+                self._boot_state_enabled = False
                 self.update_status("Dev Mode: Skipping Updates", 1.0)
                 time.sleep(0.5)
                 self.after(0, self.launch_main_app)
                 return
 
             # --- PROD MODE ---
+            self._boot_state_enabled = True
+
+            # ── CRASH-LOOP ROLLBACK ──────────────────────────────────────
+            # If the last few launches all crashed before the app could mark a
+            # clean boot (see mark_clean_boot in main_app.py), the current
+            # install is broken. Restore the previous version BEFORE any update
+            # logic runs, so a bad update is never re-downloaded / re-extracted
+            # (that would loop forever).
+            if should_rollback_boot():
+                state = read_boot_state()
+                crashed_version = str(state.get("version") or "")
+                self.update_status("Repeated startup failure — restoring previous version...", -1)
+                if self._rollback_to_previous(crashed_version):
+                    log_error(f"Rollback: boot-loop detected on v{crashed_version}, restored previous version")
+                else:
+                    # No previous version to restore (or it failed) — don't
+                    # count forever; fall through to the normal flow.
+                    log_error("Rollback: boot-loop detected but no previous version could be restored")
+                    reset_boot_state(crashed_version)
+                    time.sleep(1)
+
             if os.path.exists(CORE_ZIP_PATH) and not os.path.exists(EXTRACTED_DIR):
                 self.extract_zip()
 
@@ -409,7 +449,14 @@ class ModernSplashScreen(ctk.CTk):
             update_found = self.check_for_updates()
 
             if update_found:
-                self.extract_zip()
+                if not self.extract_zip():
+                    # Extraction of the new version failed (corrupt/partial
+                    # download, disk issue) — try to restore the previous
+                    # version right away instead of launching a possibly-broken
+                    # app_live. The boot-counter path would catch this on the
+                    # next launch anyway; doing it now avoids the crash loop.
+                    log_error("Rollback: extraction of new update failed — restoring previous version")
+                    self._rollback_to_previous("")
 
             self.update_status("Launching application...", 1.0)
             time.sleep(0.5)
@@ -420,6 +467,68 @@ class ModernSplashScreen(ctk.CTk):
             self.update_status(f"Error: {str(e)}", 0)
             time.sleep(2)
             self.after(0, self.launch_main_app)
+
+    def _rollback_to_previous(self, crashed_version: str = "") -> bool:
+        """Restore core_prev.zip (the version installed before the crash-looping
+        update) as the live app and record the crashed version as 'bad' so the
+        update check skips it until a newer release ships.
+
+        Returns True on success. Never raises.
+        """
+        try:
+            prev_zip = get_core_prev_zip_path()
+            if not os.path.exists(prev_zip):
+                log_error("Rollback: no core_prev.zip available — nothing to restore")
+                return False
+            if not zipfile.is_zipfile(prev_zip):
+                log_error("Rollback: core_prev.zip is corrupt — cannot restore")
+                return False
+
+            prev_meta = {}
+            try:
+                with open(get_core_prev_meta_path(), 'r', encoding='utf-8') as f:
+                    prev_meta = json.load(f)
+            except Exception:
+                prev_meta = {}
+            prev_ver = str(prev_meta.get("version") or "")
+            prev_hash = str(prev_meta.get("hash") or "")
+            # Only a real-looking version string may be written to
+            # core_version.json; otherwise it is derived from the extracted
+            # code after extraction (same approach as _heal_install).
+            prev_ver_valid = bool(re.match(r'^\d+\.\d+\.\d+', prev_ver))
+
+            # Swap the current zip back so the app_live gets the old code.
+            try:
+                shutil.copy2(prev_zip, CORE_ZIP_PATH)
+            except Exception as e:
+                log_error(f"Rollback: could not restore core.zip: {e}")
+                return False
+
+            self.update_status("Restoring previous version...", -1)
+            self._pending_version = prev_ver if prev_ver_valid else None
+            self._pending_hash = prev_hash
+            if not self.extract_zip():
+                log_error("Rollback: extraction of previous version failed")
+                return False
+
+            if not prev_ver_valid:
+                live = self._get_app_live_version()
+                if live:
+                    self._write_version_file(live, prev_hash)
+
+            restored_ver = prev_ver if prev_ver_valid else (self._get_app_live_version() or "")
+
+            # Never re-offer the version that just crash-looped.
+            if crashed_version:
+                remember_bad_version(crashed_version)
+                log_error(f"Rollback: marked v{crashed_version} as bad — updates to it will be skipped")
+
+            reset_boot_state(restored_ver)
+            log_error(f"Rollback: restored previous version {restored_ver or '(unknown)'}")
+            return True
+        except Exception as e:
+            log_error(f"Rollback failed: {e}")
+            return False
 
     def check_for_updates(self):
         try:
@@ -477,12 +586,30 @@ class ModernSplashScreen(ctk.CTk):
             if not server_ver or not download_url:
                 return False
 
+            # ── Known-bad version skip (rollback guard) ──
+            # A version that crash-looped and was rolled back must not be
+            # re-offered; only a strictly NEWER release clears it (see
+            # remember_bad_version / is_bad_version in src/utils.py).
+            if is_bad_version(server_ver):
+                log_error(f"Rollback: skipping update to v{server_ver} (known bad — waiting for a newer release)")
+                self.update_status("App is up to date.", 1.0)
+                time.sleep(0.5)
+                return False
+
             # Update if the version changed OR the core zip content changed
             # (same-version hotfix: same version number, new hash → re-download).
             # Version is compared against the LIVE code (see effective_ver).
             needs_update = (server_ver != effective_ver) or (server_hash and server_hash != current_hash)
 
             if needs_update:
+                # Keep the currently-installed zip as core_prev.zip BEFORE the
+                # download overwrites it, so a crash-looping update can be
+                # rolled back (see _rollback_to_previous).
+                try:
+                    promote_current_zip_to_prev()
+                except Exception:
+                    pass
+
                 self.update_status(f"New update found: v{server_ver}", 0)
                 time.sleep(0.5)
                 self.update_status("Downloading update...", 0)
@@ -535,6 +662,17 @@ class ModernSplashScreen(ctk.CTk):
         Uses withdraw() instead of destroy() to keep the Tk interpreter alive
         so main_app.py can create its own CTk window afterwards.
         """
+        # ── Boot-counter: record this launch attempt BEFORE the app starts. ──
+        # main_app.py deletes boot_state.json only after a successful startup
+        # (mark_clean_boot). If the app crashes first, the counter survives and
+        # the NEXT launch may roll back to the previous version instead of
+        # crash-looping forever. Production only — dev runs skip this.
+        if self._boot_state_enabled:
+            try:
+                record_boot_attempt(self._get_app_live_version())
+            except Exception:
+                pass
+
         self.is_destroyed = True
         if self._anim_after_id:
             try:
@@ -593,6 +731,18 @@ if __name__ == "__main__":
         for _m in [m for m in list(sys.modules)
                    if m == 'src' or m.startswith('src.')]:
             del sys.modules[_m]
+
+        # ── Boot-counter (headless, production only) ──
+        # Same as the splash path: record the launch attempt before starting
+        # the app so a crash-looping update can be rolled back on the next
+        # launch. Skipped in dev mode (running from the source tree).
+        try:
+            from src import config as _cfg
+            from src.utils import record_boot_attempt
+            if not os.path.exists(os.path.join(os.path.abspath("."), "main_app.py")):
+                record_boot_attempt(getattr(_cfg, "APP_VERSION", ""))
+        except Exception:
+            pass
 
         try:
             import main_app

@@ -5,8 +5,11 @@ import json
 import logging
 import re
 import shutil
+import time
+import zipfile
+import hashlib
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from appdirs import user_data_dir
 
 # --- C8: Centralized Logging Setup ---
@@ -699,3 +702,225 @@ def save_config(key: str, value: Any) -> None:
             json.dump(config_data, f, indent=4)
     except IOError as e:
         logger.error("Error saving config file: %s", e)
+
+
+# ============================================================================
+# UPDATE ROLLBACK — boot-counter crash detection (shared)
+# ============================================================================
+# Shared between loader.py / lite_loader.py (record boot attempts, decide when
+# to roll back, restore core_prev.zip), services.py (skip known-bad versions in
+# the in-app update check) and main_app.py / lite_app.py (mark clean boot once
+# the main window is fully rendered).
+#
+# How it works:
+#   1. Right before launching the app, the loader records a boot attempt in
+#      boot_state.json: {attempts+1, version launched, timestamp}.
+#   2. The app deletes boot_state.json ONLY after its main window is fully
+#      rendered (mark_clean_boot). A crash during startup leaves the file.
+#   3. If MAX_BOOT_ATTEMPTS consecutive launches crash within the boot window,
+#      the loader restores core_prev.zip (the version installed before the
+#      update) and records the crashed version in bad_versions.json so the
+#      update check skips it until a NEWER version ships.
+#
+# All functions are defensive (never raise) — the update path must never crash.
+
+MAX_BOOT_ATTEMPTS = 3
+BOOT_CRASH_WINDOW_SECONDS = 600  # 10 min — a stale crash from days ago doesn't count
+
+
+def get_core_zip_path() -> str:
+    """Path of the currently-installed core.zip (same dir as core_version.json)."""
+    return get_data_path("core.zip")
+
+
+def get_core_prev_zip_path() -> str:
+    """Path of the previous core.zip kept for rollback."""
+    return get_data_path("core_prev.zip")
+
+
+def get_core_prev_meta_path() -> str:
+    """{version, hash} of core_prev.zip, written when it was kept."""
+    return get_data_path("core_prev_meta.json")
+
+
+def get_core_version_file_path() -> str:
+    """Path of core_version.json (recorded version + hash of the app_live code)."""
+    return get_data_path("core_version.json")
+
+
+def get_boot_state_path() -> str:
+    return get_data_path("boot_state.json")
+
+
+def get_bad_versions_path() -> str:
+    return get_data_path("bad_versions.json")
+
+
+def _load_json_file(path: str, default: Any = None) -> Any:
+    """Read JSON from disk; returns `default` on any failure. Never raises."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+
+def _save_json_file(path: str, data: Any) -> None:
+    """Atomically-ish write JSON to disk; never raises."""
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+
+def _sha256_file(path: str) -> str:
+    """Streaming SHA-256 of a file — safe for large zips. '' on failure."""
+    try:
+        h = hashlib.sha256()
+        with open(path, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return ""
+
+
+def read_boot_state() -> Dict[str, Any]:
+    """boot_state.json contents ({attempts, version, ts}) or {}."""
+    state = _load_json_file(get_boot_state_path(), {})
+    return state if isinstance(state, dict) else {}
+
+
+def record_boot_attempt(version: str = "") -> Dict[str, Any]:
+    """Loader calls this right before launching the app.
+
+    Increments the consecutive-crash counter (reset if the previous crash is
+    older than BOOT_CRASH_WINDOW_SECONDS) and records the launched version.
+    Returns the new state.
+    """
+    state = read_boot_state()
+    attempts = 0
+    ts = state.get("ts")
+    if ts:
+        try:
+            if time.time() - float(ts) <= BOOT_CRASH_WINDOW_SECONDS:
+                attempts = int(state.get("attempts") or 0)
+        except Exception:
+            attempts = 0
+    new_state = {"attempts": attempts + 1, "version": version or "", "ts": time.time()}
+    _save_json_file(get_boot_state_path(), new_state)
+    return new_state
+
+
+def reset_boot_state(version: str = "") -> None:
+    """Zero the boot counter (used after a rollback / when rollback is impossible)."""
+    _save_json_file(get_boot_state_path(), {"attempts": 0, "version": version or "", "ts": time.time()})
+
+
+def should_rollback_boot() -> bool:
+    """True when the last MAX_BOOT_ATTEMPTS launches all crashed before the app
+    could mark a clean boot — i.e. the current install is crash-looping."""
+    state = read_boot_state()
+    if int(state.get("attempts") or 0) < MAX_BOOT_ATTEMPTS:
+        return False
+    ts = state.get("ts")
+    if ts:
+        try:
+            if time.time() - float(ts) > BOOT_CRASH_WINDOW_SECONDS:
+                return False  # stale — not an active crash loop
+        except Exception:
+            return False
+    return True
+
+
+def mark_clean_boot(app_version: str = "") -> None:
+    """App calls this once its main window is fully rendered — the signal that
+    startup succeeded. Resets the boot counter and, if a version newer than the
+    last known-bad one booted cleanly, clears the bad-version floor. Safe to
+    call in dev mode (no boot state exists there); never raises."""
+    try:
+        path = get_boot_state_path()
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
+    try:
+        bad_path = get_bad_versions_path()
+        data = _load_json_file(bad_path, {})
+        max_bad = data.get("max_bad") or ""
+        if max_bad and app_version and parse_version(app_version) > parse_version(max_bad):
+            if os.path.exists(bad_path):
+                os.remove(bad_path)
+    except Exception:
+        pass
+
+
+def is_bad_version(version: str) -> bool:
+    """True if `version` (or anything older) crash-looped and was rolled back.
+    The update check must not offer it again until a newer release ships."""
+    if not version:
+        return False
+    data = _load_json_file(get_bad_versions_path(), {})
+    max_bad = data.get("max_bad") or ""
+    if not max_bad:
+        return False
+    try:
+        return parse_version(version) <= parse_version(max_bad)
+    except Exception:
+        return False
+
+
+def remember_bad_version(version: str) -> None:
+    """Record the crashed version as the new 'known bad' floor (monotonic —
+    only ever raised, so a newer good release can boot past it)."""
+    if not version:
+        return
+    try:
+        path = get_bad_versions_path()
+        data = _load_json_file(path, {})
+        if not isinstance(data, dict):
+            data = {}
+        cur = data.get("max_bad") or ""
+        if not cur or parse_version(version) > parse_version(cur):
+            data["max_bad"] = version
+            _save_json_file(path, data)
+    except Exception:
+        pass
+
+
+def promote_current_zip_to_prev() -> bool:
+    """Keep the currently-installed core.zip as core_prev.zip BEFORE a new
+    download overwrites it, so a crash-looping update can be rolled back.
+    Records the installed version+hash in core_prev_meta.json so the rollback
+    restores core_version.json correctly. Only promotes when the current zip
+    looks like the one actually installed (or hashes can't be verified).
+    Returns True if a prev copy was made."""
+    try:
+        zip_path = get_core_zip_path()
+        if not os.path.exists(zip_path):
+            return False
+        if not zipfile.is_zipfile(zip_path):
+            return False
+        recorded_ver = ""
+        recorded_hash = ""
+        vf = get_core_version_file_path()
+        if os.path.exists(vf):
+            try:
+                vd = _load_json_file(vf, {})
+                if isinstance(vd, dict):
+                    recorded_ver = vd.get("version", "") or ""
+                    recorded_hash = vd.get("hash", "") or ""
+            except Exception:
+                pass
+        # Only keep the zip as 'previous' if it matches what we actually
+        # installed (a partial download must never become the rollback target).
+        if recorded_hash:
+            actual = _sha256_file(zip_path)
+            if actual and actual != recorded_hash:
+                return False
+        shutil.copy2(zip_path, get_core_prev_zip_path())
+        _save_json_file(get_core_prev_meta_path(), {"version": recorded_ver, "hash": recorded_hash})
+        return True
+    except Exception:
+        return False

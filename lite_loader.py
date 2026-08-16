@@ -59,6 +59,103 @@ def sha256_file(path: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# UPDATE ROLLBACK — boot-counter crash detection (mirrors loader.py)
+# ═══════════════════════════════════════════════════════════════════════
+# State files live in install_dir (user_data_dir("NREGA Bot Lite", ...)).
+# The loader records a boot attempt before launching lite_app.py; lite_app
+# deletes boot_state.json once its window is rendered. If MAX_BOOT_ATTEMPTS
+# launches crash in a row, the previous update zip is re-applied instead of
+# looping on a broken version.
+
+MAX_BOOT_ATTEMPTS = 3
+BOOT_CRASH_WINDOW_SECONDS = 600  # 10 min — a stale crash from days ago doesn't count
+
+
+def _lite_read_json(path, default=None):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+
+def _lite_write_json(path, data):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+
+def _lite_boot_state_path(install_dir):
+    return os.path.join(install_dir, "boot_state.json")
+
+
+def _lite_bad_versions_path(install_dir):
+    return os.path.join(install_dir, "bad_versions.json")
+
+
+def _lite_should_rollback(install_dir):
+    state = _lite_read_json(_lite_boot_state_path(install_dir), {}) or {}
+    if int(state.get("attempts") or 0) < MAX_BOOT_ATTEMPTS:
+        return False
+    ts = state.get("ts")
+    if ts:
+        try:
+            if time.time() - float(ts) > BOOT_CRASH_WINDOW_SECONDS:
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def _lite_record_boot_attempt(install_dir, version=""):
+    state = _lite_read_json(_lite_boot_state_path(install_dir), {}) or {}
+    attempts = 0
+    ts = state.get("ts")
+    if ts:
+        try:
+            if time.time() - float(ts) <= BOOT_CRASH_WINDOW_SECONDS:
+                attempts = int(state.get("attempts") or 0)
+        except Exception:
+            attempts = 0
+    _lite_write_json(_lite_boot_state_path(install_dir),
+                     {"attempts": attempts + 1, "version": version or "", "ts": time.time()})
+
+
+def _lite_reset_boot_state(install_dir, version=""):
+    _lite_write_json(_lite_boot_state_path(install_dir),
+                     {"attempts": 0, "version": version or "", "ts": time.time()})
+
+
+def _lite_is_bad_version(install_dir, version):
+    if not version:
+        return False
+    data = _lite_read_json(_lite_bad_versions_path(install_dir), {}) or {}
+    max_bad = data.get("max_bad") or ""
+    if not max_bad:
+        return False
+    try:
+        return parse_version(version) <= parse_version(max_bad)
+    except Exception:
+        return False
+
+
+def _lite_remember_bad_version(install_dir, version):
+    if not version:
+        return
+    try:
+        path = _lite_bad_versions_path(install_dir)
+        data = _lite_read_json(path, {}) or {}
+        cur = data.get("max_bad") or ""
+        if not cur or parse_version(version) > parse_version(cur):
+            data["max_bad"] = version
+            _lite_write_json(path, data)
+    except Exception:
+        pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # COMPACT SPLASH
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -70,6 +167,11 @@ class LiteLoaderSplash(ctk.CTk):
 
         self.is_destroyed = False
         self._dot_index = 0
+        # Boot-counter flag: True in production (record a boot attempt before
+        # launching lite_app.py so a crash-looping update can be rolled back),
+        # False in dev mode. install_dir is where the state files live.
+        self._track_boot = False
+        self._install_dir = ""
 
         ctk.set_appearance_mode("System")
 
@@ -212,8 +314,26 @@ class LiteLoaderSplash(ctk.CTk):
                 self._launch_lite_app()
                 return
 
+            # Prod mode — record boot attempts so a crash-looping update can
+            # be rolled back (see the rollback helpers at the top of this file).
+            self._track_boot = True
+            self._install_dir = install_dir
+
             # Ensure install_dir exists for version.json
             os.makedirs(install_dir, exist_ok=True)
+
+            # ── Crash-loop rollback ──
+            # Consecutive failed boots → re-apply the previous update zip
+            # BEFORE the update check, so a broken version is never re-applied.
+            if _lite_should_rollback(install_dir):
+                state = _lite_read_json(_lite_boot_state_path(install_dir), {}) or {}
+                crashed_version = str(state.get("version") or "")
+                self._set_status("Repeated startup failure — restoring previous version...")
+                if self._lite_restore_previous(install_dir, content_dir, crashed_version):
+                    print(f"Rollback: restored previous Lite version (was v{crashed_version})")
+                else:
+                    print("Rollback: no previous version available for Lite")
+                    _lite_reset_boot_state(install_dir, crashed_version)
 
             # ── Check for updates ──
             self._set_status("Checking for updates...")
@@ -233,6 +353,16 @@ class LiteLoaderSplash(ctk.CTk):
 
             lat = data.get("latest_version", "")
             if not lat:
+                self._set_status("Ready")
+                time.sleep(0.3)
+                self._launch_lite_app()
+                return
+
+            # ── Known-bad version skip (rollback guard) ──
+            # A version that crash-looped and was rolled back must not be
+            # re-offered; only a strictly NEWER release clears it.
+            if _lite_is_bad_version(install_dir, lat):
+                print(f"Rollback: skipping update to v{lat} (known bad)")
                 self._set_status("Ready")
                 time.sleep(0.3)
                 self._launch_lite_app()
@@ -278,9 +408,22 @@ class LiteLoaderSplash(ctk.CTk):
                 self._launch_lite_app()
                 return
 
+            # ── Keep the currently-installed update zip as the rollback target ──
+            # _lite_update.zip holds the zip of the version that is CURRENTLY
+            # installed (kept after every successful apply). Copy it aside with
+            # its version/hash BEFORE the download below overwrites it, so a
+            # crash-looping update can be rolled back.
+            zip_path = os.path.join(install_dir, "_lite_update.zip")
+            try:
+                if os.path.exists(zip_path) and zipfile.is_zipfile(zip_path):
+                    shutil.copy2(zip_path, os.path.join(install_dir, "_lite_prev_update.zip"))
+                    _lite_write_json(os.path.join(install_dir, "_lite_prev_meta.json"),
+                                     {"version": current_ver, "hash": current_hash})
+            except Exception as e:
+                print(f"Rollback: could not keep previous Lite zip: {e}")
+
             # ── Download update ZIP to install_dir (persistent) ──
             self._set_status(f"Downloading v{lat}...")
-            zip_path = os.path.join(install_dir, "_lite_update.zip")
 
             try:
                 r = requests.get(dl_url, stream=True, timeout=60)
@@ -309,52 +452,93 @@ class LiteLoaderSplash(ctk.CTk):
                     self._launch_lite_app()
                     return
 
-            # ── Extract into content_dir (sys._MEIPASS = _internal/) ──
-            # The ZIP contains files at project root (src/, config/, assets/,
-            # lite_app.py, etc.). Extracting into content_dir (= sys._MEIPASS
-            # = _internal/) puts them at the correct paths for --onedir builds.
-            self._set_status("Extracting update...")
-            tmp_dir = os.path.join(install_dir, "_lite_update_tmp")
-            try:
-                if os.path.exists(tmp_dir):
-                    shutil.rmtree(tmp_dir)
-                os.makedirs(tmp_dir, exist_ok=True)
-
-                with zipfile.ZipFile(zip_path, "r") as z:
-                    z.extractall(tmp_dir)
-
-                # Merge extracted files into content_dir (= _internal/)
-                for item in os.listdir(tmp_dir):
-                    src = os.path.join(tmp_dir, item)
-                    dst = os.path.join(content_dir, item)
-                    if os.path.exists(dst):
-                        if os.path.isdir(dst):
-                            shutil.rmtree(dst)
-                        else:
-                            os.remove(dst)
-                    shutil.move(src, dst)
-
-                # Save updated version + zip hash in persistent location
-                with open(ver_path, "w") as f:
-                    json.dump({"version": lat, "hash": server_hash}, f)
-
-                self._set_status("Update applied! ✓")
-                time.sleep(0.5)
-
-            except Exception as e:
-                print(f"Extraction failed: {e}")
-                self._set_status("Extraction failed")
-                time.sleep(1)
-
-            finally:
-                self._cleanup_file(zip_path)
-                shutil.rmtree(tmp_dir, ignore_errors=True)
+            # Apply (keeps zip_path on success so it becomes the 'installed
+            # version' zip used for the next rollback).
+            self._apply_update_zip(install_dir, content_dir, zip_path, lat, server_hash)
 
         except Exception as e:
             print(f"Loader error: {e}")
             traceback.print_exc()
 
         self._launch_lite_app()
+
+    # ────────────────────────────────────────────────────────────────
+    # APPLY / ROLLBACK
+    # ────────────────────────────────────────────────────────────────
+
+    def _apply_update_zip(self, install_dir, content_dir, zip_path, version, hash_val):
+        """Extract an update zip into content_dir and record its version.
+
+        Keeps zip_path on success — it becomes the 'installed version' zip used
+        as the rollback target for the NEXT update. Deletes it on failure so a
+        corrupt zip is never treated as installed. Returns True on success.
+        """
+        tmp_dir = os.path.join(install_dir, "_lite_update_tmp")
+        ver_path = os.path.join(install_dir, VERSION_FILE)
+        try:
+            self._set_status("Extracting update...")
+            if os.path.exists(tmp_dir):
+                shutil.rmtree(tmp_dir)
+            os.makedirs(tmp_dir, exist_ok=True)
+
+            with zipfile.ZipFile(zip_path, "r") as z:
+                z.extractall(tmp_dir)
+
+            # Merge extracted files into content_dir (= _internal/)
+            for item in os.listdir(tmp_dir):
+                src = os.path.join(tmp_dir, item)
+                dst = os.path.join(content_dir, item)
+                if os.path.exists(dst):
+                    if os.path.isdir(dst):
+                        shutil.rmtree(dst)
+                    else:
+                        os.remove(dst)
+                shutil.move(src, dst)
+
+            # Save updated version + zip hash in persistent location
+            if version:
+                with open(ver_path, "w") as f:
+                    json.dump({"version": version, "hash": hash_val}, f)
+
+            self._set_status("Update applied! ✓")
+            time.sleep(0.5)
+            return True
+        except Exception as e:
+            print(f"Extraction failed: {e}")
+            self._set_status("Extraction failed")
+            time.sleep(1)
+            self._cleanup_file(zip_path)  # never treat a corrupt zip as installed
+            return False
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    def _lite_restore_previous(self, install_dir, content_dir, crashed_version=""):
+        """Re-apply the previously-installed update zip (saved at promote time)
+        and restore version.json from its meta. Returns True on success.
+        """
+        prev_zip = os.path.join(install_dir, "_lite_prev_update.zip")
+        prev_meta = _lite_read_json(os.path.join(install_dir, "_lite_prev_meta.json"), {}) or {}
+        if not os.path.exists(prev_zip) or not zipfile.is_zipfile(prev_zip):
+            return False
+        prev_ver = str(prev_meta.get("version") or "")
+        prev_hash = str(prev_meta.get("hash") or "")
+
+        # Stage the previous zip as the current update zip and apply it.
+        dst = os.path.join(install_dir, "_lite_update.zip")
+        try:
+            shutil.copy2(prev_zip, dst)
+        except Exception as e:
+            print(f"Rollback: could not stage previous zip: {e}")
+            return False
+
+        if not self._apply_update_zip(install_dir, content_dir, dst, prev_ver, prev_hash):
+            return False
+
+        if crashed_version:
+            _lite_remember_bad_version(install_dir, crashed_version)
+            print(f"Rollback: marked v{crashed_version} as bad — updates to it will be skipped")
+        _lite_reset_boot_state(install_dir, prev_ver)
+        return True
 
     # ────────────────────────────────────────────────────────────────
     # LAUNCH
@@ -365,6 +549,22 @@ class LiteLoaderSplash(ctk.CTk):
         Uses withdraw() instead of destroy() to keep the Tk interpreter alive
         so lite_app.py can create its own CTk window afterwards.
         """
+        # ── Boot-counter: record this launch attempt BEFORE the app starts. ──
+        # lite_app.py deletes boot_state.json once its window is rendered; a
+        # crash before that leaves the counter to accumulate → the next launch
+        # may roll back to the previous version. Production only.
+        if getattr(self, "_track_boot", False):
+            try:
+                ver = "0.0.0"
+                try:
+                    with open(os.path.join(self._install_dir, VERSION_FILE), encoding="utf-8") as f:
+                        ver = (json.load(f).get("version") or "0.0.0")
+                except Exception:
+                    pass
+                _lite_record_boot_attempt(self._install_dir, ver)
+            except Exception:
+                pass
+
         self.is_destroyed = True
         self._cancel_after_callbacks()
         self.withdraw()
