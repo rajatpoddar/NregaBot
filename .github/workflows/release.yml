@@ -59,6 +59,28 @@ jobs:
       - name: Verify rebuild left no drift in git
         run: git diff --exit-code src/locales/
 
+  # --- 1c. Run unit tests (fail fast on logic regressions) ---
+  run-tests:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        # Only the deps needed to import loader.py / lite_loader.py and run
+        # the rollback tests (full requirements.txt is installed by the build
+        # jobs; keeping this job lean keeps it fast).
+        run: pip install pytest requests appdirs customtkinter
+
+      - name: Run pytest
+        run: python -m pytest -v
+
   # --- 2. Build for Windows (Loader EXE + Lite Portable ZIP + Secure Win Core Zip) ---
   build-windows:
       name: Build Windows (Main + Lite + Core)

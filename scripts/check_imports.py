@@ -19,7 +19,7 @@ syntax_errors = []
 all_files = []
 for root_dir, dirs, files in os.walk('.'):
     # Skip excluded dirs
-    dirs[:] = [d for d in dirs if d not in ('__pycache__', 'venv', 'backups', '.git', '.github', 'tabs_backup_c7', 'nrega-server')]
+    dirs[:] = [d for d in dirs if d not in ('__pycache__', 'venv', 'backups', '.git', '.github', 'tabs_backup_c7', 'nrega-server', 'tests')]
     for f in files:
         if f.endswith('.py'):
             full_path = os.path.join(root_dir, f)
