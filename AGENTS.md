@@ -248,6 +248,72 @@ Cohort table (trial month × trials/activated/converted), drop-off analysis
 CSV export. Funnel stages strictly nested hain (converted counted sirf activated
 keys par). Agar key generation format kabhi badle to `_TRIAL_PREFIX` update karo.
 
+## 4.12. 🔔 Account Notifications (storage full + data-deletion warning) — 16 Aug 2026
+
+Customer interaction upgrade: user ke account par kuch hota hai (storage full,
+license expired + data baaki) to wo khud WhatsApp + Email se informed hota hai.
+
+| Piece | File |
+|---|---|
+| Events + dedup tables + templates | `nrega-server/migrations/028_account_notifications.sql` (`storage_warnings`, `data_deletion_warnings`) |
+| Scheduler checks | `nrega-server/app/whatsapp_automator.py` — `check_storage_full()` + `check_data_deletion_warning()` (registered in `run_all_automation_checks`) |
+| Placeholders | `nrega-server/app/whatsapp_placeholders.py` — `license_key`, `storage_used`, `storage_limit`, `storage_percent` |
+| Dual-channel (WhatsApp + Email) | `nrega-server/app/notify_service.py` — `EVENT_DEFAULT_CHANNELS` |
+| Admin toggles/templates | `nrega-server/app/routes/admin/automation_config.py` + `admin_whatsapp_automation.html` |
+
+**Rules:**
+- `storage_full`: threshold `interval_config.threshold_pct` (default 90) — 100%
+alag stage. **Re-notify:** `interval_config.re_notify_days` (default 30) — full
+rehne par har N din me EK baar dobara warn (roj roj nahi — spam guard);
+send ke baad `sent_at` refresh hota hai. **Upgrade/refill reset:** storage
+upgrade (storage.py `verify_storage_payment`, payment_service plan upgrade,
+admin files `update_storage`) par `storage_warnings` dedup rows DELETE hote
+hain — usage gir ke dobara full hone par NAYA warning milta hai. Storage
+usage = `user_files` SUM (validate_key jaisa); legacy `max_storage NULL` →
+500 MB fallback.
+- `data_deletion_warning`: expired + cloud data → warning. `grace_days` (90)
+after expiry = deletion deadline; `warn_days` (30) pehle warn. **Actual data
+deletion yahan NAHI hota — sirf warning** (template admin edit karta hai).
+- Email body `notify_service._send_email_channel` ko `email_subject`/`email_body`
+se milta hai (Jinja `{{ user_name }}` etc.) — checks dono bhejte hain.
+- License key ab `build_context` me hamesha hota hai (`{license_key}`) — har
+template me use kar sakte hain (migration ne existing templates me bhi append
+kiya). Web login (frontend/auth.py) ab expired user ko block + buy-page redirect
+karta hai (signed token — raw key URL me nahi).
+
+## 4.13. 💲 Pricing (admin-editable plan + storage prices) — 16 Aug 2026
+
+Application ka price change ab code change ke bina hota hai: Admin → **Pricing**
+(`/admin/pricing`). Prices `app_settings` JSON me (DB override), module constants
+sirf defaults hain.
+
+| Piece | File |
+|---|---|
+| Read/write helpers | `nrega-server/app/services/license_service.py` — `get_price_table(cur, table)`, `save_price_table(cur, table, prices)` |
+| Admin page | `nrega-server/app/routes/admin/pricing.py` + `app/templates/admin/admin_pricing.html` |
+| Buy page | `nrega-server/app/routes/frontend/pages.py::buy_page` (price_tables) |
+| Order amount | `license_service.calculate_order_amount()` (DB price) |
+| Revenue / MRR | `revenue.py`, `state_analytics.py` (get_price_table) |
+| Storage order API | `nrega-server/app/routes/api/storage.py` (server-side price — client amount trust NAHI) |
+
+**Rules:**
+- Tables: `first_time`, `renewal`, `storage`. app_settings keys: `first_time_prices`,
+  `renewal_prices`, `storage_prices`. Partial override OK — missing keys defaults se.
+- **Har jagah `get_price_table(cur, table)` se padho — constants (`FIRST_TIME_PRICES`
+  etc.) seedha kabhi use mat karo**, warna admin change dikhega nahi.
+- `calculate_order_amount` + buy page + revenue/MRR + storage API sab DB-aware hain.
+- Storage order amount ab **server-side** se aata hai (client bheja `amount` ignore
+  hota hai — security fix bhi). Plans: 1gb/5gb/10gb (+ legacy 25gb).
+- Reset button → JSON rows delete (defaults par wapas).
+
+## 4.14. 🔗 Login OG tags — 16 Aug 2026
+
+`app/templates/public/base.html` me OG/Twitter meta tags add kiye (og:image →
+`https://nregabot.com/assets/og-banner.webp?v=3`, 1200x633). Pehle WhatsApp me
+link share karne par bada raw logo dikhta tha (koi og:image nahi tha). Blocks:
+`og_title` / `og_description` / `twitter_title` / `twitter_description` — page
+overwrite kar sakta hai, default marketing-site values hain.
+
 ## 5. Common tasks → where to edit
 
 | Task | Files |
@@ -259,7 +325,8 @@ keys par). Agar key generation format kabhi badle to `_TRIAL_PREFIX` update karo
 | Update flow | `loader.py`, `lite_loader.py`, `src/managers/services.py`, `scripts/build_update.py`, `config/version.json` |
 | Macro / multi-tab workflow | `src/managers/workflow_manager.py` |
 | Add/edit a VB-G-RAM-G state (no release) | Admin → **State Registry** (`/admin/portal-states`); data flow: `024_state_registry.sql` → `auth.py app_config()` → `src/config.py` registry → heartbeat fetch |
-| Revenue / MRR / churn / expiry forecast | Admin → **Revenue Dashboard** (`/admin/revenue`); `nrega-server/app/routes/admin/revenue.py` + `admin_revenue.html`. Prices ka source of truth: `app/services/license_service.py` (`FIRST_TIME_PRICES`/`RENEWAL_PRICES`) — dono sync rakho |
+| Revenue / MRR / churn / expiry forecast | Admin → **Revenue Dashboard** (`/admin/revenue`); `nrega-server/app/routes/admin/revenue.py` + `admin_revenue.html` |
+| App plan + storage prices change (no release) | Admin → **Pricing** (`/admin/pricing`); `nrega-server/app/routes/admin/pricing.py` + `admin_pricing.html`. Prices `app_settings` JSON me (DB override), defaults `license_service.py` (`FIRST_TIME_PRICES`/`RENEWAL_PRICES`/`DEFAULT_STORAGE_PRICES`) — **hamesha `get_price_table(cur, table)` se padho, constants seedha kabhi nahi** (buy page, order amount, revenue/MRR, storage API sab isi se chalti hain) |
 | Theme / colors | `src/config.py` (`COLORS`), `config/theme.json` |
 | Translations | **`en.json` + `hi.json` directly edit karo; `kn.json`/`bn.json`/`hinglish.json` GENERATED hain — unhe kabhi directly edit mat karo.** Source of truth = `scripts/translations_{kn,bn,hing}_{1..5}.py` part files. Naya key add: en.json (+ hi.json) + teeno part files (last part `_5` me) me add karo → `venv/bin/python scripts/build_locales.py` run karo (CI yahi chalta hai; exit 0 chahiye) → generated JSON khud update ho jata hai. Helpers: `check_missing_keys.py` (code vs locales), `add_missing_keys.py`. |
 | Release a new version | **CHHOTA bump** (patch, e.g. 3.2.2 → 3.2.3) — `APP_VERSION` (config.py) + `config/version.json` (latest_version, URLs, core_update version, changelog) → **core_update ke teeno hashes (`hash`, `hash_windows`, `hash_macos`) ko `""` KHAALI karo** → commit + push (CI builds). **Agent hashes fill/build_update.py kabhi NAHI chalaata** — user khud `scripts/deploy_version.sh` chala ke hashes + deploy karta hai (wo script Windows hash GitHub se auto-fill karti hai; Mac hash `build_macos.sh` banata hai). |

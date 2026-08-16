@@ -280,6 +280,40 @@ class MrFillTab(BaseAutomationTab):
         elif status == "notfound":
             self.log_warning(f"Panchayat '{panchayat_name}' not found in list.")
 
+    def _wait_for_submit_alert(self, driver, timeout=15.0):
+        """Wait for the portal's save-confirmation JS alert, accept it and return its text.
+
+        Returns the alert text (str), or None if no alert appeared within `timeout`.
+
+        NOTE (Chrome 150): jab koi dialog open nahi hota, ChromeDriver ab
+        WebDriverException("invalid argument: No dialog is showing") raise
+        karta hai — NoAlertPresentException nahi. Isliye alert probes broad
+        `except Exception` se wrap hain: missing alert yahan NORMAL case hai
+        aur kabhi automation abort nahi karna chahiye. Polling approach
+        (instead of EC.alert_is_present) isliye hai kyunki wo bhi sirf
+        NoAlertPresentException catch karta hai.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if self.is_stopped():
+                return None
+            try:
+                alert = driver.switch_to.alert
+                txt = alert.text
+            except Exception:
+                time.sleep(0.3)
+                continue
+            # Alert present — accept it (retrying, the alert can vanish between
+            # detection and accept, same as wagelist_send_tab helper).
+            for _ in range(3):
+                try:
+                    alert.accept()
+                    break
+                except Exception:
+                    time.sleep(0.3)
+            return txt
+        return None
+
     def _process_single_work_code(self, driver, wait, work_key, holiday_cols, is_manual_mode, panchayat_name):
         """
         Processes a single work code with improved error handling for 'MR Already Filled'.
@@ -287,8 +321,12 @@ class MrFillTab(BaseAutomationTab):
         current_mr_no = "N/A"
         try:
             # Dismiss alerts if any
+            # NOTE (Chrome 150): missing dialog ab WebDriverException
+            # ("invalid argument: No dialog is showing") raise karta hai, not
+            # NoAlertPresentException — broad catch zaroori hai, missing alert
+            # yahan NORMAL case hai (kabhi automation abort nahi hona chahiye).
             try: driver.switch_to.alert.accept()
-            except NoAlertPresentException: pass
+            except Exception: pass
             
             # 1. URL & Panchayat Safety Check
             if "Mustroll_Fill.aspx" not in driver.current_url:
@@ -390,29 +428,29 @@ class MrFillTab(BaseAutomationTab):
                     if val: driver.execute_script(f"document.getElementById('txtWrkStartDate').value = '{val}';")
             except Exception as e: logger.debug("MrFill: Could not auto-fill date: %s", e)
 
-            # --- 6. Submission ---
+            # --- 6/7. Submission + Final Verification ---
+            # NOTE (Chrome 150): jab koi JS dialog open nahi hota, ChromeDriver
+            # WebDriverException("invalid argument: No dialog is showing")
+            # raise karta hai — NoAlertPresentException nahi. Isliye alert
+            # probes broad catch karte hain; missing alert NORMAL case hai.
+            # Alert text usi probe me padha + accept hota hai — pehle step 6
+            # alert accept karke step 7 me DOBARA probe karta tha (dialog ab
+            # nahi tha), jo save SUCCESS hone ke baad bhi FAILED dikhata tha.
             if is_manual_mode:
                 self.app.after(0, self.app.set_status, "Manual Mode: Paused")
                 self.log_info(f"Manual Mode: Fill details for MR {current_mr_no} and click Save.")
-                WebDriverWait(driver, 600).until(EC.alert_is_present()).accept()
+                txt = self._wait_for_submit_alert(driver, timeout=600)
             else:
                 self.app.after(0, self.app.set_status, "Saving...")
                 driver.execute_script("document.getElementById('btnsave').click();")
-                WebDriverWait(driver, 10).until(EC.alert_is_present()).accept()
+                txt = self._wait_for_submit_alert(driver, timeout=15)
 
-            # --- 7. Final Verification ---
-            outcome_found = False
-            for _ in range(3):
-                try:
-                    alert = driver.switch_to.alert; txt = alert.text; alert.accept()
-                    if "Saved Successfully" in txt or "has been saved" in txt:
-                        self._log_result(panchayat_name, work_key, current_mr_no, "Success", txt)
-                    else:
-                        self._log_result(panchayat_name, work_key, current_mr_no, "Failed", txt)
-                    outcome_found = True; break
-                except NoAlertPresentException: time.sleep(1)
-
-            if not outcome_found: 
+            if txt:
+                if "Saved Successfully" in txt or "has been saved" in txt:
+                    self._log_result(panchayat_name, work_key, current_mr_no, "Success", txt)
+                else:
+                    self._log_result(panchayat_name, work_key, current_mr_no, "Failed", txt)
+            else:
                 self._log_result(panchayat_name, work_key, current_mr_no, "Failed", "Timeout: No confirmation alert.")
 
         except Exception as e:
