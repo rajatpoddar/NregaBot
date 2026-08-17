@@ -11,6 +11,10 @@ class WorkflowManager:
         self.app = app
         self.pipeline_queue = []
         self.is_pipeline_running = False
+        # Central execution queue — ab ye Macro Manager tab par nahi, YAHAN
+        # rehta hai. Koi bhi automation tab 'Add to Queue' se item add kar
+        # sakta hai, aur tab destroy ho jane par bhi queue safe rehta hai.
+        self.queue_items = []
 
     # --- HELPER: LOGGING ---
     def _log(self, macro_tab, msg, level="info"):
@@ -158,8 +162,11 @@ class WorkflowManager:
 
         self._ensure_automation_stopped(automation_key)
         
-        # Set the panchayat/agency (supports both entry widgets and option menus)
-        self._set_target_on_tab(tab, target, entry_attr)
+        # Set the panchayat/agency (supports both entry widgets and option menus).
+        # Empty target (bina panchayat wale tabs) set nahi karte — tab apna
+        # default UI use karta hai.
+        if target:
+            self._set_target_on_tab(tab, target, entry_attr)
 
         # 2. Trigger Staff Auto-fill (Fix for Muster Roll Gen)
         # ERROR FIXED HERE: Changed 'mr_gen' to 'muster'
@@ -177,18 +184,40 @@ class WorkflowManager:
         
         return self._wait_for_automation_finish(automation_key, macro_tab=macro_tab)
 
+    # --- SAFE MACRO TAB UI CALLS (background queue ke liye) ---
+    def _macro_call(self, macro_tab, method, *args):
+        """macro_tab par safe UI call — jab queue background me chale (Macro
+        Manager tab loaded nahi / destroy ho chuka) to silently skip karo."""
+        try:
+            if macro_tab is not None and hasattr(macro_tab, method):
+                alive = getattr(macro_tab, '_is_alive', lambda: True)
+                if alive():
+                    getattr(macro_tab, method)(*args)
+        except Exception:
+            pass
+
+    def _update_item_status(self, item_id, status, msg="", macro_tab=None):
+        """Queue item ka status update — hamesha item dict me (central store),
+        aur Macro Manager tab loaded + alive ho to tree me bhi."""
+        for item in self.queue_items:
+            if str(item.get('id')) == str(item_id):
+                item['status'] = status
+                item['msg'] = msg
+                break
+        self._macro_call(macro_tab, "update_item_status", item_id, status, msg)
+
     # --- CORE: GLOBAL QUEUE PROCESSOR ---
-    def process_global_queue(self, macro_tab):
-        self.app.after(0, lambda: macro_tab.set_ui_state(True))
+    def process_global_queue(self, macro_tab=None):
+        self.app.after(0, lambda m=macro_tab: self._macro_call(m, "set_ui_state", True))
         self.app.play_sound("macro_start")
 
         try:
-            for item in macro_tab.queue_items:
+            for item in self.queue_items:
                 if self.app.stop_events["macro"].is_set(): break
                 if item['status'] == 'Success': continue 
 
                 # UI Update
-                macro_tab.update_item_status(item['id'], "Running", "Starting...")
+                self._update_item_status(item['id'], "Running", "Starting...", macro_tab)
                 self._log(macro_tab, f"--- Processing Item #{item['id']}: {item['type']} ---", "info")
                 
                 success = False
@@ -198,8 +227,18 @@ class WorkflowManager:
                     task_type = item['type']
                     target = item.get('target', '')
 
+                    # === 0. TAB-QUEUED ITEMS (Add-to-Queue from any automation tab) ===
+                    # 'Add to Queue' se aaye items me tab_name + automation_key
+                    # hota hai — generic runner unhe directly chala deta hai.
+                    # Ye branch PEHLE hai kyunki display name (type) kisi
+                    # existing macro task string se collide kar sakta hai.
+                    if item.get('tab_name') and item.get('automation_key'):
+                        success = self._run_generic_task(
+                            item['tab_name'], target, item['automation_key'], macro_tab=macro_tab)
+                        msg = f"Finished: {item['type']}" if success else f"Failed: {item['type']}"
+
                     # === 1. WAGELIST GEN + AUTO SEND ===
-                    if "Wagelist Gen" in task_type or task_type == 'wagelist_gen_send':
+                    elif "Wagelist Gen" in task_type or task_type == 'wagelist_gen_send':
                         self._log(macro_tab, "Step 1: Generating Wagelists...")
                         success_gen = self._run_generic_task("Gen Wagelist", target, "gen", entry_attr="agency_entry", macro_tab=macro_tab)
                         
@@ -225,7 +264,7 @@ class WorkflowManager:
                         elif "Zero MR" in task_type or task_type == 'mr_track_zero': dest_tab = "Zero MR"; wait_key = "zero_mr"
 
                         self._log(macro_tab, "Step 1: Running MR Tracking...")
-                        macro_tab.update_item_status(item['id'], "Running", "Tracking...")
+                        self._update_item_status(item['id'], "Running", "Tracking...", macro_tab)
                         self.app.after(0, lambda: self.app.show_frame("MR Tracking"))
                         time.sleep(2.0)
                         track_tab = self.app.tab_instances.get("MR Tracking")
@@ -262,7 +301,7 @@ class WorkflowManager:
                             msg = "No Data Found in Tracking"; self._log(macro_tab, "No workcodes found.", "warning"); success = False 
                         else:
                             self._log(macro_tab, f"Step 3: Handoff to {dest_tab} ({len(codes)} codes)...")
-                            macro_tab.update_item_status(item['id'], "Running", f"Running {dest_tab}...")
+                            self._update_item_status(item['id'], "Running", f"Running {dest_tab}...", macro_tab)
                             p_name = target if target else item.get('panchayat', '')
 
                             if dest_tab == "Zero MR": self.switch_to_zero_mr_tab_with_data(codes) 
@@ -296,7 +335,7 @@ class WorkflowManager:
                 except Exception as e:
                     msg = str(e); self._log(macro_tab, f"Exception in task: {e}", "error"); success = False
 
-                macro_tab.update_item_status(item['id'], "Success" if success else "Failed", msg)
+                self._update_item_status(item['id'], "Success" if success else "Failed", msg, macro_tab)
                 self._log(macro_tab, f"Task finished: {msg}", "success" if success else "error")
                 self.app.after(0, self.app.set_status, f"Macro: {task_type} - {msg}")
                 time.sleep(3)
@@ -304,7 +343,7 @@ class WorkflowManager:
         except Exception as e:
             self.app.after(0, messagebox.showerror, "Macro Error", str(e))
         finally:
-            self.app.after(0, lambda: macro_tab.set_ui_state(False))
+            self.app.after(0, lambda m=macro_tab: self._macro_call(m, "set_ui_state", False))
             self.app.after(0, self.app.set_status, "Macro Queue Finished")
             self.app.play_sound("macro_finish")
             self._log(macro_tab, ">>> Macro Queue Execution Finished.")

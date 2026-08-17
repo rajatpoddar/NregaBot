@@ -130,6 +130,66 @@ class BaseAutomationTab(ctk.CTkFrame):
             pass
         return ""
     
+    def _my_tab_name(self) -> Optional[str]:
+        """Is tab ka display name (tab_instances / config mapping se)."""
+        try:
+            mapping = self.app._automation_key_to_tab_name()
+            return mapping.get(self.automation_key)
+        except Exception:
+            return None
+    
+    def add_to_queue_from_tab(self) -> None:
+        """Current tab ko central execution queue me add karo.
+
+        Jab koi aur automation chal rahi ho to Start button '➕ Add to Queue'
+        ban jata hai — click karne par is tab ka kaam (panchayat ke saath)
+        queue me judta hai. Current automation khatam hote hi queue
+        automatically process hota hai (app_automation._maybe_auto_start_queue).
+        """
+        try:
+            wf = getattr(self.app, 'workflows', None)
+            if wf is None:
+                return
+            tab_name = self._my_tab_name()
+            if not tab_name:
+                return
+            from src.app.app_automation import _automation_display_name
+            target = self._extract_activity_panchayat()
+            item = {
+                'id': len(wf.queue_items) + 1,
+                'type': _automation_display_name(self.automation_key),
+                'automation_key': self.automation_key,
+                'tab_name': tab_name,
+                'target': target,
+                'status': 'Pending',
+                'msg': 'Waiting...',
+            }
+            wf.queue_items.append(item)
+            # Macro Manager loaded ho to uski queue tree me bhi row dikhao
+            try:
+                macro_tab = self.app.tab_instances.get("Macro Manager")
+                if macro_tab is not None and hasattr(macro_tab, 'queue_tree'):
+                    if not macro_tab.queue_tree.exists(str(item['id'])):
+                        macro_tab.queue_tree.insert(
+                            "", "end", iid=str(item['id']),
+                            values=(item['id'], item['type'], target or "-", "Pending", "Waiting..."),
+                            tags=('Pending',))
+            except Exception:
+                pass
+            self.log_info(f"✅ Queue: {item['type']}" + (f" ({target})" if target else ""))
+            try:
+                self.app.show_toast(
+                    tr("base.queue_added_msg", name=item['type']),
+                    "info", title=tr("base.queue_added_title"))
+            except Exception:
+                pass
+            try:
+                self.app.set_status(tr("base.queue_pending", count=len(wf.queue_items)))
+            except Exception:
+                pass
+        except Exception as e:
+            logger.debug("add_to_queue_from_tab failed: %s", e)
+    
     def _extract_activity_details(self) -> str:
         """Extract result summary from results_tree if available.
         
@@ -780,13 +840,18 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.stop_button = ctk.CTkButton(inner_container, text=tr("base.btn_stop"), command=self.stop_automation, state="disabled", width=90, height=32, corner_radius=8, fg_color=config.COLORS["btn_stop"], hover_color=config.COLORS["btn_stop_hover"], font=ctk.CTkFont(size=13, weight="bold"))
         self.stop_button.pack(side="left", padx=(0, 8))
         
-        # --- NEW RETRY BUTTON ---
-        self.retry_btn = ctk.CTkButton(inner_container, text="↻ Retry Failed", command=self.retry_logic_handler, width=110, height=32, corner_radius=8, fg_color=config.COLORS["orange"], hover_color=config.COLORS["orange_hover"], font=ctk.CTkFont(size=13, weight="bold"))
+        # --- RETRY BUTTON ---
+        self.retry_btn = ctk.CTkButton(inner_container, text=tr("base.btn_retry"), command=self.retry_logic_handler, width=110, height=32, corner_radius=8, fg_color=config.COLORS["orange"], hover_color=config.COLORS["orange_hover"], font=ctk.CTkFont(size=13, weight="bold"))
         self.retry_btn.pack(side="left", padx=(0, 8))
         self.retry_btn.configure(state="disabled") # Initially disabled
 
         self.reset_button = ctk.CTkButton(inner_container, text=tr("base.btn_reset"), command=self.reset_ui, width=90, height=32, corner_radius=8, fg_color=(config.COLORS["gray70"], config.COLORS["gray40_"]), hover_color=(config.COLORS["gray60"], config.COLORS["gray35_"]), text_color="white", font=ctk.CTkFont(size=13))
         self.reset_button.pack(side="left")
+
+        # Queue-aware state: agar koi aur automation pehle se chal rahi ho to
+        # naya bana tab bhi turant 'Add to Queue' mode me dikhe (kabhi Start
+        # click karne par accidental concurrent run na ho jaye).
+        self.after(20, self.refresh_action_buttons)
         
         return outer_wrapper
 
@@ -972,8 +1037,39 @@ class BaseAutomationTab(ctk.CTkFrame):
         """
         if not self._is_alive():
             return
+        self._apply_action_buttons_state(running)
+        # Auto-switch the tab's inner notebook: show Logs while the automation
+        # runs, then show Results the moment it finishes — so the user never
+        # has to hunt for the results / export buttons after a run.
+        # (Helper is fully guarded internally — never raises.)
+        self._show_automation_tab("running" if running else "finished")
+
+    def refresh_action_buttons(self) -> None:
+        """Queue-aware action-button refresh (koi notebook switch nahi hota).
+
+        Agar is tab ka automation chal raha ho → Start 'Running...' (disabled).
+        Agar kisi AUR tab ka automation chal raha ho → Start '➕ Add to Queue'
+        (enabled) — click par is tab ka kaam central queue me judta hai aur
+        current automation khatam hote hi automatically chal jata hai.
+        Kuch nahi chal raha → normal '▶ Start'.
+        """
+        if not self._is_alive():
+            return
+        running = self.automation_key in self.app.active_automations
+        self._apply_action_buttons_state(running)
+
+    def _apply_action_buttons_state(self, running: bool) -> None:
+        """Core button-state logic — set_common_ui_state() aur
+        refresh_action_buttons() dono yahi se chalti hain."""
         try:
-            self.start_button.configure(state="disabled" if running else "normal", text=tr("base.btn_start_running") if running else tr("base.btn_start"))
+            if running:
+                self.start_button.configure(state="disabled", text=tr("base.btn_start_running"))
+            else:
+                other_running = bool(self.app.active_automations) and self.automation_key not in self.app.active_automations
+                if other_running:
+                    self.start_button.configure(state="normal", text=tr("base.btn_add_to_queue"), command=self.add_to_queue_from_tab)
+                else:
+                    self.start_button.configure(state="normal", text=tr("base.btn_start"), command=self.start_automation)
         except Exception:
             pass
         try:
@@ -989,12 +1085,6 @@ class BaseAutomationTab(ctk.CTkFrame):
                 self.retry_btn.configure(state="disabled" if running else "normal")
             except Exception:
                 pass
-
-        # Auto-switch the tab's inner notebook: show Logs while the automation
-        # runs, then show Results the moment it finishes — so the user never
-        # has to hunt for the results / export buttons after a run.
-        # (Helper is fully guarded internally — never raises.)
-        self._show_automation_tab("running" if running else "finished")
 
     def _show_automation_tab(self, state: str) -> None:
         """Auto-switch the tab's inner notebook based on automation state.
@@ -1064,11 +1154,17 @@ class BaseAutomationTab(ctk.CTkFrame):
 
     def retry_logic_handler(self) -> None:
         """Override this in child tabs if specific logic is needed, otherwise uses default."""
-        # Child tab should define 'self.input_text_widget' (the textbox with codes/jobcards)
+        # Child tab should define a codes/jobcards textbox — kuch tabs
+        # `work_codes_textbox` / `jobcards_textbox` naam use karte hain, isliye
+        # charo names check karte hain taaki retry har codes-tab par kaam kare.
         if hasattr(self, 'work_codes_text'):
             self.retry_failed_automation(self.work_codes_text)
         elif hasattr(self, 'jobcards_text'): # For Demand Tab support
             self.retry_failed_automation(self.jobcards_text)
+        elif hasattr(self, 'work_codes_textbox'):
+            self.retry_failed_automation(self.work_codes_textbox)
+        elif hasattr(self, 'jobcards_textbox'):
+            self.retry_failed_automation(self.jobcards_textbox)
         else:
             messagebox.showinfo(tr("confirm.ok"), tr("base.no_retry_logic"))
 

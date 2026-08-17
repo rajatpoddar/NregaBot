@@ -188,4 +188,12 @@ BN5 = {
     "form.work_alloc.pick_title": "ওয়ার্ক কোড নির্বাচন করুন",
     "form.work_alloc.pick_instruction": "'{work_key}' কী-এর সাথে একাধিক ওয়ার্ক কোড মিলেছে। কোনটি বরাদ্দ করবেন তা নির্বাচন করুন:",
     "form.work_alloc.pick_skip": "এই ওয়ার্ক কী এড়িয়ে যান",
+
+    # ── Action buttons + Add-to-Queue ──
+    "base.btn_retry": "↻ ব্যর্থ পুনরায় চেষ্টা করুন",
+    "base.btn_add_to_queue": "➕ সারিতে যোগ করুন",
+    "base.queue_added_title": "সারিতে যোগ হয়েছে",
+    "base.queue_added_msg": "{name} সারিতে যোগ হয়েছে — বর্তমান অটোমেশন শেষ হলে স্বয়ংক্রিয়ভাবে চলবে।",
+    "base.queue_pending": "সারি: {count}টি অপেক্ষমাণ",
+    "base.queue_auto_start": "সারি: পরবর্তী অটোমেশন শুরু হচ্ছে...",
 }

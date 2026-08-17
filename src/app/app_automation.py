@@ -186,6 +186,8 @@ class AutomationMixin:
         self.app_state.automation_progress.pop(key, None)
         self._update_emergency_stop_btn()
         self._update_running_automation_indicator()
+        # Sab tabs ke Start buttons queue-aware refresh (Start / Add to Queue)
+        self._refresh_all_tab_buttons()
 
         if self.app_state.minimize_var.get() and self.app_state.driver:
             self._minimize_active_browser()
@@ -468,11 +470,17 @@ class AutomationMixin:
             self.app_state.active_automations.remove(key)
         self.app_state.automation_progress.pop(key, None)
         self._update_running_automation_indicator()
+        # Sab tabs ke Start buttons queue-aware refresh (Start / Add to Queue)
+        self._refresh_all_tab_buttons()
         self.set_status(tr("app.status_finished"))
         self.after(5000, lambda: self.set_status(tr("app.status_ready")))
         if not self.app_state.active_automations:
             self.allow_sleep()
             self._update_emergency_stop_btn()
+        # Queue auto-start: koi automation nahi chal rahi aur queue me pending
+        # items hain to agli automation khud shuru ho jaye (bina Macro Manager
+        # kholne ke). 'macro' key active rehne ki wajah se double-start nahi hota.
+        self.after(2500, self._maybe_auto_start_queue)
         
         # ── Log activity finish ──
         # Initialize defaults before any try blocks to prevent NameError 
@@ -829,6 +837,51 @@ class AutomationMixin:
                 self._running_pct_labels[k] = pct_label
         except Exception:
             logger.debug("Failed to update running automation indicator", exc_info=True)
+
+    def _refresh_all_tab_buttons(self) -> None:
+        """Sab loaded tabs ke action buttons ko queue-aware refresh karo.
+
+        Jab koi automation start/finish hota hai to har tab ka Start button
+        sahi mode me hona chahiye: '▶ Start' / 'Running...' / '➕ Add to Queue'.
+        """
+        try:
+            instances = getattr(self.app_state, 'tab_instances', {}) or {}
+            for inst in list(instances.values()):
+                try:
+                    if hasattr(inst, 'refresh_action_buttons'):
+                        inst.refresh_action_buttons()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _maybe_auto_start_queue(self) -> None:
+        """Queue me pending items + koi automation nahi chal rahi → queue
+        khud start karo (bina Macro Manager kholne ke, background-safe)."""
+        try:
+            if self.app_state.active_automations:
+                return
+            wf = getattr(self, 'workflows', None)
+            if wf is None or not wf.queue_items:
+                return
+            pending = [i for i in wf.queue_items if i.get('status') == 'Pending']
+            if not pending:
+                return
+            macro_tab = (getattr(self.app_state, 'tab_instances', {}) or {}).get("Macro Manager")
+            if macro_tab is not None:
+                try:
+                    if not macro_tab.winfo_exists():
+                        macro_tab = None
+                except Exception:
+                    macro_tab = None
+            self.set_status(tr("base.queue_auto_start"))
+            try:
+                self.show_toast(tr("base.queue_auto_start"), "info")
+            except Exception:
+                pass
+            self.start_automation_thread("macro", wf.process_global_queue, args=(macro_tab,))
+        except Exception as e:
+            logger.debug("Auto-start queue failed: %s", e)
 
     def _clear_running_chips(self) -> None:
         """Destroy all footer running-indicator chips (comma separators included)."""

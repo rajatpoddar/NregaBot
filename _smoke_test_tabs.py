@@ -42,10 +42,19 @@ class FakeHistory:
         pass
 
 
+class _FakeWorkflows:
+    """Minimal stand-in so tabs can reference app.workflows.queue_items."""
+    def __init__(self):
+        self.queue_items = []
+        self.pipeline_queue = []
+        self.is_pipeline_running = False
+
+
 class FakeApp:
     def __init__(self):
         self.history_manager = FakeHistory()
         self.stop_events = {}
+        self.active_automations = set()
         self.active_browser = 'chrome'
         self._cached_style = None
         self.icon_images = {}
@@ -53,6 +62,7 @@ class FakeApp:
         self.license_info = {}  # File Manager reads license_info
         self.current_user = {"name": "Test"}
         self.tab_instances = {}
+        self.workflows = _FakeWorkflows()
 
     def _missing(self, *a, **k):
         return "/tmp"

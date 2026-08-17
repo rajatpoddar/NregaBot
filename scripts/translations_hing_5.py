@@ -275,4 +275,12 @@ HING5 = {
     "form.work_alloc.pick_title": "Work Code Chunein",
     "form.work_alloc.pick_instruction": "Key '{work_key}' se kai work code match hote hain. Jise allocate karna hai use chunein:",
     "form.work_alloc.pick_skip": "Is Work Key ko Chhod Dein",
+
+    # ── Action buttons + Add-to-Queue ──
+    "base.btn_retry": "↻ Failed Retry Karo",
+    "base.btn_add_to_queue": "➕ Queue Mein Add Karo",
+    "base.queue_added_title": "Queue Mein Add Ho Gaya",
+    "base.queue_added_msg": "{name} queue mein add ho gaya — abhi chal rahi automation khatam hote hi khud chalega.",
+    "base.queue_pending": "Queue: {count} pending",
+    "base.queue_auto_start": "Queue: agli automation shuru ho rahi hai...",
 }

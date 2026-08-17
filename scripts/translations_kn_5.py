@@ -188,4 +188,12 @@ KN5 = {
     "form.work_alloc.pick_title": "ವರ್ಕ್ ಕೋಡ್ ಆಯ್ಕೆ ಮಾಡಿ",
     "form.work_alloc.pick_instruction": "'{work_key}' ಕೀಗೆ ಅನೇಕ ವರ್ಕ್ ಕೋಡ್‌ಗಳು ಹೊಂದಾಣಿಕೆಯಾಗುತ್ತವೆ. ಯಾವುದನ್ನು ನಿಯೋಜಿಸಬೇಕೆಂದು ಆಯ್ಕೆ ಮಾಡಿ:",
     "form.work_alloc.pick_skip": "ಈ ವರ್ಕ್ ಕೀ ಬಿಟ್ಟುಬಿಡಿ",
+
+    # ── Action buttons + Add-to-Queue ──
+    "base.btn_retry": "↻ ವಿಫಲವಾದವುಗಳನ್ನು ಮರುಪ್ರಯತ್ನಿಸಿ",
+    "base.btn_add_to_queue": "➕ ಕ್ಯೂಗೆ ಸೇರಿಸಿ",
+    "base.queue_added_title": "ಕ್ಯೂಗೆ ಸೇರಿಸಲಾಗಿದೆ",
+    "base.queue_added_msg": "{name} ಕ್ಯೂಗೆ ಸೇರಿಸಲಾಗಿದೆ — ಪ್ರಸ್ತುತ ಆಟೊಮೇಷನ್ ಮುಗಿದ ನಂತರ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಚಲಿಸುತ್ತದೆ.",
+    "base.queue_pending": "ಕ್ಯೂ: {count} ಬಾಕಿ ಇವೆ",
+    "base.queue_auto_start": "ಕ್ಯೂ: ಮುಂದಿನ ಆಟೊಮೇಷನ್ ಪ್ರಾರಂಭವಾಗುತ್ತಿದೆ...",
 }

@@ -12,7 +12,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 class MacroManagerTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="macro")
-        self.queue_items = [] 
+        # Central execution queue — WorkflowManager par rehta hai taaki koi
+        # bhi tab ('Add to Queue') item add kar sake aur tab destroy hone par
+        # bhi queue safe rahe. Macro tab sirf isi ka VIEW hai.
+        self.queue_items = self.app.workflows.queue_items
         # Stores specific inputs for bulk demand
         self.bulk_inputs = {} 
         self._create_widgets()
@@ -105,6 +108,9 @@ class MacroManagerTab(BaseAutomationTab):
         self.queue_tree.tag_configure('Running', background='#E3F2FD', foreground='#0D47A1')
         self.queue_tree.tag_configure('Success', background='#E8F5E9', foreground='#1B5E20')
         self.queue_tree.tag_configure('Failed', background='#FFEBEE', foreground='#B71C1C')
+
+        # Dusre tabs se queue kiye gaye items yahan bhi dikhao
+        self._render_queue_tree()
 
     def _update_input_fields(self, choice):
         """Update the input fields when the task-type dropdown changes."""
@@ -221,6 +227,22 @@ class MacroManagerTab(BaseAutomationTab):
         for item in self.queue_tree.get_children():
             self.queue_tree.delete(item)
         self.log_info("Queue cleared.")
+    def _render_queue_tree(self):
+        """Central queue se tree rebuild karo (dusre tabs se add kiye gaye
+        items Macro Manager khulte hi dikhein)."""
+        try:
+            for item_id in self.queue_tree.get_children():
+                self.queue_tree.delete(item_id)
+            for item in self.queue_items:
+                if not self.queue_tree.exists(str(item['id'])):
+                    self.queue_tree.insert(
+                        "", "end", iid=str(item['id']),
+                        values=(item['id'], item['type'], item.get('target', '') or "-",
+                                item.get('status', 'Pending'), item.get('msg', 'Waiting...')),
+                        tags=(item.get('status', 'Pending'),))
+        except Exception as e:
+            print(f"Error rendering queue: {e}")
+
     def update_item_status(self, item_id, status, msg=""):
         try:
             for item in self.queue_items:

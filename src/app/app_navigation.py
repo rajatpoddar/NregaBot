@@ -725,6 +725,11 @@ class NavMixin:
             running = getattr(self.app_state, 'active_automations', set())
             if key and key in running:
                 return
+            # Koi AUR automation chal rahi ho to shortcut bhi queue kar de
+            # (Start button ki tarah) — accidental concurrent run na ho.
+            if running and key and hasattr(inst, 'add_to_queue_from_tab'):
+                inst.add_to_queue_from_tab()
+                return
             inst.start_automation()
         except Exception:
             pass
