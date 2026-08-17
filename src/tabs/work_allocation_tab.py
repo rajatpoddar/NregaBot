@@ -13,8 +13,8 @@ from src.utils import truncate_workcode
 from src.i18n import tr
 from .base_tab import BaseAutomationTab
 
-from typing import Any, Dict, List, Optional
-from ._imports import (By, Select, WebDriverWait, EC, NoAlertPresentException,
+from typing import Any, Dict, List, Optional, Tuple
+from ._imports import (By, Keys, Select, WebDriverWait, EC, NoAlertPresentException,
                        NoSuchElementException, StaleElementReferenceException,
                        TimeoutException)  # noqa: F401
 
@@ -63,6 +63,7 @@ class WorkAllocationTab(BaseAutomationTab):
 
         self.has_failures = False          # tracks errors for the final summary
         self.csv_allocation_data: Dict[str, List[str]] = {}  # work_code -> [names]
+        self._picker_win = None            # work-code picker dialog (main thread)
         # Structured rows of every successfully allocated labourer — powers the
         # 'Export for Demand' CSV (job card + name + work key) so the Demand tab
         # can re-load the same workers next week.
@@ -422,9 +423,14 @@ class WorkAllocationTab(BaseAutomationTab):
             # 1. Type the work key into the search box (triggers a postback)
             self._enter_work_key(driver, wait, work_key)
 
-            # 2. Pick the matching work code from the refreshed dropdown
-            selected_work_code_text = self._select_work_code(driver, wait, work_key)
-            if selected_work_code_text is None:
+            # 2. Pick the matching work code from the refreshed dropdown.
+            #    Multiple matches -> operator chooses (work name dekh ke).
+            selected_work_code_text, pick_status = self._select_work_code(driver, wait, work_key)
+            if pick_status == "skipped":
+                self._log_result(self.panchayat_var.get().strip(), work_key, "N/A",
+                                 "Skipped", "Skipped by user — no work code selected.")
+                return
+            if pick_status != "selected":
                 self._log_result(self.panchayat_var.get().strip(), work_key, "N/A",
                                  "Failed", "Workcode not found in dropdown.")
                 return
@@ -511,42 +517,207 @@ class WorkAllocationTab(BaseAutomationTab):
         search_box = wait.until(EC.element_to_be_clickable((By.ID, self.SEARCH_KEY_ID)))
         search_box.clear()
         search_box.send_keys(work_key)
-        driver.find_element(By.TAG_NAME, 'body').click()
+        # Portal ka work-code dropdown search box se TAB-out (blur) hone par hi
+        # render hota hai — body-click se ye reliably trigger nahi hota. Pehle
+        # explicit TAB bhejte hain (tab-out), phir check karte hain ki dropdown
+        # populate hua ya nahi; na hua ho to body-click fallback (kuch portal
+        # versions sirf blur-click par react karte hain).
+        search_box.send_keys(Keys.TAB)
         self._settle(driver, "Work Key Search")
-
-    def _select_work_code(self, driver, wait, work_key: str) -> Optional[str]:
-        """
-        Waits for the work-code dropdown to refresh, then selects the option
-        whose text contains the work key. Returns the selected text, or None.
-        """
-        def _has_options(d):
+        if not self._work_code_has_options(driver):
             try:
-                return len(d.find_elements(By.XPATH,
-                        f"//select[@id='{self.WORK_CODE_ID}']/option[position()>1]")) > 0
+                driver.find_element(By.TAG_NAME, 'body').click()
             except Exception:
-                return False
+                pass
+            self._settle(driver, "Work Key Search")
+
+    def _work_code_has_options(self, driver) -> bool:
+        """True jab work-code dropdown me at least ek real option ho (header
+        'Select...' option chhod kar)."""
         try:
-            WebDriverWait(driver, 10).until(_has_options)
+            return len(driver.find_elements(By.XPATH,
+                    f"//select[@id='{self.WORK_CODE_ID}']/option[position()>1]")) > 0
+        except Exception:
+            return False
+
+    def _select_work_code(self, driver, wait, work_key: str) -> Tuple[Optional[str], str]:
+        """
+        Waits for the work-code dropdown to refresh, then picks the option
+        whose text contains the work key.
+
+        Returns (selected_text, status):
+          - 'selected' — an option was chosen (maybe by the operator).
+          - 'notfound' — no option matched the key.
+          - 'skipped'  — multiple matches; operator (or timeout/STOP) skipped.
+
+        Jab 1 se zyada options match karein to pehla option silently NAHI
+        chuna jata — operator ko dialog dikhakar decide karwaya jata hai
+        (dropdown me har option ka work name dikhta hai).
+        """
+        try:
+            WebDriverWait(driver, 10).until(self._work_code_has_options)
         except TimeoutException:
             self.log_info("   - Work code dropdown has no options.")
-            return None
+            return None, "notfound"
 
         work_code_select_element = wait.until(EC.element_to_be_clickable((By.ID, self.WORK_CODE_ID)))
         work_code_select = Select(work_code_select_element)
 
-        matching_option = None
-        for option in work_code_select.options:
-            if work_key in option.text:
-                matching_option = option
-                break
-        if not matching_option:
-            return None
+        matching = [o for o in work_code_select.options if work_key in o.text]
+        if not matching:
+            return None, "notfound"
 
-        work_code_select.select_by_visible_text(matching_option.text)
+        if len(matching) > 1:
+            self.log_info(f"   - {len(matching)} work codes match key '{work_key}' — asking operator to choose.")
+            texts = [o.text for o in matching]
+            chosen_text = self._ask_user_pick_work_code(work_key, texts)
+            if chosen_text is None:
+                self.log_info("   - Operator skipped this work key.")
+                return None, "skipped"
+            option = next((o for o in matching if o.text == chosen_text), None)
+            if option is None:
+                return None, "skipped"
+        else:
+            option = matching[0]
+
+        work_code_select.select_by_visible_text(option.text)
         self._settle(driver, "Work Code Selection")
         # The work NAME is the part inside parentheses, e.g. '66859 (Provision
         # of Irrigation facility ...)'. Fall back to the full option text.
-        return self._extract_work_name(matching_option.text)
+        return self._extract_work_name(option.text), "selected"
+
+    # ------------------------------------------------------------------
+    # Operator work-code picker (multiple matches)
+    # ------------------------------------------------------------------
+    def _ask_user_pick_work_code(self, work_key: str,
+                                 option_texts: List[str]) -> Optional[str]:
+        """Worker thread: blocks until the operator picks a work code (or skips).
+
+        Dialog main thread par dikhta hai (Tk widgets worker thread se kabhi
+        touch nahi hote — golden rule). 180s ke baad ya STOP par auto-skip,
+        taaki automation kabhi hang na ho. Returns chosen option text, ya None
+        (skip / timeout / stop).
+        """
+        import queue
+        result_q: "queue.Queue[Optional[str]]" = queue.Queue(maxsize=1)
+        self.app.after(0, self._show_work_code_picker, work_key, option_texts, result_q)
+        deadline = time.time() + 180
+        while time.time() < deadline:
+            if self.is_stopped():
+                self.app.after(0, self._close_work_code_picker)
+                return None
+            try:
+                return result_q.get(timeout=0.5)
+            except queue.Empty:
+                continue
+        self.log_warning("   - No response in 3 minutes — skipping this work key.")
+        self.app.after(0, self._close_work_code_picker)
+        return None
+
+    def _show_work_code_picker(self, work_key: str, option_texts: List[str],
+                               result_q: Any) -> None:
+        """Main-thread modal picker — operator har option ka work name dekh ke
+        decide karta hai ki kaunsa work code select karna hai."""
+        self._picker_win = None
+        if not self._is_alive():
+            try:
+                result_q.put_nowait(None)
+            except Exception:
+                pass
+            return
+        try:
+            win = ctk.CTkToplevel(self)
+        except Exception:
+            try:
+                result_q.put_nowait(None)
+            except Exception:
+                pass
+            return
+        self._picker_win = win
+        win.title(tr("form.work_alloc.pick_title", default="Select Work Code"))
+        w, h = 620, 440
+        x = max(0, (win.winfo_screenwidth() - w) // 2)
+        y = max(0, (win.winfo_screenheight() - h) // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+        try:
+            win.transient(self.winfo_toplevel())
+            win.grab_set()
+            win.attributes("-topmost", True)
+        except Exception:
+            pass
+        win.grid_columnconfigure(0, weight=1)
+        win.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            win,
+            text=tr("form.work_alloc.pick_instruction",
+                    default="Multiple work codes match key '{work_key}'. "
+                            "Select the one to allocate:",
+                    work_key=work_key),
+            justify="left", wraplength=570,
+            font=ctk.CTkFont(size=13),
+        ).grid(row=0, column=0, sticky="ew", padx=14, pady=(12, 4))
+
+        list_frame = ctk.CTkFrame(win)
+        list_frame.grid(row=1, column=0, sticky="nsew", padx=14, pady=4)
+        list_frame.grid_rowconfigure(0, weight=1)
+        list_frame.grid_columnconfigure(0, weight=1)
+
+        light_mode = ctk.get_appearance_mode().lower() == "light"
+        lb = tkinter.Listbox(list_frame, selectmode="single", exportselection=False,
+                             activestyle="dotbox", font=("Segoe UI", 11),
+                             relief="flat", bd=0, highlightthickness=1,
+                             highlightbackground=("gray70", "gray40")[0 if light_mode else 1])
+        lb.grid(row=0, column=0, sticky="nsew", padx=(6, 2), pady=6)
+        vsb = ttk.Scrollbar(list_frame, orient="vertical", command=lb.yview)
+        vsb.grid(row=0, column=1, sticky="ns", pady=6)
+        lb.configure(yscrollcommand=vsb.set)
+
+        for i, opt_text in enumerate(option_texts):
+            lb.insert("end", opt_text)
+            if i == 0:
+                lb.selection_set(0)
+                lb.activate(0)
+
+        def _finish(value: Optional[str] = None) -> None:
+            try:
+                result_q.put_nowait(value)
+            except Exception:
+                pass
+            try:
+                if win.winfo_exists():
+                    win.destroy()
+            except Exception:
+                pass
+            if self._picker_win is win:
+                self._picker_win = None
+
+        lb.bind("<Double-Button-1>", lambda e: _finish(
+            option_texts[lb.curselection()[0]] if lb.curselection() else None))
+
+        btn_frame = ctk.CTkFrame(win, fg_color="transparent")
+        btn_frame.grid(row=2, column=0, sticky="ew", padx=14, pady=(4, 12))
+
+        ctk.CTkButton(btn_frame, text=tr("common.select"), width=110,
+                      command=lambda: _finish(
+                          option_texts[lb.curselection()[0]] if lb.curselection() else None)
+                      ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(btn_frame,
+                      text=tr("form.work_alloc.pick_skip", default="Skip This Work Key"),
+                      fg_color="gray", hover_color="gray50",
+                      command=lambda: _finish(None)).pack(side="left")
+        win.protocol("WM_DELETE_WINDOW", lambda: _finish(None))
+
+    def _close_work_code_picker(self) -> None:
+        """Closes the picker dialog (timeout / STOP path)."""
+        win = getattr(self, '_picker_win', None)
+        if win is not None:
+            try:
+                if win.winfo_exists():
+                    win.destroy()
+            except Exception:
+                pass
+            self._picker_win = None
 
     @staticmethod
     def _extract_work_name(option_text: str) -> str:

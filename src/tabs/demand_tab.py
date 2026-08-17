@@ -219,6 +219,14 @@ class DemandTab(BaseAutomationTab):
 
         self._suppress_search_refresh = False  # keeps the result list stable while ticking
 
+        # ── Smoothness caches (job-card selection lag fix) ──
+        self._search_after_id = None   # debounce timer for the search box
+        self._jc_index = {}            # 'Job card number' -> [applicant dicts]
+        self._ordered_jcs = []         # JC order as in the report (follow-JC rows)
+        self._jc_pos = {}              # JC -> position in _ordered_jcs
+        self._jc_row_cache = {}        # JC -> row_frame in Selected panel (incremental updates)
+        self._jc_more_label = None     # '+N more selected job cards' label widget
+
         self._current_panchayat = ""  # active group while automation runs (results display)
         self._current_village = ""
 
@@ -404,22 +412,25 @@ class DemandTab(BaseAutomationTab):
         # StringVar-trace based (like home_tab) — fires on EVERY text change,
         # far more reliable than a <KeyRelease> binding in packaged builds.
         self.search_var = ctk.StringVar()
-        self.search_var.trace_add("write", lambda *_: self._refresh_search_results())
+        # Debounced: har keystroke par poori list rebuild nahi hoti — typing
+        # rukne ke ~180ms baad ek hi baar refresh hota hai (smooth feel).
+        self.search_var.trace_add("write", lambda *_: self._schedule_search_refresh())
         self.search_entry = ctk.CTkEntry(qs_frame, textvariable=self.search_var,
                                          placeholder_text=tr("form.demand.search_placeholder"))
         self.search_entry.grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 6), sticky="ew")
 
         # --- Row 2: Selected-JC summary table + search results panel ---
-        # Panels stretch to fill the tab's full height for easier browsing
+        # Panels stretch to fill the tab's full height for easier browsing.
+        # Left summary card compact rahta hai (~300px) — search ko baki width.
         bottom_frame = ctk.CTkFrame(applicant_frame, fg_color="transparent")
         bottom_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 8))
-        bottom_frame.grid_columnconfigure(0, weight=1)
+        bottom_frame.grid_columnconfigure(0, weight=0, minsize=280)
         bottom_frame.grid_columnconfigure(1, weight=1)
         bottom_frame.grid_rowconfigure(0, weight=1)
 
-        # Left: selected JCs summary (scrollable internally)
+        # Left: selected JCs summary (scrollable internally) — narrow + compact
         self.selected_jc_frame = ctk.CTkScrollableFrame(
-            bottom_frame, label_text="✅ Selected Job Cards")
+            bottom_frame, label_text="✅ Selected Job Cards", width=300)
         self.selected_jc_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
         self.selected_jc_frame.grid_columnconfigure(0, weight=1)
 
@@ -668,6 +679,11 @@ class DemandTab(BaseAutomationTab):
             loaded_count = len(self.all_applicants_data)
             self.log_info(f"Loaded {loaded_count} applicants from '{os.path.basename(path)}'.")
 
+            # Precompute the JC index — search follow-JC expansion and the
+            # Selected panel use it for O(1) lookups instead of rescanning the
+            # whole dataset on every keystroke/tick.
+            self._rebuild_jc_index()
+
             # ── '?' corruption check ──
             # Excel me 'CSV (Comma delimited)' (ANSI) me save karne se Devanagari/
             # regional names '?' ban jate hain — wo data file me hi corrupt hai,
@@ -747,6 +763,11 @@ class DemandTab(BaseAutomationTab):
             messagebox.showerror(tr("dialogs.error_reading_report"), tr("dialogs.could_not_read_report", error=e))
             self.csv_path = None
             self.all_applicants_data = []
+            self._jc_index = {}
+            self._ordered_jcs = []
+            self._jc_pos = {}
+            self._jc_row_cache.clear()
+            self._jc_more_label = None
             self.file_label.configure(text=tr("errors.no_file"))
             self._update_applicant_display()
             self._update_selection_summary()
@@ -979,6 +1000,53 @@ class DemandTab(BaseAutomationTab):
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
 
+    # ────────────────────────────────────────────────────────────────
+    # Smoothness helpers (job-card selection lag fix)
+    # ────────────────────────────────────────────────────────────────
+
+    def _rebuild_jc_index(self):
+        """Precomputes JC -> applicant rows + report order once per file load.
+
+        Search follow-JC expansion and the Selected panel use these for O(1)
+        lookups instead of rescanning the whole dataset on every keystroke/tick.
+        """
+        index = {}
+        ordered = []
+        seen = set()
+        for a in self.all_applicants_data:
+            jc = a.get('Job card number', '')
+            if not jc:
+                continue
+            index.setdefault(jc, []).append(a)
+            if jc not in seen:
+                seen.add(jc)
+                ordered.append(jc)
+        self._jc_index = index
+        self._ordered_jcs = ordered
+        self._jc_pos = {jc: i for i, jc in enumerate(ordered)}
+
+    def _schedule_search_refresh(self):
+        """Debounced search: cancels any pending refresh and re-arms a timer.
+
+        Fast typing rebuilds the results list only once the user pauses
+        (~180ms), so a keystroke never triggers a full widget rebuild by
+        itself. Jab tick search-box ko clear karta hai (suppressed), tab
+        rebuild schedule NAHI hota — list stable rehti hai.
+        """
+        if getattr(self, '_suppress_search_refresh', False):
+            return
+        if self._search_after_id is not None:
+            try:
+                self.after_cancel(self._search_after_id)
+            except Exception:
+                pass
+        self._search_after_id = self.safe_after(180, self._run_search_refresh)
+
+    def _run_search_refresh(self):
+        self._search_after_id = None
+        if self._is_alive():
+            self._refresh_search_results()
+
     def _refresh_search_results(self):
         """
         Shows matching applicants in the right-hand search results panel.
@@ -1036,29 +1104,23 @@ class DemandTab(BaseAutomationTab):
         # These 'following' cards are shown WITHOUT the village tint (grey) and
         # with a ↳ marker, so the exact matches stay easy to spot.
         # (Capped at 30 hits so a broad single-character search on a big report
-        # stays fast — the visible list is capped at 120 rows anyway.)
+        # stays fast — the visible list is capped below anyway. Uses the
+        # prebuilt _jc_index/_ordered_jcs so it never rescans the whole
+        # dataset on every keystroke.)
         exact_ids = {id(x) for x in matches}
         jc_hits = ([] if len(query) < 1 else
                    [r for r in matches if query in r.get('Job card number', '').lower()])
         if jc_hits:
-            ordered_jcs = []
-            jc_pos = {}
-            for r in self.all_applicants_data:
-                j = r.get('Job card number', '')
-                if j and j not in jc_pos:
-                    jc_pos[j] = len(ordered_jcs)
-                    ordered_jcs.append(j)
             extra = []
             for r in jc_hits[:30]:
                 jc = r.get('Job card number', '')
                 vill = (r.get('village') or '').strip()
-                jpos = jc_pos.get(jc)
+                jpos = self._jc_pos.get(jc)
                 if jpos is None:
                     continue
-                for njc in ordered_jcs[jpos + 1:jpos + 4]:
-                    for a in self.all_applicants_data:
-                        if (a.get('Job card number') == njc
-                                and (a.get('village') or '').strip() == vill):
+                for njc in self._ordered_jcs[jpos + 1:jpos + 4]:
+                    for a in self._jc_index.get(njc, []):
+                        if (a.get('village') or '').strip() == vill:
                             extra.append(a)
             seen_ids = set(exact_ids)
             for e in extra:
@@ -1066,7 +1128,17 @@ class DemandTab(BaseAutomationTab):
                     matches.append(e)
                     seen_ids.add(id(e))
 
-        for row in matches[:120]:
+        # Empty search shows the whole report — cap it lower than a filtered
+        # search so the initial render stays instant on big eKYC reports.
+        # Typing narrows the list; ticking works from any visible row.
+        limit = 80 if len(query) < 1 else 120
+        light_mode = ctk.get_appearance_mode().lower() == "light"
+
+        def pick(pair):
+            """Theme-aware (light, dark) tuple → concrete colour for tk widgets."""
+            return pair[0] if light_mode else pair[1]
+
+        for row in matches[:limit]:
             name = row.get('Name of Applicant', '')
             jc   = row.get('Job card number', '')
             vill = row.get('village', '') or ''
@@ -1088,6 +1160,15 @@ class DemandTab(BaseAutomationTab):
                 # list WAISI HI rehti hai (reset nahi hoti) taaki user aas-pados
                 # ka agla jobcard bhi wahi se tick kar sake. Naya number type
                 # karte hi list khud filter ho jati hai.
+                # Pending debounced refresh bhi cancel karo — tick ke baad list
+                # kabhi rebuild NAHI hoti (pehle ye ~200-800ms 'render' feel
+                # deta tha).
+                if self._search_after_id is not None:
+                    try:
+                        self.after_cancel(self._search_after_id)
+                    except Exception:
+                        pass
+                    self._search_after_id = None
                 self._suppress_search_refresh = True
                 try:
                     self.search_entry.delete(0, "end")
@@ -1095,43 +1176,67 @@ class DemandTab(BaseAutomationTab):
                     pass
                 finally:
                     self._suppress_search_refresh = False
-                self.after(0, self._refresh_selected_jc_panel)
+                # Left panel ko poora rebuild karne ki jagah SIRF is JC ki row
+                # update hoti hai (add/count/remove) — tick per instant feel.
+                jc = data.get('Job card number', '')
+                self.after(0, lambda: self._sync_jc_row(jc))
                 self.after(0, self._update_selection_summary)
                 self.after(0, self.search_entry.focus_set)
 
-            row_frame = ctk.CTkFrame(self.search_results_frame,
-                                     fg_color=tint, corner_radius=6)
+            # NATIVE tk widgets — CTk widgets ~50x slower to create (2.7ms vs
+            # 0.05ms per row); 100+ rows wali rebuild wahi 'render' feel deti
+            # thi. Look same: village tint background + coloured check box.
+            row_bg = pick(tint)
+            row_frame = tkinter.Frame(self.search_results_frame, bg=row_bg)
             row_frame.pack(anchor="w", padx=4, pady=2, fill="x")
-            row_frame.grid_columnconfigure(0, weight=1)
 
-            cb = ctk.CTkCheckBox(
+            cb = tkinter.Checkbutton(
                 row_frame,
                 text=text,
                 variable=var, onvalue="on", offvalue="off",
                 command=_toggle,
-                fg_color=accent, hover_color=accent,
-                text_color=("gray10", "gray90"),
+                bg=row_bg, activebackground=row_bg,
+                selectcolor=pick(accent),
+                fg=pick(("gray10", "gray90")),
+                activeforeground=pick(("gray10", "gray90")),
+                anchor="w", justify="left",
+                relief="flat", bd=0, highlightthickness=0,
+                padx=8, pady=4,
             )
             if is_disabled:
-                cb.configure(state="disabled", text_color="gray50")
-            cb.grid(row=0, column=0, padx=(8, 6), pady=4, sticky="w")
+                cb.configure(state="disabled", fg="gray50")
+            cb.pack(fill="x")
 
-        if len(matches) > 120:
+        if len(matches) > limit:
             ctk.CTkLabel(self.search_results_frame,
-                         text=(f"... {len(matches) - 120} more — "
+                         text=(f"... {len(matches) - limit} more — "
                                "type to filter or use Select All"),
                          text_color="gray").pack(anchor="w", padx=6, pady=2)
 
+    # How many JC rows the Selected panel renders at most (a Select All on a
+    # very large eKYC report can select 1000+ job cards — the selection itself
+    # stays complete; only the summary panel is capped).
+    RENDER_CAP = 150
+
     def _refresh_selected_jc_panel(self):
         """
-        Redraws the left panel showing all currently selected JCs
+        Full rebuild of the left panel showing all currently selected JCs
         with applicant count and a ✕ remove button.
-        Fast — only renders selected JCs, not the whole list.
+
+        Used for discrete actions (Select All, Clear, file load, de-select).
+        Checkbox ticks use the cheaper _sync_jc_row() incremental path.
         """
+        for w in list(self._jc_row_cache.values()):
+            try:
+                w.destroy()
+            except Exception:
+                pass
+        self._jc_row_cache.clear()
+        self._jc_more_label = None
         for w in self.selected_jc_frame.winfo_children():
             w.destroy()
 
-        # Group selected applicants by JC
+        # Group selected applicants by JC (report order)
         selected_by_jc = {}
         for app_data in self.all_applicants_data:
             if app_data.get('_selected'):
@@ -1144,42 +1249,144 @@ class DemandTab(BaseAutomationTab):
                          text_color="gray", justify="left").pack(padx=10, pady=20)
             return
 
-        # Render cap: a Select All on a very large CSV/ekyc report can select
-        # 1000+ job cards — building a widget row for each would freeze the UI.
-        # The selection itself is complete; only the summary panel is capped.
-        RENDER_CAP = 150
-        for idx, (jc, members) in enumerate(selected_by_jc.items()):
-            if idx >= RENDER_CAP:
-                break
-            row_frame = ctk.CTkFrame(self.selected_jc_frame,
-                                     fg_color=("gray88", "gray22"), corner_radius=6)
-            row_frame.pack(fill="x", padx=4, pady=2)
-            row_frame.grid_columnconfigure(0, weight=1)
+        for jc, members in list(selected_by_jc.items())[:self.RENDER_CAP]:
+            self._create_jc_row(jc, members)
 
-            suffix = jc.split('/')[-1] if '/' in jc else jc
-            names  = ", ".join(m.get('Name of Applicant', '') for m in members)
-            vill   = next((m.get('village') for m in members if m.get('village')), "")
-            label_text = f"/{suffix}  ({len(members)} person{'s' if len(members)>1 else ''})"
-            if vill:
-                label_text += f"  🏘️ {vill}"
-            label_text += f"\n{names}"
+        if len(selected_by_jc) > self.RENDER_CAP:
+            self._show_jc_more_label(len(selected_by_jc) - self.RENDER_CAP)
 
-            ctk.CTkLabel(row_frame, text=label_text, anchor="w",
-                         justify="left", wraplength=200).grid(
-                row=0, column=0, padx=(8, 4), pady=4, sticky="ew")
+    def _create_jc_row(self, jc, members):
+        """Builds one JC row in the Selected panel and caches it for updates.
 
-            ctk.CTkButton(
-                row_frame, text="✕", width=28, height=28,
-                fg_color="transparent", hover_color=("gray70", "gray40"),
-                text_color=("gray30", "gray80"),
-                command=lambda j=jc: self._deselect_jc(j)
-            ).grid(row=0, column=1, padx=(0, 4), pady=4)
+        Native tk widgets — CTk rows are ~50x slower to create and this panel
+        rebuilds on Select All / Clear / de-select / run-finish. Compact:
+        narrow card, small paddings, font 10, capped names (see
+        _update_jc_row_label).
+        """
+        light_mode = ctk.get_appearance_mode().lower() == "light"
+        row_bg = ("gray88", "gray22")[0 if light_mode else 1]
+        row_frame = tkinter.Frame(self.selected_jc_frame, bg=row_bg)
+        row_frame.pack(fill="x", padx=3, pady=1)
 
-        if len(selected_by_jc) > RENDER_CAP:
-            ctk.CTkLabel(
+        tkinter.Button(
+            row_frame, text="✕", width=2, relief="flat", bd=0, cursor="hand2",
+            bg=row_bg, fg=("gray30", "gray80")[0 if light_mode else 1],
+            activebackground=("gray70", "gray40")[0 if light_mode else 1],
+            activeforeground=("gray30", "gray80")[0 if light_mode else 1],
+            command=lambda j=jc: self._deselect_jc(j)
+        ).pack(side="right", padx=(0, 3), pady=2)
+
+        label = tkinter.Label(
+            row_frame, text="", anchor="w", justify="left", wraplength=240,
+            bg=row_bg, fg=("gray10", "gray90")[0 if light_mode else 1],
+            font=("Segoe UI", 10))
+        label.pack(side="left", fill="x", expand=True, padx=(6, 2), pady=2)
+
+        row_frame._jc = jc
+        row_frame._label = label
+        self._jc_row_cache[jc] = row_frame
+        self._update_jc_row_label(row_frame, members)
+
+    def _update_jc_row_label(self, row_frame, members):
+        """Refreshes the text of an existing JC row — compact 2-line layout.
+
+        Line 1: '/suffix (count) 🏘️ village'
+        Line 2: sirf pehle 3 names + '+K more' — 20+ members wale JC par bhi
+                row chhota rehta hai (pehle saare names dikhte the → bahut
+                lambi row).
+        """
+        jc = row_frame._jc
+        suffix = jc.split('/')[-1] if '/' in jc else jc
+        vill = next((m.get('village') for m in members if m.get('village')), "")
+        line1 = f"/{suffix}  ({len(members)} person{'s' if len(members) > 1 else ''})"
+        if vill:
+            line1 += f"  🏘️ {vill}"
+
+        all_names = [m.get('Name of Applicant', '') for m in members]
+        if all_names:
+            shown = all_names[:3]
+            line2 = ", ".join(n for n in shown if n)
+            extra = len(all_names) - len(shown)
+            if extra > 0:
+                line2 += f"  +{extra} more"
+        else:
+            line2 = ""
+
+        label_text = line1 if not line2 else f"{line1}\n{line2}"
+        try:
+            row_frame._label.configure(text=label_text)
+        except Exception:
+            pass
+
+    def _selected_members(self, jc):
+        """Selected applicants belonging to a job card (index lookup + fallback)."""
+        rows = self._jc_index.get(jc)
+        if rows is None:
+            return [a for a in self.all_applicants_data
+                    if a.get('Job card number') == jc and a.get('_selected')]
+        return [a for a in rows if a.get('_selected')]
+
+    def _sync_jc_row(self, jc):
+        """
+        Incremental left-panel update after a checkbox tick — add/update/remove
+        only THIS job card's row instead of rebuilding the whole panel.
+        """
+        if not self._is_alive():
+            return
+        members = self._selected_members(jc)
+        row = self._jc_row_cache.get(jc)
+        if not members:
+            if row is not None:
+                try:
+                    row.destroy()
+                except Exception:
+                    pass
+                del self._jc_row_cache[jc]
+            self._update_jc_more_label()
+            return
+        if row is not None:
+            self._update_jc_row_label(row, members)
+        elif len(self._jc_row_cache) < self.RENDER_CAP:
+            self._create_jc_row(jc, members)
+        self._update_jc_more_label()
+
+    def _count_selected_jcs(self):
+        seen = set()
+        for a in self.all_applicants_data:
+            if a.get('_selected'):
+                jc = a.get('Job card number', '')
+                if jc:
+                    seen.add(jc)
+        return len(seen)
+
+    def _show_jc_more_label(self, extra):
+        if self._jc_more_label is None:
+            self._jc_more_label = ctk.CTkLabel(
                 self.selected_jc_frame,
-                text=f"... +{len(selected_by_jc) - RENDER_CAP} more selected job cards",
-                text_color="gray", justify="left").pack(padx=10, pady=6)
+                text="", text_color="gray", justify="left")
+            self._jc_more_label.pack(padx=10, pady=6)
+        self._jc_more_label.configure(text=f"... +{extra} more selected job cards")
+
+    def _update_jc_more_label(self):
+        """Keeps the '+N more selected job cards' hint in sync after ticks."""
+        if not self._is_alive():
+            return
+        total = self._count_selected_jcs()
+        shown = len(self._jc_row_cache)
+        if total > shown:
+            if self._jc_more_label is None:
+                self._jc_more_label = ctk.CTkLabel(
+                    self.selected_jc_frame,
+                    text="", text_color="gray", justify="left")
+                self._jc_more_label.pack(padx=10, pady=6)
+            self._jc_more_label.configure(
+                text=f"... +{total - shown} more selected job cards")
+        elif self._jc_more_label is not None:
+            try:
+                self._jc_more_label.destroy()
+            except Exception:
+                pass
+            self._jc_more_label = None
 
     def _deselect_jc(self, jc):
         """Removes all selections for a given job card."""
@@ -1481,6 +1688,22 @@ class DemandTab(BaseAutomationTab):
 
         self.csv_path = None
         self.all_applicants_data.clear()
+        if self._search_after_id is not None:
+            try:
+                self.after_cancel(self._search_after_id)
+            except Exception:
+                pass
+            self._search_after_id = None
+        self._jc_index = {}
+        self._ordered_jcs = []
+        self._jc_pos = {}
+        for w in list(self._jc_row_cache.values()):
+            try:
+                w.destroy()
+            except Exception:
+                pass
+        self._jc_row_cache.clear()
+        self._jc_more_label = None
         self._current_panchayat = ""
         self._current_village = ""
         self.file_label.configure(text=tr("errors.no_file_loaded"), text_color="gray")

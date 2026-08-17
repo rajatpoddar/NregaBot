@@ -185,4 +185,7 @@ BN5 = {
     "onboarding.browser.connect_failed": "Chrome-এর সাথে সংযুক্ত হওয়া যায়নি — ব্রাউজার আবার খুলে চেষ্টা করুন।",
     "demand.encoding_warn_title": "CSV-তে নাম নষ্ট হয়েছে",
     "demand.encoding_warn_msg": "আপনার CSV-তে {count}টি নামে '?' চিহ্ন আছে (যেমন: {sample})।\n\nএটি তখন ঘটে যখন ফাইলটি Excel-এ 'CSV (Comma delimited)' (ANSI) হিসেবে সংরক্ষিত হয় এবং নাম হিন্দি/আঞ্চলিক ভাষায় থাকে — '?' সেগুলো স্থায়ীভাবে প্রতিস্থাপন করে।\n\nExcel-এ ফাইলটি 'CSV UTF-8 (Comma delimited)' হিসেবে আবার সংরক্ষণ করে পুনরায় আপলোড করুন। এটি ঠিক না হওয়া পর্যন্ত ডিমান্ড পোর্টালের নামের সাথে মিলবে না।",
+    "form.work_alloc.pick_title": "ওয়ার্ক কোড নির্বাচন করুন",
+    "form.work_alloc.pick_instruction": "'{work_key}' কী-এর সাথে একাধিক ওয়ার্ক কোড মিলেছে। কোনটি বরাদ্দ করবেন তা নির্বাচন করুন:",
+    "form.work_alloc.pick_skip": "এই ওয়ার্ক কী এড়িয়ে যান",
 }
