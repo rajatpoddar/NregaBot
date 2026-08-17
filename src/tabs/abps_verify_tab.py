@@ -167,8 +167,8 @@ class AbpsVerifyTab(BaseAutomationTab):
                 return
 
             # Determine which panchayats to process
-            all_mode = panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
-            saved_mode = panchayat == config.MY_PANCHAYATS_LABEL
+            all_mode = self._is_panchayat_label(panchayat)
+            saved_mode = self._is_my_saved_panchayat(panchayat)
             panchayats_to_process = []
             if all_mode:
                 panch_dd = Select(wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "select[id*='DDL_panchayat']"))))

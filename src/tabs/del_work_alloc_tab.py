@@ -181,7 +181,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         if not panchayat:
             messagebox.showwarning(tr("errors.input_error"), tr("dialogs.panchayat_name_required"))
             return
-        if panchayat == config.ALL_PANCHAYATS_LABEL:
+        if self._is_panchayat_label(panchayat):
             if not messagebox.askyesno(tr("dialogs.confirm"), tr("dialogs.process_all_panchayats")):
                 return
 
@@ -193,7 +193,7 @@ class DelWorkAllocTab(BaseAutomationTab):
         # Parse multiple dates
         target_dates = [d.strip() for d in from_dates_raw.split(',') if d.strip()]
         
-        if panchayat not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
+        if not self._is_panchayat_label(panchayat):
             self.app.update_history("location_panchayat", panchayat)
         
         # Start Thread
@@ -265,8 +265,8 @@ class DelWorkAllocTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
 
             # Determine which panchayats to process
-            all_mode = panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
-            saved_mode = panchayat == config.MY_PANCHAYATS_LABEL
+            all_mode = self._is_panchayat_label(panchayat)
+            saved_mode = self._is_my_saved_panchayat(panchayat)
             panchayats_to_process = []
             if all_mode:
                 if not self._safe_load_page(driver, url):

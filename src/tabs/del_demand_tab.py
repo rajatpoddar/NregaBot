@@ -133,13 +133,13 @@ class DelDemandTab(BaseAutomationTab):
         if not panchayat:
             messagebox.showwarning(tr("errors.input_error"), tr("dialogs.panchayat_name_required"))
             return
-        if panchayat == config.ALL_PANCHAYATS_LABEL:
+        if self._is_panchayat_label(panchayat):
             if not messagebox.askyesno(tr("dialogs.confirm"), tr("dialogs.process_all_panchayats")):
                 return
 
         self.safe_tree_clear()
 
-        if panchayat not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
+        if not self._is_panchayat_label(panchayat):
             self.app.update_history("location_panchayat", panchayat)
         if village:
             self.app.update_history("location_village", village)
@@ -167,8 +167,8 @@ class DelDemandTab(BaseAutomationTab):
                 config.DEL_DEMAND_CONFIG.get("url", "https://nregade4.dord.gov.in/Netnrega/deletedemand.aspx"))
             
             # Determine which panchayats to process
-            all_mode = target_panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
-            saved_mode = target_panchayat == config.MY_PANCHAYATS_LABEL
+            all_mode = self._is_panchayat_label(target_panchayat)
+            saved_mode = self._is_my_saved_panchayat(target_panchayat)
             panchayats_to_process = []
             if all_mode:
                 self.log_info("Fetching all panchayats from the website...")

@@ -44,7 +44,8 @@ class ResendRejectedWgTab(BaseAutomationTab):
 
         # Panchayat Selection
         ctk.CTkLabel(controls_frame, text=tr("form.resend_wg.panchayat_optional")).grid(row=1, column=0, padx=15, pady=(5,0), sticky="w")
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=1, column=1, padx=15, pady=(5,0), sticky="ew")
@@ -151,13 +152,20 @@ class ResendRejectedWgTab(BaseAutomationTab):
             panchayat_options = [opt.text for opt in Select(panchayat_dropdown_element).options if '--Select' not in opt.text]
             
             panchayats_to_process = []
-            if inputs['process_all']:
+            if self._is_panchayat_label(inputs['panchayat']):
+                # 🌐 All / ⭐ My Saved — dropdown + saved list se resolve karo
+                panchayats_to_process = self._resolve_panchayats_to_process(
+                    driver, wait, inputs['panchayat'],
+                    ["ctl00_ContentPlaceHolder1_ddlpanch"])
+                if not panchayats_to_process:
+                    return
+            elif inputs['process_all']:
                 panchayats_to_process = panchayat_options
                 self.log_info(f"Found {len(panchayats_to_process)} Panchayats to process.")
             else:
                 if inputs['panchayat'] in panchayat_options:
                     panchayats_to_process = [inputs['panchayat']]
-                    self.app.update_history("location_panchayat", inputs['panchayat'])
+                    self._update_panchayat_history(inputs['panchayat'])
                 else:
                     messagebox.showerror(tr("dialogs.panchayat_not_found"), tr("dialogs.panchayat_not_found_msg", panchayat=inputs['panchayat']))
                     return

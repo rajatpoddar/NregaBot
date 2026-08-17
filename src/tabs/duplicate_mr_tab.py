@@ -56,7 +56,8 @@ class DuplicateMrTab(BaseAutomationTab):
         input_frame.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(input_frame, text=tr("common.panchayat_name_label")).grid(row=0, column=0, padx=15, pady=10, sticky="w")
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, padx=15, pady=10, sticky="ew")
@@ -154,7 +155,7 @@ class DuplicateMrTab(BaseAutomationTab):
         data = self.app.history_manager.get_tab_inputs("duplicate_mr")
         if data:
             if data.get('panchayat'):
-                self.panchayat_var.set(data['panchayat'])
+                self.panchayat_var.set(self._clean_panchayat_value(data.get('panchayat')))
             self.output_action_var.set(data.get('output_action', 'Save as PDF Only'))
             self.orientation_var.set(data.get('orientation', 'Landscape'))
             try:
@@ -165,7 +166,7 @@ class DuplicateMrTab(BaseAutomationTab):
                 pass
 
     def _load_history(self):
-        panchayat_history = self.app.history_manager.get_suggestions("location_panchayat")
+        panchayat_history = self._history_panchayat_values()
         # With CTkOptionMenu, suggestions are set at widget creation
         pass
 
@@ -191,7 +192,7 @@ class DuplicateMrTab(BaseAutomationTab):
             'orientation': orientation,
             'scale': scale,
         })
-        self.app.history_manager.save_entry("location_panchayat", panchayat)
+        self._update_panchayat_history(panchayat)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(panchayat, work_codes, action, orientation, scale))
 
     # --- NEW HELPER METHOD ---
@@ -233,7 +234,7 @@ class DuplicateMrTab(BaseAutomationTab):
         self.work_codes_textbox.configure(state="disabled")
         
         # Update history
-        self.app.history_manager.save_entry("location_panchayat", location_panchayat)
+        self._update_panchayat_history(location_panchayat)
         
         # Switch to the work codes tab
         for tab_name in self.master.children:
@@ -273,11 +274,28 @@ class DuplicateMrTab(BaseAutomationTab):
             return
 
         try:
-            for work_code in work_codes:
+            wait = WebDriverWait(driver, 20)
+            # 🌐 All / ⭐ My Saved mode → panchayat list resolve karo
+            panchayats_to_process = self._resolve_panchayats_to_process(
+                driver, wait, panchayat, ["ddlPanchayat"])
+            if not panchayats_to_process:
+                return
+
+            total_p = len(panchayats_to_process)
+            for p_idx, panchayat in enumerate(panchayats_to_process, 1):
                 if self.is_stopped():
                     break
-                self.log_info(f"--- Processing Work Code: {work_code} ---")
-                self._process_single_work_code(driver, work_code, action, panchayat, orientation, scale)
+                self.log_info(f"===== Panchayat {p_idx}/{total_p}: {panchayat} =====")
+                self.current_panchayat = panchayat
+                self.output_dir = self._get_output_dir(panchayat)
+                if not self.output_dir:
+                    self.log_error(f"Failed to create output directory for {panchayat}. Aborting.")
+                    break
+                for work_code in work_codes:
+                    if self.is_stopped():
+                        break
+                    self.log_info(f"--- Processing Work Code: {work_code} ---")
+                    self._process_single_work_code(driver, work_code, action, panchayat, orientation, scale)
         except Exception as e:
             self.log_error(f"A critical error occurred: {str(e).splitlines()[0]}")
         finally:

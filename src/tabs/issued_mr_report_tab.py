@@ -233,7 +233,7 @@ class IssuedMrReportTab(BaseAutomationTab):
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['panchayat']]):
             messagebox.showwarning(tr("errors.input_error"), tr("errors.input_required")); return
-        if inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL:
+        if self._is_panchayat_label(inputs['panchayat']):
             if not messagebox.askyesno(tr("dialogs.confirm"), tr("dialogs.process_all_panchayats")):
                 return
         
@@ -450,8 +450,8 @@ class IssuedMrReportTab(BaseAutomationTab):
                 wait.until(EC.presence_of_element_located((By.XPATH, main_table_xpath)))
 
             target_panchayat = inputs['panchayat'].strip()
-            all_mode = target_panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
-            saved_mode = target_panchayat == config.MY_PANCHAYATS_LABEL
+            all_mode = self._is_panchayat_label(target_panchayat)
+            saved_mode = self._is_my_saved_panchayat(target_panchayat)
 
             # Collect target panchayat name(s) from the summary table
             panchayat_names = []

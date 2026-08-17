@@ -125,7 +125,7 @@ class MacroManagerTab(BaseAutomationTab):
             # --- UI For Bulk Demand ---
             ctk.CTkLabel(self.input_frame, text=tr("common.panchayat_name_label")).grid(row=0, column=0, padx=10, pady=5, sticky="w")
             
-            p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+            p_vals = self._history_panchayat_values()
             p_var = ctk.StringVar()
             p_entry = ctk.CTkOptionMenu(self.input_frame, variable=p_var, values=p_vals, width=200)
             p_entry.grid(row=0, column=1, padx=10, pady=5, sticky="w")
@@ -157,7 +157,7 @@ class MacroManagerTab(BaseAutomationTab):
             ctk.CTkLabel(self.input_frame, text=tr("form.macro.target_panchayats")).grid(row=0, column=0, padx=10, pady=5, sticky="nw")
             
             # Re-create the standard target entry
-            t_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+            t_vals = self._history_panchayat_values()
             self.target_var = ctk.StringVar()
             self.target_entry = ctk.CTkOptionMenu(self.input_frame, variable=self.target_var, values=t_vals, width=200)
             self.target_entry.grid(row=0, column=1, padx=10, pady=5, sticky="ew")

@@ -89,7 +89,8 @@ class WorkAllocationTab(BaseAutomationTab):
         # Row 0: Panchayat
         ctk.CTkLabel(controls_frame, text=tr("common.panchayat_name_label")).grid(
             row=0, column=0, sticky='w', padx=15, pady=(15, 5))
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
@@ -281,7 +282,7 @@ class WorkAllocationTab(BaseAutomationTab):
             inputs['allocation_map'] = None
 
         if inputs['panchayat_name']:
-            self.app.update_history("location_panchayat", inputs['panchayat_name'])
+            self._update_panchayat_history(inputs['panchayat_name'])
         self._save_inputs(inputs)
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
@@ -317,29 +318,47 @@ class WorkAllocationTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
             save_wait = WebDriverWait(driver, 90)  # long wait for the Save confirmation
 
-            self.log_info("Navigating to Work Allocation page...")
-            driver.get(self.resolve_portal_url(config.WORK_ALLOCATION_CONFIG["url"]))
-
-            self._setup_page(driver, wait, inputs)
-
             work_keys: List[str] = inputs.get('work_keys', [])
             allocation_map = inputs.get('allocation_map')
             total_items = len(work_keys)
 
-            for i, work_key in enumerate(work_keys):
+            # 🌐 All / ⭐ My Saved mode → panchayat list resolve karo
+            panchayats_to_process = self._resolve_panchayats_to_process(
+                driver, wait, inputs.get('panchayat_name'), self.PANCHAYAT_IDS)
+            if not panchayats_to_process:
+                self.app.after(0, self.set_ui_state, False)
+                return
+
+            total_p = len(panchayats_to_process)
+            for p_idx, panchayat_name in enumerate(panchayats_to_process, 1):
                 if self.is_stopped():
                     self.log_warning("Stop signal received.")
                     break
+                inputs['panchayat_name'] = panchayat_name
+                self.panchayat_var.set(panchayat_name)
+                if total_p > 1:
+                    self.log_info(f"===== Panchayat {p_idx}/{total_p}: {panchayat_name} =====")
+                    self.app.after(0, self.app.set_status, f"Work Allocation: {panchayat_name}...")
 
-                status_msg = f"Processing {i + 1}/{total_items}: Key={work_key}"
-                self.app.after(0, self.app.set_status, status_msg)
-                self.app.after(0, self.update_status, status_msg, (i + 1) / total_items)
+                self.log_info("Navigating to Work Allocation page...")
+                driver.get(self.resolve_portal_url(config.WORK_ALLOCATION_CONFIG["url"]))
 
-                target_applicants = None
-                if allocation_map and work_key in allocation_map:
-                    target_applicants = allocation_map[work_key]
+                self._setup_page(driver, wait, inputs)
 
-                self._process_single_work_key(driver, wait, work_key, target_applicants, save_wait)
+                for i, work_key in enumerate(work_keys):
+                    if self.is_stopped():
+                        self.log_warning("Stop signal received.")
+                        break
+
+                    status_msg = f"Processing {i + 1}/{total_items}: Key={work_key}"
+                    self.app.after(0, self.app.set_status, status_msg)
+                    self.app.after(0, self.update_status, status_msg, (i + 1) / total_items)
+
+                    target_applicants = None
+                    if allocation_map and work_key in allocation_map:
+                        target_applicants = allocation_map[work_key]
+
+                    self._process_single_work_key(driver, wait, work_key, target_applicants, save_wait)
 
         except ValueError as e:
             had_error = True
@@ -1138,7 +1157,7 @@ class WorkAllocationTab(BaseAutomationTab):
             return
         saved_panchayat = data.get('panchayat_name')
         if saved_panchayat:
-            self.panchayat_var.set(saved_panchayat)
+            self.panchayat_var.set(self._clean_panchayat_value(saved_panchayat))
         saved_category = data.get('work_category')
         if saved_category and saved_category in self.work_category_menu.cget("values"):
             self.work_category_var.set(saved_category)

@@ -77,7 +77,8 @@ class MateMrGenTab(BaseAutomationTab):
         # Row 0 – Panchayat
         ctk.CTkLabel(controls_frame, text=tr("common.panchayat_name_label")).grid(
             row=0, column=0, sticky='w', padx=15, pady=(15, 0))
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, columnspan=3, sticky='ew', padx=15, pady=(15, 0))
@@ -268,7 +269,7 @@ class MateMrGenTab(BaseAutomationTab):
     def load_inputs(self):
         data = self.app.history_manager.get_tab_inputs("mate_mr")
         if data:
-            self.panchayat_var.set(data.get('panchayat', ''))
+            self.panchayat_var.set(self._clean_panchayat_value(data.get('panchayat')))
             self.start_date_entry.delete(0, "end")
             self.start_date_entry.insert(0, data.get('start_date', ''))
             self.end_date_entry.delete(0, "end")
@@ -339,7 +340,7 @@ class MateMrGenTab(BaseAutomationTab):
             messagebox.showwarning(tr("errors.input_error"), tr("dialogs.mr_count_error"))
             return
 
-        self.app.update_history("location_panchayat", inputs['panchayat'])
+        self._update_panchayat_history(inputs['panchayat'])
         inputs['work_codes'] = [
             line.strip() for line in inputs['work_codes_raw'].split('\n') if line.strip()]
         inputs['auto_mode'] = not bool(inputs['work_codes'])
@@ -425,26 +426,42 @@ class MateMrGenTab(BaseAutomationTab):
 
             self.log_info(f"Output will be in: {self.output_dir}")
 
-            if not self._validate_panchayat(driver, wait, inputs['panchayat']):
+            # 🌐 All / ⭐ My Saved mode → panchayat list resolve karo
+            panchayats_to_process = self._resolve_panchayats_to_process(
+                driver, wait, inputs['panchayat'], ["exe_agency"])
+            if not panchayats_to_process:
                 self.app.after(0, self.set_ui_state, False)
                 return
 
-            self.app.update_history("location_panchayat", inputs['panchayat'])
-
-            items_to_process = self._get_items_to_process(driver, wait, inputs)
-            session_skip_list = set()
-            total_items = len(items_to_process)
-
-            for index, item in enumerate(items_to_process):
+            total_p = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process, 1):
                 if self.is_stopped():
                     self.log_warning("Stop signal received.")
                     break
-                self.log_info(f"Processing item ({index + 1}/{total_items}): {item}")
-                self.app.after(
-                    0, self.update_status,
-                    f"Processing {item}", (index + 1) / total_items)
-                self._process_single_item(
-                    driver, wait, inputs, item, self.output_dir, session_skip_list)
+                self.log_info(f"===== Panchayat {p_idx}/{total_p}: {p_name} =====")
+                inputs['panchayat'] = p_name
+                self.output_dir = self._get_output_dir(p_name)
+
+                if not self._validate_panchayat(driver, wait, p_name):
+                    self.log_error(f"⛔ Skipping panchayat '{p_name}': validation failed.")
+                    continue
+
+                self._update_panchayat_history(p_name)
+
+                items_to_process = self._get_items_to_process(driver, wait, inputs)
+                session_skip_list = set()
+                total_items = len(items_to_process)
+
+                for index, item in enumerate(items_to_process):
+                    if self.is_stopped():
+                        self.log_warning("Stop signal received.")
+                        break
+                    self.log_info(f"Processing item ({index + 1}/{total_items}): {item}")
+                    self.app.after(
+                        0, self.update_status,
+                        f"{p_name}: Processing {item}", (index + 1) / total_items)
+                    self._process_single_item(
+                        driver, wait, inputs, item, self.output_dir, session_skip_list)
 
         except Exception as e:
             self.log_error(f"A critical error occurred: {e}")

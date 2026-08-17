@@ -76,3 +76,6 @@ docs/data/
 
 # Windows reserved names / temp files
 nul
+
+# Local app preferences (runtime artifacts — never commit)
+jc_verify_prefs.json

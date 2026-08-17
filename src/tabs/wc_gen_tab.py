@@ -82,7 +82,8 @@ class WcGenTab(BaseAutomationTab):
         panchayat_frame.grid(row=2, column=0, columnspan=2, sticky='ew', padx=10, pady=(0,10))
         panchayat_frame.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(panchayat_frame, text=tr("common.panchayat_label")).grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(panchayat_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
@@ -412,7 +413,7 @@ class WcGenTab(BaseAutomationTab):
         if not panchayat:
             messagebox.showwarning(tr("dialogs.input_required"), tr("dialogs.enter_panchayat_first"))
             return
-        self.app.update_history("location_panchayat", panchayat)
+        self._update_panchayat_history(panchayat)
         self.load_button.configure(state="disabled", text=tr("common.loading"))
         threading.Thread(target=self._load_initial_categories, daemon=True).start()
 
@@ -715,18 +716,36 @@ class WcGenTab(BaseAutomationTab):
             with open(self.csv_path, mode='r', encoding='utf-8') as csvfile:
                 rows = list(csv.reader(csvfile))[1:]
                 total = len(rows)
-                for i, row in enumerate(rows):
+
+                # 🌐 All / ⭐ My Saved mode → panchayat list resolve karo
+                panchayats_to_process = self._resolve_panchayats_to_process(
+                    driver, WebDriverWait(driver, 15),
+                    form_config['panchayat_name'], ["ContentPlaceHolder1_ddlpanch"])
+                if not panchayats_to_process:
+                    self.app.after(0, self.set_ui_state, False)
+                    return
+
+                total_p = len(panchayats_to_process)
+                for p_idx, panchayat_name in enumerate(panchayats_to_process, 1):
                     if self.is_stopped():
                         self.log_info("Automation stopped by user."); break
-                    if not any(field.strip() for field in row): continue
-                    
-                    self.log_info(f"--- Processing Row {i+1}/{total} ---")
-                    try:
-                        result_data = self._process_single_row(driver, form_config, row)
-                        if result_data:
-                            local_successful_wcs.append(result_data)
-                    except Exception as e:
-                        self.log_error(f"ERROR processing row {i+1}: {e}")
+                    form_config['panchayat_name'] = panchayat_name
+                    if total_p > 1:
+                        self.log_info(f"===== Panchayat {p_idx}/{total_p}: {panchayat_name} =====")
+                        self.app.after(0, self.app.set_status, f"WC Gen: {panchayat_name}...")
+
+                    for i, row in enumerate(rows):
+                        if self.is_stopped():
+                            self.log_info("Automation stopped by user."); break
+                        if not any(field.strip() for field in row): continue
+
+                        self.log_info(f"--- Processing Row {i+1}/{total} ---")
+                        try:
+                            result_data = self._process_single_row(driver, form_config, row)
+                            if result_data:
+                                local_successful_wcs.append(result_data)
+                        except Exception as e:
+                            self.log_error(f"ERROR processing row {i+1}: {e}")
         except FileNotFoundError: self.log_error("ERROR: CSV file not found.")
         except Exception as e: self.log_error(f"An unexpected error occurred: {e}")
         finally:

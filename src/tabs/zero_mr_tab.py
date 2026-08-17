@@ -43,7 +43,8 @@ class ZeroMrTab(BaseAutomationTab):
 
         # --- Row 1: Panchayat Name ---
         ctk.CTkLabel(controls_frame, text=tr("common.panchayat_name_label")).grid(row=1, column=0, sticky='w', padx=15, pady=5)
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=1, column=1, columnspan=3, sticky='ew', padx=15, pady=5)
@@ -158,7 +159,7 @@ class ZeroMrTab(BaseAutomationTab):
             return
 
         inputs['work_items'] = work_items
-        self.app.update_history("location_panchayat", inputs['panchayat_name'])
+        self._update_panchayat_history(inputs['panchayat_name'])
         self._save_inputs(inputs)
         
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
@@ -240,18 +241,33 @@ class ZeroMrTab(BaseAutomationTab):
                         self.app.after(0, self.update_status, status_msg, i / max(total_items, 1))
                         self._process_single_item(driver, wait, work_key, msr_no, p_name)
             else:
-                # --- Single panchayat ---
-                self._select_zero_mr_panchayat(driver, wait, inputs['panchayat_name'])
-                self.log_success("Setup complete. Starting item processing...")
-                total_items = len(inputs['work_items'])
-                for i, (work_key, msr_no) in enumerate(inputs['work_items']):
+                # --- Single panchayat — 🌐 All / ⭐ My Saved mode par loop ---
+                panchayats_to_process = self._resolve_panchayats_to_process(
+                    driver, wait, inputs['panchayat_name'], ["ddlpanch"])
+                if not panchayats_to_process:
+                    self.app.after(0, self.set_ui_state, False)
+                    return
+                total_p = len(panchayats_to_process)
+                for p_idx, p_name in enumerate(panchayats_to_process, 1):
                     if self.is_stopped():
                         self.log_warning("Stop signal received.")
                         break
-                    status_msg = f"Processing {i+1}/{total_items}: Key={work_key}, MSR={msr_no}"
-                    self.app.after(0, self.app.set_status, status_msg)
-                    self.app.after(0, self.update_status, status_msg, (i+1)/total_items)
-                    self._process_single_item(driver, wait, work_key, msr_no, inputs['panchayat_name'])
+                    self.log_info(f"===== Panchayat {p_idx}/{total_p}: {p_name} =====")
+                    try:
+                        self._select_zero_mr_panchayat(driver, wait, p_name)
+                    except ValueError as e:
+                        self.log_error(f"⛔ Skipping panchayat '{p_name}': {e}")
+                        continue
+                    self.log_success("Setup complete. Starting item processing...")
+                    total_items = len(inputs['work_items'])
+                    for i, (work_key, msr_no) in enumerate(inputs['work_items']):
+                        if self.is_stopped():
+                            self.log_warning("Stop signal received.")
+                            break
+                        status_msg = f"Processing {i+1}/{total_items}: Key={work_key}, MSR={msr_no}"
+                        self.app.after(0, self.app.set_status, status_msg)
+                        self.app.after(0, self.update_status, status_msg, (i+1)/total_items)
+                        self._process_single_item(driver, wait, work_key, msr_no, p_name)
 
         except Exception as e:
             error_msg = f"A critical error occurred: {e}"
@@ -596,4 +612,4 @@ class ZeroMrTab(BaseAutomationTab):
         if saved_fin_year:
             if saved_fin_year in self.fin_year_menu.cget("values"):
                 self.fin_year_menu.set(saved_fin_year)
-        self.panchayat_var.set(data.get('panchayat_name', ''))
+        self.panchayat_var.set(self._clean_panchayat_value(data.get('panchayat_name')))

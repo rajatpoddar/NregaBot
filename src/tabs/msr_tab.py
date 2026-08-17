@@ -33,7 +33,8 @@ class MsrTab(BaseAutomationTab):
         panchayat_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         panchayat_frame.grid(row=0, column=0, sticky='new', padx=15, pady=(10,0))
         ctk.CTkLabel(panchayat_frame, text=tr("form.msr.panchayat_name"), font=ctk.CTkFont(weight="bold")).pack(anchor='w')
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(panchayat_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.pack(fill='x', pady=(5,0))
@@ -231,18 +232,34 @@ class MsrTab(BaseAutomationTab):
                         self.app.after(0, self.update_status, status_msg, progress)
                         self._process_single_work_code(driver, wait, work_key, verify_amount, p_name)
             else:
-                # ═══ Single-panchayat run (manual / macro) ═══
-                self._select_panchayat(driver, wait, location_panchayat)
-                total = len(work_keys)
-                for i, work_key in enumerate(work_keys, 1):
+                # ═══ Single-panchayat run (manual / macro) — 🌐 All / ⭐ My
+                # Saved mode par har panchayat ke liye loop ═══
+                panchayats_to_process = self._resolve_panchayats_to_process(
+                    driver, wait, location_panchayat, [(By.NAME, "ddlPanchayat")])
+                if not panchayats_to_process:
+                    self.app.after(0, self.set_ui_state, False)
+                    return
+                total_p = len(panchayats_to_process)
+                for p_idx, location_panchayat in enumerate(panchayats_to_process, 1):
                     if self.is_stopped():
                         self.log_warning("Automation stopped by user.")
                         break
-                    status_msg = f"Processing {i}/{total}: {work_key}"
-                    progress = (i / total)
-                    self.app.after(0, self.app.set_status, status_msg)
-                    self.app.after(0, self.update_status, status_msg, progress)
-                    self._process_single_work_code(driver, wait, work_key, verify_amount, location_panchayat)
+                    self.log_info(f"===== Panchayat {p_idx}/{total_p}: {location_panchayat} =====")
+                    try:
+                        self._select_panchayat(driver, wait, location_panchayat)
+                    except ValueError as e:
+                        self.log_error(f"⛔ Skipping panchayat '{location_panchayat}': {e}")
+                        continue
+                    total = len(work_keys)
+                    for i, work_key in enumerate(work_keys, 1):
+                        if self.is_stopped():
+                            self.log_warning("Automation stopped by user.")
+                            break
+                        status_msg = f"{location_panchayat}: {i}/{total}: {work_key}"
+                        progress = (i / total)
+                        self.app.after(0, self.app.set_status, status_msg)
+                        self.app.after(0, self.update_status, status_msg, progress)
+                        self._process_single_work_code(driver, wait, work_key, verify_amount, location_panchayat)
                 
             if not self.is_stopped():
                 self.log_info("📊 Automation finished. Check the 'Results' tab for details.")
@@ -367,7 +384,7 @@ class MsrTab(BaseAutomationTab):
             raise ValueError("Panchayat name is required for Block Login.")
         if status == "notfound":
             raise ValueError(f"Panchayat '{location_panchayat}' not found.")
-        self.app.update_history("location_panchayat", location_panchayat)
+        self._update_panchayat_history(location_panchayat)
         self.log_success(f"Successfully selected Panchayat: {location_panchayat}")
         time.sleep(2)
 

@@ -51,7 +51,8 @@ class PhysicalCompleteTab(BaseAutomationTab):
 
         # Row 0: Panchayat
         ctk.CTkLabel(input_frame, text=tr("common.panchayat_name_label")).grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, columnspan=3, padx=15, pady=(15, 5), sticky="ew")
@@ -174,7 +175,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
         """Load previously saved inputs from DB."""
         data = self.app.history_manager.get_tab_inputs("physical_complete")
         if data:
-            self.panchayat_var.set(data.get("panchayat", ""))
+            self.panchayat_var.set(self._clean_panchayat_value(data.get("panchayat")))
             self.work_category_var.set(data.get("work_category", "Provision of Irrigation facility to Land Owned by SC/ST/LR or IAY Beneficiaries/Small or Marginal Farmers"))
     def start_automation(self) -> None:
         inputs = self._get_inputs()
@@ -183,7 +184,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
             return
 
         self._save_inputs(inputs)
-        self.app.update_history("location_panchayat", inputs["panchayat"])
+        self._update_panchayat_history(inputs["panchayat"])
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
@@ -207,26 +208,41 @@ class PhysicalCompleteTab(BaseAutomationTab):
             total_codes = len(inputs["work_codes"])
             success_count, fail_count = 0, 0
 
-            for i, work_code in enumerate(inputs["work_codes"]):
+            # 🌐 All / ⭐ My Saved mode → panchayat list resolve karo
+            panchayats_to_process = self._resolve_panchayats_to_process(
+                driver, WebDriverWait(driver, 15), inputs["panchayat"],
+                ["ctl00_ContentPlaceHolder1_ddlPanchayat"])
+            if not panchayats_to_process:
+                self.app.after(0, self.set_ui_state, False)
+                return
+
+            total_p = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process, 1):
                 if self.is_stopped():
                     self.log_warning("⏹️ Automation stopped by user.")
                     break
-                
-                pct = (i + 1) / total_codes * 100
-                status_msg = f"[{i+1}/{total_codes}] {truncate_workcode(work_code)} ({pct:.0f}%)"
-                self.app.after(0, self.app.set_status, f"Physical Complete: {status_msg}")
-                self.app.after(0, self.update_status, f"Processing {i+1}/{total_codes}", (i+1)/total_codes)
-                self.log_info(f"  🔄 [{i+1}/{total_codes}] Completing: {truncate_workcode(work_code)}")                
-                status, details = self._process_single_work_code(driver, inputs, work_code)
-                self._log_result(inputs['panchayat'], work_code, status, details)
-                
-                if status == "Success": 
-                    success_count += 1
-                    self.last_successful_codes.append(work_code)
-                    self.log_success(f"    ✅ {truncate_workcode(work_code)}: Marked complete")
-                else: 
-                    fail_count += 1
-                    self.log_error(f"    ❌ {truncate_workcode(work_code)}: {details}")
+                self.log_info(f"===== Panchayat {p_idx}/{total_p}: {p_name} =====")
+                inputs["panchayat"] = p_name
+                for i, work_code in enumerate(inputs["work_codes"]):
+                    if self.is_stopped():
+                        self.log_warning("⏹️ Automation stopped by user.")
+                        break
+                    
+                    pct = (i + 1) / total_codes * 100
+                    status_msg = f"[{i+1}/{total_codes}] {truncate_workcode(work_code)} ({pct:.0f}%)"
+                    self.app.after(0, self.app.set_status, f"Physical Complete: {status_msg}")
+                    self.app.after(0, self.update_status, f"{p_name}: {i+1}/{total_codes}", (i+1)/total_codes)
+                    self.log_info(f"  🔄 [{i+1}/{total_codes}] Completing: {truncate_workcode(work_code)}")                
+                    status, details = self._process_single_work_code(driver, inputs, work_code)
+                    self._log_result(inputs['panchayat'], work_code, status, details)
+                    
+                    if status == "Success": 
+                        success_count += 1
+                        self.last_successful_codes.append(work_code)
+                        self.log_success(f"    ✅ {truncate_workcode(work_code)}: Marked complete")
+                    else: 
+                        fail_count += 1
+                        self.log_error(f"    ❌ {truncate_workcode(work_code)}: {details}")
             self.log_info(f"{'='*50}")
             self.log_info(f"📊 Physical Complete: ✅ {success_count} done, ❌ {fail_count} failed (of {total_codes} total)")
             self.log_info(f"{'='*50}")

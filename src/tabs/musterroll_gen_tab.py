@@ -313,7 +313,7 @@ class MusterrollGenTab(BaseAutomationTab):
         if not all(inputs[k] for k in ['panchayat', 'start_date', 'end_date', 'designation', 'staff']):
             messagebox.showwarning(tr("errors.input_error"), tr("dialogs.all_fields_required"))
             return
-        if inputs['panchayat'] not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
+        if not self._is_panchayat_label(inputs['panchayat']):
             self._save_mapping_pair(inputs['panchayat'], inputs['staff'])
         inputs['work_codes'] = [line.strip() for line in inputs['work_codes_raw'].split('\n') if line.strip()]
         inputs['auto_mode'] = not bool(inputs['work_codes'])
@@ -417,8 +417,8 @@ class MusterrollGenTab(BaseAutomationTab):
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         panchayat_target = inputs.get('panchayat', '')
-        all_mode = panchayat_target in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
-        saved_mode = panchayat_target == config.MY_PANCHAYATS_LABEL
+        all_mode = self._is_panchayat_label(panchayat_target)
+        saved_mode = self._is_my_saved_panchayat(panchayat_target)
         self.log_info(f"Starting MR generation for: {panchayat_target}")
         self.app.after(0, self.app.set_status, "Running MR Generation...")
         

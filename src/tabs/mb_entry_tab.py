@@ -362,7 +362,7 @@ class MbEntryTab(BaseAutomationTab):
             if key == "location_panchayat":
                 # Default to All Panchayats when nothing useful was saved
                 default_value = config.ALL_PANCHAYATS_LABEL
-                if not saved or saved == config.ALL_PANCHAYATS_LABEL:
+                if not saved or self._is_panchayat_label(saved):
                     saved = config.ALL_PANCHAYATS_LABEL
             var.set(saved if saved is not None else default_value)
         self.after(100, self._on_panchayat_change)
@@ -393,8 +393,8 @@ class MbEntryTab(BaseAutomationTab):
                 panchayats_to_process = list(grouped_data.keys())
                 self.log_info(f"📦 MR Tracking data: processing {len(panchayats_to_process)} panchayats.")
             else:
-                all_mode = panchayat_target in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
-                saved_mode = panchayat_target == config.MY_PANCHAYATS_LABEL
+                all_mode = self._is_panchayat_label(panchayat_target)
+                saved_mode = self._is_my_saved_panchayat(panchayat_target)
                 if all_mode:
                     driver.get(self.resolve_portal_url(config.MB_ENTRY_CONFIG["url"]))
                     # Central helper — GP login has no dropdown; ⭐ My

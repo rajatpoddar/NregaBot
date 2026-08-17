@@ -301,7 +301,7 @@ class MrTrackingTab(BaseAutomationTab):
         
         if not all([inputs['state'], inputs['district'], inputs['block'], inputs['panchayat']]):
             messagebox.showwarning(tr("errors.input_error"), tr("dialogs.state_district_block_panchayat_required")); return
-        if inputs['panchayat'] == config.ALL_PANCHAYATS_LABEL:
+        if self._is_panchayat_label(inputs['panchayat']):
             if not messagebox.askyesno(tr("dialogs.confirm"), tr("dialogs.process_all_panchayats")):
                 return
         
@@ -309,7 +309,7 @@ class MrTrackingTab(BaseAutomationTab):
         self.app.update_history("location_state", inputs['state'])
         self.app.update_history("location_district", inputs['district'])
         self.app.update_history("location_block", inputs['block'])
-        if inputs['panchayat'] not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
+        if not self._is_panchayat_label(inputs['panchayat']):
             self.app.update_history("location_panchayat", inputs['panchayat'])
         
         driver = self.app.get_driver()
@@ -405,8 +405,8 @@ class MrTrackingTab(BaseAutomationTab):
                 return Select(wait.until(EC.element_to_be_clickable((By.ID, PANCH_ID))))
 
             # --- Determine which panchayats to process ---
-            all_mode = inputs['panchayat'] in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
-            saved_mode = inputs['panchayat'] == config.MY_PANCHAYATS_LABEL
+            all_mode = self._is_panchayat_label(inputs['panchayat'])
+            saved_mode = self._is_my_saved_panchayat(inputs['panchayat'])
             panchayats_to_process = []
             skip_first_nav = False
             if all_mode:

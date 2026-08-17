@@ -34,7 +34,8 @@ class SAReportTab(BaseAutomationTab):
 
         # --- Input Fields for the NEW page ---
         ctk.CTkLabel(controls_frame, text=tr("common.panchayat_label")).grid(row=0, column=0, sticky='w', padx=15, pady=(15, 5))
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(controls_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, sticky='ew', padx=15, pady=(15, 5))
@@ -108,7 +109,7 @@ class SAReportTab(BaseAutomationTab):
         inputs = {'panchayat': self.panchayat_var.get().strip(), 'year': self.year_var.get(), 'status': self.status_var.get()}
         if not all(inputs.values()): messagebox.showwarning(tr("errors.input_error"), tr("errors.input_required")); return
         
-        self.app.update_history("location_panchayat", inputs['panchayat'])
+        self._update_panchayat_history(inputs['panchayat'])
         self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=(inputs,))
 
     def run_automation_logic(self, inputs):
@@ -119,39 +120,55 @@ class SAReportTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20); url = "https://mnregaweb2.nic.in/netnrega/SocialAuditFindings/SA-ViewRespond-Issue.aspx"; driver.get(url)
             PANCHAYAT_ID, YEAR_ID, STATUS_ID, GET_DETAILS_BTN_ID, RESULTS_TABLE_ID, SPINNER_ID = ("ContentPlaceHolder1_ddlPanchayat", "ContentPlaceHolder1_ddlAuditConduct", "ContentPlaceHolder1_ddlStatus", "ContentPlaceHolder1_btnFilterData", "ContentPlaceHolder1_grd_IssueDetails", "ContentPlaceHolder1_UpdateProgress1")
 
-            self.log_info(f"Selecting Panchayat: {inputs['panchayat']}"); self.select_dropdown(driver, PANCHAYAT_ID, inputs['panchayat']); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
             self.log_info(f"Selecting Year: {inputs['year']}"); Select(wait.until(EC.element_to_be_clickable((By.ID, YEAR_ID)))).select_by_visible_text(inputs['year']); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
             self.log_info(f"Selecting Status: {inputs['status']}"); Select(wait.until(EC.element_to_be_clickable((By.ID, STATUS_ID)))).select_by_visible_text(inputs['status'])
-            self.log_info("Fetching details...");
-            try: old_first_row = driver.find_element(By.XPATH, f"//table[@id='{RESULTS_TABLE_ID}']//tr[2]")
-            except NoSuchElementException: old_first_row = None
-            driver.find_element(By.ID, GET_DETAILS_BTN_ID).click(); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
-            if old_first_row:
-                try: wait.until(EC.staleness_of(old_first_row))
-                except TimeoutException: self.log_warning("Staleness check timed out, proceeding...")
 
-            table = wait.until(EC.presence_of_element_located((By.ID, RESULTS_TABLE_ID))); total_rows = len(table.find_elements(By.XPATH, ".//tr[position()>1]")); self.log_info(f"Found {total_rows} records.")
-            for i in range(total_rows):
+            # 🌐 All / ⭐ My Saved mode → panchayat list resolve karo
+            panchayats_to_process = self._resolve_panchayats_to_process(
+                driver, wait, inputs['panchayat'], [PANCHAYAT_ID])
+            if not panchayats_to_process:
+                self.app.after(0, self.set_ui_state, False)
+                return
+
+            total_p = len(panchayats_to_process)
+            for p_idx, panchayat_name in enumerate(panchayats_to_process, 1):
                 if self.is_stopped(): self.log_warning("Stop signal received."); break
-                
-                # --- UPDATE: Better Status ---
-                status_msg = f"Processing row {i+1}/{total_rows}"
-                self.app.after(0, self.app.set_status, status_msg)
-                self.app.after(0, self.update_status, status_msg, (i+1)/total_rows)
-                # --- END UPDATE ---
-                
-                row = wait.until(EC.presence_of_element_located((By.XPATH, f"//table[@id='{RESULTS_TABLE_ID}']//tr[{i+2}]"))); cells = row.find_elements(By.TAG_NAME, "td")
-                
-                sr_no, district, block, panchayat, issue_no, issue_type, forwarded_to, status = (cells[0].text.strip(), cells[1].text.strip(), cells[2].text.strip(), cells[3].text.strip(), cells[4].text.strip(), cells[5].text.strip(), cells[6].text.strip(), cells[7].text.strip())
-                self.log_info(f"({sr_no}/{total_rows}) Clicking 'View' for Issue: {issue_no}"); view_button = cells[9].find_element(By.TAG_NAME, "input"); driver.execute_script("arguments[0].click();", view_button)
-                modal_wait = WebDriverWait(driver, 10); issue_description = modal_wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lblIssueDesc"))).text.strip()
-                modal_wait.until(EC.element_to_be_clickable((By.ID, "btnCloseModel"))).click(); modal_wait.until(EC.invisibility_of_element_located((By.ID, "successModal")))
-                try: modal_wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "modal-backdrop")))
-                except TimeoutException: self.log_warning("Modal backdrop did not disappear normally. Proceeding...")
-                
-                result_data = (sr_no, district, block, panchayat, issue_no, issue_type, forwarded_to, status, issue_description)
-                # Website ka SR# ignore — local serial auto-fill hota hai (_tree_insert)
-                self.app.after(0, lambda data=result_data: self._tree_insert(self.results_tree, data))
+                inputs['panchayat'] = panchayat_name
+                if total_p > 1:
+                    self.log_info(f"===== Panchayat {p_idx}/{total_p}: {panchayat_name} =====")
+                    self.app.after(0, self.app.set_status, f"SA Report: {panchayat_name}...")
+
+                self.log_info(f"Selecting Panchayat: {panchayat_name}"); self.select_dropdown(driver, PANCHAYAT_ID, panchayat_name); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
+                self.log_info("Fetching details...");
+                try: old_first_row = driver.find_element(By.XPATH, f"//table[@id='{RESULTS_TABLE_ID}']//tr[2]")
+                except NoSuchElementException: old_first_row = None
+                driver.find_element(By.ID, GET_DETAILS_BTN_ID).click(); wait.until(EC.invisibility_of_element_located((By.ID, SPINNER_ID)))
+                if old_first_row:
+                    try: wait.until(EC.staleness_of(old_first_row))
+                    except TimeoutException: self.log_warning("Staleness check timed out, proceeding...")
+
+                table = wait.until(EC.presence_of_element_located((By.ID, RESULTS_TABLE_ID))); total_rows = len(table.find_elements(By.XPATH, ".//tr[position()>1]")); self.log_info(f"Found {total_rows} records.")
+                for i in range(total_rows):
+                    if self.is_stopped(): self.log_warning("Stop signal received."); break
+
+                    # --- UPDATE: Better Status ---
+                    status_msg = f"Processing row {i+1}/{total_rows}"
+                    self.app.after(0, self.app.set_status, status_msg)
+                    self.app.after(0, self.update_status, status_msg, (i+1)/total_rows)
+                    # --- END UPDATE ---
+
+                    row = wait.until(EC.presence_of_element_located((By.XPATH, f"//table[@id='{RESULTS_TABLE_ID}']//tr[{i+2}]"))); cells = row.find_elements(By.TAG_NAME, "td")
+
+                    sr_no, district, block, panchayat, issue_no, issue_type, forwarded_to, status = (cells[0].text.strip(), cells[1].text.strip(), cells[2].text.strip(), cells[3].text.strip(), cells[4].text.strip(), cells[5].text.strip(), cells[6].text.strip(), cells[7].text.strip())
+                    self.log_info(f"({sr_no}/{total_rows}) Clicking 'View' for Issue: {issue_no}"); view_button = cells[9].find_element(By.TAG_NAME, "input"); driver.execute_script("arguments[0].click();", view_button)
+                    modal_wait = WebDriverWait(driver, 10); issue_description = modal_wait.until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lblIssueDesc"))).text.strip()
+                    modal_wait.until(EC.element_to_be_clickable((By.ID, "btnCloseModel"))).click(); modal_wait.until(EC.invisibility_of_element_located((By.ID, "successModal")))
+                    try: modal_wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "modal-backdrop")))
+                    except TimeoutException: self.log_warning("Modal backdrop did not disappear normally. Proceeding...")
+
+                    result_data = (sr_no, district, block, panchayat, issue_no, issue_type, forwarded_to, status, issue_description)
+                    # Website ka SR# ignore — local serial auto-fill hota hai (_tree_insert)
+                    self.app.after(0, lambda data=result_data: self._tree_insert(self.results_tree, data))
         except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as e: error_msg = f"A browser error occurred: {str(e).splitlines()[0]}"; self.log_error(error_msg); messagebox.showerror(tr("base.automation_error.title"), error_msg)
         except Exception as e: self.log_error(f"An unexpected error occurred: {e}"); messagebox.showerror(tr("dialogs.critical_error"), tr("dialogs.unexpected_error", error=e))
         finally:

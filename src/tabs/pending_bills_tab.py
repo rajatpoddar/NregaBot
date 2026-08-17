@@ -275,7 +275,9 @@ class PendingBillsTab(BaseAutomationTab):
     def _on_block_change(self, *_):
         self.panchayat_var.set(ALL_PANCHAYATS_LABEL)
         self.panchayat_menu.configure(
-            values=[ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL] + [v for v in self._panchayat_values(self.block_var.get().strip()) if v])
+            # _all_panchayat_values history se labels filter karta hai — warna
+            # purana saved label prefix + history dono se aa kar 2 baar dikhta.
+            values=self._all_panchayat_values(self._panchayat_values(self.block_var.get().strip())))
 
     # ────────────────────────────────────────────────────────────────────────
     # STATE / INPUT MANAGEMENT
@@ -481,7 +483,7 @@ class PendingBillsTab(BaseAutomationTab):
 
                     # ── page=B → panchayat codes ──
                     panchayats = self._get_panchayats(cfg, b_html)
-                    if panchayat == config.MY_PANCHAYATS_LABEL:
+                    if self._is_my_saved_panchayat(panchayat):
                         saved = {self._normalize_name(p) for p in self._get_saved_panchayats() if p and p.strip()}
                         if not saved:
                             self.log_warning("  ⚠ No saved panchayat found in Settings > Location Data.")

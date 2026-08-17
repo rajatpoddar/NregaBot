@@ -147,7 +147,7 @@ class WagelistGenTab(BaseAutomationTab):
             messagebox.showwarning(tr("errors.input_error"), tr("dialogs.agency_panchayat_required"))
             return
 
-        if agency not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
+        if not self._is_panchayat_label(agency):
             self.app.update_history("location_panchayat", agency)
         
         # We pass it as a list [agency] so the looping logic in run_automation_logic handles it correctly
@@ -184,8 +184,8 @@ class WagelistGenTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 30)
             
             # --- ALL / MY SAVED PANCHAYATS MODE: fetch the panchayat list from the website ---
-            if len(agency_list) == 1 and agency_list[0] in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
-                saved_mode = agency_list[0] == config.MY_PANCHAYATS_LABEL
+            if len(agency_list) == 1 and self._is_panchayat_label(agency_list[0]):
+                saved_mode = self._is_my_saved_panchayat(agency_list[0])
                 driver.get(self.resolve_portal_url(config.WAGELIST_GEN_CONFIG["base_url"]))
                 try:
                     agency_select = wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_exe_agency')))

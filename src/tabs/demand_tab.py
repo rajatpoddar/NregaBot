@@ -230,6 +230,14 @@ class DemandTab(BaseAutomationTab):
         self._current_panchayat = ""  # active group while automation runs (results display)
         self._current_village = ""
 
+        # Retry chain ke pehle-wale successful labourers (run 1) yahan carry
+        # hote hain — retry run start_automation() results tree CLEAR kar deta
+        # hai, isliye finally-block unhe is set se merge karta hai taaki
+        # auto-allocation me SABHI successful jobcards aa saken (sirf retried
+        # nahi). _handoff_allocation._proceed() par clear ho jata hai.
+        self._retry_prior_success_names = set()
+        self._skip_retry_clear = False  # _retry_failed_applicants ise True karta hai
+
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -598,11 +606,8 @@ class DemandTab(BaseAutomationTab):
         dropdown entries in other tabs and can end up saved in history — they
         are NOT selectable panchayats and would fail as 'Panchayat Not Found'
         if chosen here."""
-        labels = {str(getattr(config, 'ALL_PANCHAYATS_LABEL', '')),
-                  str(getattr(config, 'MY_PANCHAYATS_LABEL', ''))}
-        labels.discard('')
         return [p for p in (self._get_saved_panchayats() or [])
-                if p and str(p).strip() not in labels]
+                if p and not self._is_panchayat_label(p)]
 
     def _process_input_file(self, path):
         """
@@ -1581,6 +1586,13 @@ class DemandTab(BaseAutomationTab):
         Validates all user inputs and starts the main automation thread
         using the app's built-in thread manager (which plays sound).
         """
+        # FRESH run par carry-over set clear karo (retry chain ka data agle
+        # run me leak na ho). _retry_failed_applicants ise skip karwata hai.
+        skip_retry_clear = getattr(self, '_skip_retry_clear', False)
+        self._skip_retry_clear = False
+        if not skip_retry_clear:
+            self._retry_prior_success_names = set()
+
         # --- 1. Get and Validate Inputs ---
         state = self.state_var.get()
         if not state: messagebox.showerror(tr("errors.input_error"), tr("dialogs.select_state")); return
@@ -1627,7 +1639,9 @@ class DemandTab(BaseAutomationTab):
         self.set_ui_state(running=True) # Disable UI elements
 
         # --- 3. Save History and Group Data ---
-        self.app.history_manager.save_entry("location_panchayat", panchayat)
+        # Labels (All/My Saved) history mein kabhi save nahi hote — demand ka
+        # dropdown unhe filter karta hai, par saved data se bhi leak na ho.
+        self._update_panchayat_history(panchayat)
         if state and state in getattr(self, 'state_options', []):
             self.app.history_manager.save_entry("location_state", state.upper())
         self.app.history_manager.save_entry("demand_days", days_str)
@@ -1885,6 +1899,18 @@ class DemandTab(BaseAutomationTab):
                         elif "fail" in status or "error" in status:
                             failed_names.add(name)
 
+                    # Retry run: start_automation() ne tree clear kar diya tha,
+                    # isliye run 1 ke successful names tree me nahi hain — unhe
+                    # carry-over set se merge karo taaki auto-allocation me
+                    # SABHI successful jobcards aa saken (sirf retried nahi).
+                    if self._retry_prior_success_names:
+                        carried = self._retry_prior_success_names - success_names
+                        if carried:
+                            success_names |= carried
+                            self.log_info(
+                                f"↻ Retry: {len(carried)} pehle-successful labourer(s) "
+                                f"bhi allocation me shamil kiye.")
+
                     panchayat = getattr(self, '_current_panchayat', '') or ""
 
                     # Per-worker work codes (legacy CSV 'Allocation Work Code')
@@ -1930,6 +1956,9 @@ class DemandTab(BaseAutomationTab):
         never 'Allocate All'. An empty map means nothing succeeded, so no
         allocation happens."""
         def _proceed() -> None:
+            # Carry-over set ab consume ho chuka hai (allocation map usi se
+            # bana) — clear karo taaki agla FRESH run ise dobara na uthaye.
+            self._retry_prior_success_names = set()
             if allocation_map:
                 count = sum(len(v) for v in allocation_map.values())
                 self.app.after(0, self.app.log_message, self.log_display,
@@ -2603,11 +2632,15 @@ class DemandTab(BaseAutomationTab):
         Adds a new row to the results treeview with correct color tags.
         """
         jc, name, status = data[0], data[1], data[2]
+        # Fallback values kabhi special labels nahi hote — agar panchayat_var
+        # mein '🌐 All Panchayats'/'⭐ My Saved Panchayats' ho to uski jagah
+        # '-' dikhao (label literal panchayat ki tarah result mein na aaye).
+        fallback_panchayat = self._clean_panchayat_value(self.panchayat_var.get()) or "-"
         if len(data) >= 5:
-            panchayat = data[3] or self.panchayat_var.get().strip() or "-"
+            panchayat = data[3] or fallback_panchayat
             village = data[4] or "-"
         else:
-            panchayat = getattr(self, '_current_panchayat', '') or self.panchayat_var.get().strip() or "-"
+            panchayat = getattr(self, '_current_panchayat', '') or fallback_panchayat
             village = getattr(self, '_current_village', '') or "-"
         row_id = len(self.results_tree.get_children()) + 1
         
@@ -2670,12 +2703,32 @@ class DemandTab(BaseAutomationTab):
                 tr("demand.retry_not_in_csv"))
             return
 
+        # Retry run se PEHLE: abhi tree me jo successful hain (run 1 ke) unhe
+        # carry-over set me accumulate karo. Retry ka start_automation() tree
+        # clear kar dega — isliye ye names yahan preserve hote hain aur retry
+        # run ke finally-block me merge hote hain. Isse auto-allocation me
+        # run 1 + retry dono ke successful jobcards aate hain (sirf retried
+        # wale nahi).
+        try:
+            for item_id in self.results_tree.get_children():
+                values = self.results_tree.item(item_id, 'values')
+                status = str(values[5]).lower() if len(values) > 5 else ""
+                name = str(values[4]).strip() if len(values) > 4 else ""
+                if name and "success" in status:
+                    self._retry_prior_success_names.add(name)
+        except Exception:
+            pass
+
         self._refresh_selected_jc_panel()
         self._update_selection_summary()
         self._update_jc_header_counters()
         self.log_info(f"Re-selected {re_selected_count} failed applicants. Restarting demand automation...")
 
-        # Turant automation re-run for just the failed applicants
+        # Turant automation re-run for just the failed applicants. Flag set
+        # karo taaki start_automation() carry-over set clear na kare (usme
+        # run 1 ke successful names hain jo retry ke baad allocation me
+        # merge hone chahiye).
+        self._skip_retry_clear = True
         self.start_automation()
 
     def export_results(self):
@@ -2707,7 +2760,7 @@ class DemandTab(BaseAutomationTab):
                 self.state_var.set(saved_state)
             elif getattr(self, 'state_options', []):
                 self.state_var.set(self.state_options[0])
-            self.panchayat_var.set(data.get('panchayat', ''))
+            self.panchayat_var.set(self._clean_panchayat_value(data.get('panchayat')))
             days_to_set = data.get('days', days_to_set)
             work_key_to_set = data.get('work_key_for_allocation', '')
             loaded = data.get('demand_date', '');

@@ -147,7 +147,7 @@ class EmbVerifyTab(BaseAutomationTab):
 
         work_codes = [line.strip() for line in self.work_codes_text.get("1.0", "end-1c").splitlines() if line.strip()]
         
-        if panchayat not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL):
+        if not self._is_panchayat_label(panchayat):
             self.app.update_history("location_panchayat", panchayat)
         for wc in work_codes:
             self.app.update_history("work_code", wc)
@@ -191,8 +191,8 @@ class EmbVerifyTab(BaseAutomationTab):
             wait = WebDriverWait(driver, 20)
 
             # Determine which panchayats to process
-            all_mode = panchayat in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)
-            saved_mode = panchayat == config.MY_PANCHAYATS_LABEL
+            all_mode = self._is_panchayat_label(panchayat)
+            saved_mode = self._is_my_saved_panchayat(panchayat)
             panchayats_to_process = []
             if all_mode:
                 driver.get(self.resolve_portal_url(config.EMB_VERIFY_CONFIG["url"]))
@@ -269,7 +269,7 @@ class EmbVerifyTab(BaseAutomationTab):
                         wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddl_work")))
                         time.sleep(1.5)  # Brief wait for postback to begin
 
-                if p_name != config.ALL_PANCHAYATS_LABEL:
+                if not self._is_panchayat_label(p_name):
                     self.app.update_history("location_panchayat", p_name)
 
             # Queue summary on main thread after inserts are processed

@@ -150,7 +150,8 @@ class MaterialEntryTab(BaseAutomationTab):
         input_frame.grid_columnconfigure(1, weight=1)
         input_frame.grid_columnconfigure(3, weight=1)
         ctk.CTkLabel(input_frame, text=tr("form.material_entry.panchayat_block")).grid(row=0, column=0, padx=15, pady=5, sticky="w")
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.grid(row=0, column=1, columnspan=3, padx=15, pady=5, sticky="ew")
@@ -401,202 +402,217 @@ class MaterialEntryTab(BaseAutomationTab):
         success_count = 0
         fail_count = 0
         try:
-            for i, task in enumerate(inputs["tasks"]):
+            # 🌐 All / ⭐ My Saved mode → panchayat list resolve karo
+            panchayats_to_process = self._resolve_panchayats_to_process(
+                driver, wait, inputs['panchayat'],
+                ["ctl00_ContentPlaceHolder1_ddlpanchayat_code"])
+            if not panchayats_to_process:
+                self.app.after(0, self.set_common_ui_state, False)
+                return
+
+            total_p = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process, 1):
                 if self.is_stopped():
                     self.log_warning("⚠ Automation stopped by user.")
                     break
-                work_key = task['work_key']
-                bill_no = task['bill_no']
-                self.update_status(f"Processing {work_key} (Bill {bill_no})", (i + 1) / total_tasks)
-                self.log_info(f"▶ Processing Work Key: {work_key} | Bill: {bill_no}")
-                try:
-                    driver.get(self.resolve_portal_url(config.MATERIAL_ENTRY_CONFIG["url"]))
-                    # Wait for page to fully load before interacting
-                    wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
-                    time.sleep(1.5)  # Brief wait for postback to begin
-                    # 1. Panchayat (Block Login) — central helper: GP login par
-                    # panchayat has no dropdown, so selection is skipped and
-                    # automation continues with villages/work
-                    if inputs['panchayat']:
-                        status, _ = self._select_panchayat_or_skip(
-                            driver, wait, inputs['panchayat'],
-                            ["ctl00_ContentPlaceHolder1_ddlpanchayat_code"])
-                        if status == "gp":
-                            self.log_info("ℹ Panchayat dropdown not found (GP login assumed)")
-                        elif status == "selected":
-                            self.log_info(f"✓ Panchayat selected: {inputs['panchayat']}")
-                            time.sleep(1.5)  # Brief wait for postback to begin
-                        elif status == "notfound":                             self.log_warning(f"⚠️ Panchayat '{inputs['panchayat']}' not found in dropdown.")
-                    # 2. Work Category — re-fetch after panchayat postback to avoid stale
-                    self.log_info("▶ Selecting Work Category...")
-                    for attempt in range(3):
-                        try:
-                            cat_dd_el = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
-                            wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
-                            Select(cat_dd_el).select_by_visible_text(inputs['work_category'])
-                            self.log_info(f"✓ Category: {inputs['work_category']}")
-                            break
-                        except StaleElementReferenceException:
-                            if attempt == 2:
-                                raise
-                            time.sleep(1.5)  # Brief wait for postback to begin
-                    time.sleep(1.5)  # Brief wait for postback to begin
-                    # 3. Work Code Search
-                    self.log_info(f"▶ Searching Work Key: {work_key}...")
-                    for attempt in range(3):
-                        try:
-                            search_wk = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txtwrksearchkey")))
-                            search_wk.clear()
-                            search_wk.send_keys(work_key)
-                            search_wk.send_keys(Keys.TAB)
-                            break
-                        except StaleElementReferenceException:
-                            if attempt == 2:
-                                raise
-                            time.sleep(1.5)  # Brief wait for postback to begin
-                    time.sleep(1.5)  # Brief wait for postback to begin
-                    # Re-fetch dropdown fresh after postback
-                    found_wc = False
-                    for attempt in range(3):
-                        try:
-                            wc_dd_el = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlWork_code")))
-                            wc_dd = Select(wc_dd_el)
-                            for opt in wc_dd.options:
-                                if work_key in opt.text:
-                                    wc_dd.select_by_visible_text(opt.text)
-                                    self.log_info(f"✓ Work code selected: {opt.text}")
-                                    found_wc = True
-                                    break
-                            break
-                        except StaleElementReferenceException:
-                            if attempt == 2:
-                                raise
-                            time.sleep(1)
-                    if not found_wc:
-                        self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", "Work code not found in dropdown")
-                        fail_count += 1
-                        continue
-                    time.sleep(1.5)  # Brief wait for postback to begin
-                    # 4. Vendor Code
-                    self.log_info(f"▶ Searching Vendor: {inputs['vendor_code']}...")
-                    for attempt in range(3):
-                        try:
-                            vendor_txt = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txttinsearch")))
-                            vendor_txt.clear()
-                            vendor_txt.send_keys(inputs['vendor_code'])
-                            vendor_txt.send_keys(Keys.TAB)
-                            break
-                        except StaleElementReferenceException:
-                            if attempt == 2:
-                                raise
-                            time.sleep(1.5)  # Brief wait for postback to begin
-                    time.sleep(1.5)  # Brief wait for postback to begin
-                    vendor_found = False
-                    for attempt in range(3):
-                        try:
-                            vendor_dd = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlVendor"))))
-                            if len(vendor_dd.options) > 1:
-                                vendor_dd.select_by_index(1)
-                                self.log_info(f"✓ Vendor selected: {vendor_dd.first_selected_option.text}")
-                                vendor_found = True
-                            break
-                        except StaleElementReferenceException:
-                            if attempt == 2:
-                                raise
-                            time.sleep(1.5)  # Brief wait for postback to begin
-                    if not vendor_found:
-                        self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", "Vendor not found after search")
-                        fail_count += 1
-                        continue
-                    time.sleep(1.5)  # Brief wait for postback to begin
-                    # 5. Bill Details
-                    self.log_info("▶ Entering Bill Details...")
-                    bill_input = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_txtBill_no")
-                    bill_input.clear()
-                    bill_input.send_keys(bill_no)
-                    date_input = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_txtBilldate")
-                    date_input.clear()
-                    date_input.send_keys(inputs['bill_date'])
-                    date_input.send_keys(Keys.TAB)
-                    self.log_info(f"✓ Bill No: {bill_no}, Date: {inputs['bill_date']}")
-                    time.sleep(1.5)  # Brief wait for postback to begin
-                    # 6. Fill Materials
-                    self.log_info("▶ Filling Materials...")
-                    filled_count = 0
-                    for mat in inputs['materials']:
-                        try:
-                            xpath = f"//table[@id='ctl00_ContentPlaceHolder1_gvData']//tr[.//span[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{mat['name'].lower()}')]]"
-                            mat_row = driver.find_element(By.XPATH, xpath)
-                            rate_input = mat_row.find_element(By.XPATH, ".//input[contains(@id, '_Rate')]")
-                            rate_input.clear()
-                            rate_input.send_keys(mat['rate'])
-                            rate_input.send_keys(Keys.TAB)
-                            qty_input = mat_row.find_element(By.XPATH, ".//input[contains(@id, '_Quantity')]")
-                            qty_input.clear()
-                            qty_input.send_keys(mat['qty'])
-                            qty_input.send_keys(Keys.TAB)
-                            gst_dd = Select(mat_row.find_element(By.XPATH, ".//select[contains(@id, '_gst_slab')]"))
-                            gst_dd.select_by_visible_text(mat['gst'])
-                            self.log_info(f"  ✓ {mat['name']}: Rate={mat['rate']}, Qty={mat['qty']}, GST={mat['gst']}%")
-                            filled_count += 1
-                        except NoSuchElementException:
-                            self.log_warning(f"  ⚠ Material '{mat['name']}' not found in table")
-                        except (StaleElementReferenceException, ElementNotInteractableException) as e:
-                            self.log_warning(f"  ⚠ Error filling '{mat['name']}': {str(e)}")
-                    if filled_count == 0:
-                        self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", "No materials could be filled")
-                        fail_count += 1
-                        continue
-                    time.sleep(1.5)  # Brief wait for postback to begin
-                    # 7. Checkbox & Submit
-                    self.log_info("▶ Confirming and Saving...")
-                    checkbox = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_CheckBox1")
-                    if not checkbox.is_selected():
-                        driver.execute_script("arguments[0].click();", checkbox)
-                    submit_btn = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_cmdProceed")
-                    driver.execute_script("arguments[0].click();", submit_btn)
-                    time.sleep(2.0)  # Short wait after click
-                    # 8. Handle Alerts
+                self.log_info(f"===== Panchayat {p_idx}/{total_p}: {p_name} =====")
+                inputs['panchayat'] = p_name
+                for i, task in enumerate(inputs["tasks"]):
+                    if self.is_stopped():
+                        self.log_warning("⚠ Automation stopped by user.")
+                        break
+                    work_key = task['work_key']
+                    bill_no = task['bill_no']
+                    self.update_status(f"Processing {work_key} (Bill {bill_no})", (i + 1) / total_tasks)
+                    self.log_info(f"▶ Processing Work Key: {work_key} | Bill: {bill_no}")
                     try:
-                        alert = WebDriverWait(driver, 3).until(EC.alert_is_present())
-                        alert_text = alert.text
-                        alert.accept()
-                        self.log_warning(f"ℹ Alert: {alert_text}")
-                    except TimeoutException:
-                        pass
-                    # 9. Check Success
-                    try:
-                        success_msg = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_lblMsg"))).text
-                        if "successfully" in success_msg.lower() or "saved" in success_msg.lower():
-                            self.log_info(f"✅ SUCCESS: {success_msg}")
-                            self._log_result(inputs['panchayat'], work_key, bill_no, "Success", success_msg)
-                            success_count += 1
-                        else:
-                            self.log_warning(f"Unexpected message: {success_msg}")
-                            self._log_result(inputs['panchayat'], work_key, bill_no, "Warning", success_msg)
-                    except TimeoutException:
-                        self.log_warning("⚠ Could not verify success message")
-                        self._log_result(inputs['panchayat'], work_key, bill_no, "Unknown", "No confirmation message found")
-                except TimeoutException as e:
-                    error_msg = f"Timeout: Element not found - {str(e)}"
-                    self.log_error(f"{error_msg}")
-                    self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
-                    fail_count += 1
-                except NoSuchElementException as e:
-                    error_msg = f"Element not found: {str(e)}"
-                    self.log_error(f"{error_msg}")
-                    self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
-                    fail_count += 1
-                except WebDriverException as e:
-                    error_msg = f"WebDriver error: {str(e)}"
-                    self.log_error(f"{error_msg}")
-                    self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
-                    fail_count += 1
-                except Exception as e:
-                    error_msg = f"Unexpected error: {str(e)}"
-                    self.log_error(f"{error_msg}")
-                    self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
-                    fail_count += 1
+                        driver.get(self.resolve_portal_url(config.MATERIAL_ENTRY_CONFIG["url"]))
+                        # Wait for page to fully load before interacting
+                        wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
+                        time.sleep(1.5)  # Brief wait for postback to begin
+                        # 1. Panchayat (Block Login) — central helper: GP login par
+                        # panchayat has no dropdown, so selection is skipped and
+                        # automation continues with villages/work
+                        if inputs['panchayat']:
+                            status, _ = self._select_panchayat_or_skip(
+                                driver, wait, inputs['panchayat'],
+                                ["ctl00_ContentPlaceHolder1_ddlpanchayat_code"])
+                            if status == "gp":
+                                self.log_info("ℹ Panchayat dropdown not found (GP login assumed)")
+                            elif status == "selected":
+                                self.log_info(f"✓ Panchayat selected: {inputs['panchayat']}")
+                                time.sleep(1.5)  # Brief wait for postback to begin
+                            elif status == "notfound":                             self.log_warning(f"⚠️ Panchayat '{inputs['panchayat']}' not found in dropdown.")
+                        # 2. Work Category — re-fetch after panchayat postback to avoid stale
+                        self.log_info("▶ Selecting Work Category...")
+                        for attempt in range(3):
+                            try:
+                                cat_dd_el = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
+                                wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_ddlworkcategory")))
+                                Select(cat_dd_el).select_by_visible_text(inputs['work_category'])
+                                self.log_info(f"✓ Category: {inputs['work_category']}")
+                                break
+                            except StaleElementReferenceException:
+                                if attempt == 2:
+                                    raise
+                                time.sleep(1.5)  # Brief wait for postback to begin
+                        time.sleep(1.5)  # Brief wait for postback to begin
+                        # 3. Work Code Search
+                        self.log_info(f"▶ Searching Work Key: {work_key}...")
+                        for attempt in range(3):
+                            try:
+                                search_wk = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txtwrksearchkey")))
+                                search_wk.clear()
+                                search_wk.send_keys(work_key)
+                                search_wk.send_keys(Keys.TAB)
+                                break
+                            except StaleElementReferenceException:
+                                if attempt == 2:
+                                    raise
+                                time.sleep(1.5)  # Brief wait for postback to begin
+                        time.sleep(1.5)  # Brief wait for postback to begin
+                        # Re-fetch dropdown fresh after postback
+                        found_wc = False
+                        for attempt in range(3):
+                            try:
+                                wc_dd_el = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlWork_code")))
+                                wc_dd = Select(wc_dd_el)
+                                for opt in wc_dd.options:
+                                    if work_key in opt.text:
+                                        wc_dd.select_by_visible_text(opt.text)
+                                        self.log_info(f"✓ Work code selected: {opt.text}")
+                                        found_wc = True
+                                        break
+                                break
+                            except StaleElementReferenceException:
+                                if attempt == 2:
+                                    raise
+                                time.sleep(1)
+                        if not found_wc:
+                            self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", "Work code not found in dropdown")
+                            fail_count += 1
+                            continue
+                        time.sleep(1.5)  # Brief wait for postback to begin
+                        # 4. Vendor Code
+                        self.log_info(f"▶ Searching Vendor: {inputs['vendor_code']}...")
+                        for attempt in range(3):
+                            try:
+                                vendor_txt = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txttinsearch")))
+                                vendor_txt.clear()
+                                vendor_txt.send_keys(inputs['vendor_code'])
+                                vendor_txt.send_keys(Keys.TAB)
+                                break
+                            except StaleElementReferenceException:
+                                if attempt == 2:
+                                    raise
+                                time.sleep(1.5)  # Brief wait for postback to begin
+                        time.sleep(1.5)  # Brief wait for postback to begin
+                        vendor_found = False
+                        for attempt in range(3):
+                            try:
+                                vendor_dd = Select(wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlVendor"))))
+                                if len(vendor_dd.options) > 1:
+                                    vendor_dd.select_by_index(1)
+                                    self.log_info(f"✓ Vendor selected: {vendor_dd.first_selected_option.text}")
+                                    vendor_found = True
+                                break
+                            except StaleElementReferenceException:
+                                if attempt == 2:
+                                    raise
+                                time.sleep(1.5)  # Brief wait for postback to begin
+                        if not vendor_found:
+                            self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", "Vendor not found after search")
+                            fail_count += 1
+                            continue
+                        time.sleep(1.5)  # Brief wait for postback to begin
+                        # 5. Bill Details
+                        self.log_info("▶ Entering Bill Details...")
+                        bill_input = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_txtBill_no")
+                        bill_input.clear()
+                        bill_input.send_keys(bill_no)
+                        date_input = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_txtBilldate")
+                        date_input.clear()
+                        date_input.send_keys(inputs['bill_date'])
+                        date_input.send_keys(Keys.TAB)
+                        self.log_info(f"✓ Bill No: {bill_no}, Date: {inputs['bill_date']}")
+                        time.sleep(1.5)  # Brief wait for postback to begin
+                        # 6. Fill Materials
+                        self.log_info("▶ Filling Materials...")
+                        filled_count = 0
+                        for mat in inputs['materials']:
+                            try:
+                                xpath = f"//table[@id='ctl00_ContentPlaceHolder1_gvData']//tr[.//span[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{mat['name'].lower()}')]]"
+                                mat_row = driver.find_element(By.XPATH, xpath)
+                                rate_input = mat_row.find_element(By.XPATH, ".//input[contains(@id, '_Rate')]")
+                                rate_input.clear()
+                                rate_input.send_keys(mat['rate'])
+                                rate_input.send_keys(Keys.TAB)
+                                qty_input = mat_row.find_element(By.XPATH, ".//input[contains(@id, '_Quantity')]")
+                                qty_input.clear()
+                                qty_input.send_keys(mat['qty'])
+                                qty_input.send_keys(Keys.TAB)
+                                gst_dd = Select(mat_row.find_element(By.XPATH, ".//select[contains(@id, '_gst_slab')]"))
+                                gst_dd.select_by_visible_text(mat['gst'])
+                                self.log_info(f"  ✓ {mat['name']}: Rate={mat['rate']}, Qty={mat['qty']}, GST={mat['gst']}%")
+                                filled_count += 1
+                            except NoSuchElementException:
+                                self.log_warning(f"  ⚠ Material '{mat['name']}' not found in table")
+                            except (StaleElementReferenceException, ElementNotInteractableException) as e:
+                                self.log_warning(f"  ⚠ Error filling '{mat['name']}': {str(e)}")
+                        if filled_count == 0:
+                            self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", "No materials could be filled")
+                            fail_count += 1
+                            continue
+                        time.sleep(1.5)  # Brief wait for postback to begin
+                        # 7. Checkbox & Submit
+                        self.log_info("▶ Confirming and Saving...")
+                        checkbox = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_CheckBox1")
+                        if not checkbox.is_selected():
+                            driver.execute_script("arguments[0].click();", checkbox)
+                        submit_btn = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_cmdProceed")
+                        driver.execute_script("arguments[0].click();", submit_btn)
+                        time.sleep(2.0)  # Short wait after click
+                        # 8. Handle Alerts
+                        try:
+                            alert = WebDriverWait(driver, 3).until(EC.alert_is_present())
+                            alert_text = alert.text
+                            alert.accept()
+                            self.log_warning(f"ℹ Alert: {alert_text}")
+                        except TimeoutException:
+                            pass
+                        # 9. Check Success
+                        try:
+                            success_msg = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_lblMsg"))).text
+                            if "successfully" in success_msg.lower() or "saved" in success_msg.lower():
+                                self.log_info(f"✅ SUCCESS: {success_msg}")
+                                self._log_result(inputs['panchayat'], work_key, bill_no, "Success", success_msg)
+                                success_count += 1
+                            else:
+                                self.log_warning(f"Unexpected message: {success_msg}")
+                                self._log_result(inputs['panchayat'], work_key, bill_no, "Warning", success_msg)
+                        except TimeoutException:
+                            self.log_warning("⚠ Could not verify success message")
+                            self._log_result(inputs['panchayat'], work_key, bill_no, "Unknown", "No confirmation message found")
+                    except TimeoutException as e:
+                        error_msg = f"Timeout: Element not found - {str(e)}"
+                        self.log_error(f"{error_msg}")
+                        self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
+                        fail_count += 1
+                    except NoSuchElementException as e:
+                        error_msg = f"Element not found: {str(e)}"
+                        self.log_error(f"{error_msg}")
+                        self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
+                        fail_count += 1
+                    except WebDriverException as e:
+                        error_msg = f"WebDriver error: {str(e)}"
+                        self.log_error(f"{error_msg}")
+                        self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
+                        fail_count += 1
+                    except Exception as e:
+                        error_msg = f"Unexpected error: {str(e)}"
+                        self.log_error(f"{error_msg}")
+                        self._log_result(inputs['panchayat'], work_key, bill_no, "Failed", error_msg)
+                        fail_count += 1
         except Exception as e:
             self.handle_error(e)
         finally:

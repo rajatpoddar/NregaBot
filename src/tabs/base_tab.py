@@ -63,7 +63,13 @@ class BaseAutomationTab(ctk.CTkFrame):
     def _extract_activity_panchayat(self) -> str:
         """Auto-extract panchayat name from common widget patterns.
         Checks panchayat_var (StringVar), panchayat_menu/entry widgets,
-        config_vars dict pattern (used by many tabs), and returns uppercase value or empty string."""
+        config_vars dict pattern (used by many tabs), and returns uppercase value or empty string.
+
+        Special '🌐 All Panchayats' / '⭐ My Saved Panchayats' labels are
+        returned AS-IS (not uppercased) — queue/Add-to-Queue path inhe tab ke
+        dropdown par set karta hai, aur tabs `config.ALL_PANCHAYATS_LABEL` se
+        exact (case-sensitive) match karte hain. Uppercase karne se label
+        match nahi hota aur tab label ko literal panchayat maan leta hai."""
         try:
             # Priority 0: Check config_vars dict pattern (used by mb_entry, demand, etc.)
             cfg = getattr(self, 'config_vars', None)
@@ -71,14 +77,14 @@ class BaseAutomationTab(ctk.CTkFrame):
                 for key in ['location_panchayat', 'panchayat_name', 'panchayat']:
                     var = cfg.get(key)
                     if var is not None and hasattr(var, 'get'):
-                        val = var.get().strip().upper()
+                        val = self._normalize_extracted_panchayat(var.get())
                         if val:
                             return val
             # Priority 1: StringVar named panchayat_var
             for attr in ['panchayat_var', 'panchayat']:
                 v = getattr(self, attr, None)
                 if v is not None and hasattr(v, 'get'):
-                    val = v.get().strip().upper()
+                    val = self._normalize_extracted_panchayat(v.get())
                     if val:
                         return val
             # Priority 2: CTkOptionMenu
@@ -89,18 +95,37 @@ class BaseAutomationTab(ctk.CTkFrame):
                         try:
                             var = w.cget('variable')
                             if var and hasattr(var, 'get'):
-                                val = var.get().strip().upper()
+                                val = self._normalize_extracted_panchayat(var.get())
                                 if val:
                                     return val
                         except Exception:
                             pass
                     if hasattr(w, 'get'):
-                        val = w.get().strip().upper()
+                        val = self._normalize_extracted_panchayat(w.get())
                         if val:
                             return val
         except Exception:
             pass
         return ""
+
+    def _normalize_extracted_panchayat(self, raw: Any) -> str:
+        """Extracted panchayat value ko normalize karo: special labels ka
+        CANONICAL form return karo (chahe history/UI mein uppercase variant
+        ho), baaki uppercase. Queue path (Add to Queue / Macro) isi value ko
+        tab ke dropdown par set karta hai — labels ka exact case zaroori hai
+        warna tab label ko literal panchayat maan leta hai."""
+        try:
+            val = str(raw or "").strip()
+            if not val:
+                return ""
+            up = val.upper()
+            if up == str(config.ALL_PANCHAYATS_LABEL).upper():
+                return str(config.ALL_PANCHAYATS_LABEL)
+            if up == str(config.MY_PANCHAYATS_LABEL).upper():
+                return str(config.MY_PANCHAYATS_LABEL)
+            return val.upper()
+        except Exception:
+            return ""
     
     def _extract_activity_village(self) -> str:
         """Auto-extract village name from common widget patterns."""
@@ -2014,21 +2039,94 @@ class BaseAutomationTab(ctk.CTkFrame):
             texts.append(t)
         return texts
 
+    def _is_my_saved_panchayat(self, value: Any) -> bool:
+        """Case-insensitive check: kya value '⭐ My Saved Panchayats' label hai
+        (kisi bhi case variant mein — history mein uppercase bhi ho sakta hai)."""
+        try:
+            val = str(value or "").strip()
+            return bool(val) and val.upper() == str(config.MY_PANCHAYATS_LABEL).upper()
+        except Exception:
+            return False
+
+    def _is_panchayat_label(self, value: Any) -> bool:
+        """Check if a value is one of the special All/My-Saved panchayat labels.
+
+        Case-insensitive — history mein labels ke uppercase variants bhi save
+        ho sakte hain ('⭐ MY SAVED PANCHAYATS' — purane code ne .upper() karke
+        save kiya tha). Isliye exact match nahi, .upper() compare karte hain.
+        """
+        try:
+            val = str(value or "").strip()
+            if not val:
+                return False
+            up = val.upper()
+            return (up == str(config.ALL_PANCHAYATS_LABEL).upper()
+                    or up == str(config.MY_PANCHAYATS_LABEL).upper())
+        except Exception:
+            return False
+
     def _with_all_panchayats(self, menu_widget: Any) -> None:
         """Prepend the '🌐 All Panchayats' + '⭐ My Saved Panchayats' options to an option menu's values."""
         try:
             vals = list(menu_widget.cget("values"))
         except Exception:
             return
-        clean = [v for v in vals if v and v not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)]
+        clean = [v for v in vals if v and not self._is_panchayat_label(v)]
         if not clean:
             clean = [""]
         menu_widget.configure(values=[config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL] + clean)
 
     def _all_panchayat_values(self, raw_vals: Optional[List[str]]) -> List[str]:
         """Build option-menu values = [All Panchayats, My Saved Panchayats] + deduped non-empty values."""
-        vals = [v for v in (raw_vals or []) if v and v not in (config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL)]
+        vals = [v for v in (raw_vals or []) if v and not self._is_panchayat_label(v)]
         return [config.ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL] + vals
+
+    def _clean_panchayat_value(self, value: Any) -> str:
+        """Saved/history value se special labels hatao — single-panchayat tabs
+        ke load_inputs/dropdown ke liye. Label milne par '' return hota hai
+        taaki literal panchayat ki tarah set/select na ho."""
+        try:
+            val = str(value or "").strip()
+            if not val:
+                return ""
+            if self._is_panchayat_label(val):
+                return ""
+            return val
+        except Exception:
+            return ""
+
+    def _update_panchayat_history(self, value: Any) -> None:
+        """History mein panchayat save karo — special labels ('🌐 All
+        Panchayats' / '⭐ My Saved Panchayats', kisi bhi case mein) kabhi save
+        NAHI hote.
+
+        Labels history mein chale jayen to wo single-panchayat tabs ke dropdown
+        mein dikhte hain aur user galti se unhe literal panchayat ki tarah
+        select kar leta hai (result mein label aata hai).
+        """
+        try:
+            val = str(value or "").strip()
+            if not val or self._is_panchayat_label(val):
+                return
+            self.app.update_history("location_panchayat", val)
+        except Exception:
+            pass
+
+    def _history_panchayat_values(self) -> List[str]:
+        """History suggestions se panchayat dropdown values — special labels
+        ('🌐 All Panchayats' / '⭐ My Saved Panchayats') filter hote hain.
+
+        Single-panchayat tabs (jo All/My-Saved mode support NAHI karte) ise
+        use karte hain taaki history mein leak hua label dropdown mein na dikhe
+        aur user galti se usse literal panchayat ki tarah select na kare.
+        """
+        try:
+            vals = [v for v in (self.app.history_manager.get_suggestions("location_panchayat") or [])
+                    if v and not self._is_panchayat_label(v)]
+            return vals or [""]
+        except Exception:
+            return [""]
+
 
     # ------------------------------------------------------------------
     # State-aware portal URL resolution (har vbgramg transaction tab use
@@ -2114,6 +2212,35 @@ class BaseAutomationTab(ctk.CTkFrame):
         self.log_warning("⚠️ No saved panchayat found on the website. Check Settings > Location Data.")
         self._reset_ui_state_safe()
         return True
+
+    def _resolve_panchayats_to_process(self, driver: Any, wait: Any,
+                                       panchayat_target: str,
+                                       p_locators: List[Any],
+                                       timeout: int = 5) -> List[str]:
+        """All/My-Saved label select hone par process karne layak panchayat
+        list resolve karo (website dropdown fetch / saved list se).
+
+        Normal panchayat → [panchayat_target] return hota hai.
+        '🌐 All Panchayats' → dropdown ke saare panchayat.
+        '⭐ My Saved Panchayats' → Settings mein saved panchayat (GP login par
+        bhi — saved list direct use hoti hai, dropdown ki zaroorat nahi).
+
+        Returns [] jab kuch process nahi ho sakta (caller ko abort karna
+        chahiye — warning pehle hi log ho chuki hai).
+        """
+        if not self._is_panchayat_label(panchayat_target):
+            return [panchayat_target]
+        saved_mode = self._is_my_saved_panchayat(panchayat_target)
+        names, _is_gp = self._fetch_panchayats_from_website(
+            driver, wait, p_locators, saved_mode=saved_mode, timeout=timeout)
+        if not names:
+            self._abort_if_no_saved_panchayats(names)
+            return []
+        if saved_mode:
+            self.log_info(f"⭐ My Saved Panchayats mode: {len(names)} saved panchayat(s) will be processed.")
+        else:
+            self.log_info(f"🌐 All Panchayats mode: found {len(names)} panchayats.")
+        return names
 
     @staticmethod
     def _is_aggregate_panchayat_name(name: str) -> bool:

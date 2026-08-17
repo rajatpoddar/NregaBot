@@ -60,7 +60,8 @@ class MrFillTab(BaseAutomationTab):
         panchayat_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
         panchayat_frame.grid(row=0, column=0, sticky='ew', padx=15, pady=(12,0))
         ctk.CTkLabel(panchayat_frame, text=tr("common.panchayat_name"), font=ctk.CTkFont(weight="bold")).pack(anchor='w')
-        p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
+        p_vals = self._all_panchayat_values(
+            self.app.history_manager.get_suggestions("location_panchayat"))
         self.panchayat_var = ctk.StringVar()
         self.panchayat_menu = ctk.CTkOptionMenu(panchayat_frame, variable=self.panchayat_var, values=p_vals)
         self.panchayat_menu.pack(fill='x', pady=(5,0))
@@ -158,7 +159,7 @@ class MrFillTab(BaseAutomationTab):
         saved_data = self.app.history_manager.get_tab_inputs("mr_fill")
         
         # Set values from saved_data, falling back to defaults
-        self.panchayat_var.set(saved_data.get("panchayat_name", ""))
+        self.panchayat_var.set(self._clean_panchayat_value(saved_data.get("panchayat_name")))
         self.holiday_cols_var.set(saved_data.get("holiday_cols", ""))
         # Coerce to a real bool: saved data may hold "", "True", "False", "1", etc.
         self.manual_mode_var.set(str(saved_data.get("manual_mode", False)).strip().lower() in ("1", "true", "yes", "on"))
@@ -241,19 +242,33 @@ class MrFillTab(BaseAutomationTab):
             if driver.current_url != self.resolve_portal_url(config.MR_FILL_CONFIG["url"]):
                 driver.get(self.resolve_portal_url(config.MR_FILL_CONFIG["url"]))
             
-            # --- 3. Initial Panchayat Selection ---
-            self._ensure_panchayat_selected(driver, wait, panchayat_name)
+            # --- 3. 🌐 All / ⭐ My Saved mode → panchayat list resolve karo ---
+            panchayats_to_process = self._resolve_panchayats_to_process(
+                driver, wait, panchayat_name, ["ddlPanchayat"])
+            if not panchayats_to_process:
+                self.app.after(0, self.set_ui_state, False)
+                return
 
-            # --- 4. Work Key Loop ---
-            total = len(work_keys)
-            for i, work_key in enumerate(work_keys, 1):
-                if self.is_stopped(): 
-                    self.log_warning("Automation stopped by user."); break
-                
-                self.app.after(0, self.update_status, f"Processing {i}/{total}: {work_key}", (i/total))
-                
-                # PASSING PANCHAYAT NAME HERE to handle re-selection if page reloads
-                self._process_single_work_code(driver, wait, work_key, holiday_cols, is_manual_mode, panchayat_name)
+            total_p = len(panchayats_to_process)
+            for p_idx, panchayat_name in enumerate(panchayats_to_process, 1):
+                if self.is_stopped():
+                    break
+                self.log_info(f"===== Panchayat {p_idx}/{total_p}: {panchayat_name} =====")
+                self.app.after(0, self.app.set_status, f"MR Fill: {panchayat_name}...")
+
+                # --- 4. Initial Panchayat Selection ---
+                self._ensure_panchayat_selected(driver, wait, panchayat_name)
+
+                # --- 5. Work Key Loop ---
+                total = len(work_keys)
+                for i, work_key in enumerate(work_keys, 1):
+                    if self.is_stopped(): 
+                        self.log_warning("Automation stopped by user."); break
+                    
+                    self.app.after(0, self.update_status, f"{panchayat_name}: {i}/{total}: {work_key}", (i/total))
+                    
+                    # PASSING PANCHAYAT NAME HERE to handle re-selection if page reloads
+                    self._process_single_work_code(driver, wait, work_key, holiday_cols, is_manual_mode, panchayat_name)
                 
             if not self.is_stopped(): 
                 self.log_info("📊 Automation finished. Check the 'Results' tab for details.")        

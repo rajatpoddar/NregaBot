@@ -1,19 +1,29 @@
 {
-  "latest_version": "3.2.5",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.5-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.5-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.5-Linux.tar.gz",
+  "latest_version": "3.2.6",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.6-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.6-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.6-Linux.tar.gz",
   "core_update": {
-    "version": "3.2.5",
-    "url": "https://nregabot.com/updates/core_v3.2.5.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.2.5.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.5.zip",
+    "version": "3.2.6",
+    "url": "https://nregabot.com/updates/core_v3.2.6.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.6.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.6.zip",
     "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "86857a717617e311b15ce9cc0175c164fc7f05d8cf864c4274240eda9a34f5dd",
-    "hash_macos": "1312574920b5a110d9be14a20b8c4661c05308dac9208af9944ac921fb5252b7"
+    "hash_windows": "",
+    "hash_macos": ""
   },
   "changelog": {
+    "3.2.6": [
+      "📸 **Jobcard Verification — Photo Upload Fixed:** The Upload Family Photo popup now works reliably. The portal shows an Ajax ModalPopup (image preview) after upload — not a JS alert — so the bot now waits for the right signal. The popup window is closed safely without ever closing the main browser window (which used to crash the whole run). Save now confirms via postback + error label instead of assuming a JS alert.",
+      "🌐 **Jobcard Verification — 'All Villages' in Dropdown:** The 'Process all villages' checkbox is replaced with a proper '🌐 All Villages' option in the village dropdown (like other tabs). Village dropdown also reloads with the option when the panchayat changes.",
+      "🖼️ **Jobcard Verification — Skip Already-Uploaded:** Jobcards whose family photo is already uploaded are skipped automatically — no duplicate upload attempts. Photo upload is also skipped (with a clear log) when no matching photo file is found for the jobcard.",
+      "🏘️ **All / My Saved Panchayats — 12 More Tabs:** MR Fill, MSR, Zero MR, Duplicate MR, Mate MR Gen, Material Entry, Physical Complete, Scheme Closing, WC Gen, Work Allocation, Resend Rejected Wagelist and SA Report now support '🌐 All Panchayats' and '⭐ My Saved Panchayats' modes — each panchayat runs in sequence with its real name in the results (no more literal labels).",
+      "🧹 **Panchayat Label Cleanup (All Tabs):** 'All Panchayats' / 'My Saved Panchayats' labels can no longer leak into dropdowns, history or result columns. Detection is now case-insensitive (old uppercase labels in local history are ignored), queue/Add-to-Queue targets keep labels intact, and saved history entries are filtered from single-panchayat tabs.",
+      "🔁 **Demand Tab Retry Fix:** Retry now re-runs ALL jobcards that failed, not just the ones that succeeded previously — so a partial run followed by retry processes the complete set (including work-code allocation) as expected.",
+      "➕ **Add to Queue from Any Tab:** When another automation is running, Start buttons become 'Add to Queue' — the task is queued centrally and starts automatically the moment the current automation finishes. Macro queue also runs from the central store, so queued items survive even if the Macro Manager tab is closed.",
+      "⌨️ **Ctrl+Enter Queue Safety:** The Start shortcut also queues instead of running concurrently when another automation is active."
+    ],
     "3.2.5": [
       "🌐 **Location Data Pool (Block Sharing):** Aapke Block ke Panchayat & Villages ab server par safely share hote hain — same block ke doosre users bina PO/GP portal login ke bhi ye data directly download kar sakte hain (Settings → 'Block Data Download'). Sirf panchayat/village names share hote hain (public MGNREGA data) — koi personal info nahi.",
       "🏘️ **Add Panchayat — Login Not Required:** Onboarding ke 'Add Panchayat' step me ab PO/GP login ke bina bhi aapke block ke panchayat/villages server se auto-load hote hain — green tick ke saath seedha Next dabayein. Na PO na GP login wale users ab atakte nahi.",

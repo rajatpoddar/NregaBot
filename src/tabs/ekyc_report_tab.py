@@ -69,8 +69,11 @@ class EKycReportTab(BaseAutomationTab):
         ctk.CTkLabel(input_frame, text="Panchayat:").grid(row=0, column=0, padx=(10, 5), pady=10, sticky="w")
         p_vals = self.app.history_manager.get_suggestions("location_panchayat") or [""]
         self.panchayat_var = ctk.StringVar(value=ALL_PANCHAYATS_LABEL)
+        # _all_panchayat_values history se labels filter karta hai — warna
+        # purana saved label (old code se) prefix + history dono se aa kar
+        # dropdown mein 2 baar dikhta.
         self.panchayat_menu = ctk.CTkOptionMenu(input_frame, variable=self.panchayat_var,
-                                                values=[ALL_PANCHAYATS_LABEL, MY_PANCHAYATS_LABEL] + [v for v in p_vals if v], width=140)
+                                                values=self._all_panchayat_values(p_vals), width=140)
         self.panchayat_menu.grid(row=0, column=1, padx=5, pady=10, sticky="ew")
 
         # Village Input (Autocomplete Linked to Global History)
@@ -84,7 +87,7 @@ class EKycReportTab(BaseAutomationTab):
         # Filter villages when panchayat changes
         def _on_panchayat_change(*_):
             pan = self.panchayat_var.get()
-            if pan and pan not in (ALL_PANCHAYATS_LABEL, MY_PANCHAYATS_LABEL):
+            if pan and not self._is_panchayat_label(pan):
                 vals = self.app.history_manager.get_filtered_suggestions("location_village", "location_panchayat", pan) or []
             else:
                 vals = self.app.history_manager.get_suggestions("location_village") or []
@@ -282,10 +285,12 @@ class EKycReportTab(BaseAutomationTab):
         try:
             panchayat_target = self.panchayat_var.get().strip()
             village_target = self.village_var.get().strip()
-            # Map the "All" dropdown labels back to empty (process everything)
-            if panchayat_target == ALL_PANCHAYATS_LABEL:
+            # Map the "All" dropdown labels back to empty (process everything).
+            # Case-insensitive — history mein uppercase label variant bhi ho
+            # sakta hai.
+            if self._is_panchayat_label(panchayat_target) and not self._is_my_saved_panchayat(panchayat_target):
                 panchayat_target = ""
-            elif panchayat_target == MY_PANCHAYATS_LABEL:
+            elif self._is_my_saved_panchayat(panchayat_target):
                 panchayat_target = MY_PANCHAYATS_LABEL  # Keep marker → filtered below
             if village_target == ALL_VILLAGES_LABEL:
                 village_target = ""
@@ -312,9 +317,9 @@ class EKycReportTab(BaseAutomationTab):
             # 2. Determine Panchayats to Process
             panchayats_to_process = []
             
-            if panchayat_target and panchayat_target != MY_PANCHAYATS_LABEL:
+            if panchayat_target and not self._is_my_saved_panchayat(panchayat_target):
                 panchayats_to_process.append(panchayat_target)
-                self.app.update_history("location_panchayat", panchayat_target)
+                self._update_panchayat_history(panchayat_target)
             else:
                 self.update_status("Fetching panchayat list...")
                 try:
@@ -323,9 +328,9 @@ class EKycReportTab(BaseAutomationTab):
                     # directly (no timeout).
                     panchayats_to_process, _is_gp = self._fetch_panchayats_from_website(
                         driver, wait, ["ctl00_ContentPlaceHolder1_DDL_panchayat"],
-                        saved_mode=(panchayat_target == MY_PANCHAYATS_LABEL))
+                        saved_mode=self._is_my_saved_panchayat(panchayat_target))
 
-                    if panchayat_target == MY_PANCHAYATS_LABEL:
+                    if self._is_my_saved_panchayat(panchayat_target):
                         self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} saved panchayat(s) will be processed.")
                         if not panchayats_to_process:
                             try:
@@ -585,7 +590,7 @@ class EKycReportTab(BaseAutomationTab):
     def save_inputs(self):
         panchayat = self.panchayat_var.get().strip()
         village = self.village_var.get().strip()
-        if panchayat == ALL_PANCHAYATS_LABEL:
+        if self._is_panchayat_label(panchayat) and not self._is_my_saved_panchayat(panchayat):
             panchayat = ""  # Save as empty = all panchayats
         # MY_PANCHAYATS_LABEL is kept as-is so the mode restores on next launch
         if village == ALL_VILLAGES_LABEL:
