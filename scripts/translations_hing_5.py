@@ -272,4 +272,7 @@ HING5 = {
     "onboarding.browser.connect_failed": "Chrome se connect nahi ho paya — browser dobara khol ke try karein.",
     "demand.encoding_warn_title": "CSV me names kharab hain",
     "demand.encoding_warn_msg": "Aapki CSV me {count} name(s) me '?' mark hain (jaise: {sample})।\n\nYe tab hota hai jab file Excel me 'CSV (Comma delimited)' (ANSI) me save hoti hai aur names Hindi/regional me hote hain — '?' unhe hamesha ke liye badal deta hai.\n\nFile ko Excel me 'CSV UTF-8 (Comma delimited)' format me dobara save karke upload karein. Jab tak ye theek nahi hota, demand portal ke names se match nahi hogi.",
+    "form.work_alloc.pick_title": "Work Code Chunein",
+    "form.work_alloc.pick_instruction": "Key '{work_key}' se kai work code match hote hain. Jise allocate karna hai use chunein:",
+    "form.work_alloc.pick_skip": "Is Work Key ko Chhod Dein",
 }
