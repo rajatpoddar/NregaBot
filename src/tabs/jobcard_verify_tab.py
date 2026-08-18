@@ -10,7 +10,7 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger
 from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from ._imports import By, Select, WebDriverWait, EC  # noqa: F401
+from ._imports import By, Select, WebDriverWait, EC, TimeoutException, NoAlertPresentException  # noqa: F401
 
 
 logger = get_logger()
@@ -32,6 +32,10 @@ class JobcardVerifyTab(BaseAutomationTab):
         self._jc_success = 0
         self._jc_failed = 0
         self._jc_skipped = 0
+        # Is run mein already processed jobcards — save postback ke baad page
+        # reload hone par wahi row dobara milti hai (photo upload fail hone par
+        # portal usse verified nahi maanta). Dobara process na ho, isliye track.
+        self._processed_jobcards: set = set()
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(3, weight=1)
         self._create_widgets()
         self._load_saved_preferences()
@@ -240,6 +244,7 @@ class JobcardVerifyTab(BaseAutomationTab):
         self.app.clear_log(self.log_display)
         self.log_info("🚀 Starting Jobcard Verification...")
         self.app.after(0, self.app.set_status, "Running Jobcard Verification...")
+        self._processed_jobcards = set()
         
         try:
             driver = self.app.get_driver()
@@ -417,9 +422,30 @@ class JobcardVerifyTab(BaseAutomationTab):
             # generic file-input CSS fallback bhi rakhte hain.
             file_input = wait.until(EC.presence_of_element_located(
                 (By.ID, "ContentPlaceHolder1_FileUpload_JC")))
-            if not file_input.is_displayed():
+            if not file_input.is_displayed() or not file_input.is_enabled():
                 file_input = driver.find_element(By.CSS_SELECTOR, 'input[type="file"]')
-            file_input.send_keys(photo_path)
+
+            # ⚠️ Photo PEHLE attach karo, phir hi Upload click karo. Page-load
+            # race me send_keys kabhi-kabhi file set nahi karta (element ready
+            # hone se pehle) — isliye value verify karke retry karte hain;
+            # file attach confirm hone par HI upload button click hota hai.
+            file_attached = False
+            for _attempt in range(3):
+                try:
+                    file_input.send_keys(photo_path)
+                    if (file_input.get_attribute("value") or "").strip():
+                        file_attached = True
+                        break
+                except Exception:
+                    pass
+                time.sleep(1)
+                try:
+                    file_input = driver.find_element(By.CSS_SELECTOR, 'input[type="file"]')
+                except Exception:
+                    break
+            if not file_attached:
+                self.log_error("     - Photo file input par attach nahi hua; upload skip.")
+                return False
 
             # Upload button by ID (saved HTML: ContentPlaceHolder1_upload_photo) —
             # native click pehle (submit form trigger karta hai), fail ho to JS.
@@ -568,7 +594,14 @@ class JobcardVerifyTab(BaseAutomationTab):
                 break # End of this page
             
             jobcard_no = row_check[0].get_attribute("value")
-            
+
+            # Save postback ke baad page reload hota hai aur wahi row dobara
+            # milti hai — is run mein already processed jobcard ko skip karo
+            # (warna upload fail hone par wahi row baar-baar process hogi).
+            if jobcard_no in self._processed_jobcards:
+                row_index += 1
+                continue
+
             should_skip = False
             if verify_account_only:
                 try:
@@ -627,6 +660,7 @@ class JobcardVerifyTab(BaseAutomationTab):
                 driver.execute_script("arguments[0].click();", update_btn)
 
                 save_ok, save_msg = self._confirm_save(driver, wait, save_html, row_id_base)
+                self._processed_jobcards.add(jobcard_no)
                 if save_ok:
                     self.log_success("     - Saved successfully.")
                     # Element wait handled by WebDriverWait below
@@ -641,6 +675,7 @@ class JobcardVerifyTab(BaseAutomationTab):
             except Exception as e:
                 self.log_error(f"     - Error saving row: {e}")
                 self._add_jc_result_row(panchayat, village, jobcard_no, "❌ Failed", str(e)[:150])
+                self._processed_jobcards.add(jobcard_no)
                 row_index += 1
 
     def _handle_pagination(self, driver, wait, current_page_num):

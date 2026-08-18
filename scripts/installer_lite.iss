@@ -2,7 +2,7 @@
 ; Version defined by build script via /dAppVersion=
 
 #ifndef AppVersion
-#define AppVersion "3.2.5"
+#define AppVersion "3.2.6"
 #endif
 #define AppName "NREGA Bot Lite"
 #define AppPublisher "PoddarSolutions"
