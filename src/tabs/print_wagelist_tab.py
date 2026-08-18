@@ -7,7 +7,7 @@ then visit each on the portal and save as PDF.
 
 Flow:
   1. Paste any text containing wagelist numbers
-  2. Click "Extract" → regex finds all \d+WL\d+ patterns, deduplicates
+  2. Click "Extract" → regex finds all digits+WL+digits patterns, deduplicates
   3. Click Start → for each wagelist:
      a. Navigate to view_wagelist.aspx?flag=UNSK
      b. Select Financial Year
