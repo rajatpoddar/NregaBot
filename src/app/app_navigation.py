@@ -52,6 +52,7 @@ class NavMixin:
             "MR Payment": "emoji_mr_payment",
             "Gen Wagelist": "emoji_gen_wagelist",
             "Send Wagelist": "emoji_send_wagelist",
+            "Print Wagelist": "emoji_send_wagelist",
             "FTO Generation": "emoji_fto_gen",
             "Duplicate MR Print": "emoji_duplicate_mr",
             "Material Entry": "emoji_material_entry",

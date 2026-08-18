@@ -57,6 +57,7 @@ AUTOMATION_DISPLAY_NAMES = {
     "update_estimate": "Update Estimate",
     "wc_gen": "Work Code Generation",
     "send": "Wagelist Send",
+    "print_wagelist": "Print Wagelist",
     "duplicate_mr": "Duplicate MR",
     "social_audit_respond": "Social Audit",
     "muster": "Muster Roll",
@@ -892,6 +893,7 @@ class AutomationMixin:
             "fto_gen_del": "FTO Generation",
             "macro": "Macro Manager",
             "pdf_merger": "PDF Merger",
+            "print_wagelist": "Print Wagelist",
             "wc_extractor": "Workcode Extractor",
         }.items():
             mapping.setdefault(k, n)

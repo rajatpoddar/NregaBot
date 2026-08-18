@@ -110,6 +110,11 @@ def get_tabs_definition(app: Any) -> Dict[str, Dict[str, Any]]:
                 "icon": app.icon_images.get("emoji_send_wagelist"),
                 "key": "wagelist_send"
             },
+            "Print Wagelist": {
+                "creation_func": _lazy_import("PrintWagelistTab", "src.tabs.print_wagelist_tab"),
+                "icon": app.icon_images.get("emoji_gen_wagelist"),
+                "key": "print_wagelist"
+            },
             "FTO Generation": {
                 "creation_func": _lazy_import("FtoGenerationTab", "src.tabs.fto_generation_tab"),
                 "icon": app.icon_images.get("emoji_fto_gen"),
