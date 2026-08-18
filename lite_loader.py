@@ -322,6 +322,52 @@ class LiteLoaderSplash(ctk.CTk):
             # Ensure install_dir exists for version.json
             os.makedirs(install_dir, exist_ok=True)
 
+            # ── Maintenance Mode ──
+            maintenance_msg = None
+            try:
+                resp = requests.get(f"{UPDATE_URL}/api/app-config", timeout=3)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    mm = data.get('maintenance_mode')
+                    if isinstance(mm, dict) and mm.get('enabled'):
+                        maintenance_msg = mm.get('message', 'App is under maintenance.')
+            except Exception:
+                pass
+            if not maintenance_msg:
+                try:
+                    mm_path = os.path.join(install_dir, "maintenance_mode.json")
+                    if os.path.exists(mm_path):
+                        with open(mm_path, 'r') as f:
+                            mm = json.load(f)
+                        if isinstance(mm, dict) and mm.get('enabled'):
+                            maintenance_msg = mm.get('message', 'App is under maintenance.')
+                except Exception:
+                    pass
+            if maintenance_msg:
+                self._set_status(f"🔧 {maintenance_msg}")
+                time.sleep(5)
+                self.destroy()
+                return
+
+            # ── Server-triggered Rollback ──
+            try:
+                rb_path = os.path.join(install_dir, "force_rollback.json")
+                if os.path.exists(rb_path):
+                    with open(rb_path, 'r') as f:
+                        rb = json.load(f)
+                    target_ver = rb.get('target_version', '') if isinstance(rb, dict) else ''
+                    if target_ver:
+                        msg = rb.get('message', '') or f"Rolling back to v{target_ver}..."
+                        self._set_status(f"🔄 {msg}")
+                        self._lite_restore_previous(install_dir, content_dir, target_ver)
+                    # Clear after acting on it
+                    try:
+                        os.remove(rb_path)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
             # ── Crash-loop rollback ──
             # Consecutive failed boots → re-apply the previous update zip
             # BEFORE the update check, so a broken version is never re-applied.
@@ -367,6 +413,22 @@ class LiteLoaderSplash(ctk.CTk):
                 time.sleep(0.3)
                 self._launch_lite_app()
                 return
+
+            # ── Admin-blocked version skip ──
+            try:
+                bv_path = os.path.join(install_dir, "blocked_versions.json")
+                if os.path.exists(bv_path):
+                    with open(bv_path, 'r') as f:
+                        bv = json.load(f)
+                    versions = bv.get('versions', []) if isinstance(bv, dict) else []
+                    if lat in versions:
+                        print(f"Blocked: skipping update to v{lat} (admin blocked)")
+                        self._set_status("Ready")
+                        time.sleep(0.3)
+                        self._launch_lite_app()
+                        return
+            except Exception:
+                pass
 
             # Read current version + applied zip hash from persistent location
             current_ver = "0.0.0"

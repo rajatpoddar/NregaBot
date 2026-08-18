@@ -1125,8 +1125,65 @@ del "%~f0" & exit
 # MAIN EXECUTION ENTRY POINT
 # ============================================================================
 
+def _check_maintenance_mode_quick() -> bool:
+    """Quick maintenance-mode check: server API first (fast), local file fallback.
+    Returns True if maintenance mode is ON (app should NOT start).
+    Called before the app is created so even `python main_app.py` respects it."""
+    # 1. Server API (3s timeout — don't block startup long)
+    # If server reachable: TRUST its response (even if disabled → return False).
+    # Local file is only used when server is unreachable.
+    server_reached = False
+    try:
+        from src import config
+        resp = requests.get(
+            f"{config.LICENSE_SERVER_URL}/api/app-config",
+            timeout=3,
+        )
+        if resp.status_code == 200:
+            server_reached = True
+            data = resp.json()
+            mm = data.get("maintenance_mode")
+            logger.info(f"Maintenance check: server returned {mm}")
+            if isinstance(mm, dict) and mm.get("enabled"):
+                return True
+            # Server reachable + not enabled → definitely NOT in maintenance
+            return False
+    except Exception as e:
+        logger.warning(f"Maintenance check: server unreachable ({e})")
+    # 2. Server unreachable → fallback to local file
+    if not server_reached:
+        try:
+            from src.utils import get_data_path
+            mm_path = get_data_path("maintenance_mode.json")
+            if os.path.exists(mm_path):
+                with open(mm_path, 'r') as f:
+                    mm = json.load(f)
+                logger.info(f"Maintenance check: local file = {mm}")
+                if isinstance(mm, dict) and mm.get('enabled'):
+                    return True
+        except Exception:
+            pass
+    return False
+
+
 def run_application():
     logging.basicConfig(level=logging.INFO)
+
+    # ── Maintenance mode check (before anything else) ──
+    # Server or local file signals maintenance → show message and exit.
+    if _check_maintenance_mode_quick():
+        try:
+            root = tkinter.Tk()
+            root.withdraw()
+            messagebox.showwarning(
+                "Maintenance Mode",
+                "🔧 App is currently under maintenance.\n\n"
+                "Please try again later."
+            )
+            root.destroy()
+        except Exception:
+            print("🔧 App is currently under maintenance. Please try again later.")
+        sys.exit(0)
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:

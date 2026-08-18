@@ -25,6 +25,10 @@ from src.utils import (
     read_boot_state,
     get_core_prev_zip_path,
     get_core_prev_meta_path,
+    # App Control — server-driven emergency controls
+    read_force_rollback,
+    clear_force_rollback,
+    read_blocked_versions,
 )
 
 # --- Try importing CustomTkinter for Modern UI ---
@@ -416,6 +420,61 @@ class ModernSplashScreen(ctk.CTk):
             # --- PROD MODE ---
             self._boot_state_enabled = True
 
+            # ── MAINTENANCE MODE ───────────────────────────────────────
+            # Server-driven kill switch: if admin enabled maintenance mode,
+            # show message and exit immediately. Check server API directly
+            # (fast, 3s timeout) — don't rely only on the local file which
+            # may be stale.
+            maintenance_msg = None
+            try:
+                resp = requests.get(
+                    f"{config.LICENSE_SERVER_URL}/api/app-config",
+                    timeout=3,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    mm = data.get("maintenance_mode")
+                    if isinstance(mm, dict) and mm.get('enabled'):
+                        maintenance_msg = mm.get('message', 'App is under maintenance.')
+            except Exception:
+                pass
+            # Fallback: local file (heartbeat writes this)
+            if not maintenance_msg:
+                try:
+                    from src.utils import get_data_path
+                    mm_data_path = get_data_path("maintenance_mode.json")
+                    if os.path.exists(mm_data_path):
+                        with open(mm_data_path, 'r') as f:
+                            mm = json.load(f)
+                        if isinstance(mm, dict) and mm.get('enabled'):
+                            maintenance_msg = mm.get('message', 'App is under maintenance.')
+                except Exception:
+                    pass
+            if maintenance_msg:
+                self.update_status(f"🔧 {maintenance_msg}", -1)
+                log_error(f"Maintenance mode: {maintenance_msg}")
+                time.sleep(5)
+                self.after(0, self.destroy)
+                return
+
+            # ── SERVER-TRIGGERED ROLLBACK ──────────────────────────────
+            # If the server signaled a forced rollback (admin pressed the
+            # button), restore core_prev.zip BEFORE any update logic.
+            try:
+                rb = read_force_rollback()
+                target_ver = rb.get('target_version', '')
+                if target_ver:
+                    msg = rb.get('message', '') or f"Rolling back to v{target_ver}..."
+                    self.update_status(f"🔄 {msg}", -1)
+                    log_error(f"Force rollback: {msg}")
+                    if self._rollback_to_previous(target_ver):
+                        log_error(f"Force rollback: restored v{target_ver}")
+                    else:
+                        log_error(f"Force rollback: could not restore v{target_ver}")
+                    clear_force_rollback()
+            except Exception:
+                pass
+
             # ── CRASH-LOOP ROLLBACK ──────────────────────────────────────
             # If the last few launches all crashed before the app could mark a
             # clean boot (see mark_clean_boot in main_app.py), the current
@@ -592,6 +651,15 @@ class ModernSplashScreen(ctk.CTk):
             # remember_bad_version / is_bad_version in src/utils.py).
             if is_bad_version(server_ver):
                 log_error(f"Rollback: skipping update to v{server_ver} (known bad — waiting for a newer release)")
+                self.update_status("App is up to date.", 1.0)
+                time.sleep(0.5)
+                return False
+
+            # ── Admin-blocked version skip ──
+            # Server admin blocked this version (dangerous release, etc.).
+            blocked = read_blocked_versions()
+            if blocked and server_ver in blocked:
+                log_error(f"Blocked: skipping update to v{server_ver} (admin blocked)")
                 self.update_status("App is up to date.", 1.0)
                 time.sleep(0.5)
                 return False

@@ -924,3 +924,52 @@ def promote_current_zip_to_prev() -> bool:
         return True
     except Exception:
         return False
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  APP CONTROL — Server-driven emergency controls
+#  (Maintenance Mode, Force Rollback, Blocked Versions)
+# ═══════════════════════════════════════════════════════════════════════
+
+def get_force_rollback_path() -> str:
+    """Path of force_rollback.json — set by the client heartbeat when the
+    server signals a forced rollback; read by loader.py on next launch."""
+    return get_data_path("force_rollback.json")
+
+
+def save_force_rollback(data: dict) -> None:
+    """Persist a force-rollback signal from the server."""
+    _save_json_file(get_force_rollback_path(), data)
+
+
+def read_force_rollback() -> dict:
+    """Read the force-rollback signal; returns {} if none."""
+    data = _load_json_file(get_force_rollback_path(), {})
+    return data if isinstance(data, dict) else {}
+
+
+def clear_force_rollback() -> None:
+    """Remove the force-rollback signal after it has been acted on."""
+    try:
+        path = get_force_rollback_path()
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
+
+
+def get_blocked_versions_path() -> str:
+    """Path of blocked_versions.json — synced from server, checked by loader."""
+    return get_data_path("blocked_versions.json")
+
+
+def save_blocked_versions(versions: list) -> None:
+    """Persist the blocked-versions list from the server."""
+    _save_json_file(get_blocked_versions_path(), {"versions": versions})
+
+
+def read_blocked_versions() -> list:
+    """Read blocked versions list; returns [] if none."""
+    data = _load_json_file(get_blocked_versions_path(), {})
+    versions = data.get("versions") if isinstance(data, dict) else None
+    return versions if isinstance(versions, list) else []

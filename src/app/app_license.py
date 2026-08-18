@@ -1857,6 +1857,37 @@ class LicenseMixin:
                                     self.after(0, lambda w=bool(wdr): self._apply_daily_report_setting(w))
                                 except Exception:
                                     pass
+
+                            # ── App Control: Maintenance Mode ──
+                            # ALWAYS write the file — even when server returns
+                            # null/disabled, so stale "enabled: true" gets cleared.
+                            mm = data.get("maintenance_mode")
+                            try:
+                                from src.utils import get_data_path, _save_json_file
+                                _save_json_file(
+                                    get_data_path("maintenance_mode.json"),
+                                    mm if isinstance(mm, dict) else {"enabled": False}
+                                )
+                            except Exception:
+                                pass
+
+                            # ── App Control: Force Rollback ──
+                            # ALWAYS write — server null means no rollback pending.
+                            frb = data.get("force_rollback")
+                            try:
+                                from src.utils import save_force_rollback
+                                save_force_rollback(frb if isinstance(frb, dict) else {})
+                            except Exception:
+                                pass
+
+                            # ── App Control: Blocked Versions ──
+                            # ALWAYS write — server null/empty means nothing blocked.
+                            bv = data.get("blocked_versions")
+                            try:
+                                from src.utils import save_blocked_versions
+                                save_blocked_versions(bv if isinstance(bv, list) else [])
+                            except Exception:
+                                pass
                     except Exception as e:
                         logger.error("Config Fetch Error: %s", e)
                     ping_counter = 0
