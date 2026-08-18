@@ -63,6 +63,11 @@ def get_tabs_definition_lite(app: Any) -> Dict[str, Dict[str, Any]]:
                 "icon": "📤",
                 "key": "wagelist_send"
             },
+            "Print Wagelist": {
+                "creation_func": _lazy_import("PrintWagelistTab", "src.tabs.print_wagelist_tab"),
+                "icon": "🖨️",
+                "key": "print_wagelist"
+            },
             "Duplicate MR": {
                 "creation_func": _lazy_import("DuplicateMrTab", "src.tabs.duplicate_mr_tab"),
                 "icon": "🖨️",
