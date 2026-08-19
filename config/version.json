@@ -22,7 +22,9 @@
       "🧹 **Panchayat Label Cleanup (All Tabs):** 'All Panchayats' / 'My Saved Panchayats' labels can no longer leak into dropdowns, history or result columns. Detection is now case-insensitive (old uppercase labels in local history are ignored), queue/Add-to-Queue targets keep labels intact, and saved history entries are filtered from single-panchayat tabs.",
       "🔁 **Demand Tab Retry Fix:** Retry now re-runs ALL jobcards that failed, not just the ones that succeeded previously — so a partial run followed by retry processes the complete set (including work-code allocation) as expected.",
       "➕ **Add to Queue from Any Tab:** When another automation is running, Start buttons become 'Add to Queue' — the task is queued centrally and starts automatically the moment the current automation finishes. Macro queue also runs from the central store, so queued items survive even if the Macro Manager tab is closed.",
-      "⌨️ **Ctrl+Enter Queue Safety:** The Start shortcut also queues instead of running concurrently when another automation is active."
+      "⌨️ **Ctrl+Enter Queue Safety:** The Start shortcut also queues instead of running concurrently when another automation is active.",
+      "🖨️ **Print Wagelist (New Tab):** View and save any wagelist as PDF — paste any text containing wagelist numbers (reports, messages, CSVs), extract them automatically, then visit each on the portal and save as a PDF. Supports Chrome CDP and Firefox print-to-PDF.",
+      "🎮 **Server-Driven App Control (Admin):** Admin panel now has an App Control page with three emergency levers — Maintenance Mode (block all clients), Force Rollback (restore previous version), and Blocked Versions (prevent specific updates). All changes propagate to clients within ~2 minutes via /api/app-config."
     ],
     "3.2.5": [
       "🌐 **Location Data Pool (Block Sharing):** Aapke Block ke Panchayat & Villages ab server par safely share hote hain — same block ke doosre users bina PO/GP portal login ke bhi ye data directly download kar sakte hain (Settings → 'Block Data Download'). Sirf panchayat/village names share hote hain (public MGNREGA data) — koi personal info nahi.",
