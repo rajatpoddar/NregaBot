@@ -460,6 +460,19 @@ class MrFillTab(BaseAutomationTab):
                 driver.execute_script("document.getElementById('btnsave').click();")
                 txt = self._wait_for_submit_alert(driver, timeout=15)
 
+            # --- TWO-STEP ALERT HANDLING ---
+            # Portal shows 2 alerts on save:
+            #   1st: "Total No. of selected worker is X Do you want to Save?" (confirmation)
+            #   2nd: "Muster roll has been saved" (success)
+            # Accept the 1st confirmation, then wait for and accept the 2nd success alert.
+            if txt and "Do you want to Save" in txt:
+                self.log_info(f"  ✅ Confirmation accepted: {truncate_workcode(work_key)}")
+                # Wait for the second (success) alert
+                txt2 = self._wait_for_submit_alert(driver, timeout=15)
+                if txt2:
+                    txt = txt2  # Use second alert text for success/fail check
+                # If no second alert, keep first alert text as-is for check below
+
             if txt:
                 if "Saved Successfully" in txt or "has been saved" in txt:
                     self._log_result(panchayat_name, work_key, current_mr_no, "Success", txt)
