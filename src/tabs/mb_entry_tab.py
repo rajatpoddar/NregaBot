@@ -13,6 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import (
     UnexpectedAlertPresentException, 
     NoSuchElementException, 
+    NoAlertPresentException,
     TimeoutException
 )
 
@@ -492,20 +493,34 @@ class MbEntryTab(BaseAutomationTab):
             if "MustorRoll/MeasurementBook.aspx" not in driver.current_url: driver.get(self.resolve_portal_url(config.MB_ENTRY_CONFIG["url"]))
 
             try:
-                # Central helper — GP login (no panchayat dropdown) par
-                # selection is skipped; no timeout/error occurs.
-                status, _ = self._select_panchayat_or_skip(
-                    driver, wait, cfg['location_panchayat'],
-                    ['ctl00_ContentPlaceHolder1_ddl_panch'])
-                if status == "selected":
-                    try:
-                        dd = wait.until(EC.presence_of_element_located(
-                            (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
-                        wait.until(EC.staleness_of(dd))
-                        wait.until(EC.presence_of_element_located(
-                            (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
-                    except Exception:
-                        pass
+                # Skip panchayat re-selection if already correctly selected —
+                # avoids an unnecessary ASP.NET postback (~5-8s on govt servers).
+                panchayat_already_ok = False
+                try:
+                    dd_el = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')
+                    cur_val = Select(dd_el).first_selected_option.text.strip().lower()
+                    if cur_val == cfg['location_panchayat'].strip().lower():
+                        panchayat_already_ok = True
+                except Exception:
+                    pass
+
+                if panchayat_already_ok:
+                    self.log_info(f"Panchayat '{cfg['location_panchayat']}' already selected — skipping re-selection.")
+                else:
+                    # Central helper — GP login (no panchayat dropdown) par
+                    # selection is skipped; no timeout/error occurs.
+                    status, _ = self._select_panchayat_or_skip(
+                        driver, wait, cfg['location_panchayat'],
+                        ['ctl00_ContentPlaceHolder1_ddl_panch'])
+                    if status == "selected":
+                        try:
+                            dd = wait.until(EC.presence_of_element_located(
+                                (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
+                            wait.until(EC.staleness_of(dd))
+                            wait.until(EC.presence_of_element_located(
+                                (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
+                        except Exception:
+                            pass
             except Exception as e: logger.debug("MBEntry: Panchayat select wait failed: %s", e)
             
             wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtMBNo')))
@@ -550,7 +565,7 @@ class MbEntryTab(BaseAutomationTab):
             self.log_info("🔘 Clicking Radio Button...")
             radio_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_rddist_0")))
             driver.execute_script("arguments[0].click();", radio_btn)
-            time.sleep(1.0)  # Short wait after click
+            time.sleep(0.5)  # Short wait after click
 
             self.log_info("⏳ Waiting for Period Dropdown...")
             # Process EVERY available Measurement Period for this work — not
@@ -848,19 +863,22 @@ class MbEntryTab(BaseAutomationTab):
                 save_btn = driver.find_element(By.XPATH, '//input[@value="Save"]')
                 driver.execute_script("arguments[0].click();", save_btn)
 
-                # Handle alert
+                # Handle alert — use a short-timeout wait (5s) since
+                # most alerts appear instantly; also catch NoAlertPresentException
+                # which some Selenium versions throw instead of TimeoutException.
+                alert_wait = WebDriverWait(driver, 5)
                 try:
-                    alert = wait.until(EC.alert_is_present())
+                    alert = alert_wait.until(EC.alert_is_present())
                     alert_text = alert.text
                     alert.accept()
                     status = "Success" if "success" in alert_text.lower() or "saved" in alert_text.lower() else "Failed"
                     self._log_result(cfg, work_code, status, alert_text, work_name, mr_no, period_text)
                     self.log_info(f"      {period_text}: {status} — {alert_text}")
-                except TimeoutException:
+                except (TimeoutException, NoAlertPresentException):
                     self._log_result(cfg, work_code, "Failed", "No Alert Received", work_name, mr_no, period_text)
 
-                # Let the postback settle before the next period
-                time.sleep(2)
+                # Brief settle before the next period
+                time.sleep(1)
 
             except Exception as e:
                 err_msg = str(e).splitlines()[0]

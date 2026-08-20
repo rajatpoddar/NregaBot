@@ -247,6 +247,39 @@ class UIMixin:
         footer.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 20))
         footer.grid_propagate(False)
 
+        # ── Helper: save / restore status label during hover ──
+        # Hover handlers override the status label with a tooltip; on leave
+        # we must restore whatever was there before (running indicator,
+        # "Ready", or any other live status).  Without this, leaving the
+        # stop button during automation would reset to "Ready" and the
+        # running-indicator text would vanish — the Windows hover glitch.
+        self._pre_hover_status = None
+        self._pre_hover_status_color = None
+
+        def _save_status():
+            try:
+                if self.status_label and self.status_label.winfo_exists():
+                    self._pre_hover_status = self.status_label.cget("text")
+                    self._pre_hover_status_color = self.status_label.cget("text_color")
+            except Exception:
+                pass
+
+        def _restore_status():
+            try:
+                if self.status_label and self.status_label.winfo_exists():
+                    if self._pre_hover_status is not None:
+                        self.status_label.configure(
+                            text=self._pre_hover_status,
+                            text_color=self._pre_hover_status_color)
+                    else:
+                        self.status_label.configure(
+                            text=tr("app.status_ready"), text_color="gray60")
+            except Exception:
+                pass
+            self._pre_hover_status = None
+            self._pre_hover_status_color = None
+
+        # ══════════════ LEFT SIDE: copyright + running + status ══════════════
         status_frame = ctk.CTkFrame(footer, fg_color="transparent")
         status_frame.pack(side="left", padx=20, fill="y")
 
@@ -257,7 +290,8 @@ class UIMixin:
             text_color=("gray50", "gray60")
         ).pack(side="left", padx=(0, 15))
 
-        ctk.CTkFrame(status_frame, width=2, height=14, corner_radius=0, fg_color=("gray80", "gray40")).pack(side="left", padx=(0, 10))
+        ctk.CTkFrame(status_frame, width=1, height=14, corner_radius=0,
+                     fg_color=("gray80", "gray40")).pack(side="left", padx=(0, 10))
 
         self.loading_animation_label = ctk.CTkLabel(status_frame, text="", width=20, font=ctk.CTkFont(size=14))
         self.loading_animation_label.pack(side="left")
@@ -277,32 +311,36 @@ class UIMixin:
         self.running_automation_chips: List[Any] = []
 
         # Separator between running automation name and status
-        ctk.CTkFrame(status_frame, width=2, height=14, corner_radius=0,
+        ctk.CTkFrame(status_frame, width=1, height=14, corner_radius=0,
                      fg_color=("gray80", "gray40")).pack(side="left", padx=(10, 0))
 
         # ── Status Label ──
-        # Footer reads: "© 2025 NREGA Bot | ▶ Running: X | Status: ..."
         self.status_label = ctk.CTkLabel(status_frame, text=tr("app.status_ready"), text_color="gray60", font=ctk.CTkFont(size=12))
         self.status_label.pack(side="left", padx=(8, 0))
 
+        # ══════════════ RIGHT SIDE: dock icons + stop + server ══════════════
         dock_frame = ctk.CTkFrame(footer, fg_color="transparent")
         dock_frame.pack(side="right", padx=15, pady=5)
 
         # Separator before the emergency-stop group
-        ctk.CTkFrame(dock_frame, width=2, height=14, corner_radius=0, fg_color=("gray80", "gray40")).pack(side="left", padx=(0, 10))
+        ctk.CTkFrame(dock_frame, width=1, height=14, corner_radius=0,
+                     fg_color=("gray80", "gray40")).pack(side="left", padx=(0, 10))
 
-        # ── Emergency Stop — clickable dot + label ──
+        # ── Emergency Stop — proper button with hover background ──
         _stop_cmd = lambda e: self._emergency_stop_all()
-        self.emergency_stop_frame = ctk.CTkFrame(dock_frame, fg_color="transparent", cursor="hand2")
-        self.emergency_stop_frame.pack(side="left", padx=(4, 4))
+        self.emergency_stop_frame = ctk.CTkFrame(
+            dock_frame, fg_color="transparent", cursor="hand2",
+            corner_radius=6, border_width=1,
+            border_color=("gray80", "gray40"))
+        self.emergency_stop_frame.pack(side="left", padx=(4, 4), ipadx=8, ipady=3)
         self.emergency_stop_frame.bind("<Button-1>", _stop_cmd)
 
-        # Bigger red dot indicator
+        # Red dot indicator
         self.emergency_stop_indicator = ctk.CTkFrame(
-            self.emergency_stop_frame, width=16, height=16, corner_radius=8,
+            self.emergency_stop_frame, width=10, height=10, corner_radius=5,
             fg_color="transparent",
         )
-        self.emergency_stop_indicator.pack(side="left", padx=(0, 5))
+        self.emergency_stop_indicator.pack(side="left", padx=(6, 4), pady=2)
         self.emergency_stop_indicator.bind("<Button-1>", _stop_cmd)
 
         # "STOP ALL" label
@@ -313,22 +351,34 @@ class UIMixin:
             text_color=("gray50", "gray50"),
             cursor="hand2",
         )
-        self.emergency_stop_label.pack(side="left")
+        self.emergency_stop_label.pack(side="left", padx=(0, 6), pady=2)
         self.emergency_stop_label.bind("<Button-1>", _stop_cmd)
 
-        # Hover tooltip for the whole group
+        # Hover: ONLY visual bg change on the button itself.
+        # Status label ko bilkul mat chho — text change se layout shift
+        # hota hai aur footer "dance" karta hai (especially on Windows).
         def _stop_enter(e):
-            if hasattr(self, 'status_label') and self.status_label and self.status_label.winfo_exists():
-                self.status_label.configure(text=tr("app.emergency_stop_hint"), text_color=("#DC2626", "#EF4444"))
+            if self.emergency_stop_frame and self.emergency_stop_frame.winfo_exists():
+                self.emergency_stop_frame.configure(
+                    fg_color=("#FEE2E2", "#450A0A"),
+                    border_color=("#DC2626", "#EF4444"))
+            if self.emergency_stop_label and self.emergency_stop_label.winfo_exists():
+                self.emergency_stop_label.configure(
+                    text_color=("#DC2626", "#EF4444"))
+
         def _stop_leave(e):
-            if hasattr(self, 'status_label') and self.status_label and self.status_label.winfo_exists():
-                self.status_label.configure(text=tr("app.status_ready"), text_color="gray60")
-        self.emergency_stop_frame.bind("<Enter>", _stop_enter)
-        self.emergency_stop_frame.bind("<Leave>", _stop_leave)
-        self.emergency_stop_indicator.bind("<Enter>", _stop_enter)
-        self.emergency_stop_indicator.bind("<Leave>", _stop_leave)
-        self.emergency_stop_label.bind("<Enter>", _stop_enter)
-        self.emergency_stop_label.bind("<Leave>", _stop_leave)
+            if self.emergency_stop_frame and self.emergency_stop_frame.winfo_exists():
+                self.emergency_stop_frame.configure(
+                    fg_color="transparent",
+                    border_color=("gray80", "gray40"))
+            if self.emergency_stop_label and self.emergency_stop_label.winfo_exists():
+                self.emergency_stop_label.configure(
+                    text_color=("gray50", "gray50"))
+
+        for w in (self.emergency_stop_frame, self.emergency_stop_indicator,
+                  self.emergency_stop_label):
+            w.bind("<Enter>", _stop_enter)
+            w.bind("<Leave>", _stop_leave)
 
         def create_icon_btn(parent, icon_name, command, tooltip_text):
             icon = self.icon_images.get(icon_name)
@@ -339,10 +389,12 @@ class UIMixin:
             )
             btn.pack(side="left", padx=4)
 
-            def on_enter(e):
-                self.status_label.configure(text=tooltip_text, text_color=("#3B82F6", "#60A5FA"))
+            def on_enter(e, _tt=tooltip_text):
+                _save_status()
+                if self.status_label and self.status_label.winfo_exists():
+                    self.status_label.configure(text=_tt, text_color=("#3B82F6", "#60A5FA"))
             def on_leave(e):
-                self.status_label.configure(text=tr("app.status_ready"), text_color="gray60")
+                _restore_status()
 
             btn.bind("<Enter>", on_enter)
             btn.bind("<Leave>", on_leave)
@@ -353,13 +405,18 @@ class UIMixin:
         create_icon_btn(dock_frame, "whatsapp", lambda: webbrowser.open("https://chat.whatsapp.com/Bup3hDCH3wn2shbUryv8wn"), tr("app.tooltip.join_community"))
         create_icon_btn(dock_frame, "settings", lambda: self.show_frame("Settings"), tr("app.tooltip.open_settings"))
 
-        ctk.CTkFrame(dock_frame, width=2, height=20, corner_radius=0, fg_color=("gray80", "gray40")).pack(side="left", padx=10)
+        ctk.CTkFrame(dock_frame, width=1, height=20, corner_radius=0,
+                     fg_color=("gray80", "gray40")).pack(side="left", padx=10)
 
         self.server_status_indicator = ctk.CTkFrame(dock_frame, width=12, height=12, corner_radius=6, fg_color="gray")
         self.server_status_indicator.pack(side="left", padx=(0, 5))
 
-        def on_server_hover(e): self.status_label.configure(text=tr("app.tooltip.server_status"))
-        def on_server_leave(e): self.status_label.configure(text=tr("app.status_ready"))
+        def on_server_hover(e):
+            _save_status()
+            if self.status_label and self.status_label.winfo_exists():
+                self.status_label.configure(text=tr("app.tooltip.server_status"))
+        def on_server_leave(e):
+            _restore_status()
         self.server_status_indicator.bind("<Enter>", on_server_hover)
         self.server_status_indicator.bind("<Leave>", on_server_leave)
 

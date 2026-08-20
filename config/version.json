@@ -1,19 +1,26 @@
 {
-  "latest_version": "3.2.6",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.6-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.6-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.6-Linux.tar.gz",
+  "latest_version": "3.2.7",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.7-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.7-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.7-Linux.tar.gz",
   "core_update": {
-    "version": "3.2.6",
-    "url": "https://nregabot.com/updates/core_v3.2.6.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.2.6.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.6.zip",
+    "version": "3.2.7",
+    "url": "https://nregabot.com/updates/core_v3.2.7.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.7.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.7.zip",
     "force_full_reinstall": false,
     "hash": "",
     "hash_windows": "",
     "hash_macos": ""
   },
   "changelog": {
+    "3.2.7": [
+      "⚡ **MB Entry Faster:** Panchayat re-selection skip ho raha hai jab dropdown me pehle se sahi panchayat selected ho — har work code pe ~5-8s postback bachta hai. Alert wait timeout 25s se 5s kar diya (alerts instant aate hain). Sleep timers bhi reduce kiye.",
+      "🐞 **MB Entry 'no such alert' Fix:** Save ke baad jab portal alert nahi dikhata to `NoAlertPresentException` crash hota tha — ab properly catch hota hai aur entry 'Failed: No Alert Received' dikhati hai.",
+      "🐞 **MR Fill Alert Fix:** Save operation me portal alert handling improve kiya — unexpected alerts ab gracefully handle hote hain instead of crashing the run.",
+      "🐛 **Footer Hover Glitch Fixed:** Stop All button hover karne pe automation running hone par footer 'dance' karta tha (status label text change se layout shift). Ab hover sirf button ka own visual change karta hai — status label bilkul touch nahi hota.",
+      "🎨 **Footer Stop Button Improved:** Stop All ko proper pill-button look diya — border, padding, aur hover background effect (light red → red). Dot aur border ke beech overlap fix kiya."
+    ],
     "3.2.6": [
       "📸 **Jobcard Verification — Photo Upload Fixed:** The Upload Family Photo popup now works reliably. The portal shows an Ajax ModalPopup (image preview) after upload — not a JS alert — so the bot now waits for the right signal. The popup window is closed safely without ever closing the main browser window (which used to crash the whole run). Save now confirms via postback + error label instead of assuming a JS alert.",
       "🌐 **Jobcard Verification — 'All Villages' in Dropdown:** The 'Process all villages' checkbox is replaced with a proper '🌐 All Villages' option in the village dropdown (like other tabs). Village dropdown also reloads with the option when the panchayat changes.",
