@@ -295,6 +295,30 @@ class MrFillTab(BaseAutomationTab):
         elif status == "notfound":
             self.log_warning(f"Panchayat '{panchayat_name}' not found in list.")
 
+    @staticmethod
+    def _norm_code(value) -> str:
+        """AUDIT FIX helper: lowercase alphanumerics-only form of a code for
+        tolerant matching (ignores '/', '-', spaces and case)."""
+        return "".join(ch for ch in str(value or "").lower() if ch.isalnum())
+
+    def _select_option_containing(self, select_obj, target_key, label):
+        """Select the first dropdown option whose normalized text CONTAINS the
+        normalized target key.
+
+        Fail-safe by design: raises ValueError when nothing matches so the
+        item is recorded as Failed — instead of blindly selecting options[1]
+        and risking attendance on the WRONG work code.
+        """
+        want = self._norm_code(target_key)
+        if not want:
+            raise ValueError(f"Empty {label} requested — nothing to match.")
+        for idx, opt in enumerate(select_obj.options):
+            txt = (opt.text or "").strip()
+            if txt and want in self._norm_code(txt):
+                select_obj.select_by_index(idx)
+                return
+        raise ValueError(f"{label.capitalize()} '{target_key}' not found among dropdown options.")
+
     def _wait_for_submit_alert(self, driver, timeout=15.0):
         """Wait for the portal's save-confirmation JS alert, accept it and return its text.
 
@@ -392,7 +416,11 @@ class MrFillTab(BaseAutomationTab):
             if len(work_code_select.options) <= 1: 
                 raise IndexError("Work code not found in dropdown.")
             
-            work_code_select.select_by_index(1) 
+            # AUDIT FIX (25 Aug 2026): fail-safe target matching — select the
+            # option whose text actually CONTAINS the requested work code.
+            # The old blind `select_by_index(1)` could fill attendance on the
+            # WRONG work code when search returned multiple/partial matches.
+            self._select_option_containing(work_code_select, work_key, "work code")
             time.sleep(1.5)
 
             # --- 4. Select MR No. ---
@@ -509,7 +537,11 @@ class MrFillTab(BaseAutomationTab):
             status = str(values[3]).upper()
             
             if "SUCCESS" not in status:
-                failed_items.append(work_code)
+                # AUDIT FIX (25 Aug 2026): the tree shows truncated codes — map
+                # back to the FULL portal code via _log_result's map, so retry
+                # searches the exact code instead of a 6-digit suffix.
+                full_map = getattr(self, "_full_workcode_map", {}) or {}
+                failed_items.append(full_map.get(work_code, work_code))
         
         if not failed_items:
             messagebox.showinfo(tr("dialogs.great"), tr("base.retry_no_fails"))
@@ -533,7 +565,17 @@ class MrFillTab(BaseAutomationTab):
         """Logs the result to the log display and the results tree."""
         # Clean up message for display
         details = msg.replace("\n", " ").replace("\r", " ").strip()
-        work_key = truncate_workcode(work_key)
+        # AUDIT FIX (25 Aug 2026): remember the FULL work code so Retry can
+        # re-run the exact portal code even though the tree displays only the
+        # privacy-truncated suffix (truncate_workcode). Retry used to feed the
+        # 6-digit suffix back into the portal search box.
+        full_key = str(work_key or "").strip()
+        display_key = truncate_workcode(full_key)
+        if not hasattr(self, "_full_workcode_map"):
+            self._full_workcode_map = {}
+        if display_key != full_key and display_key:
+            self._full_workcode_map[display_key] = full_key
+        work_key = display_key
         
         # Determine Tag and Log Level
         level = "error"

@@ -98,10 +98,6 @@ jobs:
         - name: Install dependencies
           run: pip install -r requirements.txt
   
-        - name: Create .env file
-          run: echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" > .env
-          shell: bash
-  
         - name: Install Inno Setup
           run: choco install innosetup --yes
           shell: powershell
@@ -115,23 +111,51 @@ jobs:
         - name: Create Core Zip (Windows)
           shell: python
           run: |
-            import os, shutil, zipfile
+            import os, zipfile
             
             version = '${{ needs.get-release-info.outputs.version }}'
             zip_name = f'dist/core_win_v{version}.zip'
-            temp_dir = 'dist/core_temp_win'
             
-            if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
+            # AUDIT FIX (25 Aug 2026) — WHITELIST packaging, mirroring
+            # scripts/build_update.py (the proven macOS core-zip packager).
+            # The old blacklist copytree shipped AGENTS.md (internal NAS IP +
+            # deploy topology), improvement plans, dev/test scripts, and would
+            # have shipped nrega-server secrets whenever that folder existed at
+            # build time. Only runtime-needed files ship now — same guarantee
+            # the macOS zip already had.
+            ALLOWED_TOP_LEVEL = {
+                "main_app.py", "lite_app.py", "lite_loader.py", "requirements.txt",
+                "src", "config", "assets", "docs",
+            }
+            ALLOWED_DOCS = {"changelog.json", "license.txt"}
+            ALLOWED_EXT = (".py", ".json", ".txt", ".html", ".css", ".js", ".bat", ".sh",
+                           ".md", ".png", ".ico", ".icns", ".wav", ".ttf", ".bmp",
+                           ".jpeg", ".jpg", ".csv")
+            SKIP_DIRS = {"__pycache__", ".git", "venv", "env", ".venv", "dist", "build",
+                         "user_uploads", ".idea", ".vscode", "Update_Output", "backups",
+                         "screenshots"}
+            SENSITIVE_FILES = {".env", ".env.example", ".env.dev", ".env.production",
+                               "firebase-service-account.json", "hooks.json",
+                               "deploy.sh", "docker-compose.yml", "Dockerfile",
+                               ".dockerignore", ".gitignore"}
             
-            def ignore_func(dir, files):
-                ignored = [f for f in files if f in ['venv', '.git', '.github', 'dist', 'build', '__pycache__', 'user_uploads', '.env', '.vscode', 'web', 'docs', 'scripts', 'backups']]
-                if os.path.basename(dir) == 'assets':
-                    if 'screenshots' in files:
-                        ignored.append('screenshots')
-                return ignored
+            def _is_allowed(rel_path):
+                norm = rel_path.replace("\\", "/")
+                first = norm.split("/")[0]
+                if first not in ALLOWED_TOP_LEVEL:
+                    return False
+                if first == "docs":
+                    return norm in {f"docs/{f}" for f in ALLOWED_DOCS}
+                if "/" not in norm:
+                    return norm in ALLOWED_TOP_LEVEL
+                if os.path.basename(norm) in SENSITIVE_FILES:
+                    return False
+                return norm.endswith(ALLOWED_EXT)
             
-            shutil.copytree('.', temp_dir, ignore=ignore_func)
+            if os.path.exists(zip_name):
+                os.remove(zip_name)
             
+            count = 0
             # IMPORTANT: .py source files ARE included (same as the macOS core
             # zip built by scripts/build_update.py). The deployed loader EXE
             # reads app_live/src/config.py to detect the installed version.
@@ -141,15 +165,23 @@ jobs:
             # EVERY launch. Shipping the source lets already-installed loaders
             # self-heal through the next smart update without reinstalling.
             with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zf:
-                for root, dirs, files in os.walk(temp_dir):
-                    for file in files:
-                        if file.endswith(('.exe', '.bat', '.sh', '.spec', '.ps1', '.iss')): continue
-                        full_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(full_path, temp_dir)
-                        zf.write(full_path, rel_path)
-            
-            shutil.rmtree(temp_dir)
-            print(f'Success: Created {zip_name}')
+                for top in sorted(ALLOWED_TOP_LEVEL):
+                    if not os.path.exists(top):
+                        continue
+                    if os.path.isfile(top):
+                        if _is_allowed(top):
+                            zf.write(top, top)
+                            count += 1
+                        continue
+                    for root, dirs, files in os.walk(top):
+                        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+                        for file in files:
+                            fp = os.path.join(root, file)
+                            arc = os.path.relpath(fp).replace("\\", "/")
+                            if _is_allowed(arc):
+                                zf.write(fp, arc)
+                                count += 1
+            print(f'Success: Created {zip_name} ({count} whitelisted files)')
 
             # Compute the SHA-256 so config/version.json's core_update.hash_windows
             # can be filled in before uploading this zip (enables same-version
@@ -204,10 +236,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-
-      - name: Create .env file
-        run: echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" > .env
-        shell: bash
 
       - name: Run Beta Portable build
         shell: cmd

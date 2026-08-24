@@ -1,6 +1,11 @@
 # 🔍 NREGA Bot v3.2.7 — Full Production Forensic Audit Report
 
-> **Audit date:** 25 Aug 2026
+> **⚡ FIX STATUS (25 Aug 2026):** Is audit ke Phase-1 me se **9 low-effort/high-impact
+> fixes APPLY ho chuke hain** (F1–F9) — details, issue→change→benefit breakdown aur
+> validation results ke liye dekho:
+> [`docs/AUDIT_FIX_PROGRESS_25Aug2026.md`](AUDIT_FIX_PROGRESS_25Aug2026.md)
+>
+**Audit date:** 25 Aug 2026
 > **Scope:** desktop app root repo (`main` @ `6b5d175`) + build/CI pipeline. Server (`nrega-server/`) inspected only where it intersects the desktop supply chain.
 > **Method:** read-only inspection of loader/update flow, licensing, threading, Selenium automation, data parsing, i18n, CI/build scripts, tests. Static checks executed: `pytest` (20/20 pass), `scripts/build_locales.py` (exit 0), `scripts/check_imports.py`, targeted runtime verification of suspect logic. **No code was modified.**
 >

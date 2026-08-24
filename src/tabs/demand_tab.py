@@ -1755,6 +1755,7 @@ class DemandTab(BaseAutomationTab):
         postback — we always wait for the dependent list to populate before
         continuing (see _wait_dropdown_populated).
         """
+        self._demand_error = ""   # AUDIT FIX: cleared at run start; set only by the FATAL handler
         driver = None
         try:
             driver = self.app.get_driver()
@@ -1868,6 +1869,12 @@ class DemandTab(BaseAutomationTab):
                 self.app.after(0, self.app.log_message, self.log_display, "✅ All processed.")
 
         except Exception as e:
+            # AUDIT FIX (25 Aug 2026): record the fatal error on self — the old
+            # `elif 'e' in locals():` check in the finally block was ALWAYS
+            # False (Python deletes the except-name when the block exits), so
+            # crashed runs reported "Finished" and still triggered the
+            # allocation handoff.
+            self._demand_error = type(e).__name__
             self.app.after(0, self.app.log_message, self.log_display, f"CRITICAL ERROR: {type(e).__name__} - {e}", "error")
             self.app.after(0, self.update_status, f"Error: {type(e).__name__}", 0.0)
             self.app.after(0, lambda: messagebox.showerror(tr("dialogs.error"), tr("dialogs.automation_stopped", error=e)))
@@ -1880,9 +1887,13 @@ class DemandTab(BaseAutomationTab):
                 self.app.after(0, self.app.log_message, self.log_display, "Stopped by user.", "warning")
                 final_status_text = "Stopped"
                 final_tab_status = "Stopped"
-            elif 'e' in locals():
-                final_status_text = f"Error: {type(e).__name__}"
-                final_tab_status = f"Error: {type(e).__name__}"
+            elif getattr(self, '_demand_error', ''):
+                # AUDIT FIX (25 Aug 2026): was `elif 'e' in locals():` which is
+                # ALWAYS False in Python 3 (the except-name is deleted when the
+                # block exits) → crashed runs reported "Finished" and fell into
+                # the handoff branch below. The explicit flag fixes both.
+                final_status_text = f"Error: {getattr(self, '_demand_error', '')}"
+                final_tab_status = f"Error: {getattr(self, '_demand_error', '')}"
                 final_progress = 0.0
             else:
                 # --- INTELLIGENT HANDOFF LOGIC (auto work allocation) ---
@@ -1943,7 +1954,7 @@ class DemandTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, final_status_text)
             self.app.after(0, self.update_status, final_tab_status, final_progress)
 
-            if not self.is_stopped() and 'e' not in locals():
+            if not self.is_stopped() and not getattr(self, '_demand_error', ''):
                 self.app.after(5000, lambda: self.app.set_status("Ready"))
                 self.app.after(5000, lambda: self.update_status("Ready", 0.0))
 

@@ -584,7 +584,7 @@ class HistoryManager:
                 if resp.status_code == 200:
                     result = resp.json()
                     logger.info("✅ Usage stats sync: %s features synced to server.",
-                                result.get('synced_features', len(snapshot)))
+                                result.get('synced_features', len(stats)))
                 else:
                     logger.debug("⚠️ Usage stats sync: HTTP %s (%s)",
                                  resp.status_code, resp.text[:200])

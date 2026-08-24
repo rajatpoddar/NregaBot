@@ -16,6 +16,7 @@ from src import config
 # Rollback helpers — boot-counter crash detection + core_prev.zip management.
 # Shared with main_app.py / services.py via src/utils.py.
 from src.utils import (
+    parse_version,
     record_boot_attempt,
     reset_boot_state,
     should_rollback_boot,
@@ -664,12 +665,40 @@ class ModernSplashScreen(ctk.CTk):
                 time.sleep(0.5)
                 return False
 
-            # Update if the version changed OR the core zip content changed
-            # (same-version hotfix: same version number, new hash → re-download).
-            # Version is compared against the LIVE code (see effective_ver).
-            needs_update = (server_ver != effective_ver) or (server_hash and server_hash != current_hash)
+            # AUDIT FIX (25 Aug 2026): update ONLY to a strictly NEWER version,
+            # or for a same-version hotfix (same version number, changed hash).
+            # The old `server_ver != effective_ver` accepted DOWNGRADES; and an
+            # empty server hash used to mean "apply unverified". Both refused now.
+            if parse_version(server_ver) < parse_version(effective_ver):
+                log_error(f"Update skipped: server offers v{server_ver}, older than "
+                          f"installed v{effective_ver}. Downgrade refused.")
+                self.update_status("App is up to date.", 1.0)
+                time.sleep(0.5)
+                return False
+
+            needs_update = (
+                parse_version(server_ver) > parse_version(effective_ver)
+                or (parse_version(server_ver) == parse_version(effective_ver)
+                    and bool(server_hash) and server_hash != current_hash)
+            )
 
             if needs_update:
+                # Fail-safe integrity gate: an EMPTY server hash means the
+                # payload cannot be verified — refuse instead of running it.
+                if not server_hash:
+                    log_error("Update skipped: server did not provide an integrity "
+                              "hash for this core zip. Refusing unverified update.")
+                    self.update_status("App is up to date.", 1.0)
+                    time.sleep(0.5)
+                    return False
+
+                # Transport guard: payload must come over HTTPS from our host.
+                if not isinstance(download_url, str) or not download_url.startswith("https://nregabot.com/"):
+                    log_error(f"Update skipped: unsafe download URL '{str(download_url)[:80]}'.")
+                    self.update_status("App is up to date.", 1.0)
+                    time.sleep(0.5)
+                    return False
+
                 # Keep the currently-installed zip as core_prev.zip BEFORE the
                 # download overwrites it, so a crash-looping update can be
                 # rolled back (see _rollback_to_previous).

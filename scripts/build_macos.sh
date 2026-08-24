@@ -90,7 +90,6 @@ $PYINSTALLER_CMD --noconfirm --clean --windowed --name "${APP_NAME}" \
 --add-data="docs/license.txt:docs/" \
 --add-data="src:src" \
 --add-data="src/locales:src/locales" \
---add-data=".env:." \
 --collect-all customtkinter \
 --collect-data fpdf \
 --collect-all selenium \
@@ -120,7 +119,6 @@ $PYINSTALLER_CMD --noconfirm --clean --windowed --name "${LITE_APP_NAME}" \
 --add-data="docs/license.txt:docs/" \
 --add-data="src:src" \
 --add-data="src/locales:src/locales" \
---add-data=".env:." \
 --collect-all customtkinter \
 --collect-all selenium \
 --collect-all webdriver_manager \

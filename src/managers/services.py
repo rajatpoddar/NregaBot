@@ -232,6 +232,12 @@ class ServiceManager:
         
         def _worker() -> None:
             try:
+                # AUDIT FIX (25 Aug 2026) — transport guard: update payloads
+                # must be HTTPS from our own host. A tampered/mis-edited
+                # version.json must not point the download at http:// or a
+                # foreign host (requests follows https→http redirects).
+                if not isinstance(url, str) or not url.startswith("https://nregabot.com/"):
+                    raise Exception(f"Refusing unsafe update URL: {str(url)[:80]}")
                 filename = url.split('/')[-1]
                 dl_path = os.path.join(get_user_downloads_path(), filename)
                 
