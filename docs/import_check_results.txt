@@ -1,4 +1,4 @@
-Results: 889 OK, 846 ERRORS, 0 SYNTAX ERRORS
+Results: 898 OK, 855 ERRORS, 0 SYNTAX ERRORS
 
 IMPORT/RUNTIME ERRORS:
   [dist/NREGABot Lite.app/Contents/Frameworks/selenium/webdriver/common/action_chains.py] No module named 'dist.NREGABot Lite.app'
@@ -341,11 +341,13 @@ IMPORT/RUNTIME ERRORS:
   [dist/NREGABot Lite.app/Contents/Resources/src/lite_tab_config.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/location_data.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/location_hierarchy.py] No module named 'dist.NREGABot Lite.app'
+  [dist/NREGABot Lite.app/Contents/Resources/src/location_sync.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/managers/browser_manager.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/managers/icon_manager.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/managers/services.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/managers/sound_manager.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/managers/workflow_manager.py] No module named 'dist.NREGABot Lite.app'
+  [dist/NREGABot Lite.app/Contents/Resources/src/portal_login.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/state.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/tab_config.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/tabs/SA_report_tab.py] No module named 'dist.NREGABot Lite.app'
@@ -387,6 +389,7 @@ IMPORT/RUNTIME ERRORS:
   [dist/NREGABot Lite.app/Contents/Resources/src/tabs/pdf_merger_tab.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/tabs/pending_bills_tab.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/tabs/physical_complete_tab.py] No module named 'dist.NREGABot Lite.app'
+  [dist/NREGABot Lite.app/Contents/Resources/src/tabs/print_wagelist_tab.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/tabs/professional_pdf.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/tabs/resend_rejected_wg_tab.py] No module named 'dist.NREGABot Lite.app'
   [dist/NREGABot Lite.app/Contents/Resources/src/tabs/sad_update_tab.py] No module named 'dist.NREGABot Lite.app'
@@ -764,11 +767,13 @@ IMPORT/RUNTIME ERRORS:
   [dist/NREGABot.app/Contents/Resources/src/lite_tab_config.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/location_data.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/location_hierarchy.py] No module named 'dist.NREGABot.app'
+  [dist/NREGABot.app/Contents/Resources/src/location_sync.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/managers/browser_manager.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/managers/icon_manager.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/managers/services.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/managers/sound_manager.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/managers/workflow_manager.py] No module named 'dist.NREGABot.app'
+  [dist/NREGABot.app/Contents/Resources/src/portal_login.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/state.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/tab_config.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/tabs/SA_report_tab.py] No module named 'dist.NREGABot.app'
@@ -810,6 +815,7 @@ IMPORT/RUNTIME ERRORS:
   [dist/NREGABot.app/Contents/Resources/src/tabs/pdf_merger_tab.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/tabs/pending_bills_tab.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/tabs/physical_complete_tab.py] No module named 'dist.NREGABot.app'
+  [dist/NREGABot.app/Contents/Resources/src/tabs/print_wagelist_tab.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/tabs/professional_pdf.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/tabs/resend_rejected_wg_tab.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/src/tabs/sad_update_tab.py] No module named 'dist.NREGABot.app'
@@ -847,3 +853,6 @@ IMPORT/RUNTIME ERRORS:
   [dist/NREGABot.app/Contents/Resources/webdriver_manager/firefox.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/webdriver_manager/microsoft.py] No module named 'dist.NREGABot.app'
   [dist/NREGABot.app/Contents/Resources/webdriver_manager/opera.py] No module named 'dist.NREGABot.app'
+  [run_server.py] OSError: [Errno 48] Address already in use
+  [server_loop.py] OSError: [Errno 48] Address already in use
+  [start_server.py] OSError: [Errno 48] Address already in use
