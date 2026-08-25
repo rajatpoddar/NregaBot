@@ -1,3 +1,5 @@
 # Dev/test-only dependencies — NOT shipped with the app or the core zip.
 # Runtime deps come from requirements.txt.
 pytest==8.3.4
+# Lint gate (release.yml run-tests job me F821 undefined-name check) — Batch-4
+ruff==0.16.4

@@ -400,6 +400,9 @@ class MbEntryTab(BaseAutomationTab):
                     driver.get(self.resolve_portal_url(config.MB_ENTRY_CONFIG["url"]))
                     # Central helper — GP login has no dropdown; ⭐ My
                     # Saved mode me Settings ke saved panchayats directly use.
+                    # AUDIT FIX: `wait` is branch me kabhi define nahi hua tha
+                    # (F821) — panchayat-list fetch crash hota tha. Local wait:
+                    wait = WebDriverWait(driver, 20)
                     panchayats_to_process, _is_gp = self._fetch_panchayats_from_website(
                         driver, wait, ['ctl00_ContentPlaceHolder1_ddl_panch'],
                         saved_mode=saved_mode)

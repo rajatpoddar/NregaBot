@@ -290,8 +290,9 @@ class LicenseMixin:
                                         btn.configure(state="normal", text="Request Removal")
                                     ])
                             except Exception as e:
+                                err_text = str(e)  # AUDIT FIX: closure-safe capture
                                 self.after(0, lambda: [
-                                    messagebox.showerror("Error", str(e), parent=win),
+                                    messagebox.showerror("Error", err_text, parent=win),
                                     btn.configure(state="normal", text="Request Removal")
                                 ])
 
@@ -462,15 +463,16 @@ class LicenseMixin:
                         self.after(0, _reset_btn)
 
                 except Exception as e:
+                    err_text = str(e)  # AUDIT FIX: closure-safe capture
                     def _error():
                         if not win.winfo_exists():
                             return
                         progress_bar.stop()
                         progress_bar.pack_forget()
                         self.play_sound("error")
-                        key_status.configure(text=f"❌  {str(e).split(chr(10))[0][:60]}",
+                        key_status.configure(text=f"❌  {err_text.split(chr(10))[0][:60]}",
                                              text_color=("#DC2626", "#EF4444"))
-                        messagebox.showerror("Error", str(e), parent=win)
+                        messagebox.showerror("Error", err_text, parent=win)
                         if key_activate_btn.winfo_exists():
                             key_activate_btn.configure(state="normal", text="Activate")
                     self.after(0, _error)
@@ -701,15 +703,16 @@ class LicenseMixin:
                         self.after(0, _reset_email)
 
                 except Exception as e:
+                    err_text = str(e)  # AUDIT FIX: closure-safe capture
                     def _email_error():
                         if not win.winfo_exists():
                             return
                         progress_bar.stop()
                         progress_bar.pack_forget()
                         self.play_sound("error")
-                        email_status.configure(text=f"❌  {str(e).split(chr(10))[0][:60]}",
+                        email_status.configure(text=f"❌  {err_text.split(chr(10))[0][:60]}",
                                                text_color=("#DC2626", "#EF4444"))
-                        messagebox.showerror("Error", str(e), parent=win)
+                        messagebox.showerror("Error", err_text, parent=win)
                         if email_activate_btn.winfo_exists():
                             email_activate_btn.configure(state="normal", text="Login & Activate")
                     self.after(0, _email_error)
@@ -927,8 +930,9 @@ class LicenseMixin:
                             _set_quick_buttons("normal"),
                         ))
                 except Exception as e:
+                    err_text = str(e)  # AUDIT FIX: closure-safe capture
                     self.after(0, lambda: (
-                        _quick_status(f"❌  {e}", ("#DC2626", "#EF4444")),
+                        _quick_status(f"❌  {err_text}", ("#DC2626", "#EF4444")),
                         _set_quick_buttons("normal"),
                     ))
 
@@ -1060,9 +1064,10 @@ class LicenseMixin:
                                 submit_btn.configure(state="normal", text="Register"),
                             ))
                     except Exception as e:
+                        err_text = str(e)  # AUDIT FIX: closure-safe capture
                         self.after(0, lambda: (
                             self.play_sound("error"),
-                            pf_status.configure(text=f"❌  {e}",
+                            pf_status.configure(text=f"❌  {err_text}",
                                                 text_color=("#DC2626", "#EF4444")),
                             submit_btn.configure(state="normal", text="Register"),
                         ))

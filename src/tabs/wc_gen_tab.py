@@ -454,7 +454,7 @@ class WcGenTab(BaseAutomationTab):
                  error_msg = error_msg.split("Stacktrace:")[0].strip()
             
             self.app.after(0, lambda msg=error_msg: messagebox.showerror(tr("dialogs.error"), tr("dialogs.failed_load_categories", error=msg)))
-            self.log_error(f"Error: {msg}")
+            self.log_error(f"Error: {error_msg}")
 
         finally:
             self.app.after(0, lambda: self.load_button.configure(state="normal", text=tr("form.wc_gen.load_categories")))

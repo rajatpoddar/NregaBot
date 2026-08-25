@@ -44,6 +44,12 @@ for filepath in sorted(all_files):
     # Skip scripts/ files that aren't part of the main package
     if mod_name.startswith('scripts.'):
         continue
+
+    # AUDIT FIX (25 Aug 2026): side-effect dev servers — inhe IMPORT karna
+    # khud server START karta hai (port bind). Compile to hoga (neeche), par
+    # import-execute kabhi nahi.
+    is_side_effect_server = os.path.basename(filepath) in (
+        'run_server.py', 'start_server.py', 'server_loop.py')
     
     try:
         with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
@@ -56,6 +62,11 @@ for filepath in sorted(all_files):
         print()
         continue
     
+    if is_side_effect_server:
+        # Compile-only — import-execute side effects se bachne ke liye.
+        success.append(rel_path + ' (compile-only)')
+        continue
+
     try:
         importlib.import_module(mod_name)
         success.append(rel_path)
@@ -70,6 +81,10 @@ for filepath in sorted(all_files):
 
 print('=' * 70)
 print(f'Results: {len(success)} OK, {len(errors)} ERRORS, {len(syntax_errors)} SYNTAX ERRORS')
+
+# AUDIT FIX (25 Aug 2026): gate exit-code — CI/release flow isko blocking check
+# ki tarah use kar sake. (Pehle hamesha exit 0 hota tha chahe errors hon.)
+exit_code = 0
 
 if errors:
     print('\nIMPORT/RUNTIME ERRORS:')
@@ -96,3 +111,8 @@ with open('docs/import_check_results.txt', 'w') as f:
         f.write('All imports passed!')
 
 print('\nResults saved to docs/import_check_results.txt')
+
+# AUDIT FIX (25 Aug 2026): non-zero exit on genuine problems.
+if syntax_errors or errors:
+    sys.exit(1)
+sys.exit(0)

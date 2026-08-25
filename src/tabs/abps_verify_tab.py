@@ -463,6 +463,7 @@ class AbpsVerifyTab(BaseAutomationTab):
             messagebox.showinfo(tr("status.success"), tr("dialogs.pdf_saved_to", path=file_path))
             # Try to open the file
             try:
+                import subprocess  # AUDIT FIX: lazy import (F821 — pehle undefined tha)
                 if os.name == 'nt': os.startfile(file_path)
                 else: subprocess.call(['open', file_path])
             except Exception as e: logger.debug("ABPS: Failed to open exported PDF: %s", e)

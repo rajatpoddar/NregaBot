@@ -873,7 +873,8 @@ class FileManagementTab(ctk.CTkFrame):
                         reason = f"Server error ({response.status_code})"
                     self.app.after(0, lambda: self._on_whatsapp_done(False, reason))
             except requests.exceptions.RequestException as e:
-                self.app.after(0, lambda: self._on_whatsapp_done(False, f"Connection error: {e}"))
+                err_text = str(e)  # AUDIT FIX: closure-safe capture
+                self.app.after(0, lambda: self._on_whatsapp_done(False, f"Connection error: {err_text}"))
 
         threading.Thread(target=_send, daemon=True).start()
 

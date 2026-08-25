@@ -1890,9 +1890,10 @@ class DemandTab(BaseAutomationTab):
             # crashed runs reported "Finished" and still triggered the
             # allocation handoff.
             self._demand_error = type(e).__name__
+            err_text = str(e)  # AUDIT FIX: closure-safe capture for the lambda below
             self.app.after(0, self.app.log_message, self.log_display, f"CRITICAL ERROR: {type(e).__name__} - {e}", "error")
             self.app.after(0, self.update_status, f"Error: {type(e).__name__}", 0.0)
-            self.app.after(0, lambda: messagebox.showerror(tr("dialogs.error"), tr("dialogs.automation_stopped", error=e)))
+            self.app.after(0, lambda: messagebox.showerror(tr("dialogs.error"), tr("dialogs.automation_stopped", error=err_text)))
         finally:
             final_status_text = "Finished"
             final_tab_status = "Finished"

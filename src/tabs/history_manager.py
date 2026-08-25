@@ -63,6 +63,21 @@ class HistoryManager:
             except Exception as e:
                 logger.debug("HistoryManager.close failed: %s", e)
 
+    def checkpoint_wal(self):
+        """AUDIT FIX (25 Aug 2026): flush committed WAL content into the main
+        DB file (app shutdown path, before os._exit).
+
+        PASSIVE checkpoint mode NEVER blocks on concurrent readers/writers —
+        it does as much as it safely can and returns. Failure is silently
+        ignored: shutdown must stay fast and a checkpoint hiccup must never
+        break quitting."""
+        with self.lock:
+            try:
+                conn = self._get_connection()
+                conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+            except Exception as e:
+                logger.debug("WAL checkpoint skipped: %s", e)
+
     def _init_db(self):
         """Create the tables."""
         with self.lock:

@@ -1339,6 +1339,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                         self.after(0, _fail)
 
                 except Exception as e:
+                    err_text = str(e)  # AUDIT FIX: closure-safe capture
                     def _error():
                         if not win.winfo_exists():
                             return
@@ -1346,7 +1347,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                         progress_bar.pack_forget()
                         status_label.configure(text="❌  Connection error",
                                                text_color=("#DC2626", "#EF4444"))
-                        messagebox.showerror("Error", str(e), parent=win)
+                        messagebox.showerror("Error", err_text, parent=win)
                         if activate_btn.winfo_exists():
                             activate_btn.configure(state="normal", text="Activate")
                     self.after(0, _error)
@@ -1473,10 +1474,11 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                     self.after(500, _do_open)
 
             except Exception as e:
+                err_text = str(e)  # AUDIT FIX: closure-safe capture
                 def _show_error():
                     if not win.winfo_exists():
                         return
-                    status_lbl.configure(text=f"❌  Download failed: {str(e)[:60]}", text_color="red")
+                    status_lbl.configure(text=f"❌  Download failed: {err_text[:60]}", text_color="red")
                     win.after(3000, lambda: win.destroy() if win.winfo_exists() else None)
                 self.after(0, _show_error)
 

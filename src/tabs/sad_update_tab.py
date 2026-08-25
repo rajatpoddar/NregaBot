@@ -458,7 +458,8 @@ class SadUpdateTab(BaseAutomationTab):
 
         except Exception as e:
             self.log(f"Critical Error: {e}")
-            self.app.after(0, lambda: messagebox.showerror(tr("dialogs.error"), str(e)))
+            err_text = str(e)  # AUDIT FIX: closure-safe capture
+            self.app.after(0, lambda: messagebox.showerror(tr("dialogs.error"), err_text))
         finally:
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Ready")

@@ -425,6 +425,136 @@ zero functional risk.
 | `from src.tabs._imports import InvalidSessionIdException, NoSuchWindowException` | ✅ OK |
 | location_data me `str(e)` responses | ✅ 0 |
 
+---
+---
+
+# 🔄 BATCH 4 — Safe Implementations (25 Aug 2026, continued)
+
+> Is batch ka highlight: **ruff F821 scan ne 16 REAL latent bugs pakde** — wahi
+> bug-class jisme error-dialogs khud NameError se crash hote the. Sab fix + CI gate.
+
+## 📊 Batch-4 Summary
+
+| # | Fix | Risk | Status |
+|---|---|---|---|
+| C0 | **16× F821 undefined-name bugs fixed** (12 dead-`e` callbacks + 3 typos/missing-defs) | Low — har site context-check karke closure-safe capture | ✅ Applied |
+| C1 | Shutdown par SQLite WAL PASSIVE checkpoint | Near-zero — kabhi block nahi karta, exception-wrapped | ✅ Applied |
+| C2 | `check_imports.py`: dist/build excluded (Batch-3) + server-scripts compile-only + **exit-code gate** | Zero product impact | ✅ Applied |
+| C3 | CI me Ruff F821 blocking gate (`run-tests` job me step) | Verified-clean command hi gate hai | ✅ Applied |
+| C4 | Server SRV2 webhook LAN-default change | **SKIPPED** — `.env` me WEBHOOK_HOST nahi mila; change webhook tod deta | ⏸️ Skip (verified reason) |
+| C5 | AGENTS.md golden rules #12–13 add (license choke-point, whitelist-only zip) | Docs only | ✅ Applied |
+
+## C0 — 16 undefined-name bugs (F821 sweep) 🟠 P1
+
+**Issue:** Ruff F821 ne pakda: **12 jagah deferred callbacks (`self.after(0, lambda…)`)
+me `e` reference hota tha** — except-block exit hote hi Python `e` delete kar deta
+hai, to callback chalne par `NameError` hota. Matlab: **activation/download/OAuth/
+WhatsApp-send ke ERROR dialogs khud crash hote the** — user ko asli error kabhi
+dikhta hi nahi tha. Plus 4 alag bugs:
+* `mb_entry_tab` All-Panchayats branch me `wait` defined hi nahi tha → panchayat-list
+  fetch crash.
+* `abps_verify_tab` me `subprocess` import missing → PDF-open path crash.
+* `wc_gen_tab` me `msg` vs `error_msg` typo → log line crash.
+
+**Kya kiya:** Har site ka context padha; uniform **closure-safe capture**
+(`err_text = str(e)` inside except, callback usko use karta hai). Asserted
+exact-match script se lagaya (16/16 anchors matched uniquely). `_imports.py` me
+`InvalidSessionIdException` export add. **Ruff ab CLEAN (0 errors).**
+
+**Sahi hua:** Error paths ab user ko ASLI error dikhate hain; MB-Entry All-Panchayats
+mode pehli baar sahi chalega; ABPS PDF-open crash gone.
+
+## C1 — Graceful SQLite shutdown checkpoint 🟡
+
+**Issue:** `on_closing()` seedha `os._exit(0)` karta tha — last session ke
+suggestions/usage-stats WAL me reh jate the (power-loss par risk).
+
+**Kya kiya:** `history_manager.checkpoint_wal()` (PASSIVE pragma — never blocks,
+lock-guarded, exception-safe) + `on_closing` me driver-quit se pehle call.
+**Sahi hua:** Committed data har quit par main-DB me flush; shutdown speed unchanged
+(passive = instant), hang ka rasta nahi.
+
+## C2+C3 — Import-check ab REAL gate hai + CI lint
+
+* `check_imports.py`: side-effect dev servers (`run_server/start_server/server_loop`)
+  ab compile-only; **exit(1) on genuine errors**. Current baseline: **145 files,
+  EXIT=0, zero errors** ✅
+* `release.yml` run-tests job me **Ruff F821 blocking step** — aaj clean hai isliye
+  safe; naya undefined-name introduce hota hi CI fail karega (ye bug-class ab
+  dobara enter nahi ho sakti).
+
+## ⏸️ Deferred / skipped (reasons documented)
+
+* **C4/SRV2 skip:** `.env` me `WEBHOOK_HOST` absent → default-empty change live
+  WhatsApp webhook todta. (Private repo me hardcoded IP ka exposure bhi minimal.)
+* ed25519 update-signing: purane installed loaders verify code nahi rakhte — value
+  tabhi jab users installer reinstall karein. Dedicated session chahiye.
+* MR Fill date-error disambiguation + sleep→waits migration: portal-supervised
+  testing pending.
+
+## ✅ Batch-4 Validation
+
+| Check | Result |
+|---|---|
+| Ruff F821 (src + loaders) | ✅ **CLEAN — 0 errors** (pehle 16) |
+| py_compile (14 touched files) | ✅ PASS |
+| pytest | ✅ 20/20 |
+| Smoke test (all tabs) | ✅ PASSED |
+| check_imports gate | ✅ 145 files, EXIT=0 |
+| release.yml YAML parse | ✅ OK |
+
+---
+---
+
+# 🔄 BATCH 5 — Location Pool Admin Visibility (25 Aug 2026)
+
+> **User request:** "Admin panel me dikhna chahiye kis-kis block ka data hai."
+> Desktop fetch-flow waisa hi rahega (koi change nahi) — sirf ADMIN VISIBILITY add hui.
+
+## 📊 Batch-5 Summary
+
+| # | Item | Side | Status |
+|---|---|---|---|
+| S-A | `location_data_repo.get_coverage()` — block-wise aggregate query | Server | ✅ Applied |
+| S-B | `/admin/location-pool` page (`@admin_required`, read-only) | Server | ✅ Applied |
+| S-C | Blueprint registration (`admin/__init__.py`) | Server | ✅ Applied |
+| S-D | Template: info banner + 3 overview cards + searchable table | Server | ✅ Applied |
+| S-E | Sidebar link — Database & Ops section me "🗺️ Location Pool" | Server | ✅ Applied |
+| D-A | `requirements-dev.txt` me ruff pin (`0.16.4`) + CI step bhi pinned | Desktop/CI | ✅ Applied |
+
+## Page kya dikhata hai — `/admin/location-pool`
+
+* **3 overview cards:** Blocks With Data · Total Panchayats · Total Villages (merged)
+* **Table (state→district→block):** panchayat count, merged village count,
+  **Sources badge** (green ≥3 users / amber 2 / gray 1 — kitne alag users ne
+  contribute kiya), last update (IST)
+* **Search box:** state/district/block par live client-side filter
+* **Empty state:** abhi data nahi to clear message
+
+**Safety:** Read-only page, `@admin_required` ke peeche, apna alag query
+(`get_coverage()` — GROUP BY aggregate), kisi existing endpoint/flow ko touch nahi
+kiya. PII nahi — sirf public-grade names + counts; source identity sha256 hash me
+hai jo kabhi render nahi hoti.
+
+## ⚠️ Deploy note
+
+Ye changes tab live honge jab AAP `nrega-server` commit+push+deploy karoge
+(agent NAS rule). Naya route additive hai — purane clients/screens isse affect
+nahi hote. Koi migration NAHI chahiye (`location_data_pool` table migration-027
+me already hai).
+
+## ✅ Batch-5 Validation
+
+| Check | Result |
+|---|---|
+| py_compile (route + repo + admin __init__) | ✅ PASS |
+| Jinja template parse (jinja2.Environment.parse) | ✅ OK |
+| `location_data_repo` singleton exists (line 166) | ✅ Confirmed |
+| Sidebar endpoint name match (`admin.location_pool_page`) | ✅ Verified |
+| CI ruff pin == dev pin (0.16.4) | ✅ Matched |
+
+
+
 
 
 

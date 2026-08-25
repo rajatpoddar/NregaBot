@@ -78,6 +78,14 @@ jobs:
         # jobs; keeping this job lean keeps it fast).
         run: pip install pytest requests appdirs customtkinter
 
+      - name: Ruff — undefined-name gate (F821)
+        # AUDIT FIX (25 Aug 2026): F821 ne real production bugs pakde the
+        # (dead-'e' callbacks, undefined wait/subprocess). Narrow rule set =
+        # low noise, high signal. Naya F821 introduce hua to yahin fail hoga.
+        run: |
+          pip install ruff==0.16.4
+          ruff check --select F821 src/ loader.py lite_loader.py main_app.py lite_app.py
+
       - name: Run pytest
         run: python -m pytest -v
 

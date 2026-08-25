@@ -891,7 +891,8 @@ class AboutTab(ctk.CTkFrame):
                     self.app.after(0, lambda: messagebox.showerror(tr("base.automation_error.title"), result.get("reason", "Unknown server error."), parent=self))
 
             except Exception as e:
-                self.app.after(0, lambda: messagebox.showerror(tr("base.automation_error.title"), tr("errors.generic", error=str(e)[:200]), parent=self))
+                err_text = str(e)[:200]  # AUDIT FIX: closure-safe capture
+                self.app.after(0, lambda: messagebox.showerror(tr("base.automation_error.title"), tr("errors.generic", error=err_text), parent=self))
             finally:
                 # --- FIX: Check if button still exists before configuring ---
                 def safe_re_enable_button():

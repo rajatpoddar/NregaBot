@@ -579,6 +579,15 @@ class NregaBotApp(ctk.CTk, LicenseMixin, NavMixin, AutomationMixin, UIMixin):
             # Force garbage collection before exit
             gc.collect()
 
+            # AUDIT FIX (25 Aug 2026): flush SQLite WAL → main DB before the
+            # hard os._exit below. Passive checkpoint never blocks and is
+            # wrapped so any hiccup can never hang or break shutdown.
+            try:
+                if getattr(self, 'history_manager', None):
+                    self.history_manager.checkpoint_wal()
+            except Exception as e:
+                logger.debug("Shutdown checkpoint failed: %s", e)
+
             # Cleanup zombie browser process
             try:
                 if self.app_state.driver:
