@@ -704,7 +704,7 @@ class DashboardReportTab(BaseAutomationTab):
                 pdf.add_font("Custom", "", font_reg, uni=True)
                 pdf.add_font("Custom", "B", font_bold, uni=True)
                 f_name = "Custom"
-            except: f_name = "Arial"
+            except Exception: f_name = "Arial"
 
             # Title Block
             pdf.set_font(f_name, "B", 16)

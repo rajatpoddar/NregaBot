@@ -337,7 +337,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                 try:
                     with open(file_path, 'r', encoding=enc) as f:
                         return list(csv.DictReader(f))
-                except: continue
+                except Exception: continue
             raise Exception("Failed to read CSV.")
 
     def run_automation_logic(self, inputs):
@@ -434,14 +434,14 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                 try:
                     Select(driver.find_element(By.NAME, "schemeId")).select_by_visible_text(inputs['scheme_type'])
                     time.sleep(1) 
-                except:
+                except Exception:
                     self._log_result(applicant_name, final_scheme_remark, "Failed", "Scheme Type Error")
                     continue
 
                 try:
                     svc_select = Select(wait.until(EC.presence_of_element_located((By.NAME, "schemeService"))))
                     try: svc_select.select_by_visible_text(inputs['service'])
-                    except:
+                    except Exception:
                         found = False
                         for opt in svc_select.options:
                             if inputs['service'].lower() in opt.text.lower():
@@ -490,7 +490,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                     try:
                         self._find(driver, By.XPATH, "//button[contains(., 'Reset')]").click()
                         time.sleep(1.0)  # Short wait after click
-                    except: driver.refresh(); time.sleep(2)
+                    except Exception: driver.refresh(); time.sleep(2)
 
                     self._log_result(applicant_name, final_scheme_remark, "Success", ack_number)
                 except Exception as e:
@@ -538,7 +538,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         if inputs['app_remarks']: self._safe_send_keys(driver, "remarks", inputs['app_remarks'])
                         
                         try: select_obj.select_by_visible_text(inputs['scheme_type'])
-                        except: time.sleep(2); continue
+                        except Exception: time.sleep(2); continue
 
                         # Element wait handled by WebDriverWait below
                         svc_select = Select(driver.find_element(By.NAME, "schemeService"))
@@ -549,7 +549,7 @@ class SarkarAapkeDwarTab(BaseAutomationTab):
                         
                         try:
                             try: svc_select.select_by_visible_text(inputs['service'])
-                            except:
+                            except Exception:
                                 for opt in svc_select.options:
                                     if inputs['service'].lower() in opt.text.lower():
                                         svc_select.select_by_visible_text(opt.text); break

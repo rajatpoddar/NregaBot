@@ -553,6 +553,85 @@ me already hai).
 | Sidebar endpoint name match (`admin.location_pool_page`) | ✅ Verified |
 | CI ruff pin == dev pin (0.16.4) | ✅ Matched |
 
+---
+---
+
+# 🔄 BATCH 6 — Test Foundation + Bare-Except Sweep + Hygiene (25 Aug 2026)
+
+> User-approved scope: 1️⃣ pure-function test foundation · 2️⃣ E722 bare-except sweep
+> · 3️⃣ repo hygiene. Zero production-logic change — sirf safety-net + mechanical
+> hardening + clutter removal.
+
+## 📊 Batch-6 Summary
+
+| # | Item | Result |
+|---|---|---|
+| T1 | **36 naye unit tests** — `tests/test_utils_pure.py` + `tests/test_location_merge.py` | ✅ 56/56 total passing |
+| T2 | **44 bare-`except:` → `except Exception:`** (40 tabs + loader×2 + main_app + ui_components) | ✅ Sweep + manual |
+| T3 | CI ruff gate expand: **F821 → F821,E722** | ✅ Applied (verified-clean baseline) |
+| H1 | `docs/import_check_results.txt` untrack (gitignore me tha, tracked tha) | ✅ git rm --cached |
+| H2 | Root clutter: 0-byte `persistent_server2.py` deleted, `_audit_tab_layout.py` → `scripts/dev/`, 6 empty root logs deleted | ✅ Done |
+| — | check_imports re-run post-changes | ✅ 142 files, EXIT=0 |
+
+## T1 — Test foundation (36 tests)
+
+**Issue:** Audit ka sabse bada structural risk tha ZERO unit-test coverage pure
+functions par — jo demand/report/update ke core me hain.
+
+**Kya cover hua:**
+* **parse_version** — ordering (`3.2.10 > 3.2.9` tuple-compare), pre-release suffix,
+  None-safety, downgrade-detection semantic (Batch-1 fix ka core)
+* **current_financial_year** — April boundary parametrized (Jan/Mar-end/Apr-1/Dec),
+  monkeypatched clock
+* **truncate_workcode** — full pattern, long-suffix clamp, digit-fallback,
+  alphanumeric no-loss, jobcard-style IDs untouched, empty/None
+* **mask_pii_text** — Aadhaar (contiguous+spaced), mobile, IFSC, multi-PII single
+  pass, plain-text untouched, None-safe
+* **location_sync.apply_server_data** — missing-only merge invariant: new-block add,
+  **idempotency** (dobara same data = 0/0), partial-village merge,
+  case-insensitive dedup (`rampur` vs `RAMPUR`)
+* **DemandTab._get_village_code** — JH slash-first semantics + RJ last-3
+
+**Interesting:** ek test ne mujhe hi pakda — maine JH format galat assume kiya tha;
+function ke documented behavior se test correct kiya. Tests likhne ka asli fayda.
+
+## T2 — Bare-except sweep (44 sites)
+
+**Issue:** bare `except:` sirf exceptions nahi — **KeyboardInterrupt/SystemExit ko
+bhi swallow karta hai**. Practical impact: automation hang hoti to user kabhi-kabhi
+Stop bhi press kar pata (signal swallow). Plus real bugs hide hote the.
+
+**Kya kiya:** Scripted indent-preserving sweep in tabs (13 files / 40 sites) +
+manual 4 sites (loader extract-rename & app.destroy, main_app single-instance
+socket, ui_components canvas bbox). Sab `except Exception:` ban gaye — behavior
+same for normal Exceptions, signals ab pass through.
+
+**Verified:** grep count → **0** bare-excepts tabs me; py_compile 13 files OK.
+
+## T3+C — CI gate ab F821,E722 dono
+
+Baseline verified-clean hone ke baad hi gate expand kiya — dobara enter hone se
+pehle hi fail-fast. requirements-dev me ruff==0.16.4 pin; CI step same version.
+
+## Hygiene notes
+
+* `import_check_results.txt` generated artifact hai — ab untracked (local file
+  barkarar). Har check-run par phantom "M" band.
+* `_audit_tab_layout.py` scripts/dev/ me move (git mv — history preserved).
+* Empty logs delete — content-free thi (0 bytes), koi data loss nahi.
+
+## ✅ Batch-6 Validation
+
+| Check | Result |
+|---|---|
+| pytest (20 purane + 36 naye) | ✅ **56 passed** |
+| Ruff gate F821,E722 | ✅ CLEAN |
+| py_compile (13 touched files) | ✅ PASS |
+| Smoke test (all tabs instantiate) | ✅ PASSED |
+| check_imports gate | ✅ EXIT=0, 142 files |
+| release.yml YAML parse | ✅ OK |
+
+
 
 
 

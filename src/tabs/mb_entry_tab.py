@@ -555,7 +555,7 @@ class MbEntryTab(BaseAutomationTab):
                     target_index = index; found_work = True; break
             
             try: extracted_work_name = re.findall(r'\((.*?)\)', select_work.options[target_index].text)[-1]
-            except: extracted_work_name = "Unknown"
+            except Exception: extracted_work_name = "Unknown"
 
             element_to_go_stale = select_work_elem 
             select_work.select_by_index(target_index)

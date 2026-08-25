@@ -571,7 +571,7 @@ class MisReportsTab(BaseAutomationTab):
                             self.app.after(0, lambda r=report_name: self._tree_insert(self.results_tree, (r, "Failed", "No data found"), ('failed',)))
                             try:
                                 driver.close()
-                            except: pass
+                            except Exception: pass
                             driver.switch_to.window(main_tab)
                             time.sleep(1)
                             continue
@@ -659,7 +659,7 @@ class MisReportsTab(BaseAutomationTab):
                             worksheet.page_setup.fitToWidth = 1
                             worksheet.page_setup.fitToHeight = 0
                             worksheet.page_setup.paperSize = worksheet.PAPERSIZE_A4
-                        except:
+                        except Exception:
                             pass
                         
                         self.log_success(f"'{report_name}' saved ({len(report_df)} rows).")
@@ -668,7 +668,7 @@ class MisReportsTab(BaseAutomationTab):
                         # ── Close new tab and switch back to accordion ──
                         try:
                             driver.close()
-                        except: pass
+                        except Exception: pass
                         driver.switch_to.window(main_tab)
                         time.sleep(1)
                         
@@ -682,10 +682,10 @@ class MisReportsTab(BaseAutomationTab):
                         # Try to close the new tab and go back to accordion
                         try:
                             driver.close()
-                        except: pass
+                        except Exception: pass
                         try:
                             driver.switch_to.window(main_tab)
-                        except: pass
+                        except Exception: pass
             
             finally:
                 if sheets_written > 0:
@@ -695,7 +695,7 @@ class MisReportsTab(BaseAutomationTab):
                     self.log_warning("No reports were successfully processed. Excel file not saved.")
                     if os.path.exists(save_path):
                         try: os.remove(save_path)
-                        except: pass
+                        except Exception: pass
         except Exception as e:
             error_msg = str(e).split('\n')[0]; self.log_error(f"Critical error: {error_msg}"); messagebox.showerror(tr("dialogs.critical_error"), error_msg)
         finally:

@@ -442,7 +442,7 @@ class MarqueeLabel(ctk.CTkFrame):
         try:
             first_item = self.items[0]
             try: self.canvas.bbox(first_item['id'])
-            except: return 
+            except Exception: return 
 
             last_item = self.items[-1]
             last_coords = self.canvas.coords(last_item['id'])

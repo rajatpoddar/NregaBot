@@ -386,7 +386,7 @@ class ModernSplashScreen(ctk.CTk):
                     print(f"Cleanup Error: {e}")
                     try:
                         os.rename(EXTRACTED_DIR, f"{EXTRACTED_DIR}_old_{int(time.time())}")
-                    except:
+                    except Exception:
                         pass
 
             os.makedirs(EXTRACTED_DIR, exist_ok=True)
@@ -793,7 +793,7 @@ if __name__ == "__main__":
 
         try:
             app.destroy()
-        except:
+        except Exception:
             pass
 
         # 1. Determine Launch Path

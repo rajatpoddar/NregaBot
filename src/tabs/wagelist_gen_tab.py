@@ -266,14 +266,14 @@ class WagelistGenTab(BaseAutomationTab):
                         try:
                             proceed_btn = wait.until(EC.element_to_be_clickable((By.ID, 'ctl00_ContentPlaceHolder1_go')))
                             driver.execute_script("arguments[0].click();", proceed_btn)
-                        except:
+                        except Exception:
                             break
 
                         # D. Wait for Table & Find Row
                         try:
                             wagelist_table = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_wagelist_msr")))
                             rows = wagelist_table.find_elements(By.XPATH, ".//tr[td]")
-                        except:
+                        except Exception:
                             self.log_info(f"   No wagelist table found for {agency_name_part}.")
                             break
 
@@ -338,7 +338,7 @@ class WagelistGenTab(BaseAutomationTab):
                             try:
                                 err_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
                                 err_text = err_elem.get_attribute("innerText").strip()
-                            except: err_text = "Unknown Error"
+                            except Exception: err_text = "Unknown Error"
                             
                             self.log_error(f"   Failed: {err_text}")
                             self._log_result(agency_name_part, work_code, f"Failed ({err_text[:20]})", "N/A", "", "")

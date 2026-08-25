@@ -392,7 +392,7 @@ class MrFillTab(BaseAutomationTab):
             
             # Check for stale element to detect page refresh later
             try: old_wc_ddl = driver.find_element(By.ID, "ddlWorkCode")
-            except: old_wc_ddl = None
+            except Exception: old_wc_ddl = None
 
             search_box = wait.until(EC.presence_of_element_located((By.ID, "txtSearch")))
             driver.execute_script("arguments[0].value = arguments[1];", search_box, work_key)

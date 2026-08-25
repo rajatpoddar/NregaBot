@@ -1,3 +1,0 @@
-Results: 85 OK, 0 ERRORS, 0 SYNTAX ERRORS
-
-All imports passed!

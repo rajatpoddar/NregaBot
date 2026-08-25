@@ -359,7 +359,7 @@ class ZeroMrTab(BaseAutomationTab):
                 try:
                     debug_select = Select(driver.find_element(By.ID, "ddlworkcode"))
                     options_preview = [o.text for o in debug_select.options[:3]]
-                except:
+                except Exception:
                     options_preview = "Unknown"
                 raise NoSuchElementException(f"Could not find a work code matching '{work_key}' in the dropdown. Available: {options_preview}...")
 

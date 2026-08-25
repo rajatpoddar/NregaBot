@@ -398,7 +398,7 @@ class EKycReportTab(BaseAutomationTab):
                             try:
                                 village_dd_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDL_Village")
                                 break
-                            except: time.sleep(1)
+                            except Exception: time.sleep(1)
                         
                         if not village_dd_elem: raise Exception("Village Dropdown not found")
 
@@ -491,7 +491,7 @@ class EKycReportTab(BaseAutomationTab):
             try:
                 table = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_gvData")))
                 rows = table.find_elements(By.TAG_NAME, "tr")
-            except:
+            except Exception:
                 self.log_error("Table not found.")
                 break
 
@@ -531,7 +531,7 @@ class EKycReportTab(BaseAutomationTab):
                         self.all_scraped_data.append(record)
                         self.check_and_insert_to_tree(record)
                         count_on_page += 1
-                    except: continue
+                    except Exception: continue
 
             self.log_info(f"  > Page {current_page_num}: {count_on_page} new records.")
             next_page_num = current_page_num + 1
@@ -543,7 +543,7 @@ class EKycReportTab(BaseAutomationTab):
                 driver.execute_script("arguments[0].click();", next_link)
                 
                 try: WebDriverWait(driver, 10).until(EC.staleness_of(old_table))
-                except: time.sleep(3)
+                except Exception: time.sleep(3)
                 current_page_num += 1
             except NoSuchElementException:
                 break

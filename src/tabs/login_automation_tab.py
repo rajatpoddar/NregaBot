@@ -230,7 +230,7 @@ class LoginAutomationTab(BaseAutomationTab):
                     WebDriverWait(self.app.get_driver(), 5).until(lambda d: len(Select(d.find_element(By.XPATH, xpath)).options) > 1)
                     sel = Select(self.app.get_driver().find_element(By.XPATH, xpath))
                 try: sel.select_by_visible_text(text)
-                except:
+                except Exception:
                     found = False
                     for opt in sel.options:
                         if opt.text.strip().lower() == text.lower():

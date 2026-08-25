@@ -1197,7 +1197,7 @@ def run_application():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.bind(("127.0.0.1", 60123))
-    except:
+    except Exception:
         try:
             s.connect(("127.0.0.1", 60123))
             s.sendall(b'focus')

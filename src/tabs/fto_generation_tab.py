@@ -323,7 +323,7 @@ class FtoGenerationTab(BaseAutomationTab):
                     if ":" in text:
                         return text.split(":")[1].strip()
                     return text.strip()
-                except:
+                except Exception:
                     return None
 
             # 1. District
@@ -384,7 +384,7 @@ class FtoGenerationTab(BaseAutomationTab):
             try:
                 dd_elem = wait.until(EC.presence_of_element_located((By.TAG_NAME, "select")))
                 select = Select(dd_elem)
-            except:
+            except Exception:
                 self.log_warning("Dropdown not found.")
                 self._log_result(log_name, "Skipped", "Dropdown not found")
                 return

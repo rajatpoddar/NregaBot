@@ -518,7 +518,7 @@ class WcGenTab(BaseAutomationTab):
             
             try:
                 next_element_ref = driver.find_element(By.ID, current['next_id'])
-            except:
+            except Exception:
                 next_element_ref = None
 
             Select(select_element).select_by_visible_text(selection)

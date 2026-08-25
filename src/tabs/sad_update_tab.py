@@ -222,7 +222,7 @@ class SadUpdateTab(BaseAutomationTab):
                             reader = csv.reader(f)
                             rows_to_scan = list(reader)
                         break
-                    except: continue
+                    except Exception: continue
 
             for row in rows_to_scan:
                 if not row: continue
@@ -380,7 +380,7 @@ class SadUpdateTab(BaseAutomationTab):
                         try:
                             fallback_btn = driver.find_element(By.XPATH, "//a[contains(., 'Update')]")
                             driver.execute_script("arguments[0].click();", fallback_btn)
-                        except:
+                        except Exception:
                             self.log("--> Record Not Found")
                             self.add_result(search_term, "Failed", "Record/Update Link not found")
                             continue

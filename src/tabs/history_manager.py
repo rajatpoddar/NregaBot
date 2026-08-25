@@ -247,7 +247,7 @@ class HistoryManager:
                 cursor = conn.cursor()
                 cursor.execute("SELECT field_key, value FROM tab_inputs WHERE tab_key = ?", (tab_key,))
                 return dict(cursor.fetchall())
-            except:
+            except Exception:
                 return {}
 
     def get_tab_input(self, tab_key: str, field_key: str, default: str = "") -> str:
@@ -259,7 +259,7 @@ class HistoryManager:
                 cursor.execute("SELECT value FROM tab_inputs WHERE tab_key = ? AND field_key = ?", (tab_key, field_key))
                 row = cursor.fetchone()
                 return row[0] if row else default
-            except:
+            except Exception:
                 return default
 
     def clear_tab_inputs(self, tab_key: str = None):
@@ -297,7 +297,7 @@ class HistoryManager:
                     cursor.execute("SELECT COUNT(*) FROM tab_inputs")
                 row = cursor.fetchone()
                 return row[0] if row else 0
-            except:
+            except Exception:
                 return 0
 
     # ── Import legacy JSON files into tab_inputs table ──
@@ -407,7 +407,7 @@ class HistoryManager:
                 cursor.execute("SELECT value FROM suggestions WHERE field_key = ? ORDER BY value ASC", (field_key,))
                 rows = cursor.fetchall()
                 return [row[0] for row in rows]
-            except: return []
+            except Exception: return []
 
     def get_filtered_suggestions(self, field_key: str, parent_key: str, parent_value: str) -> list:
         """Get suggestions filtered by parent-child hierarchy.
@@ -494,7 +494,7 @@ class HistoryManager:
                 cursor.execute("SELECT automation_key FROM usage_stats ORDER BY count DESC LIMIT ?", (count,))
                 rows = cursor.fetchall()
                 return [row[0] for row in rows]
-            except:
+            except Exception:
                 return []
 
     # ────────────────────────────────────────────────────────────────
@@ -508,7 +508,7 @@ class HistoryManager:
                 cursor = conn.cursor()
                 cursor.execute("SELECT field_key, COUNT(*) FROM suggestions GROUP BY field_key ORDER BY field_key")
                 return dict(cursor.fetchall())
-            except:
+            except Exception:
                 return {}
 
     def get_total_suggestions_count(self) -> int:
@@ -520,7 +520,7 @@ class HistoryManager:
                 cursor.execute("SELECT COUNT(*) FROM suggestions")
                 row = cursor.fetchone()
                 return row[0] if row else 0
-            except:
+            except Exception:
                 return 0
 
     def get_usage_stats_count(self) -> int:
@@ -532,7 +532,7 @@ class HistoryManager:
                 cursor.execute("SELECT COUNT(*) FROM usage_stats")
                 row = cursor.fetchone()
                 return row[0] if row else 0
-            except:
+            except Exception:
                 return 0
 
     def get_usage_stats_all(self) -> Dict[str, int]:
@@ -977,7 +977,7 @@ class HistoryManager:
                 cursor.execute("SELECT timestamp, activity_type, description FROM activity_log ORDER BY id DESC LIMIT ?", (limit,))
                 rows = cursor.fetchall()
                 return rows
-            except:
+            except Exception:
                 return []
 
     def get_recent_activity_structured(self, limit: int = 50) -> list:
@@ -1009,7 +1009,7 @@ class HistoryManager:
                         "details": row[9] or "",
                     })
                 return result
-            except:
+            except Exception:
                 return []
 
     def get_activity_summary_for_today(self) -> list:
@@ -1037,7 +1037,7 @@ class HistoryManager:
                     "count": r[3],
                     "avg_duration": float(r[4] or 0),
                 } for r in rows]
-            except:
+            except Exception:
                 return []
 
     # ────────────────────────────────────────────────────────────────
