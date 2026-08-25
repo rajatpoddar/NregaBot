@@ -20,6 +20,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # --- selenium.common.exceptions ---
 from selenium.common.exceptions import (
+    InvalidSessionIdException,
     NoAlertPresentException,
     NoSuchElementException,
     NoSuchWindowException,
@@ -96,6 +97,7 @@ __all__ = [
     "NoAlertPresentException",
     "NoSuchElementException",
     "NoSuchWindowException",
+    "InvalidSessionIdException",
     "StaleElementReferenceException",
     "TimeoutException",
     "UnexpectedAlertPresentException",

@@ -1551,7 +1551,22 @@ class DemandTab(BaseAutomationTab):
                     break
                 except (UnicodeDecodeError, UnicodeError):
                     continue
-            
+
+            # AUDIT FIX (25 Aug 2026): macro-path mojibake warning — eKYC path
+            # ('?' check) ke jaisa signal yahan bhi. WARN-ONLY: kabhi block nahi
+            # karta, sirf user ko batata hai ki encoding theek karni hogi warna
+            # names portal grid me match nahi honge.
+            _bad = sum(
+                1 for r in self.work_data
+                if any(isinstance(v, str) and ("\ufffd" in v or "??" in v)
+                       for v in r.values())
+            )
+            if _bad:
+                self.log_warning(
+                    f"⚠️ {_bad}/{len(self.work_data)} rows me garbled text (mojibake) mili "
+                    f"— file ko 'CSV UTF-8' format me re-save karo, warna names portal par "
+                    f"match nahi honge.")
+
             self.log_info(f"Loaded {len(self.work_data)} rows from {file_path} (macro)")
 
         except Exception as e:

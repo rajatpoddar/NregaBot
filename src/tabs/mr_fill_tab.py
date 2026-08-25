@@ -11,7 +11,9 @@ from .base_tab import BaseAutomationTab
 from src.utils import get_logger, truncate_workcode
 from src.i18n import tr
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from ._imports import By, Select, WebDriverWait, EC, NoAlertPresentException, NoSuchElementException, TimeoutException  # noqa: F401
+from ._imports import (By, Select, WebDriverWait, EC, NoAlertPresentException,
+                       NoSuchElementException, TimeoutException,
+                       InvalidSessionIdException, NoSuchWindowException)  # noqa: F401
 
 
 logger = get_logger()
@@ -331,6 +333,14 @@ class MrFillTab(BaseAutomationTab):
         aur kabhi automation abort nahi karna chahiye. Polling approach
         (instead of EC.alert_is_present) isliye hai kyunki wo bhi sirf
         NoAlertPresentException catch karta hai.
+
+        AUDIT FIX (25 Aug 2026): do exceptions AB re-raise hote hain —
+          * NoSuchWindowException  → browser TAB band ho gaya
+          * InvalidSessionIdException → browser process hi mar gaya
+        In dono me aur wait karna bekaar hai (har item full timeout jalega,
+        end result waise bhi FAILED). Ab turant raise → upar ka handler ek
+        hi saaf error dikhata hai. Missing-alert case pehle jaisa hi poll
+        karta hai.
         """
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -339,6 +349,9 @@ class MrFillTab(BaseAutomationTab):
             try:
                 alert = driver.switch_to.alert
                 txt = alert.text
+            except (NoSuchWindowException, InvalidSessionIdException):
+                # Browser/tab dead — fast-abort (see docstring above).
+                raise
             except Exception:
                 time.sleep(0.3)
                 continue

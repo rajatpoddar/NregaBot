@@ -348,5 +348,83 @@ service proposed) — tumhara "baad me" ke liye ready.
 | Raw license.dat writes remaining | ✅ 0 |
 | Smoke test (tabs instantiate) | ✅ PASSED (Batch-1 me; Batch-2 tabs UI touch nahi karta) |
 
+---
+---
+
+# 🔄 BATCH 3 — Safe Implementations (25 Aug 2026, continued)
+
+> Wahi constraint: additive/fail-safe only. Automation ke **submission logic me zero
+> change** — sirf failure-mode speedup aur warnings.
+
+## 📊 Batch-3 Summary
+
+| # | Fix | Risk | Status |
+|---|---|---|---|
+| B1 | MR Fill alert-probe dead-browser fast-abort | Low — outcome same (FAILED), bas ab fast + clear | ✅ Applied |
+| B2 | Demand macro-path mojibake WARNING (non-blocking) | Zero — warn-only | ✅ Applied |
+| B3 | `check_imports.py` se dist/build scan removed | Zero (dev tool) | ✅ Applied |
+| B4 | Server SRV3: location_data 500s se `str(e)` leak removed | Zero functional | ✅ Applied (local) |
+
+## B1 — MR Fill: browser marne par ab 15s×items nahi jalte
+
+**Issue:** `_wait_for_submit_alert()` ka broad `except Exception` HAR exception ko
+"alert nahi aaya" samajhta tha — including `NoSuchWindowException` (tab band) aur
+`InvalidSessionIdException` (browser process dead). In cases me har remaining item
+full timeout jalta tha, end result waise bhi FAILED with confusing message.
+
+**Kya kiya:** In do exceptions ko explicitly re-raise kiya; baaki missing-alert
+polling pehle jaisa hi (Chrome-150 "No dialog is showing" case untouched).
+Docstring me rationale documented.
+
+**Sahi hua:** Browser/tab death par run turant saaf "no such window / invalid
+session id" errors dikhata hai — seconds me, hours nahi. Submission path bilkul
+untouched.
+
+## B2 — Demand macro CSV me mojibake warning
+
+**Issue:** eKYC path me '?'-corruption check tha (`_process_input_file`), par Macro
+CSV path (`load_csv_data`) silently garbled names load leta — encoding ladder ka
+last stop latin-1 kabhi fail hi nahi hota (audit D4).
+
+**Kya kiya:** Parse-complete hone par warn-only check — `\ufffd` ya `'??'` wale
+rows gin kar clear Hinglish warning log hota hai ("CSV UTF-8 me re-save karo").
+**Start button block NAHI hota** — user ki final choice hamesha unki.
+
+**Sahi hua:** Silent mojibake → visible signal. Demand submission behavior unchanged.
+
+## B3 — check_imports.py noise fix
+
+**Issue:** Script `dist/` ke PyInstaller bundles ke andar site-packages copies scan
+karta tha → **855 fake errors** ("No module named 'dist.NREGABot.app'") jo real
+source errors ko drown kar dete the.
+
+**Kya kiya:** Skip-dirs me `dist`, `build` add + comment.
+
+**Sahi hua:** Ab script ka exit/output sirf REAL source problems dikhayega — future
+audits/releases ka signal clean.
+
+## B4 — Server SRV3 fix (local edit, deploy AAP karenge)
+
+**Issue:** `location_data.py` dono endpoints 500 par `str(e)` client ko bhejte the
+(internal PG/table detail leak). Validate endpoint already generic tha.
+
+**Kya kiya:** Dono reasons generic ("Sync/Fetch failed on server. Please retry
+later."); full detail logger me hi. **Verified:** file me `str(e)` responses = 0.
+
+**⚠️ Deploy note:** Ye change tab live hoga jab AAP server commit+push+deploy
+karoge (agent NAS rule). Client-side is body ka content kahin use nahi karta —
+zero functional risk.
+
+## ✅ Batch-3 Validation
+
+| Check | Result |
+|---|---|
+| `py_compile` (_imports, mr_fill, demand, check_imports, location_data) | ✅ PASS |
+| pytest | ✅ 20/20 |
+| Smoke test | ✅ PASSED |
+| `from src.tabs._imports import InvalidSessionIdException, NoSuchWindowException` | ✅ OK |
+| location_data me `str(e)` responses | ✅ 0 |
+
+
 
 
