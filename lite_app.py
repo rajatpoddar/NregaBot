@@ -55,7 +55,8 @@ from src.app.app_license import LicenseMixin
 from src.utils import (
     resource_path, get_data_path, get_user_downloads_path, get_nregabot_path,
     get_report_path, get_config, save_config, validate_config,
-    setup_logging, get_logger, _suppress_overscroll, install_crash_reporter
+    setup_logging, get_logger, _suppress_overscroll, install_crash_reporter,
+    save_license_dat
 )
 
 # --- Shared automation display names for the footer's "▶ Running: ..."
@@ -1299,8 +1300,7 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
                             progress_bar.pack_forget()
                             save_config('last_used_license_key', key_val)
                             self.license_info.update({**data, 'key': key_val})
-                            with open(get_data_path('license.dat'), 'w') as f:
-                                json.dump(self.license_info, f)
+                            save_license_dat(self.license_info)
                             self.set_server_status(True)
                             status_label.configure(text="✅  Activated successfully!",
                                                    text_color=("#059669", "#10B981"))

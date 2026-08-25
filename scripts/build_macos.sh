@@ -105,6 +105,12 @@ $PYINSTALLER_CMD --noconfirm --clean --windowed --name "${APP_NAME}" \
 --hidden-import=main_app \
 --hidden-import=pypdf \
 --hidden-import=humanize \
+--hidden-import=openpyxl \
+--hidden-import=ttkbootstrap \
+--hidden-import=tkinterdnd2 \
+--hidden-import=pyperclip \
+--hidden-import=bs4 \
+--hidden-import=requests_toolbelt \
 --collect-submodules=src.tabs \
 $HIDDEN_IMPORTS \
 loader.py
@@ -128,6 +134,12 @@ $PYINSTALLER_CMD --noconfirm --clean --windowed --name "${LITE_APP_NAME}" \
 --hidden-import=PIL \
 --hidden-import=pypdf \
 --hidden-import=humanize \
+--hidden-import=openpyxl \
+--hidden-import=ttkbootstrap \
+--hidden-import=tkinterdnd2 \
+--hidden-import=pyperclip \
+--hidden-import=bs4 \
+--hidden-import=requests_toolbelt \
 --hidden-import=src.app.app_automation \
 --collect-submodules=src.managers \
 --collect-submodules=src.tabs \

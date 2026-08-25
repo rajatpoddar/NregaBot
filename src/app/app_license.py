@@ -20,7 +20,8 @@ from PIL import Image
 from src import config
 from src.utils import (
     resource_path, get_data_path, get_user_downloads_path,
-    get_config, save_config, get_logger, parse_version, format_bytes
+    get_config, save_config, get_logger, parse_version, format_bytes,
+    save_license_dat
 )
 from src.i18n import tr
 from src.location_data import STATE_DISTRICT_MAP
@@ -417,8 +418,7 @@ class LicenseMixin:
                             progress_bar.pack_forget()
                             save_config('last_used_license_key', key_val)
                             self.app_state.license_info.update({**data, 'key': key_val})
-                            with open(get_data_path('license.dat'), 'w') as f:
-                                json.dump(self.app_state.license_info, f)
+                            save_license_dat(self.app_state.license_info)
                             self.play_sound("success")
                             key_status.configure(text="✅  Activated successfully!",
                                                  text_color=("#059669", "#10B981"))
@@ -656,8 +656,7 @@ class LicenseMixin:
                             save_config('last_used_email', id_val)
                             self._storage_alert_shown = False
                             self.app_state.license_info = data
-                            with open(get_data_path('license.dat'), 'w') as f:
-                                json.dump(self.app_state.license_info, f)
+                            save_license_dat(self.app_state.license_info)
                             self.play_sound("success")
                             email_status.configure(text="✅  Activated successfully!",
                                                    text_color=("#059669", "#10B981"))
@@ -847,8 +846,7 @@ class LicenseMixin:
                 save_config('last_used_license_key', data.get('key') or '')
                 self._storage_alert_shown = False
                 self.app_state.license_info = data
-                with open(get_data_path('license.dat'), 'w') as f:
-                    json.dump(self.app_state.license_info, f)
+                save_license_dat(self.app_state.license_info)
                 self.play_sound("success")
                 _quick_status("✅  Activated successfully!", ("#059669", "#10B981"))
                 win.after(500, lambda: [activated.set(True), win.destroy()])
@@ -1519,8 +1517,7 @@ class LicenseMixin:
                                     'max_devices': res.get("max_devices", 1),
                                 }
                                 self.app_state.license_info.update(license_info)
-                                with open(get_data_path('license.dat'), 'w') as f:
-                                    json.dump(self.app_state.license_info, f)
+                                save_license_dat(self.app_state.license_info)
                                 self.play_sound("success")
                                 status_label.configure(text="✅  Trial activated successfully!",
                                                        text_color=("#059669", "#10B981"))
@@ -2286,8 +2283,7 @@ class LicenseMixin:
             return  # already stored — no repeated disk writes
         try:
             from src.utils import get_data_path
-            with open(get_data_path('license.dat'), 'w') as f:
-                json.dump(lic, f)
+            save_license_dat(lic)
         except Exception:
             logger.debug("Failed to persist user_level", exc_info=True)
 

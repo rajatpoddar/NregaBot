@@ -45,6 +45,12 @@ pyinstaller --noconfirm --windowed --onedir ^
 --hidden-import=main_app ^
 --hidden-import=pypdf ^
 --hidden-import=humanize ^
+--hidden-import=openpyxl ^
+--hidden-import=ttkbootstrap ^
+--hidden-import=tkinterdnd2 ^
+--hidden-import=pyperclip ^
+--hidden-import=bs4 ^
+--hidden-import=requests_toolbelt ^
 --collect-submodules=src.tabs ^
 loader.py
 
@@ -80,6 +86,12 @@ pyinstaller --noconfirm --windowed --onedir ^
 --hidden-import=PIL ^
 --hidden-import=pypdf ^
 --hidden-import=humanize ^
+--hidden-import=openpyxl ^
+--hidden-import=ttkbootstrap ^
+--hidden-import=tkinterdnd2 ^
+--hidden-import=pyperclip ^
+--hidden-import=bs4 ^
+--hidden-import=requests_toolbelt ^
 --hidden-import=src.app.app_automation ^
 --collect-submodules=src.managers ^
 --collect-submodules=src.tabs ^

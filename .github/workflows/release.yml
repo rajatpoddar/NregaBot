@@ -293,6 +293,12 @@ jobs:
           --hidden-import=packaging \
           --hidden-import=main_app \
           --hidden-import=humanize \
+          --hidden-import=openpyxl \
+          --hidden-import=ttkbootstrap \
+          --hidden-import=tkinterdnd2 \
+          --hidden-import=pyperclip \
+          --hidden-import=bs4 \
+          --hidden-import=requests_toolbelt \
           --collect-submodules=src.tabs \
           loader.py
 

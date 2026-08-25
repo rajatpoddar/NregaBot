@@ -12,7 +12,8 @@ from typing import Any, Dict, Optional
 from getmac import get_mac_address
 from tkinter import messagebox
 from src import config
-from src.utils import get_data_path, get_user_downloads_path, parse_version
+from src.utils import (get_data_path, get_user_downloads_path, parse_version,
+                       save_license_dat)
 
 
 def _is_dev_mode() -> bool:
@@ -101,8 +102,7 @@ class ServiceManager:
                 
                 self.app.after(0, self.app._apply_feature_flags)
 
-                with open(get_data_path('license.dat'), 'w') as f:
-                    json.dump(self.app.license_info, f)
+                save_license_dat(self.app.license_info)
                 
                 if not is_startup_check: 
                     self.app.play_sound("success")

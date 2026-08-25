@@ -1,22 +1,31 @@
-Pillow
-selenium
-webdriver-manager
-pyperclip
-appdirs
-beautifulsoup4
-getmac
-fpdf2
-pyinstaller
-ttkbootstrap
-darkdetect
-python-dotenv
-customtkinter
-tkcalendar
-humanize
-tkinterdnd2
-requests-toolbelt
-openpyxl
-pandas
-lxml
-pypdf
-reportlab
+# Runtime dependencies — version FLOORS (>=) pinned to the versions verified
+# in the dev venv on 25 Aug 2026 (audit Batch-2). Floors prevent accidental
+# downgrades/regressions in CI while still allowing newer releases.
+#
+# GOLDEN RULE reminder: har NAYI dependency ke liye matching --hidden-import=
+# entries bhi add karo — scripts/build_windows.bat + scripts/build_macos.sh
+# + release.yml (Linux job). Warna packaged release me ModuleNotFoundError.
+Pillow>=12.3.0
+selenium>=4.46.0
+webdriver-manager>=4.1.2
+pyperclip>=1.11.0
+appdirs>=1.4.4
+beautifulsoup4>=4.12.3
+getmac>=0.9.5
+fpdf2>=2.8.7
+pyinstaller>=6.21.0
+ttkbootstrap>=2.0.1
+darkdetect>=0.8.0
+python-dotenv>=1.2.2
+customtkinter>=6.0.0
+tkcalendar>=1.6.1
+humanize>=4.11.0
+tkinterdnd2>=0.6.2
+requests-toolbelt>=1.0.0
+openpyxl>=3.1.5
+pandas>=3.0.5
+lxml>=5.3.0
+pypdf>=6.14.2
+reportlab>=5.0.0
+# Direct runtime dep (pehle sirf transitive tha) — tabs/managers me seedha use hota hai:
+requests>=2.34.2

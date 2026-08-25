@@ -642,6 +642,26 @@ def parse_version(version_str: str) -> tuple:
         return (0,)
 
 
+def save_license_dat(data: dict) -> None:
+    """AUDIT FIX (25 Aug 2026): persist license.dat through ONE choke-point
+    with owner-only permissions.
+
+    Why: license.dat holds the raw license key + user PII and was written
+    world-readable-per-umask from 7 different call-sites. This helper is now
+    the only writer. os.chmod(0o600) is effectively a no-op on Windows
+    (Python maps it to the read-only flag; the file stays writable for the
+    owner) and enforces owner-only on macOS/Linux. Encoding is explicitly
+    utf-8 (keys are ASCII, but explicit beats platform-default). Never
+    raises — a permission hiccup must never break activation."""
+    path = get_data_path("license.dat")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    try:
+        os.chmod(path, 0o600)
+    except Exception:
+        pass
+
+
 def validate_config() -> bool:
     """
     Validates the config.json file. If corrupted or unreadable, 

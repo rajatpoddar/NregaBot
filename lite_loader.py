@@ -485,6 +485,19 @@ class LiteLoaderSplash(ctk.CTk):
                 print(f"Rollback: could not keep previous Lite zip: {e}")
 
             # ── Download update ZIP to install_dir (persistent) ──
+            # AUDIT FIX (25 Aug 2026): transport guard — payload must be HTTPS
+            # from our own host (mirrors the loader.py fix). NOTE: unlike the
+            # main loader, an EMPTY server_hash is NOT refused here because the
+            # generic hash field is normally empty for Lite (version-only
+            # updates are the documented Lite flow); verification still runs
+            # whenever a hash IS present.
+            if not isinstance(dl_url, str) or not dl_url.startswith("https://nregabot.com/"):
+                print(f"Update skipped: unsafe download URL '{str(dl_url)[:80]}'.")
+                self._set_status("App is up to date")
+                time.sleep(0.5)
+                self._launch_lite_app()
+                return
+
             self._set_status(f"Downloading v{lat}...")
 
             try:

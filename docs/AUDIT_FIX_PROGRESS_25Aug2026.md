@@ -248,4 +248,105 @@ docs/AUDIT_FIX_PROGRESS_25Aug2026.md (NEW - ye file)
 *Kuch bhi commit nahi kiya — review ke baad user commit karega. Rollback simple hai:
 sab changes uncommitted working-tree changes hain (`git diff` / `git checkout -- <file>`).*
 
+---
+---
+
+# 🔄 BATCH 2 — Safe Implementations (25 Aug 2026, continued)
+
+> **Constraint honored:** app already 200 live users par hai → is batch me SIRF
+> additive guards, dead-weight removal aur fail-safe changes hain. Kisi portal
+> automation ka core submission logic touch NAHI hua. `nrega-server` ka code
+> **bilkul nahi chheda** (read-only audit alag doc me — neeche link).
+
+## 📊 Batch-2 Summary
+
+| # | Fix | Risk | Status |
+|---|---|---|---|
+| D1 | `lite_loader.py` HTTPS transport guard | Zero (additive) | ✅ Applied |
+| D2 | Missing PyInstaller hidden-imports ×6, teeno build targets | Zero (additive) | ✅ Applied |
+| D3 | `requirements.txt` version floors (`>=`) | Very low (pip dry-run verified) | ✅ Applied |
+| D4 | `license.dat` chmod-600 choke-point (F10 ab CLOSED) | Near-zero | ✅ Applied |
+| S1 | nrega-server READ-ONLY audit | None (no changes) | ✅ Doc ban gaya |
+
+## D1 — Lite loader ko transport guard mila
+
+**Issue:** Main loader (Batch-1, F2) me download URL guard lag chuka tha, par
+`lite_loader.py` abhi bhi server-ke-bheje kisi bhi URL se update zip download kar
+leta. **Deliberate skip:** empty-hash refusal Lite me port NAHI kiya — kyunki Lite
+generic `hash` field use karta hai jo *normally empty hota hai* (comment khud kehta
+hai version-only updates expected hain). Wo rule Lite updates tod deta.
+
+**Kya kiya:** `dl_url` par `https://nregabot.com/` prefix guard + clean skip path.
+
+**Sahi hua:** Dono loaders ab same transport rule follow karte hain; Lite ka
+documented update flow untouched.
+
+## D2 — Hidden-imports: "humanize incident" class band
+
+**Issue:** `openpyxl`, `ttkbootstrap`, `tkinterdnd2`, `pyperclip`, `bs4`,
+`requests_toolbelt` requirements me the par kisi build script me explicit
+hidden-import NAHI tha — openpyxl sirf tab-module collection ke side-effect se
+bundle hota tha. Ek refactor (lazy import pattern badla) = packaged release me
+`ModuleNotFoundError`.
+
+**Kya kiya:** Ye 6 hidden-imports add kiye: `build_windows.bat` (main+lite),
+`build_macos.sh` (main+lite), `release.yml` Linux job. Purely additive — PyInstaller
+already-collected modules ignore karta hai, to break hone ka rasta hi nahi.
+
+**Sahi hua:** Local-vs-packaged drift ka sabse bada recurring risk class closed.
+
+## D3 — requirements.txt ab version-floors ke saath
+
+**Issue:** 22 dependencies BINA kisi version ke — har CI build naye versions ka
+lottery tha. Audit Top-10 #10 ka remaining half.
+
+**Kya kiya:** Dev venv me verified versions par `>=` floors + `requests` ko explicit
+direct-dep banaya + header me golden-rule reminder (nayi dep ⇒ hidden-import bhi).
+`==` full-freeze NAHI kiya: CI Python 3.11 vs local 3.12 resolution differences se
+false breakage aata — floors strictly-better hain unpinned se.
+
+**Verified:** `pip install -r requirements.txt --dry-run` → exit 0 (floors locally
+installed versions se satisfiable).
+
+## D4 — license.dat ab EK choke-point se likha jata hai (F10 closed)
+
+**Issue:** Raw license key + user PII wali file 7 alag jagah plain-open se likhi
+jati thi — default umask permissions, encoding platform-default.
+
+**Kya kiya:** `src/utils.py::save_license_dat()` helper (utf-8 write +
+`os.chmod(0o600)` try/except-wrapped) + scripted uniform transform ne saato sites
+ko convert kiya:
+`app_license.py` ×5 (activation/OAuth/trial/user_level), `services.py` ×1
+(validation refresh), `lite_app.py` ×1. Imports teeno files me add.
+**Verified:** purana write-pattern grep → **0 matches**; helper-calls → exactly 7;
+py_compile OK. Windows par chmod no-op hai (safe), macOS/Linux par owner-only.
+
+**Break-risk check:** Helper kabhi raise nahi karta; write behavior byte-compatible
+(ASCII keys); activation flow me koi behavioral change nahi.
+
+## S1 — nrega-server READ-ONLY audit
+
+Doc: [`docs/NREGA_SERVER_AUDIT_READ_ONLY_25Aug2026.md`](NREGA_SERVER_AUDIT_READ_ONLY_25Aug2026.md)
+
+**TL;DR:** Core solid hai (validate row-lock + signed links, IDOR-safe file manager,
+PII-masked crash pipeline, sha256 location pool). Findings: **SRV1 P1** secret
+rotation pending (USER action), **SRV2/3/4 P2** LAN-default / str(e)-leak /
+proxy-rate-limit verify, **SRV5–8 P3** perf + token-upgrade + admin-sprawl notes.
+Admin panel messiness cataloged (36 route modules / 39 templates; shared stats
+service proposed) — tumhara "baad me" ke liye ready.
+
+**Server me zero changes** — NAS push/command agent-rule ke under kabhi nahi.
+
+## ✅ Batch-2 Validation
+
+| Check | Result |
+|---|---|
+| `py_compile` (lite_loader, lite_app, utils, app_license, services) | ✅ PASS |
+| pytest | ✅ 20/20 |
+| pip dry-run with new floors | ✅ exit 0 |
+| hidden-import=openpyxl count (bat/sh/yml) | ✅ 2/2/1 |
+| Raw license.dat writes remaining | ✅ 0 |
+| Smoke test (tabs instantiate) | ✅ PASSED (Batch-1 me; Batch-2 tabs UI touch nahi karta) |
+
+
 
