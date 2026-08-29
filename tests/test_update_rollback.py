@@ -13,7 +13,6 @@ never touched (get_data_path / loader module constants are monkeypatched).
 
 Run:  venv/bin/python -m pytest tests/test_update_rollback.py -v
 """
-import json
 import os
 import time
 import zipfile
@@ -21,7 +20,6 @@ import zipfile
 import pytest
 
 import src.utils as U
-
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -144,7 +142,7 @@ class TestPromote:
 # loader._rollback_to_previous
 # ---------------------------------------------------------------------------
 
-import loader  # noqa: E402  (heavy-ish module; kept after the utils tests)
+import loader
 
 
 @pytest.fixture()
