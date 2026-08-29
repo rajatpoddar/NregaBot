@@ -1,6 +1,6 @@
-"""Characterization tests for ``src.app.app_automation._extract_error_context``.
+"""Characterization tests for ``src.error_context._extract_error_context``.
 
-The function (app_automation.py:86-137) takes an Exception and returns a
+The function takes an Exception and returns a
 4-tuple ``(error_type, error_msg, error_source, error_traceback)`` with
 specific caps:
   * ``error_msg`` is capped at 600 chars and PII-masked.
@@ -11,11 +11,15 @@ specific caps:
 These tests exercise the real function on real exceptions. No mocking
 of the function itself; only ``src.utils.mask_pii_text`` is called by the
 real function and we let it run.
+
+Note: ``_extract_error_context`` was previously defined in
+``src/app/app_automation.py:86-137`` and was extracted to
+``src/error_context.py`` in Phase 2A (no behavior change).
 """
 
 from __future__ import annotations
 
-from src.app.app_automation import _extract_error_context
+from src.error_context import _extract_error_context
 
 
 def _raise_and_capture(exc: BaseException) -> tuple:
