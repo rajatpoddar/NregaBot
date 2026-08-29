@@ -66,11 +66,28 @@ class WorkflowManager:
         self._log(macro_tab, f"Automation '{key}' finished.")
         return True
 
-    def _ensure_automation_stopped(self, key):
-        """Ensures a specific automation is definitely stopped before starting."""
+    def _ensure_automation_stopped(self, key, *, max_polls: int = 10):
+        """Ensures a specific automation is definitely stopped before starting.
+
+        Polls ``self.app.active_automations`` until the given ``key`` is no
+        longer present, up to ``max_polls`` iterations. Each iteration
+        sleeps approximately one second (``time.sleep(1)``), so wall-clock
+        time may exceed ``max_polls`` seconds on a slow host. This is **not**
+        a strict wall-clock timeout — it is a polling-iteration cap.
+
+        Returns ``None`` regardless of whether the key disappears; the
+        caller is expected to proceed either way.
+
+        Args:
+            key: Automation key to wait for (e.g. ``"demand"``).
+            max_polls: Maximum number of polling iterations. Must be ``>= 1``.
+                Default is ``10`` (preserves prior hardcoded behavior).
+        """
+        if max_polls < 1:
+            raise ValueError("max_polls must be >= 1")
         if key in self.app.active_automations:
             self.app.after(0, self.app.set_status, f"Waiting for {key} to clear...")
-            for _ in range(10): 
+            for _ in range(max_polls):
                 if key not in self.app.active_automations: break
                 time.sleep(1)
 

@@ -861,3 +861,56 @@ class TestEnsureAutomationStopped:
         # No log_message calls (the method uses set_status, not log_message).
         assert logged == []
 
+    def test_honors_explicit_max_polls(self, fast_polling) -> None:
+        # When ``max_polls=N`` is passed, the loop runs N iterations
+        # (not the default 10). Total checks = 1 (outer guard at L88)
+        # + N (loop iterations).
+        app = _FakeApp()
+        app.active_automations = {"k"}  # never removed
+        app.stop_events = {"macro": threading.Event()}
+        app.log_message = lambda *a, **k: None
+        wm = WorkflowManager(app)
+
+        check_count = [0]
+        original = app.active_automations
+
+        class _CountingSet(set):
+            def __contains__(self, item):
+                check_count[0] += 1
+                return True  # key always present
+
+        app.active_automations = _CountingSet(original)
+        result = wm._ensure_automation_stopped("k", max_polls=3)
+        assert result is None
+        # 1 (outer guard at L88) + 3 (loop iterations with max_polls=3) = 4
+        assert check_count[0] == 4
+
+    def test_max_polls_zero_raises_value_error(self) -> None:
+        # ``max_polls=0`` is invalid — the validation in the method body
+        # raises ValueError before any polling happens. The validation
+        # runs even when the key is absent, because it documents the
+        # contract (>=1 iteration).
+        app = _FakeApp()
+        app.active_automations = set()  # key not present
+        app.stop_events = {"macro": threading.Event()}
+        wm = WorkflowManager(app)
+
+        with pytest.raises(ValueError) as exc_info:
+            wm._ensure_automation_stopped("k", max_polls=0)
+        # The error message must reference the parameter name and the
+        # required bound so the failure is actionable.
+        assert "max_polls must be >= 1" in str(exc_info.value)
+
+    def test_max_polls_negative_raises_value_error(self) -> None:
+        # ``max_polls=-1`` is invalid for the same reason.
+        app = _FakeApp()
+        app.active_automations = {"k"}  # present — to confirm validation
+                                       # fires before the polling guard
+        app.stop_events = {"macro": threading.Event()}
+        app.log_message = lambda *a, **k: None
+        wm = WorkflowManager(app)
+
+        with pytest.raises(ValueError) as exc_info:
+            wm._ensure_automation_stopped("k", max_polls=-1)
+        assert "max_polls must be >= 1" in str(exc_info.value)
+
