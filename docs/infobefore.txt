@@ -1,0 +1,66 @@
+                    WELCOME TO NREGA BOT
+
+Thank you for choosing NREGA Bot -- your desktop automation
+assistant for the MGNREGA / VB-G-RAM-G portal.
+
+This wizard will install NREGA Bot on your computer.
+
+The application will be installed in the following location:
+    [Program Files]\NREGA Bot
+
+A shortcut will be added to your Start Menu, and you will have the
+option to create a desktop icon.
+
+------------------------------------------------------------------
+
+SYSTEM REQUIREMENTS
+    - Windows 10 or later (64-bit)
+    - 4 GB RAM (8 GB recommended)
+    - Google Chrome installed
+    - Active internet connection
+
+A Lite version of the app is also available for low-end devices
+with limited memory.
+
+------------------------------------------------------------------
+
+IMPORTANT -- PLEASE READ BEFORE INSTALLING
+
+1. TRIAL & LICENSE
+   A free 30-day trial is included with every installation. After
+   the trial, a license key is required to continue using the
+   automation features. You can purchase a key online at
+   https://nregabot.com/buy
+
+2. GOVERNMENT PORTAL USE
+   NREGA Bot automates data entry on live government portals using
+   credentials that you provide. It does not bypass login or
+   security controls. You are solely responsible for the
+   credentials you enter, your authority to use the portal,
+   compliance with applicable rules, and the accuracy of all data
+   submitted. Always verify automated output against official
+   records.
+
+3. PRIVACY (DPDP Act 2023)
+   Aadhaar numbers and other sensitive identifiers are never stored
+   or transmitted in readable form. Portal credentials are never
+   stored by the app. Only non-sensitive activity metadata and
+   data you explicitly choose to sync leave your device.
+
+4. NO GOVERNMENT AFFILIATION
+   NREGA Bot is an independent software product. It is not
+   affiliated with, endorsed by, or connected to any government
+   body or the MGNREGA / VB-G-RAM-G scheme.
+
+5. UPDATES
+   The app checks for updates automatically. License holders
+   receive free updates for the duration of their plan. Updates
+   are SHA-256 verified before installation.
+
+6. SUPPORT
+   For help, email nregabot@gmail.com or visit https://nregabot.com
+
+------------------------------------------------------------------
+
+By clicking Next, you agree to the End User License Agreement
+shown on the previous screen. Click 'Next' to continue.
