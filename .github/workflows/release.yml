@@ -76,7 +76,10 @@ jobs:
         # Only the deps needed to import loader.py / lite_loader.py and run
         # the rollback tests (full requirements.txt is installed by the build
         # jobs; keeping this job lean keeps it fast).
-        run: pip install pytest requests appdirs customtkinter
+        # Pillow: tab modules (src/tabs/base_tab.py) import PIL at module top,
+        # and test_location_merge imports DemandTab — bina Pillow ke ye tests
+        # ModuleNotFoundError dete hain (same version floor as requirements.txt).
+        run: pip install pytest requests appdirs customtkinter Pillow>=12.3.0
 
       - name: Ruff — undefined-name & bare-except gate (F821,E722)
         # AUDIT FIX (25 Aug 2026): F821 ne real production bugs pakde the
