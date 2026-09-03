@@ -76,10 +76,11 @@ jobs:
         # Only the deps needed to import loader.py / lite_loader.py and run
         # the rollback tests (full requirements.txt is installed by the build
         # jobs; keeping this job lean keeps it fast).
-        # Pillow: tab modules (src/tabs/base_tab.py) import PIL at module top,
-        # and test_location_merge imports DemandTab — bina Pillow ke ye tests
-        # ModuleNotFoundError dete hain (same version floor as requirements.txt).
-        run: pip install pytest requests appdirs customtkinter Pillow>=12.3.0
+        # test_location_merge imports src.tabs.demand_tab, whose module-level
+        # import chain (base_tab/_imports/professional_pdf) needs PIL,
+        # selenium and fpdf2 — bina inke ye tests ModuleNotFoundError dete hain.
+        # Version floors mirror requirements.txt (Pillow/selenium/fpdf2).
+        run: pip install pytest requests appdirs customtkinter Pillow>=12.3.0 selenium>=4.46.0 fpdf2>=2.8.7
 
       - name: Ruff — undefined-name & bare-except gate (F821,E722)
         # AUDIT FIX (25 Aug 2026): F821 ne real production bugs pakde the
