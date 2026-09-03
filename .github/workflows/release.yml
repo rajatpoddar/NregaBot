@@ -77,10 +77,12 @@ jobs:
         # the rollback tests (full requirements.txt is installed by the build
         # jobs; keeping this job lean keeps it fast).
         # test_location_merge imports src.tabs.demand_tab, whose module-level
-        # import chain (base_tab/_imports/professional_pdf) needs PIL,
-        # selenium and fpdf2 — bina inke ye tests ModuleNotFoundError dete hain.
-        # Version floors mirror requirements.txt (Pillow/selenium/fpdf2).
-        run: pip install pytest requests appdirs customtkinter Pillow>=12.3.0 selenium>=4.46.0 fpdf2>=2.8.7
+        # import chain (base_tab → _imports/date_picker_popup/professional_pdf
+        # → src.utils/i18n/config) needs ALL of: customtkinter, Pillow,
+        # selenium, fpdf2, openpyxl, requests, appdirs. Inme se koi bhi miss
+        # hua to ModuleNotFoundError — is set ko kabhi chhota mat karo.
+        # Version floors mirror requirements.txt (Pillow/selenium/fpdf2/openpyxl).
+        run: pip install pytest requests appdirs customtkinter Pillow>=12.3.0 selenium>=4.46.0 fpdf2>=2.8.7 openpyxl>=3.1.5
 
       - name: Ruff — undefined-name & bare-except gate (F821,E722)
         # AUDIT FIX (25 Aug 2026): F821 ne real production bugs pakde the
