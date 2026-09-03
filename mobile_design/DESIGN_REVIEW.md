@@ -119,7 +119,7 @@ Hard blockers for v1.0 → do first (nothing blocks the v0.1 beta):
 4. ✅ `client_msg_id` idempotency on chat + whatsapp-send — **DONE 3 Sep** (migration 031: partial unique on `whatsapp_chat` + `file_whatsapp_sends` marker table)
 
 Then (needed before v1.0, H1 = key + OTP decided):
-5. 🆕 Mobile session token — `POST /api/mobile/send-otp` (reuse email OTP) + `verify-otp` + `refresh` → short-lived signed token; license key kabhi phone par store nahi (OTP mode)
+5. ✅ Mobile session token — **DONE in code (Batch 2, 4 Sep)** — `POST /api/mobile/send-otp` (reuse email OTP) + `verify-otp` + `refresh` + `logout` → short-lived signed session token (30 min, itsdangerous) + 30-day DB-backed rotating refresh token (hash-only, migration 032). License key kabhi phone par store nahi (OTP mode): verify-otp payload me raw `key` omit hai; har existing Bearer endpoint par session token chalta hai (`token_required` fallback, utils.py). Files: `app/routes/api/mobile.py`, `app/services/mobile_auth_service.py`, `app/repositories/mobile_session_repo.py`, `migrations/032_mobile_sessions.sql` + tests `tests/test_mobile_auth_service.py` (16).** Deploy NAS par user khud karega (RULE-CI-002) — code committed nahi, review ke liye ready.
 6. 🆕 app-config: android version/checksum + storage tier list
 7. 🆕 rename/move endpoints (flag-gated)
 8. 🆕 Stable device-id fingerprint rule on heartbeat
@@ -130,8 +130,6 @@ Then (needed before v1.0, H1 = key + OTP decided):
 ## 6. Next steps
 
 1. ✅ H1/H2/H6a/H6b decided (see §4). H6c deferred.
-2. **Backend wire-up in `nrega-server`** (this repo, deployed by user on NAS):
-   - Batch 1 (v0.1 blockers, nothing blocks beta): FCM plumbing (`register-fcm-token` + send), notifications feed, activity paging, `client_msg_id` idempotency
-   - Batch 2: mobile session token (`verify-otp`/`refresh`) per H1, app-config android fields + storage tier list, stable device-id rule, telemetry sink, Range-206 test
+2. ✅ Backend Batch 2 (4 Sep): mobile session token flow (`/api/mobile/send-otp|verify-otp|refresh|logout`) code-ready in `nrega-server` — user deploy + integration-test NAS par baaki.
 3. **Android skeleton** (separate `android-app/` repo): Gradle + M3 theme (design §4 tokens), CI debug APK = M0; then M1: splash → key login → validate → device slot claim.
 4. H6c (WhatsApp number policy) — user checks WhatsApp Business account rules before v1.0.
