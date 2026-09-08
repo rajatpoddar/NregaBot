@@ -1,19 +1,26 @@
 {
-  "latest_version": "3.2.7",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.7-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.7-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.7-Linux.tar.gz",
+  "latest_version": "3.2.8",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.8-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.8-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.8-Linux.tar.gz",
   "core_update": {
-    "version": "3.2.7",
-    "url": "https://nregabot.com/updates/core_v3.2.7.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.2.7.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.7.zip",
+    "version": "3.2.8",
+    "url": "https://nregabot.com/updates/core_v3.2.8.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.8.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.8.zip",
     "force_full_reinstall": false,
     "hash": "",
     "hash_windows": "",
     "hash_macos": ""
   },
   "changelog": {
+    "3.2.8": [
+      "🔄 **Sabhi Users Tak Update Push:** Ye release isliye hai taaki pichhle updates (3.2.5 + 3.2.7) ke features har user tak pahunch jayen. Agar aap pehle se 3.2.7 par hain to code me aapke liye kuch naya nahi hai — purane version wale users ko neeche di gayi saari cheezein pehli baar milengi.",
+      "🌐 **Location Data Pool (Block Sharing):** Aapke Block ke Panchayat & Villages server par safely share hote hain — same block ke doosre users bina PO/GP portal login ke ye data seedha download kar sakte hain (Settings → '🌐 Block Data Download'). Sirf panchayat/village names share hote hain (public MGNREGA data) — koi personal info nahi.",
+      "🏘️ **Fresh Install — Add Panchayat ki Zaroorat Nahi:** Naya install karne par onboarding ke 'Add Panchayat' step me aapke block ka data agar server par pehle se hai to wo apne aap load ho jata hai (green tick) — bas Next dabaiye. Same block ke naye users ko manually panchayat/village add nahi karna padega.",
+      "⚡ **eMB Entry Tez Hui:** Panchayat re-selection skip hota hai jab dropdown me pehle se sahi panchayat selected ho — har work code par ~5-8 second ka postback bachta hai. Alert wait 25s se 5s kar diya aur sleep timers bhi kam kiye — lambi MB entry list ab kaafi tez chalti hai.",
+      "🐞 **eMB Entry 'No Alert' Crash Fix:** Save ke baad portal alert na dikhane par poora run crash ho jata tha — ab wo entry saaf-saaf 'Failed: No Alert Received' dikhati hai aur baaki entries chalti rehti hain."
+    ],
     "3.2.7": [
       "⚡ **MB Entry Faster:** Panchayat re-selection skip ho raha hai jab dropdown me pehle se sahi panchayat selected ho — har work code pe ~5-8s postback bachta hai. Alert wait timeout 25s se 5s kar diya (alerts instant aate hain). Sleep timers bhi reduce kiye.",
       "🐞 **MB Entry 'no such alert' Fix:** Save ke baad jab portal alert nahi dikhata to `NoAlertPresentException` crash hota tha — ab properly catch hota hai aur entry 'Failed: No Alert Received' dikhati hai.",

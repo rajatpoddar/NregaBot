@@ -4,9 +4,9 @@
 
 # 🚜 NREGA Bot
 
-**v3.2.7** — Powerful NREGA Automation for Windows, macOS & Linux
+**v3.2.8** — Powerful NREGA Automation for Windows, macOS & Linux
 
-[![Version](https://img.shields.io/badge/version-3.2.7-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
+[![Version](https://img.shields.io/badge/version-3.2.8-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f?style=flat-square)](https://nregabot.com/#downloads)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)]()
 [![Updates](https://img.shields.io/badge/updates-Smart%20SHA--256%20Verified-4c1?style=flat-square)]()
@@ -268,7 +268,35 @@ Yes — a special **Lite build** is available for low-end PCs with a reduced fea
 
 ## 📜 Changelog
 
-### 🆕 What's New in v3.2.7
+### 🆕 What's New in v3.2.8
+
+> Maintenance release — its job is to make sure every user actually receives the 3.2.5 and 3.2.7 features. If you are already on 3.2.7 there is no new code for you.
+
+- 🌐 **Location Data Pool (Block Sharing)** — your Block's Panchayat & Villages sync to the server and are shared with same-block users, so anyone in the block can download them directly (Settings → **🌐 Block Data Download**) even without a PO/GP portal login. Only public panchayat/village names are shared — no personal data.
+- 🏘️ **Fresh Install — No Need to Add Panchayat** — on a new install the onboarding "Add Panchayat" step auto-loads your block's data from the server (green tick) if another user in the same block has already contributed it. Just press Next.
+- ⚡ **eMB Entry Faster** — panchayat re-selection is skipped when the dropdown already holds the right panchayat, saving ~5-8s of postback per work code. Alert wait cut from 25s to 5s and sleep timers reduced, so long MB entry lists run noticeably quicker.
+- 🐞 **eMB Entry 'No Alert' Crash Fix** — when the portal showed no alert after Save the whole run used to crash; that entry is now marked 'Failed: No Alert Received' and the rest keep going.
+
+<details>
+<summary><b>What's New in v3.2.7</b></summary>
+
+- ⚡ **MB Entry Faster** — panchayat re-selection skipped when already correct (~5-8s saved per work code); alert wait 25s → 5s; sleep timers reduced.
+- 🐞 **MB Entry 'no such alert' Fix** — `NoAlertPresentException` is caught properly; the entry reports 'Failed: No Alert Received' instead of crashing.
+- 🐞 **MR Fill Alert Fix** — unexpected portal alerts during Save are handled gracefully instead of ending the run.
+- 🐛 **Footer Hover Glitch Fixed** — hovering Stop All while automation was running made the footer "dance"; hover now changes only the button, never the status label.
+- 🎨 **Footer Stop Button Improved** — proper pill-button look with border, padding and a light-red → red hover background.
+
+</details>
+
+<details>
+<summary><b>What's New in v3.2.6</b></summary>
+
+- 📸 **Jobcard Verification — Photo Upload Fixed** — the Upload Family Photo popup now works reliably: the bot waits for the portal's Ajax ModalPopup instead of a JS alert, and closes the popup window without ever closing the main browser window.
+- 🌐 **Jobcard Verification — 'All Villages' in Dropdown** — the "process all villages" checkbox is replaced by a proper **🌐 All Villages** option in the village dropdown, which reloads when the panchayat changes.
+
+</details>
+
+### 🆕 What's New in v3.2.5
 
 - 🌐 **Location Data Pool (Block Sharing)** — your Block's Panchayat & Villages now sync to the server and are shared with same-block users. Anyone in the block can download them directly (Settings → **Block Data Download**) — even without a PO/GP portal login. Only public panchayat/village names are shared, no personal data.
 - 🏘️ **Add Panchayat — Login Not Required** — the onboarding "Add Panchayat" step now auto-loads your block's Panchayat & Villages from the server with a green tick — just press Next, even if you have neither PO nor GP login.

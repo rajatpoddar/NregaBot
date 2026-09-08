@@ -1,4 +1,11 @@
 {
+  "3.2.8": [
+    "🔄 **Sabhi Users Tak Update Push:** Ye release isliye hai taaki pichhle updates (3.2.5 + 3.2.7) ke features har user tak pahunch jayen. Agar aap pehle se 3.2.7 par hain to code me aapke liye kuch naya nahi hai — purane version wale users ko neeche di gayi saari cheezein pehli baar milengi.",
+    "🌐 **Location Data Pool (Block Sharing):** Aapke Block ke Panchayat & Villages server par safely share hote hain — same block ke doosre users bina PO/GP portal login ke ye data seedha download kar sakte hain (Settings → '🌐 Block Data Download'). Sirf panchayat/village names share hote hain (public MGNREGA data) — koi personal info nahi.",
+    "🏘️ **Fresh Install — Add Panchayat ki Zaroorat Nahi:** Naya install karne par onboarding ke 'Add Panchayat' step me aapke block ka data agar server par pehle se hai to wo apne aap load ho jata hai (green tick) — bas Next dabaiye. Same block ke naye users ko manually panchayat/village add nahi karna padega.",
+    "⚡ **eMB Entry Tez Hui:** Panchayat re-selection skip hota hai jab dropdown me pehle se sahi panchayat selected ho — har work code par ~5-8 second ka postback bachta hai. Alert wait 25s se 5s kar diya aur sleep timers bhi kam kiye — lambi MB entry list ab kaafi tez chalti hai.",
+    "🐞 **eMB Entry 'No Alert' Crash Fix:** Save ke baad portal alert na dikhane par poora run crash ho jata tha — ab wo entry saaf-saaf 'Failed: No Alert Received' dikhati hai aur baaki entries chalti rehti hain."
+  ],
   "3.2.5": [
     "🌐 **Location Data Pool (Block Sharing):** Aapke Block ke Panchayat & Villages ab server par safely share hote hain — same block ke doosre users bina PO/GP portal login ke bhi ye data directly download kar sakte hain (Settings → 'Block Data Download'). Sirf panchayat/village names share hote hain (public MGNREGA data) — koi personal info nahi.",
     "🏘️ **Add Panchayat — Login Not Required:** Onboarding ke 'Add Panchayat' step me ab PO/GP login ke bina bhi aapke block ke panchayat/villages server se auto-load hote hain — green tick ke saath seedha Next dabayein. Na PO na GP login wale users ab atakte nahi.",

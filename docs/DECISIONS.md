@@ -311,3 +311,45 @@
 - `docs/RULES.md` RULE-CM-002 (documentation ownership boundaries)
 - `docs/MEMORY.md` MEM-015 (the version-drift evidence that surfaced during this same audit pass)
 
+---
+
+## DEC-009 - Ship 3.2.8 as a no-code-change re-release of the 3.2.5 + 3.2.7 features
+
+**Status:** Implemented (version bump committed; build/deploy pending — user-only, see RULE-REL-002)
+**Date:** 8 Sep 2026
+**Commit:** this version-bump commit
+
+**Decision:** Bump the desktop app from **3.2.7 to 3.2.8** with **zero source changes**, purely to re-announce and re-push the block Location Data Pool (shipped 3.2.5) and the eMB Entry speedup (shipped 3.2.7) to every user.
+
+**Evidence gathered before the bump:**
+
+- `git diff --name-only v3.2.7..HEAD` → only `.gitignore` and `mobile_design/DESIGN_REVIEW.md`. No file under `src/`, `config/`, `main_app.py` or `lite_app.py` changed after the 3.2.7 tag.
+- Live `https://nregabot.com/version.json` already served `latest_version: 3.2.7` with both `hash_windows` and `hash_macos` populated — i.e. 3.2.7 was fully deployed and users were already receiving it.
+- Location pool is complete end-to-end: `src/location_sync.py`, onboarding auto-fetch `src/ui_components.py::_fetch_pool_background`, Settings button `src/tabs/settings_tab.py::_download_block_data`, server `nrega-server/app/routes/api/location_data.py`, repo `location_data_repo.py`, migration `027_location_data_pool.sql`, tests `tests/test_location_merge.py`.
+- eMB speedup is present: `src/tabs/mb_entry_tab.py:499-515` (panchayat re-selection skip) and `:869-872` (5s alert wait).
+
+**Rationale:**
+
+- The requester's working assumption was that these changes had never been released. The evidence above shows they had been, but the bump was explicitly reaffirmed after that was reported — this entry records that the release carries no new code so nobody later mistakes 3.2.8 for a feature release.
+- The 3.2.8 changelog therefore leads with an explicit "maintenance release / no new code if you are already on 3.2.7" line rather than presenting old features as new.
+
+**Alternatives considered:**
+
+- Skip the bump entirely — rejected by the requester; a fresh version number is the only lever that re-notifies users still sitting on ≤3.2.4.
+- Fold the pending admin drill-down (below) into 3.2.8 — rejected: it is a `nrega-server` change and needs no desktop version at all.
+
+**Consequences:**
+
+- Version bumped in `config/version.json` (`latest_version` + `core_update.version` + all four download URLs), `src/config.py::APP_VERSION`, `README.md` badge/header, `scripts/installer.iss`, `scripts/installer_lite.iss`, `AGENTS.md` §8.
+- All three `core_update` hashes stay `""` per RULE-REL-002 — `scripts/deploy_version.sh` fills them.
+- `README.md` changelog headings were corrected in the same pass: the section labelled "What's New in v3.2.7" actually carried the **3.2.5** notes, so it was relabelled and real collapsed v3.2.7 / v3.2.6 sections were added.
+
+**Known gap (deliberately NOT closed in this release):**
+
+- The admin Location Pool page (`nrega-server/app/routes/admin/location_pool.py` + `app/templates/admin/admin_location_pool.html`) shows only block-level **counts** (panchayat count, village count, source count). It does not list *which* panchayats and *which* villages a block holds, even though `location_data_repo.get_block_panchayats()` already returns exactly that. A drill-down (expandable row or `/admin/location-pool/<state>/<district>/<block>`) is still open work — server-side only, no desktop release needed.
+
+**Related files:**
+
+- `config/version.json`, `src/config.py`, `README.md`, `AGENTS.md`, `scripts/installer.iss`, `scripts/installer_lite.iss`, `docs/changelog.json`
+- `docs/RULES.md` RULE-REL-002 (agent never fills hashes), RULE-CI-002 (NAS deploy is user-only)
+- `nrega-server/app/routes/admin/location_pool.py` (the open gap)
