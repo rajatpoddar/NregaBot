@@ -20,8 +20,12 @@
 #    3. ./deploy_version.sh         → is script se bas ek command, done!
 #
 #  Usage:
-#    ./deploy_version.sh                     # default NAS settings
-#    NAS_HOST=192.168.1.50 ./deploy_version.sh
+#    ./deploy_version.sh                     # NAS host auto-detect (LAN → Tailscale)
+#    NAS_HOST=192.168.1.50 ./deploy_version.sh   # host khud batao (auto-detect off)
+#
+#  NAS host auto-detect: pehle LAN IP try hota hai, reachable na ho to
+#  Tailscale IP par chala jata hai — ghar se bahar se deploy karne ke liye
+#  ab har baar NAS_HOST=... likhne ki zaroorat nahi.
 #
 #  Required: ssh + scp access to NAS (password or key), internet (GitHub API).
 # =============================================================================
@@ -29,11 +33,45 @@ set -e
 
 # ── Config (env vars se override kar sakte ho) ──────────────────────────────
 NAS_USER="${NAS_USER:-rajat}"
-NAS_HOST="${NAS_HOST:-192.168.29.101}"
+NAS_HOST_LAN="${NAS_HOST_LAN:-192.168.29.101}"
+NAS_HOST_TS="${NAS_HOST_TS:-100.98.94.128}"        # Tailscale (node: cabelwala)
 NAS_BASE="${NAS_BASE:-/volume1/docker/Projects/Nrega-Bot}"
 COMPOSE_DIR="${NAS_BASE}/license-server"
 NAS_UPDATES="${NAS_BASE}/website/updates"          # container me /updates mount
 GITHUB_REPO="rajatpoddar/NregaBot"                 # public repo — bina token chalega
+
+# ── NAS host resolve: LAN pehle, na mile to Tailscale ──────────────────────
+#  Probe sirf TCP port 22 par connect karke turant band karta hai — koi SSH
+#  auth attempt NAHI. (DSM Auto Block failed logins par trigger hota hai;
+#  bare TCP connect usme count nahi hota — RULE-CI-002 ka spirit.)
+#
+#  NOTE: macOS/BSD `nc` me connect timeout `-G` hai, `-w` nahi. `-w` akela
+#  connect ko bound NAHI karta — unreachable host par 75s tak latak jata hai
+#  (measured). Isliye dono pass karte hain.
+_nas_reachable() {
+    nc -z -G 3 -w 3 "$1" 22 >/dev/null 2>&1
+}
+
+if [ -n "${NAS_HOST:-}" ]; then
+    echo "🔗 NAS host: $NAS_HOST (env se diya gaya — auto-detect skip)"
+elif ! command -v nc >/dev/null 2>&1; then
+    NAS_HOST="$NAS_HOST_LAN"
+    echo "🔗 NAS host: $NAS_HOST (LAN default — nc nahi mila, auto-detect skip)"
+elif _nas_reachable "$NAS_HOST_LAN"; then
+    NAS_HOST="$NAS_HOST_LAN"
+    echo "🔗 NAS host: $NAS_HOST (LAN)"
+elif _nas_reachable "$NAS_HOST_TS"; then
+    NAS_HOST="$NAS_HOST_TS"
+    echo "🔗 NAS host: $NAS_HOST (Tailscale — LAN reachable nahi tha)"
+else
+    echo "❌ NAS kahin se bhi reachable nahi (port 22):"
+    echo "     LAN       : $NAS_HOST_LAN"
+    echo "     Tailscale : $NAS_HOST_TS"
+    echo ""
+    echo "   • Tailscale on hai? →  tailscale status"
+    echo "   • Ya host khud batao →  NAS_HOST=<ip> ./deploy_version.sh"
+    exit 1
+fi
 
 # ── SSH single-connection options (password sirf 1 baar) ───────────────────
 SSH_CTL="/tmp/deploy_version_${NAS_USER}@${NAS_HOST}.sock"
