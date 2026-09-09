@@ -45,6 +45,74 @@ PANCHAYAT_KEYS = ["location_panchayat", "panchayat_name", "panchayat",
 VILLAGE_KEYS = ["location_village", "village_name"]
 
 
+def is_dev_mode() -> bool:
+    """Source tree se run ho raha hai ya nahi (packaged build → False).
+
+    `src/managers/services._is_dev_mode()` ko hi reuse karta hai — dev-only UI
+    aur update-skip dono ek hi definition par rahein.
+    """
+    try:
+        from src.managers.services import _is_dev_mode
+        return bool(_is_dev_mode())
+    except Exception:
+        return False
+
+
+def add_panchayat_manual(app, name: str) -> Tuple[bool, str]:
+    """Dev-mode manual panchayat add — bina portal scrape ke.
+
+    Wahi jagah likhta hai jahan scrape likhta hai, taaki naam har tab ke
+    dropdown me aaye:
+      - sabhi PANCHAYAT_KEYS (history manager → plain suggestions)
+      - Block→Panchayat hierarchy, agar block pata ho (filtered dropdowns)
+
+    Server location pool par kuch NAHI bhejta — dev/test ka panchayat
+    (aksar doosre block ka) shared pool me nahi jana chahiye.
+
+    Returns: (added, message) — caller sirf message dikhata hai, kabhi raise
+    nahi hota.
+    """
+    clean = " ".join((name or "").split()).upper()
+    if not clean:
+        return False, "Panchayat ka naam likhein."
+
+    hm = getattr(app, "history_manager", None)
+    if hm is None:
+        return False, "History manager available nahi hai."
+
+    existing = set()
+    for k in PANCHAYAT_KEYS:
+        try:
+            existing.update(str(s).strip().upper() for s in (hm.get_suggestions(k) or []))
+        except Exception:
+            pass
+    if clean in existing:
+        return False, f"'{clean}' pehle se saved hai."
+
+    try:
+        for k in PANCHAYAT_KEYS:
+            hm.save_entry(k, clean)
+    except Exception as e:
+        logger.error("Manual panchayat add failed: %s", e)
+        return False, f"Save nahi ho paya: {e}"
+
+    # Block pata ho to hierarchy me bhi jodo — warna filtered dropdowns
+    # (Issued MR Report waghairah) is naam ko chhod denge.
+    block = ""
+    try:
+        block = location_sync.get_user_location(app)[2]
+    except Exception:
+        block = ""
+    if block:
+        try:
+            get_hierarchy().add_child("Block", block, "Panchayat", clean)
+        except Exception as e:
+            logger.debug("Manual panchayat hierarchy link skipped: %s", e)
+
+    where = f" (Block: {block})" if block else ""
+    return True, f"✅ '{clean}' add ho gaya{where}"
+
+
 def _state_aware_demand_url(app) -> str:
     """State-aware demand page URL — saved location_state (Settings/license)
     ke hisaab se host resolve karta hai (Rajasthan → vbgramgde3).
@@ -517,9 +585,55 @@ class SettingsTab(ctk.CTkFrame):
                                             text_color=("gray50", "gray60"))
         self._scrape_status.pack(side="left", padx=(8, 0))
 
+        # ── Dev-only Card: Manual Panchayat Add ──
+        # Sirf source tree se run karne par banta hai (packaged build me nahi).
+        # Kisi doosre block ka panchayat testing ke liye chahiye ho to portal
+        # scrape ki zaroorat nahi padti — naam type karo, bas.
+        if is_dev_mode():
+            self._dev_add_frame = ctk.CTkFrame(
+                scroll, fg_color=("#EEF2FF", "#1E1B4B"), corner_radius=8,
+                border_width=1, border_color=("#A5B4FC", "#4338CA"))
+            self._dev_add_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(3, 5))
+            self._dev_add_frame.grid_columnconfigure(0, weight=1)
+
+            dev_header = ctk.CTkFrame(self._dev_add_frame, fg_color="transparent")
+            dev_header.pack(fill="x", padx=12, pady=(8, 2))
+            ctk.CTkLabel(dev_header, text="🧪 Dev: Add Panchayat Manually",
+                         font=ctk.CTkFont(size=13, weight="bold"),
+                         text_color=("#4338CA", "#A5B4FC")).pack(side="left")
+
+            ctk.CTkLabel(
+                self._dev_add_frame,
+                text=("Sirf dev build me dikhta hai. Naam type karke Add dabayein — "
+                      "panchayat sabhi tabs ke dropdown me aa jayega. Server location "
+                      "pool par kuch nahi bheja jata."),
+                font=ctk.CTkFont(size=11), text_color=("gray50", "gray60"),
+                wraplength=620, justify="left",
+            ).pack(anchor="w", padx=12, pady=(0, 4))
+
+            dev_row = ctk.CTkFrame(self._dev_add_frame, fg_color="transparent")
+            dev_row.pack(fill="x", padx=12, pady=(0, 4))
+
+            self._dev_panch_entry = ctk.CTkEntry(
+                dev_row, height=30, font=ctk.CTkFont(size=12),
+                placeholder_text="Panchayat ka naam...")
+            self._dev_panch_entry.pack(side="left", expand=True, fill="x")
+            self._dev_panch_entry.bind("<Return>", lambda e: self._dev_add_panchayat())
+
+            ctk.CTkButton(dev_row, text="➕ Add", width=90, height=30,
+                          font=ctk.CTkFont(size=12, weight="bold"),
+                          fg_color=("#4F46E5", "#4F46E5"), text_color="white",
+                          hover_color=("#4338CA", "#4338CA"),
+                          command=self._dev_add_panchayat).pack(side="left", padx=(8, 0))
+
+            self._dev_add_status = ctk.CTkLabel(
+                self._dev_add_frame, text="", font=ctk.CTkFont(size=10),
+                text_color=("gray50", "gray60"), wraplength=620, justify="left")
+            self._dev_add_status.pack(anchor="w", padx=12, pady=(0, 8))
+
         # ── Toolbar ──
         toolbar = ctk.CTkFrame(scroll, fg_color="transparent")
-        toolbar.grid(row=3, column=0, sticky="ew", padx=10, pady=(5, 2))
+        toolbar.grid(row=4, column=0, sticky="ew", padx=10, pady=(5, 2))
         toolbar.grid_columnconfigure(0, weight=1)
         self.loc_count_label = ctk.CTkLabel(toolbar, text="", font=ctk.CTkFont(size=12),
                                              text_color=("gray50", "gray60"))
@@ -535,7 +649,7 @@ class SettingsTab(ctk.CTkFrame):
 
         # ── Listbox (fixed height — scrollable page ke andar bhi hamesha dikhe) ──
         lc = ctk.CTkFrame(scroll, fg_color="transparent")
-        lc.grid(row=4, column=0, sticky="ew", padx=10, pady=(0, 6))
+        lc.grid(row=5, column=0, sticky="ew", padx=10, pady=(0, 6))
         lc.grid_rowconfigure(0, weight=1)
         lc.grid_columnconfigure(0, weight=1)
         bc = self._resolve_color(("#CBD5E1", "#475569"))
@@ -568,9 +682,9 @@ class SettingsTab(ctk.CTkFrame):
         self.loc_listbox.bind("<Button-5>", _on_listbox_wheel, add="+")
         self._refresh_loc_list()
 
-        # ── Prominent Delete bar (row 5) — chhoti screen par bhi clearly dikhe ──
+        # ── Prominent Delete bar (row 6) — chhoti screen par bhi clearly dikhe ──
         del_bar = ctk.CTkFrame(scroll, fg_color=("gray95", "gray25"), corner_radius=8)
-        del_bar.grid(row=5, column=0, sticky="ew", padx=10, pady=(4, 14))
+        del_bar.grid(row=6, column=0, sticky="ew", padx=10, pady=(4, 14))
         del_bar.grid_columnconfigure(1, weight=1)
         self._del_big_btn = ctk.CTkButton(
             del_bar, text="🗑️  Delete Selected Panchayat", height=34,
@@ -960,6 +1074,35 @@ class SettingsTab(ctk.CTkFrame):
         except Exception:
             pass
         return sorted(blocks, key=str.lower)
+
+    def _dev_add_panchayat(self) -> None:
+        """Dev card ka Add button / Enter key — manual panchayat entry.
+
+        Koi browser, koi scrape, koi server call nahi. Sirf local history +
+        hierarchy. Restart optional rakha hai (scrape ki tarah forced nahi)
+        kyunki dev me ek saath kai naam add karne padte hain.
+        """
+        entry = getattr(self, "_dev_panch_entry", None)
+        if entry is None:
+            return
+        added, msg = add_panchayat_manual(self.app, entry.get())
+        self._dev_add_status.configure(
+            text=msg,
+            text_color=("#16A34A", "#4ADE80") if added else ("#DC2626", "#F87171"),
+        )
+        if not added:
+            return
+
+        entry.delete(0, "end")
+        self._refresh_loc_list()
+        if messagebox.askyesno(
+            "Restart?",
+            f"{msg}\n\nSabhi tabs ke dropdown me dikhne ke liye app restart karna "
+            "hoga.\n\nAbhi restart karein? (Aur panchayat add karne hain to 'No' "
+            "dabayein.)",
+            parent=self.winfo_toplevel(),
+        ):
+            self._restart_application()
 
     def _scrape_from_website(self) -> None:
         """

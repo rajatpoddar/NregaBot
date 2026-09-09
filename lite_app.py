@@ -56,7 +56,7 @@ from src.utils import (
     resource_path, get_data_path, get_user_downloads_path, get_nregabot_path,
     get_report_path, get_config, save_config, validate_config,
     setup_logging, get_logger, _suppress_overscroll, install_crash_reporter,
-    save_license_dat
+    save_license_dat, shorten_status
 )
 
 # --- Shared automation display names for the footer's "▶ Running: ..."
@@ -1092,7 +1092,8 @@ class NregaBotLiteApp(ctk.CTk, LicenseMixin):
 
     def set_status(self, message: str, color=None) -> None:
         if self.status_label:
-            self.status_label.configure(text=f"Status: {message}")
+            # shorten_status: lamba status footer ka STOP ALL button kha jata tha.
+            self.status_label.configure(text=f"Status: {shorten_status(message)}")
 
     def set_server_status(self, is_connected: bool) -> None:
         if self.server_status_indicator:

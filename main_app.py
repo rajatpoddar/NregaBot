@@ -62,7 +62,7 @@ from src.state import AppState
 from src.utils import (
     resource_path, get_data_path, get_user_downloads_path, get_nregabot_path,
     get_report_path, get_config, save_config, validate_config,
-    setup_logging, get_logger, install_crash_reporter
+    setup_logging, get_logger, install_crash_reporter, shorten_status
 )
 
 # Note: Heavy libraries (Selenium) are imported inside
@@ -888,7 +888,11 @@ del "%~f0" & exit
                 self.app_state.is_animating = True; self._animate_loading_icon()
             elif not should_animate: self.app_state.is_animating = False
 
-            self.status_label.configure(text=f"Status: {message}", text_color=final_color)
+            # Footer ek line hai — bina bound ke lamba status right side ka
+            # STOP ALL button hi gayab kar deta tha. Rang/sound ka decision
+            # upar poore message par hota hai, sirf display chhota hota hai.
+            self.status_label.configure(text=f"Status: {shorten_status(message)}",
+                                        text_color=final_color)
             if not self.app_state.is_animating and self.loading_animation_label: self.loading_animation_label.configure(text="")
 
     def _animate_loading_icon(self, frame_index=0):

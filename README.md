@@ -4,9 +4,9 @@
 
 # 🚜 NREGA Bot
 
-**v3.2.8** — Powerful NREGA Automation for Windows, macOS & Linux
+**v3.2.9** — Powerful NREGA Automation for Windows, macOS & Linux
 
-[![Version](https://img.shields.io/badge/version-3.2.8-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
+[![Version](https://img.shields.io/badge/version-3.2.9-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f?style=flat-square)](https://nregabot.com/#downloads)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)]()
 [![Updates](https://img.shields.io/badge/updates-Smart%20SHA--256%20Verified-4c1?style=flat-square)]()
@@ -268,7 +268,16 @@ Yes — a special **Lite build** is available for low-end PCs with a reduced fea
 
 ## 📜 Changelog
 
-### 🆕 What's New in v3.2.8
+### 🆕 What's New in v3.2.9
+
+- ⚡ **eMB Entry Much Faster** — a ~25 second stall after every panchayat selection is gone. The postback wait was watching an element fetched *after* the page had already reloaded, so it could never fire and always burned its full timeout. Most noticeable on Block/PO/JE logins.
+- 🐞 **eMB Entry — Multi-Period Crash Fixed** — moving to a work's second measurement period threw `stale element reference` and failed the whole work. Period options are now snapshotted as text, so every period is processed.
+- ⏭️ **'No Muster Roll Available' Is No Longer an Error** — a period with no muster roll (eMB already booked, or the MR hasn't reached your login yet) is now reported as **Skipped**, not a red failure. The summary counts them separately: ✅ entered, ⚠️ skipped, ❌ failed.
+- 🔢 **eMB Entry — Correct Work Code in Results** — the Work Code column showed a fragment like `22-23)`; it now shows the real workcode's last 6 digits (e.g. `209915`).
+- 🛑 **Footer 'STOP ALL' Button Restored** — a long status line (eMB Entry's work code + period) filled the whole footer and pushed the STOP ALL button out of view. Status text is now shortened and the right-hand dock always keeps its space.
+
+<details>
+<summary><b>What's New in v3.2.8</b></summary>
 
 > Maintenance release — its job is to make sure every user actually receives the 3.2.5 and 3.2.7 features. If you are already on 3.2.7 there is no new code for you.
 
@@ -276,6 +285,8 @@ Yes — a special **Lite build** is available for low-end PCs with a reduced fea
 - 🏘️ **Fresh Install — No Need to Add Panchayat** — on a new install the onboarding "Add Panchayat" step auto-loads your block's data from the server (green tick) if another user in the same block has already contributed it. Just press Next.
 - ⚡ **eMB Entry Faster** — panchayat re-selection is skipped when the dropdown already holds the right panchayat, saving ~5-8s of postback per work code. Alert wait cut from 25s to 5s and sleep timers reduced, so long MB entry lists run noticeably quicker.
 - 🐞 **eMB Entry 'No Alert' Crash Fix** — when the portal showed no alert after Save the whole run used to crash; that entry is now marked 'Failed: No Alert Received' and the rest keep going.
+
+</details>
 
 <details>
 <summary><b>What's New in v3.2.7</b></summary>

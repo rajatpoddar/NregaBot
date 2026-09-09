@@ -131,6 +131,33 @@ def get_user_downloads_path() -> str:
     return str(Path.home() / "Downloads")
 
 
+# ── Footer status text ────────────────────────────────────────────
+# Footer ek hi line hai aur uska left (status) hissa right (STOP ALL + dock
+# icons) se PEHLE pack hota hai. Tk ka packer pehle pack hue slave ko cavity
+# pehle deta hai — isliye bina bound ke lamba status poora footer kha jata
+# tha aur STOP ALL button map hi nahi hota tha.
+STATUS_MAX_CHARS = 90
+
+
+def shorten_status(message, limit: int = STATUS_MAX_CHARS) -> str:
+    """Footer status ke liye message ko ek line + bounded length me laao.
+
+    Beech me ellipsis lagti hai (aage-peeche dono kaam ke hote hain —
+    workcode shuruat me, period/progress ant me).
+
+    Whitespace collapse bhi hota hai: newline label ki single line ko
+    tod deta hai.
+    """
+    text = " ".join(str(message if message is not None else "").split())
+    if len(text) <= limit:
+        return text
+    if limit <= 1:
+        return "…"[:max(limit, 0)]
+    head = (limit - 1) * 3 // 5
+    tail = limit - 1 - head
+    return f"{text[:head]}…{text[-tail:]}" if tail else f"{text[:head]}…"
+
+
 # ── Workcode pattern & truncation ─────────────────────────────────
 WORKCODE_PATTERN = re.compile(r'\b(34\d{8}(?:/\w+)+/\d+)\b')
 
@@ -153,8 +180,13 @@ def truncate_workcode(workcode: str) -> str:
         return workcode or ""
     
     wc = workcode.strip()
-    if WORKCODE_PATTERN.match(wc):
-        parts = wc.split('/')
+    m = WORKCODE_PATTERN.match(wc)
+    if m:
+        # MATCHED HISSA hi split karo, poori string nahi. Pattern sirf shuruat
+        # match karta hai; portal ke dropdown values "workcode$workname" hote
+        # hain, to poori string split karne par last part naam ka tukda
+        # ("22-23)") nikal aata tha.
+        parts = m.group(1).split('/')
         last_part = parts[-1]
         if len(last_part) > 6:
             return last_part[-6:]

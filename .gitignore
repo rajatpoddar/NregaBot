@@ -80,3 +80,7 @@ nul
 
 # Local app preferences (runtime artifacts — never commit)
 jc_verify_prefs.json
+
+# Saved portal pages (markup reference only — inme user ka block/state context
+# aur ASP.NET __VIEWSTATE hota hai; repo me nahi jaane chahiye)
+docs/htm/

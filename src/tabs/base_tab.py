@@ -2364,10 +2364,39 @@ class BaseAutomationTab(ctk.CTkFrame):
         except Exception:
             pass
 
+    # Panchayat change par ASP.NET full postback hota hai. Uska wait apne
+    # chhote timeout par hona chahiye — caller ke 20-25s wale wait object par
+    # NAHI (warna partial postback wale page par har panchayat 25s kha jata).
+    POSTBACK_WAIT_TIMEOUT = 10
+
+    def _wait_for_postback(self, driver: Any, element: Any,
+                           timeout: Optional[float] = None) -> bool:
+        """`element` ke DOM se detach hone ka bounded wait = full postback done.
+
+        IMPORTANT: `element` postback TRIGGER karne se **pehle** ka reference
+        hona chahiye. Selection ke BAAD dobara find karoge to naye document ka
+        element milega, jo kabhi stale nahi hoga — aur wait apna poora timeout
+        jala dega. eMB Entry ka ~25s per-panchayat stall bilkul yahi tha.
+
+        Partial (AJAX) postback me element stale nahi hota — tab False return
+        hota hai, exception nahi; caller bina ruke aage badh sakta hai.
+
+        Returns: True jab element stale ho gaya (postback complete).
+        """
+        if element is None:
+            return False
+        try:
+            WebDriverWait(driver, timeout or self.POSTBACK_WAIT_TIMEOUT).until(
+                EC.staleness_of(element))
+            return True
+        except Exception:
+            return False
+
     def _select_panchayat_or_skip(self, driver: Any, wait: Any,
                                   panchayat_name: str, p_locators: List[Any],
                                   v_ids: Optional[List[str]] = None,
-                                  label_ids: Any = (), timeout: int = 3) -> Tuple[str, str]:
+                                  label_ids: Any = (), timeout: int = 3,
+                                  wait_postback: bool = False) -> Tuple[str, str]:
         """CENTRAL panchayat handler — har automation tab yahi use karta hai.
 
         Block/PO login (dropdown present):
@@ -2409,6 +2438,11 @@ class BaseAutomationTab(ctk.CTkFrame):
             return "missing", ""
         if not self._select_by_text_fuzzy(Select(pd), name):
             return "notfound", name
+        if wait_postback:
+            # `pd` selection se PEHLE ka reference hai — yahi sahi staleness
+            # signal hai. Opt-in rakha hai taaki baaki tabs ka behaviour
+            # (jinme postback ka wait nahi chahiye) waisa hi rahe.
+            self._wait_for_postback(driver, pd)
         if v_ids:
             self._wait_for_dropdown_options(driver, wait, v_ids,
                                             "villages after panchayat selection")

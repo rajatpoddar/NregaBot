@@ -279,6 +279,17 @@ class UIMixin:
             self._pre_hover_status = None
             self._pre_hover_status_color = None
 
+        # ══════════════ RIGHT SIDE dock — PEHLE pack hota hai ══════════════
+        # Tk ka packer pehle pack hue slave ko cavity pehle deta hai. Agar
+        # status_frame (left) pehle pack ho aur uska text lamba ho jaye, to
+        # wo poora footer kha leta hai aur dock_frame ko 0 width milti hai —
+        # STOP ALL button map hi nahi hota. Dock pehle pack karke uski jagah
+        # reserve kar dete hain; status ko jo bache wo milta hai.
+        # (Children niche banaye/pack kiye gaye hain — wo dock_frame ke andar
+        # hain, isliye unka order is fix se alag hai.)
+        dock_frame = ctk.CTkFrame(footer, fg_color="transparent")
+        dock_frame.pack(side="right", padx=15, pady=5)
+
         # ══════════════ LEFT SIDE: copyright + running + status ══════════════
         status_frame = ctk.CTkFrame(footer, fg_color="transparent")
         status_frame.pack(side="left", padx=20, fill="y")
@@ -318,9 +329,8 @@ class UIMixin:
         self.status_label = ctk.CTkLabel(status_frame, text=tr("app.status_ready"), text_color="gray60", font=ctk.CTkFont(size=12))
         self.status_label.pack(side="left", padx=(8, 0))
 
-        # ══════════════ RIGHT SIDE: dock icons + stop + server ══════════════
-        dock_frame = ctk.CTkFrame(footer, fg_color="transparent")
-        dock_frame.pack(side="right", padx=15, pady=5)
+        # ══════════════ RIGHT SIDE contents: dock icons + stop + server ══════
+        # (dock_frame khud upar pack ho chuka hai — dekho wahan ka note.)
 
         # Separator before the emergency-stop group
         ctk.CTkFrame(dock_frame, width=1, height=14, corner_radius=0,

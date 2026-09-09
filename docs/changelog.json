@@ -1,4 +1,11 @@
 {
+  "3.2.9": [
+    "⚡ **eMB Entry Bahot Tez:** Panchayat select hone ke baad har panchayat par ~25 second ka stall lagta tha (galat element par postback ka wait) — ab wo turant aage badhta hai. Block/PO/JE login par sabse zyada farq dikhega.",
+    "🐞 **eMB Entry — Multi-Period Run Ka Crash Fix:** Ek work ke doosre measurement period par jaate hi 'stale element reference' aata tha aur poora work Failed ho jata tha. Ab saare period aaram se process hote hain.",
+    "⏭️ **'No Muster Roll Available' Ab Error Nahi:** Jis period ka muster roll nahi hai (eMB pehle ho chuka, ya MR abhi aapke login me aaya nahi) wo ab साफ **Skipped** dikhta hai — laal Failed nahi. Summary bhi ab alag batati hai: ✅ entered, ⚠️ skipped, ❌ failed.",
+    "🔢 **eMB Entry — Work Code Sahi Dikhta Hai:** Result table ke Work Code column me '22-23)' jaisa galat tukda aa raha tha; ab asli workcode ke last 6 digits (jaise 209915) dikhte hain.",
+    "🛑 **Footer Ka 'STOP ALL' Button Wapas:** Lamba status text (jaise eMB Entry ka work code + period) poora footer kha jata tha aur STOP ALL button gayab ho jata tha. Ab status chhota karke dikhta hai aur STOP ALL hamesha apni jagah rehta hai."
+  ],
   "3.2.8": [
     "🔄 **Sabhi Users Tak Update Push:** Ye release isliye hai taaki pichhle updates (3.2.5 + 3.2.7) ke features har user tak pahunch jayen. Agar aap pehle se 3.2.7 par hain to code me aapke liye kuch naya nahi hai — purane version wale users ko neeche di gayi saari cheezein pehli baar milengi.",
     "🌐 **Location Data Pool (Block Sharing):** Aapke Block ke Panchayat & Villages server par safely share hote hain — same block ke doosre users bina PO/GP portal login ke ye data seedha download kar sakte hain (Settings → '🌐 Block Data Download'). Sirf panchayat/village names share hote hain (public MGNREGA data) — koi personal info nahi.",

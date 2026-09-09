@@ -33,7 +33,49 @@ from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException, Tim
 
 logger = get_logger()
 
+# Portal ke 'Muster Roll No.' label (lbl_msr) me MR number ki jagah ye text
+# aata hai jab us period ka muster roll available nahi hai — matlab eMB pehle
+# hi ho chuka hai, ya MR abhi tak us user ke login me nahi aaya. Dono me se
+# koi bhi FAILURE nahi hai; inhe Skipped report karna hai warna admin panel me
+# error spike dikhta hai. Markup reference: docs/htm/Measurement Book.htm
+NO_MUSTER_ROLL_MARKERS = ("no muster roll", "no musteroll", "muster roll not available")
+
+
+def _parse_work_option(option_value: str, option_text: str):
+    """'Select Work' dropdown ka ek option → (select_value, work_name, work_code).
+
+    Portal ke option ka VALUE aur TEXT dono "workcode$workname" format me hote
+    hain (docs/htm/Measurement Book.htm):
+
+        <option value="3404003001/IF/7080902209915$(IF-Plantatin/.../6/22-23)">
+
+    - select_value : poora raw value — dropdown me option match karne ke liye.
+    - work_code    : '$' se pehle wala ASLI workcode — logging/result display
+                     ke liye. Pehle yahan poora value chala jata tha, jisse
+                     Work Code column me "22-23)" dikhta tha.
+    - work_name    : brackets wala naam.
+    """
+    text = option_text or ""
+    try:
+        work_name = re.findall(r'\((.*?)\)', text)[-1]
+    except Exception:
+        work_name = text
+    work_code = text.split('$')[0] if '$' in text else (option_value or text)
+    return option_value, work_name, work_code
+
+
+def _is_no_muster_roll(mr_text) -> bool:
+    """lbl_msr ka text 'muster roll hai hi nahi' bata raha hai kya?"""
+    text = " ".join(str(mr_text or "").split()).lower()
+    return any(marker in text for marker in NO_MUSTER_ROLL_MARKERS)
+
+
 class MbEntryTab(BaseAutomationTab):
+    # 'lbl_person_days' bharne ka bounded wait. Caller ka wait object 25s ka
+    # hai; jis period ka muster roll hi nahi hai usme value kabhi nahi bharti,
+    # to wahan har period 25s jalata tha aur phir 'Script Error' banta tha.
+    PERSONDAYS_WAIT_TIMEOUT = 15
+
     def __init__(self, parent: Any, app_instance: Any) -> None:
         """Initializes the eMB Entry tab."""
         super().__init__(parent, app_instance, automation_key="mb_entry")
@@ -467,6 +509,7 @@ class MbEntryTab(BaseAutomationTab):
         finally:
             # Count success/fail from results_tree
             success_count = 0
+            skipped_count = 0
             fail_count = 0
             for item in self.results_tree.get_children():
                 vals = self.results_tree.item(item)['values']
@@ -474,16 +517,32 @@ class MbEntryTab(BaseAutomationTab):
                     status = str(vals[5]).lower()
                     if 'success' in status:
                         success_count += 1
+                    elif 'skip' in status:
+                        # 'No Muster Roll' / '0 Persondays' — normal hai,
+                        # failure nahi. Alag gino warna admin ko error spike.
+                        skipped_count += 1
                     else:
                         fail_count += 1
-            self.log_info(f"📊 eMB Entry Complete: ✅ {success_count} measurements entered, ❌ {fail_count} failed (of {success_count + fail_count} total)")
+            total_count = success_count + skipped_count + fail_count
+            self.log_info(
+                f"📊 eMB Entry Complete: ✅ {success_count} measurements entered, "
+                f"⚠️ {skipped_count} skipped, ❌ {fail_count} failed "
+                f"(of {total_count} total)")
             self.app.after(0, self.set_ui_state, False)
             self.app.after(0, self.app.set_status, "Automation Finished")
 
     def _log_result(self, cfg, work_code, status, details, work_name="-", mr_no="-", mr_period="-"):
+        """Ek result row. Skipped ko warning (amber) dikhate hain, failure nahi —
+        'No Muster Roll' / '0 Persondays' error nahi hain (msr_tab jaisa hi)."""
         timestamp = datetime.now().strftime("%H:%M:%S")
         panchayat = cfg.get('location_panchayat', '-')
-        tags = ('failed',) if 'success' not in status.lower() else ()
+        status_lower = status.lower()
+        if 'success' in status_lower:
+            tags = ('success',)
+        elif 'skip' in status_lower:
+            tags = ('skipped',)
+        else:
+            tags = ('failed',)
         values = (panchayat, truncate_workcode(work_code), work_name, mr_no, mr_period, status, details, timestamp)
         self.safe_tree_insert(values, tags)
 
@@ -512,18 +571,15 @@ class MbEntryTab(BaseAutomationTab):
                 else:
                     # Central helper — GP login (no panchayat dropdown) par
                     # selection is skipped; no timeout/error occurs.
-                    status, _ = self._select_panchayat_or_skip(
+                    # wait_postback=True → helper selection se PEHLE wale
+                    # dropdown reference par staleness ka bounded wait karta
+                    # hai. Pehle yahan selection ke BAAD dobara find karke
+                    # staleness ka wait hota tha — wo element kabhi stale nahi
+                    # hota, isliye har panchayat par poora 25s timeout jalta tha.
+                    self._select_panchayat_or_skip(
                         driver, wait, cfg['location_panchayat'],
-                        ['ctl00_ContentPlaceHolder1_ddl_panch'])
-                    if status == "selected":
-                        try:
-                            dd = wait.until(EC.presence_of_element_located(
-                                (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
-                            wait.until(EC.staleness_of(dd))
-                            wait.until(EC.presence_of_element_located(
-                                (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
-                        except Exception:
-                            pass
+                        ['ctl00_ContentPlaceHolder1_ddl_panch'],
+                        wait_postback=True)
             except Exception as e: logger.debug("MBEntry: Panchayat select wait failed: %s", e)
             
             wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_txtMBNo')))
@@ -597,18 +653,12 @@ class MbEntryTab(BaseAutomationTab):
             driver.get(self.resolve_portal_url(config.MB_ENTRY_CONFIG["url"]))
 
         try:
-            status, _ = self._select_panchayat_or_skip(
+            # wait_postback=True → postback ka wait selection se PEHLE wale
+            # dropdown reference par (dekho _process_specific_works ka note).
+            self._select_panchayat_or_skip(
                 driver, wait, cfg['location_panchayat'],
-                ['ctl00_ContentPlaceHolder1_ddl_panch'])
-            if status == "selected":
-                try:
-                    dd = wait.until(EC.presence_of_element_located(
-                        (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
-                    wait.until(EC.staleness_of(dd))
-                    wait.until(EC.presence_of_element_located(
-                        (By.ID, 'ctl00_ContentPlaceHolder1_ddl_panch')))
-                except Exception:
-                    pass
+                ['ctl00_ContentPlaceHolder1_ddl_panch'],
+                wait_postback=True)
         except Exception:
             pass
 
@@ -643,15 +693,7 @@ class MbEntryTab(BaseAutomationTab):
         for option in select_work.options:
             val = option.get_attribute("value")
             if val and val != "0":
-                option_text = option.text
-                try:
-                    extracted_name = re.findall(r'\((.*?)\)', option_text)[-1]
-                except Exception:
-                    extracted_name = option_text
-                # Extract work code from option text (before $ sign)
-                # Dropdown format: workcode$workname
-                wc_from_text = option_text.split('$')[0] if '$' in option_text else val
-                work_options.append((val, extracted_name, wc_from_text))
+                work_options.append(_parse_work_option(val, option.text))
 
         if not work_options:
             self.log_error("❌ No works found in dropdown!")
@@ -662,8 +704,10 @@ class MbEntryTab(BaseAutomationTab):
         total = len(work_options)
         processed_codes = set()
 
-        # Step 5: Process each work from the dropdown
-        for i, (work_code, work_name, wc_from_text) in enumerate(work_options):
+        # Step 5: Process each work from the dropdown.
+        # select_value = poora "workcode$workname" (dropdown match ke liye),
+        # work_code    = saaf workcode (logging / result column ke liye).
+        for i, (select_value, work_name, work_code) in enumerate(work_options):
             if self.is_stopped():
                 self.log_warning("Automation stopped.")
                 break
@@ -685,7 +729,7 @@ class MbEntryTab(BaseAutomationTab):
                 # Find matching option
                 found_idx = None
                 for idx, option in enumerate(select_work.options):
-                    if option.get_attribute("value") == work_code:
+                    if option.get_attribute("value") == select_value:
                         found_idx = idx
                         break
 
@@ -704,10 +748,9 @@ class MbEntryTab(BaseAutomationTab):
                 # Re-set page no after dropdown selection (page refresh may clear it)
                 driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtpageno').value = '{cfg['page_no']}';")
 
-                # --- Auto MB No: update MB No field based on work code from option text ---
-                # Dropdown text format = workcode$workname → take last 4 digits before $
-                if self.auto_mb_no_var.get() and len(wc_from_text) >= 4:
-                    auto_mb = wc_from_text[-4:]
+                # --- Auto MB No: saaf workcode ke last 4 digits ---
+                if self.auto_mb_no_var.get() and len(work_code) >= 4:
+                    auto_mb = work_code[-4:]
                     driver.execute_script(f"document.getElementById('ctl00_ContentPlaceHolder1_txtMBNo').value = '{auto_mb}';")
 
                 # Click Radio Button (district = first option)
@@ -744,26 +787,32 @@ class MbEntryTab(BaseAutomationTab):
             EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlSelMPeriod"))
         )
         period_select = Select(period_elem)
-        period_options = [o for o in period_select.options if o.get_attribute("value")]
-        if not period_options:
+        # Options ko STRINGS me snapshot karo — <option> WebElement references
+        # loop ke aar-paar mat pakdo. Pehla period select hote hi ASP.NET full
+        # postback hota hai aur ye saare elements detach ho jate hain; agli
+        # iteration me unhe padhna StaleElementReferenceException deta tha aur
+        # poora work "Failed" ho jata tha. Wahi snapshot pattern jo isi file ke
+        # _process_all_works_from_dropdown me pehle se hai.
+        periods = [(o.get_attribute("value"), o.text)
+                   for o in period_select.options if o.get_attribute("value")]
+        if not periods:
             self._log_result(cfg, work_code, "Failed", "No measurement period found", work_name)
             return
 
-        self.log_info(f"   Found {len(period_options)} measurement period(s) for {work_code}:")
-        for opt in period_options:
-            self.log_info(f"      - {opt.text}")
+        total_periods = len(periods)
+        self.log_info(f"   Found {total_periods} measurement period(s) for {work_code}:")
+        for _, ptext in periods:
+            self.log_info(f"      - {ptext}")
 
-        for idx, period_option in enumerate(period_options, 1):
+        for idx, (period_value, period_text) in enumerate(periods, 1):
             if self.is_stopped():
                 self.log_warning("Automation stopped.")
                 break
-            period_value = period_option.get_attribute("value")
-            period_text = period_option.text
-            self.app.after(0, self.app.set_status, f"{work_code}: period {idx}/{len(period_options)} ({period_text})")
+            self.app.after(0, self.app.set_status, f"{work_code}: period {idx}/{total_periods} ({period_text})")
             self.app.after(0, self.update_status,
-                           f"{work_code}: period {idx}/{len(period_options)} ({period_text})",
-                           idx / len(period_options))
-            self.log_info(f"   [{idx}/{len(period_options)}] Processing period: {period_text}")
+                           f"{work_code}: period {idx}/{total_periods} ({period_text})",
+                           idx / total_periods)
+            self.log_info(f"   [{idx}/{total_periods}] Processing period: {period_text}")
 
             try:
                 # Clear any lingering alert from the previous save before
@@ -821,16 +870,35 @@ class MbEntryTab(BaseAutomationTab):
                 except TimeoutException:
                     pass
 
-                # Wait for person days to load for this period
+                # Wait for person days to load for this period.
+                # Bounded + non-fatal: jis period ka muster roll hi nahi hai
+                # usme value kabhi nahi bharti. Pehle ye caller ke 25s wait par
+                # tha aur TimeoutException 'Script Error' row bana deta tha —
+                # yaani ek normal 'abhi MR nahi aaya' case admin ko error
+                # dikhta tha. Ab neeche ke skip checks ise handle karte hain.
                 wait.until(EC.presence_of_element_located((By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days')))
-                wait.until(
-                    lambda d: d.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days').get_attribute('value') != ''
-                )
+                try:
+                    WebDriverWait(driver, self.PERSONDAYS_WAIT_TIMEOUT).until(
+                        lambda d: d.find_element(
+                            By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days'
+                        ).get_attribute('value') != ''
+                    )
+                except TimeoutException:
+                    pass
 
                 try:
                     mr_no = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_lbl_msr").text
                 except Exception:
                     mr_no = "-"
+
+                # Muster roll hi available nahi — eMB pehle ho chuka hai ya MR
+                # abhi tak is login me nahi aaya. Ye ERROR nahi hai.
+                if _is_no_muster_roll(mr_no):
+                    self.log_info(f"      Period '{period_text}': Muster Roll available nahi — skipping.")
+                    self._log_result(cfg, work_code, "Skipped",
+                                     "No Muster Roll Available (eMB ho chuka ya MR abhi aaya nahi)",
+                                     work_name, mr_no, period_text)
+                    continue
 
                 pd_elem = driver.find_element(By.ID, 'ctl00_ContentPlaceHolder1_lbl_person_days')
                 total_persondays = int(pd_elem.get_attribute('value') or 0)
