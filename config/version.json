@@ -10,8 +10,8 @@
     "url_macos": "https://nregabot.com/updates/core_mac_v3.2.9.zip",
     "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "",
-    "hash_macos": ""
+    "hash_windows": "90914d482d945e34b34c7ec5f710489288b604c87c54a6de7cb43d74951f2ac7",
+    "hash_macos": "27fb59f29fd592cfb43d9bc6bea6acecbc699d686e436d856eefb3af20202a61"
   },
   "changelog": {
     "3.2.9": [

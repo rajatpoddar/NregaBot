@@ -94,17 +94,26 @@ def build_block_payload(state: str, district: str, block: str, app=None):
     from src.location_hierarchy import get_hierarchy
 
     hier = get_hierarchy()
+    # UNION lete hain — sirf hierarchy par bharosa nahi.
+    #
+    # `Block→Panchayat` hierarchy sirf pool DOWNLOAD bharta hai; scrape use
+    # nahi bharta tha. Pehle ye hierarchy hi source thi (suggestions sirf
+    # fallback), to ek baar '🌐 Block Data Download' dabane ke baad user ka
+    # upload usi purane snapshot par lock ho jata tha — 25 panchayat locally
+    # hone par bhi sirf 5 sync hote the, aur pool kabhi grow hi nahi kar pata
+    # tha. Ab dono source milate hain: user ke paas jo bhi hai, wo jayega.
+    names = set()
     try:
-        panch_names = hier.get_children("Block", block, "Panchayat")
+        names.update(hier.get_children("Block", block, "Panchayat") or [])
     except Exception:
-        panch_names = []
-    if not panch_names:
-        try:
-            hm = getattr(app, "history_manager", None)
-            if hm is not None:
-                panch_names = [p for p in hm.get_suggestions("location_panchayat") if p]
-        except Exception:
-            panch_names = []
+        pass
+    try:
+        hm = getattr(app, "history_manager", None)
+        if hm is not None:
+            names.update(hm.get_suggestions("location_panchayat") or [])
+    except Exception:
+        pass
+    panch_names = sorted({_norm(n) for n in names if _norm(n)})
 
     panchayats = []
     for p in panch_names[: _MAX_PANCHAYATS_PER_SYNC]:
@@ -126,12 +135,21 @@ def build_block_payload(state: str, district: str, block: str, app=None):
     }
 
 
-def sync_block_to_server(app, license_key: str = "", force: bool = False) -> bool:
+def sync_block_to_server(app, license_key: str = "", force: bool = False,
+                         blocking: bool = False) -> bool:
     """
-    User ke block ka panchayat→village data server ko bhejo (background).
+    User ke block ka panchayat→village data server ko bhejo.
 
     Throttled: _MIN_SYNC_INTERVAL_SECONDS ke andar repeat call skip (force=True
     se bypass — e.g. scrape ke turant baad).
+
+    blocking=False (default) → background daemon thread, turant return.
+    blocking=True            → POST poora hone tak wait (15s timeout).
+
+    blocking ZAROORI hai jab caller ke turant baad app band/restart hona hai:
+    restart_application() `os._exit(0)` maarta hai, jo daemon threads ka
+    intezaar nahi karta — is wajah se scrape ka data server par pahunchta hi
+    nahi tha.
     """
     global _last_sync_at
     if not force:
@@ -169,12 +187,16 @@ def sync_block_to_server(app, license_key: str = "", force: bool = False) -> boo
                 r = resp.json()
                 logger.info("☁️ Location pool sync: +%s new / %s updated panchayat(s) "
                             "for block %s", r.get("added", 0), r.get("updated", 0), block)
-            else:
-                logger.debug("⚠️ Location pool sync: HTTP %s (%s)",
-                             resp.status_code, resp.text[:200])
+                return True
+            logger.debug("⚠️ Location pool sync: HTTP %s (%s)",
+                         resp.status_code, resp.text[:200])
         except Exception as e:
             logger.debug("⚠️ Location pool sync failed (retry next cycle): %s", e)
+        return False
 
+    if blocking:
+        _do_sync()
+        return True
     threading.Thread(target=_do_sync, daemon=True).start()
     return True
 
@@ -285,15 +307,18 @@ def apply_server_data(block: str, panchayats: list, app=None) -> tuple:
     return (panch_added, vill_added)
 
 
-def sync_current_location(app, force: bool = False) -> bool:
+def sync_current_location(app, force: bool = False, blocking: bool = False) -> bool:
     """
-    Convenience: app se license + location utha ke background sync start karo.
+    Convenience: app se license + location utha ke sync start karo.
 
     Har panchayat add (scrape success, manual add, GP auto-add) ke baad call
     karo — throttled, silent, kabhi crash nahi.
+
+    blocking=True us waqt do jab call ke turant baad app restart/exit hona hai.
     """
     try:
-        return sync_block_to_server(app, license_key="", force=force)
+        return sync_block_to_server(app, license_key="", force=force,
+                                    blocking=blocking)
     except Exception as e:
         logger.debug("sync_current_location error: %s", e)
         return False

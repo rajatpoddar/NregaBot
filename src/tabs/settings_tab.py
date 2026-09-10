@@ -272,11 +272,27 @@ def run_panchayat_scrape(app, on_status=None, on_success=None, on_failed=None):
                         continue
 
             # ── Step 3: Save everything with hierarchy ──
+            # Block→Panchayat link scrape bhi banata hai. Pehle sirf pool
+            # download ise bharta tha, isliye hierarchy scrape ke baad bhi
+            # purani/adhoori rehti thi — jo filtered dropdowns aur location
+            # pool payload dono ko galat cap kar deti thi.
+            scrape_block = ""
+            try:
+                from src import location_sync as _lsync
+                scrape_block = _lsync.get_user_location(app)[2]
+            except Exception:
+                scrape_block = ""
+
             saved_panch = 0
             saved_vill = 0
             for panch_name, villages in all_panch_villages.items():
                 for k in PANCHAYAT_KEYS:
                     hm.save_entry(k, panch_name)
+                if scrape_block:
+                    try:
+                        hier.add_child("Block", scrape_block, "Panchayat", panch_name)
+                    except Exception:
+                        pass
                 saved_panch += 1
                 for v_name in villages:
                     for k in VILLAGE_KEYS:
@@ -755,10 +771,14 @@ class SettingsTab(ctk.CTkFrame):
             return
         raw_names = [self.loc_listbox.get(i) for i in sel]
         
-        # Extract panchayat names from the display format "🏘️ NAME  (X villages)" or "🏘️ NAME"
+        # Display format "🏘️ NAME  (X villages)" / "🏘️ NAME  (1 village)" / "🏘️ NAME"
+        # se asli naam nikalo. `villages?` zaroori hai — _refresh_loc_list ek
+        # village par SINGULAR likhta hai, aur pehle regex sirf plural match
+        # karta tha, to aise panchayat ka naam "GP-B  (1 village)" ban jata tha
+        # aur delete chup-chaap fail ho jata tha.
         panch_names = []
         for n in raw_names:
-            m = re.match(r'🏘️\s*(.+?)(?:\s*\(\d+ villages\))?$', n)
+            m = re.match(r'🏘️\s*(.+?)(?:\s*\(\d+\s+villages?\))?$', n)
             if m:
                 panch_names.append(m.group(1).strip())
             else:
@@ -774,7 +794,17 @@ class SettingsTab(ctk.CTkFrame):
         hier = get_hierarchy()
         deleted_panch = 0
         deleted_vill = 0
-        
+
+        # Block ka naam — Block→Panchayat link hatane ke liye. Ye link pehle
+        # bacha reh jata tha, jisse deleted panchayat (a) filtered dropdowns me
+        # dikhta rehta tha aur (b) location pool payload ke through server par
+        # dobara upload ho jata tha.
+        del_block = ""
+        try:
+            del_block = location_sync.get_user_location(self.app)[2]
+        except Exception:
+            del_block = ""
+
         for name in panch_names:
             # 1. Get all villages under this panchayat from hierarchy
             villages = hier.get_children("Panchayat", name, "Village")
@@ -787,7 +817,15 @@ class SettingsTab(ctk.CTkFrame):
             
             # 3. Remove hierarchy relationships for villages
             hier.remove_all_children_of("Panchayat", name)
-            
+
+            # 3b. Block→Panchayat link bhi hatao (warna panchayat dropdowns me
+            #     aur server pool payload me wapas aa jata hai)
+            if del_block:
+                try:
+                    hier.remove_child("Block", del_block, "Panchayat", name)
+                except Exception as e:
+                    logger.debug("Block→Panchayat unlink skipped for %s: %s", name, e)
+
             # 4. Delete panchayat from history
             for k in self._get_panchayat_keys():
                 hm.remove_entry(k, name)
@@ -1173,16 +1211,33 @@ class SettingsTab(ctk.CTkFrame):
         self.after(8000, lambda: self._scrape_status.configure(text=""))
 
         # ── Location pool: scrape kiya hua data same-block users ke liye
-        # server par bhejo (silent background, kabhi crash nahi) ──
-        if saved_panch:
+        # server par bhejo, PHIR restart karo ──
+        #
+        # Pehle sync ek daemon thread me shuru hota tha aur agli hi line par
+        # _restart_application() chal jata tha. restart_application() `os._exit(0)`
+        # maarta hai, jo process ko turant khatam kar deta hai — daemon threads ka
+        # intezaar kiye bina. Nateeja: scrape kiya hua panchayat data server pool
+        # tak KABHI pahunchta hi nahi tha (dusre operators ko purana data dikhta
+        # rehta tha). Ab sync blocking hai aur restart uske baad hota hai.
+        if not saved_panch:
+            return
+
+        import threading
+
+        self._scrape_status.configure(
+            text="☁️ Server par sync ho raha hai...",
+            text_color=("#2563EB", "#60A5FA"))
+
+        def _sync_then_restart():
             try:
-                location_sync.sync_current_location(self.app, force=True)
+                location_sync.sync_current_location(self.app, force=True, blocking=True)
             except Exception as e:
                 logger.debug("Location pool sync error: %s", e)
+            # Sync fail ho to bhi restart zaroori hai — naye panchayat sabhi
+            # tabs ke dropdown me tabhi aayenge.
+            self.app.after(0, self._restart_application)
 
-        # Restart so the newly added panchayats appear in every tab's dropdowns.
-        if saved_panch:
-            self._restart_application()
+        threading.Thread(target=_sync_then_restart, daemon=True).start()
 
     def _scrape_failed(self, error_msg):
         """Update UI on scrape failure."""

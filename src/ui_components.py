@@ -1590,6 +1590,18 @@ class OnboardingGuide(ctk.CTkToplevel):
                     self._panch_btn.configure(state="normal", text=tr("onboarding.panch.btn"))
                     if saved_panch:
                         self._panchayat_added = True
+                        # ── Location pool: onboarding ka scrape bhi server par
+                        # jaana chahiye. Pehle yahan sync call hi nahi tha —
+                        # sirf Settings wala scrape sync karta tha (aur wo bhi
+                        # restart ki wajah se fail hota tha), isliye pool me
+                        # sirf automation-time auto-add wala adhoora data
+                        # pahunchta tha. Yahan restart nahi hota, to
+                        # background (non-blocking) sync theek hai.
+                        try:
+                            from src import location_sync
+                            location_sync.sync_current_location(self.parent, force=True)
+                        except Exception:
+                            pass
                         done_txt = tr("onboarding.panch.done", panch=saved_panch, vill=saved_vill)
                         if gp_mode:
                             done_txt += "\n" + tr("onboarding.panch.gp_note")
