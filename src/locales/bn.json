@@ -1104,5 +1104,8 @@
   "file_manager.same_filter_as_pdf_merger": "(PDF মার্জার যে ফিল্টার ব্যবহার করে একই)",
   "form.mb_entry.info_card_text": "• এই eMB অটোমেশন শুধু একক অ্যাক্টিভিটি কাজের জন্য ব্যবহার করুন।\n• ওয়ার্ককোড বক্স খালি রেখে 'অটোমেশন শুরু করুন' ক্লিক করুন — সব উপলব্ধ কাজ একে একে অটো-ফিল হবে!",
   "file_manager.download_complete": "ডাউনলোড সম্পন্ন",
-  "file_manager.downloaded_ok": "'{file}' সফলভাবে ডাউনলোড হয়েছে"
+  "file_manager.downloaded_ok": "'{file}' সফলভাবে ডাউনলোড হয়েছে",
+  "push.automation_success": "✅ {name} সম্পন্ন হয়েছে",
+  "push.automation_failed": "⚠️ {name} সমস্যাসহ শেষ হয়েছে",
+  "push.automation_duration": "{duration} লেগেছে"
 }

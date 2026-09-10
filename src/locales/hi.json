@@ -1104,5 +1104,8 @@
   "file_manager.same_filter_as_pdf_merger": "(वही फ़िल्टर जो PDF मर्जर उपयोग करता है)",
   "form.mb_entry.info_card_text": "• इस eMB ऑटोमेशन का उपयोग केवल सिंगल एक्टिविटी कार्यों के लिए करें।\n• वर्ककोड बॉक्स खाली छोड़कर 'Start Automation' पर क्लिक करें — सभी उपलब्ध कार्य एक-एक करके ऑटो-फिल हो जाएंगे!",
   "file_manager.download_complete": "डाउनलोड पूर्ण",
-  "file_manager.downloaded_ok": "'{file}' सफलतापूर्वक डाउनलोड हो गई"
+  "file_manager.downloaded_ok": "'{file}' सफलतापूर्वक डाउनलोड हो गई",
+  "push.automation_success": "✅ {name} पूरा हुआ",
+  "push.automation_failed": "⚠️ {name} में कुछ दिक्कत रही",
+  "push.automation_duration": "{duration} लगा"
 }

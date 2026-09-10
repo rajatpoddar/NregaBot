@@ -84,6 +84,72 @@ def _automation_display_name(key: str) -> str:
     return AUTOMATION_DISPLAY_NAMES.get(key, key.replace("_", " ").title())
 
 
+# Sirf ye do statuses phone par jaate hain. 'stopped' user ne khud kiya hai —
+# usse wahi baat wapas batane ka koi matlab nahi.
+PUSH_NOTIFY_STATUSES = ("success", "failed")
+
+
+def _format_duration(seconds: float) -> str:
+    """42.0 → '42s', 150.0 → '2.5m'. Notification me lambi ginti nahi chahiye."""
+    try:
+        secs = float(seconds)
+    except (TypeError, ValueError):
+        secs = 0.0
+    if secs < 60:
+        return f"{secs:.0f}s"
+    return f"{secs / 60:.1f}m"
+
+
+def build_automation_push_payload(license_key: str, key: str, panchayat: str,
+                                  status: str, duration: float,
+                                  details: str) -> Optional[Dict[str, Any]]:
+    """
+    Companion app ke liye automation-complete push ka payload banao.
+
+    Text yahan banta hai, server par nahi — kyunki notification user ki apni
+    bhasha me aana chahiye aur bhasha sirf desktop ko pata hai (`tr()`,
+    5 locales). Server sirf validate + truncate karta hai.
+
+    Returns:
+        dict — POST /api/push/automation-complete ka body
+        None — kuch mat bhejo (stopped run, ya license hi nahi)
+    """
+    if status not in PUSH_NOTIFY_STATUSES:
+        return None
+    license_key = (license_key or "").strip()
+    if not license_key:
+        return None
+
+    name = _automation_display_name(key)
+    if status == "success":
+        title = tr("push.automation_success", default="✅ {name} complete",
+                   name=name)
+    else:
+        title = tr("push.automation_failed", default="⚠️ {name} finished with issues",
+                   name=name)
+
+    # Body: panchayat → result line → duration. Jo hissa khaali hai wo
+    # chhod diya jata hai, taaki " |  | 12s" jaisa kachra na bane.
+    parts = []
+    if panchayat:
+        parts.append(str(panchayat))
+    if details:
+        parts.append(str(details))
+    parts.append(tr("push.automation_duration", default="Took {duration}",
+                    duration=_format_duration(duration)))
+
+    return {
+        "license_key": license_key,
+        "automation_key": key,
+        "status": status,
+        "panchayat": panchayat or "",
+        "duration_seconds": float(duration or 0.0),
+        "details": details or "",
+        "title": title,
+        "body": " · ".join(parts),
+    }
+
+
 class AutomationMixin:
     """Mixin class containing browser and automation dispatch methods.
 
@@ -486,6 +552,11 @@ class AutomationMixin:
                 self._sync_automation_results_to_cloud(
                     key, panchayat, status, duration, details, tab_instance
                 )
+
+                # ── Companion app par push (Phase 1) — success/failed only ──
+                self._push_automation_complete(
+                    key, panchayat, status, duration, details
+                )
                 
                 # ── Sync activity log to server (Phase 2) ──
                 lic = getattr(self.app_state, 'license_info', {}) or {}
@@ -502,6 +573,53 @@ class AutomationMixin:
                     logger.debug("Usage stats sync failed for %s: %s", key, e)
             except Exception as e:
                 logger.error(f"Failed to sync for {key}: {e}")
+
+    # ════════════════════════════════════════════════════════════
+    # COMPANION APP — automation finish push (Phase 1)
+    # ════════════════════════════════════════════════════════════
+    def _push_automation_complete(self, key, panchayat, status, duration, details):
+        """
+        Automation khatam — user ke phone par bata do.
+
+        Ye notification pehle WhatsApp par jata tha aur band kar diya gaya
+        tha (users ko baar-baar aane wale message se chidh hoti thi aur pata
+        nahi chalta tha kiska message hai). Ab wahi baat app me jati hai,
+        jahan user ise ek tap me band kar sakta hai — toggle Account screen
+        me hai, server par `licenses.push_automation_notify`.
+
+        Fire-and-forget, `_sync_automation_results_to_cloud()` jaisa hi:
+        daemon thread + har exception `logger.debug`. Ek notification ka
+        fail hona kisi kaamyaab automation ko chhoo bhi nahi sakta.
+        """
+        try:
+            lic = getattr(self.app_state, 'license_info', {}) or {}
+            payload = build_automation_push_payload(
+                license_key=lic.get('key', ''), key=key, panchayat=panchayat,
+                status=status, duration=duration, details=details,
+            )
+            if payload is None:
+                return   # stopped run, ya license hi nahi — bhejne ko kuch nahi
+
+            server_url = config.LICENSE_SERVER_URL
+            if not server_url:
+                return
+
+            def _send():
+                try:
+                    resp = requests.post(
+                        f"{server_url}/api/push/automation-complete",
+                        json=payload, timeout=15)
+                    if resp.status_code == 200:
+                        logger.debug("Push notify OK for %s: %s", key, resp.text[:120])
+                    else:
+                        logger.debug("Push notify failed for %s: %s %s",
+                                     key, resp.status_code, resp.text[:200])
+                except Exception as e:
+                    logger.debug("Push notify error for %s: %s", key, e)
+
+            threading.Thread(target=_send, daemon=True).start()
+        except Exception as e:
+            logger.debug("Push notify pre-check error for %s: %s", key, e)
 
     # ════════════════════════════════════════════════════════════
     # CLOUD REPORTS — raw results sync (30-day web portal storage)
