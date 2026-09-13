@@ -19,6 +19,28 @@ from ._imports import By, Select, WebDriverWait, EC, NoSuchElementException  # n
 
 logger = get_logger()
 
+
+def _matches_filter(ekyc_value: Any, filter_mode: str) -> bool:
+    """Ek MEMBER ka eKYC status chune hue filter se match karta hai kya.
+
+    Har record ek member hota hai (job card + applicant), isliye ek hi job card
+    ke do members alag-alag chhante jaate hain — MISTRI HEMBRAM (Yes) filter
+    "Yes" me, KARAN HEMBRAM (NO) filter "No" me, dono ek hi card JH-...-001/36
+    ke hain.
+
+    Portal uppercase "NO" bhejta hai (dekho tests/fixtures/ekyc_grid_page2.html), isliye
+    comparison case-insensitive hai. Khaali value = verified nahi.
+
+    Tk se aazad rakha gaya hai: pehle ye logic `filter_var.get()` par tiki thi,
+    jise scraping thread padhta tha — RULE-UI-002 ka ulta aur untestable.
+    """
+    verified = "yes" in str(ekyc_value or "").strip().lower()
+    if filter_mode == "Verified (Yes)":
+        return verified
+    if filter_mode == "Not Verified (No)":
+        return not verified
+    return True  # "All"
+
 # Dropdown labels used when the user wants to process ALL panchayats / ALL villages
 ALL_PANCHAYATS_LABEL = config.ALL_PANCHAYATS_LABEL
 MY_PANCHAYATS_LABEL = config.MY_PANCHAYATS_LABEL
@@ -496,6 +518,7 @@ class EKycReportTab(BaseAutomationTab):
                 break
 
             count_on_page = 0
+            page_records = []
             if len(rows) > 1:
                 for row in rows[1:]:
                     cols = row.find_elements(By.TAG_NAME, "td")
@@ -529,9 +552,12 @@ class EKycReportTab(BaseAutomationTab):
                             "jobcard": jc, "name": name, "abps": abps, "ekyc": ekyc
                         }
                         self.all_scraped_data.append(record)
-                        self.check_and_insert_to_tree(record)
+                        page_records.append(record)
                         count_on_page += 1
                     except Exception: continue
+
+            # Poore page ki rows ek saath main thread ko (RULE-UI-002).
+            self._flush_rows_to_tree(page_records)
 
             self.log_info(f"  > Page {current_page_num}: {count_on_page} new records.")
             next_page_num = current_page_num + 1
@@ -552,28 +578,59 @@ class EKycReportTab(BaseAutomationTab):
                 break
 
     def _should_show_record(self, record):
-        """Filter logic based on eKYC status only"""
-        filter_mode = self.filter_var.get()
-        ekyc_yes = "yes" in record['ekyc'].lower()
+        """Filter logic based on eKYC status only. MAIN THREAD ONLY.
 
-        if filter_mode == "All": 
-            return True
-        elif filter_mode == "Verified (Yes)" and ekyc_yes: 
-            return True
-        elif filter_mode == "Not Verified (No)" and not ekyc_yes: 
-            return True
-        return False
+        `filter_var` ek Tk variable hai — ise sirf main thread se padho.
+        """
+        return _matches_filter(record.get('ekyc'), self.filter_var.get())
 
-    def check_and_insert_to_tree(self, record):
-        if self._should_show_record(record):
-            sno = len(self.tree.get_children()) + 1
-            self.tree.insert("", "end", values=(sno, record['panchayat'], record['village'], record['jobcard'], record['name'], record['abps'], record['ekyc']))
-            if sno % 10 == 0: self.tree.yview_moveto(1)
+    # ── Tree inserts: scraping worker thread se aate hain ───────────────
+    # RULE-UI-002 — pehle `check_and_insert_to_tree()` seedha worker thread se
+    # `filter_var.get()` / `tree.insert()` call karta tha. Tk thread-safe nahi
+    # hai: aisa call chupchaap fail ho sakta hai, yaani report se members gayab.
+    # Ek job card ke 2 me se 1 member gire to report jobcard-wise dikhne lagti
+    # hai — yahi user ki 13 Sep 2026 wali shikayat thi.
+
+    def _flush_rows_to_tree(self, records) -> None:
+        """WORKER THREAD SE SAFE. Ek page ki rows main thread ko saunp do.
+
+        Poora page ek hi `after()` me jata hai — per-row schedule karne par
+        bade scans (hazaaron rows) Tk ka event loop bhar dete hain.
+        """
+        if not records or not self._is_alive():
+            return
+        # Copy: caller apni list clear karke agla page bharta hai.
+        batch = list(records)
+        self.app.after(0, self._insert_records, batch)
+
+    def _insert_records(self, records) -> None:
+        """MAIN THREAD ONLY. Batch ko filter ke hisaab se tree me daalo."""
+        if not self._is_alive():
+            return
+        inserted = False
+        for record in records:
+            if self._insert_if_visible(record):
+                inserted = True
+        if inserted:
+            try:
+                self.tree.yview_moveto(1)
+            except Exception:
+                pass
+
+    def _insert_if_visible(self, record) -> bool:
+        """MAIN THREAD ONLY. Ek member ki row, agar filter use dikhata hai."""
+        if not self._should_show_record(record):
+            return False
+        sno = len(self.tree.get_children()) + 1
+        self.tree.insert("", "end", values=(
+            sno, record['panchayat'], record['village'], record['jobcard'],
+            record['name'], record['abps'], record['ekyc']))
+        return True
 
     def apply_filter_visuals(self):
-        """Re-apply filter to tree based on current filter_var."""
+        """Re-apply filter to tree based on current filter_var. MAIN THREAD."""
         for item in self.tree.get_children(): self.tree.delete(item)
-        for r in self.all_scraped_data: self.check_and_insert_to_tree(r)
+        for r in self.all_scraped_data: self._insert_if_visible(r)
 
     def export_professional_report(self):
         """Export using the base class professional Excel method."""

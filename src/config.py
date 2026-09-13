@@ -733,6 +733,12 @@ def get_state_portal_url(url: str, state: str = "") -> str:
 
 # --- ADD THIS NEW DICTIONARY ---
 # Config for state-specific demand URLs and logic
+# MGNREGA rozgaar guarantee — ek household ko ek financial year me kitne din
+# ka kaam mil sakta hai. Scheme me ye 100 tha, ab 125 hai (13 Sep 2026).
+# Demand Tab isi se available days nikalta hai aur result status likhta hai, to
+# aage limit badle to sirf yahi line badalni hai.
+MGNREGA_GUARANTEED_DAYS: int = 125
+
 STATE_DEMAND_CONFIG: Dict[str, Dict[str, str]] = {
     "Jharkhand": {
         "base_url": "https://vbgramgde2.dord.gov.in/vbgramg/demand_new.aspx",

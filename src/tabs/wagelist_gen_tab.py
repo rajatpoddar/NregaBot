@@ -18,11 +18,146 @@ from ._imports import By, PrintOptions, Select, WebDriverWait, EC, NoSuchElement
 
 logger = get_logger()
 
+
+def _parse_workcode_input(raw: Optional[str]) -> List[str]:
+    """Work Codes textbox ka raw text → saaf, order-preserving, dedupe'd list.
+
+    Baaki tabs (eMB Entry, MR Payment) line-per-code parse karte hain; yahan
+    comma/semicolon/tab bhi chalte hain taaki Excel ki ek row seedhi paste ho
+    sake. Khaali text → `[]`, jiska matlab hai "filter mat karo, sab generate
+    karo" (purana behaviour).
+    """
+    codes: List[str] = []
+    seen = set()
+    for part in re.split(r'[,\n\r\t;]+', str(raw or "")):
+        code = part.strip()
+        if not code:
+            continue
+        key = code.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        codes.append(code)
+    return codes
+
+
+def _wc_match_keys(code: Optional[str]) -> frozenset:
+    """Ek workcode ke saare roop jinse wo match ho sakta hai.
+
+    User teen tarah se paste karta hai, teeno chalne chahiye:
+      * poora portal code   — "3422003019/IF/7080902694979"
+      * panchayat ke bina   — "IF/7080902694979"
+      * app ka truncated    — "694979"  (Results tree / Excel export isi
+                              format me dikhata hai, dekho truncate_workcode)
+
+    Do codes match karte hain jab unke key-sets ka intersection khaali na ho.
+    Khaali/junk input → khaali set, jo kabhi kisi se match nahi karta.
+    """
+    raw = re.sub(r'\s+', '', str(code or "")).upper()
+    if not raw:
+        return frozenset()
+    keys = {raw}
+    tail = raw.split('/')[-1]
+    if tail:
+        keys.add(tail)
+    short = truncate_workcode(raw)
+    if short:
+        keys.add(short.upper())
+    return frozenset(keys)
+
+
+_CHECKBOX_ON = {"on", "1", "true", "yes"}
+_CHECKBOX_OFF = {"off", "0", "false", "no"}
+
+
+def _checkbox_state(raw: Any, default: str) -> str:
+    """DB me saved value → CTkCheckBox ka "on"/"off".
+
+    `save_tab_inputs_batch` har value ko `str()` kar deta hai, aur purane
+    records me "True"/"1" jaisi cheezein bhi ho sakti hain. Jo samajh na aaye
+    us par default hi lautao — settings ka ek kharaab record tab ko toda na de.
+    """
+    value = str(raw if raw is not None else "").strip().lower()
+    if value in _CHECKBOX_ON:
+        return "on"
+    if value in _CHECKBOX_OFF:
+        return "off"
+    return default
+
+
+# Isse chhota numeric tukda match karne ke liye nahi maana jata — "194" jaisa
+# fragment kisi bhi doosre workcode se takra sakta hai.
+_MIN_FRAGMENT_LEN = 4
+
+
+def _wc_page_keys(code: Optional[str]) -> frozenset:
+    """Page ki row ke match keys — identity keys + uske numeric tail ke suffix.
+
+    User aksar poora code nahi, bas aakhri kuch digits paste karta hai (13 Sep
+    2026 ki report me "18672", jo 7080902718672 ke last FIVE digits the). Isliye
+    row apne tail ke har suffix (>= `_MIN_FRAGMENT_LEN`) se match karti hai.
+
+    Ye expansion SIRF page side par hota hai. Dono taraf karne par do alag
+    works jinke tail ka ant same hai (…694979 aur …124979) aapas me galat match
+    kar jate — isliye user ke diye code aur failed-row tracking dono `identity`
+    keys (`_wc_match_keys`) par hi rehte hain.
+    """
+    keys = set(_wc_match_keys(code))
+    if not keys:
+        return frozenset()
+    tail = re.sub(r'\s+', '', str(code or "")).upper().split('/')[-1]
+    if tail.isdigit():
+        for n in range(_MIN_FRAGMENT_LEN, len(tail)):
+            keys.add(tail[-n:])
+    return frozenset(keys)
+
+
+def _wanted_codes_satisfied_by(page_code: Optional[str], wanted_pairs) -> set:
+    """Is page row se user ke kaun-kaun se diye gaye code poore ho gaye.
+
+    `wanted_pairs` = [(user ka likha code, uske identity keys), ...]. Yahan bhi
+    page side ke fragment keys use hote hain, warna "18672" se wagelist ban
+    jaane ke baad bhi wo code 'Not Found' report hota.
+    """
+    page_keys = _wc_page_keys(page_code)
+    if not page_keys:
+        return set()
+    return {code for code, keys in wanted_pairs if keys & page_keys}
+
+
+def _pick_next_row_index(row_codes: List[str], wanted_keysets, failed_keys) -> Optional[int]:
+    """Pending table ki agli process karne layak row ka index (warna None).
+
+    `row_codes` me table ki har row ka Work Code column hota hai (blank spacer
+    row bhi — dekho tests/fixtures/wagelist_pending.html). Pehle yahan index-based
+    `rows[total_errors_to_skip]` tha; ab candidate filter hai taaki:
+      * `wanted_keysets` khaali/None ho to har row chale (purana ALL mode), aur
+      * jo row ek baar fail ho chuki hai wo dobara na uthe (success par row
+        portal se khud gayab ho jati hai, isliye sirf failures track karne
+        hote hain).
+    """
+    for idx, code in enumerate(row_codes):
+        identity = _wc_match_keys(code)
+        if not identity:
+            continue  # blank spacer row
+        # Failed-tracking identity par — warna ek row fail hote hi wo saari
+        # rows skip ho jayengi jinka tail ka ant same hai.
+        if failed_keys and (identity & failed_keys):
+            continue
+        if wanted_keysets:
+            page_keys = _wc_page_keys(code)
+            if not any(page_keys & wanted for wanted in wanted_keysets):
+                continue
+        return idx
+    return None
+
+
 class WagelistGenTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="gen")
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(0, weight=1)
         self._create_widgets()
+        self._load_inputs()
     def _create_widgets(self) -> None:
 
         # Configure Main Grid (Full Expansion)
@@ -34,6 +169,7 @@ class WagelistGenTab(BaseAutomationTab):
         notebook.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         settings_tab = notebook.add("Settings")
+        work_codes_tab = notebook.add("Work Codes")
         results_tab = notebook.add("Results")
         # Log/Status Area added to Notebook
         self._create_log_and_status_area(parent_notebook=notebook)
@@ -67,20 +203,57 @@ class WagelistGenTab(BaseAutomationTab):
         self.save_pdf_var = ctk.StringVar(value="off")
         self.save_pdf_checkbox = ctk.CTkCheckBox(
             controls_frame, text=tr("form.wagelist.save_pdf"),
-            variable=self.save_pdf_var, onvalue="on", offvalue="off"
+            variable=self.save_pdf_var, onvalue="on", offvalue="off",
+            command=self._save_inputs
         )
         self.save_pdf_checkbox.grid(row=2, column=0, columnspan=2, sticky='w', padx=15, pady=(10, 0))
 
         self.send_to_sender_var = ctk.StringVar(value="on")
         self.send_to_sender_checkbox = ctk.CTkCheckBox(
             controls_frame, text="✓ Auto-start 'Send Wagelist' automation after generation completes (sends only the generated ones)",
-            variable=self.send_to_sender_var, onvalue="on", offvalue="off"
+            variable=self.send_to_sender_var, onvalue="on", offvalue="off",
+            command=self._save_inputs
         )
         self.send_to_sender_checkbox.grid(row=3, column=0, columnspan=2, sticky='w', padx=15, pady=10)
+
+        ctk.CTkLabel(
+            controls_frame,
+            text="💡 Only need a few works? Put their work codes in the 'Work Codes' tab — "
+                 "leave it empty to generate every pending wagelist.",
+            text_color="gray60", font=ctk.CTkFont(size=11), justify="left", wraplength=620,
+        ).grid(row=4, column=0, columnspan=2, sticky='w', padx=15, pady=(0, 15))
 
         # Action Buttons (Start/Stop) — outside the card
         action_frame = self._create_action_buttons(parent_frame=settings_tab)
         action_frame.grid(row=2, column=0, sticky='ew', padx=10, pady=(0, 15))
+
+        # ================== WORK CODES TAB ==================
+        # Khaali = pending list ka sab kuch (purana behaviour). Kuch bhara ho to
+        # sirf wahi workcodes generate hote hain — baaki automations jaisa.
+        work_codes_tab.grid_columnconfigure(0, weight=1)
+        work_codes_tab.grid_rowconfigure(2, weight=1)
+
+        wc_controls_frame = ctk.CTkFrame(work_codes_tab, fg_color="transparent")
+        wc_controls_frame.grid(row=0, column=0, sticky='ew')
+        self.wc_clear_button = ctk.CTkButton(
+            wc_controls_frame, text=tr("common.clear"), width=80,
+            command=lambda: self.work_codes_text.delete("1.0", tkinter.END))
+        self.wc_clear_button.pack(side='right', pady=(5, 0), padx=(0, 5))
+        self.wc_extract_button = ctk.CTkButton(
+            wc_controls_frame, text=tr("common.extract_from_text"), width=120,
+            command=lambda: self._extract_and_update_workcodes(self.work_codes_text))
+        self.wc_extract_button.pack(side='right', pady=(5, 0), padx=(0, 5))
+
+        ctk.CTkLabel(
+            work_codes_tab,
+            text="One work code per line (comma-separated also works). "
+                 "Full code, 'IF/7080902694979' or just the last 6 digits — all match.\n"
+                 "💡 Leave this empty to generate ALL pending wagelists, exactly like before.",
+            text_color="gray60", font=ctk.CTkFont(size=11), justify="left", wraplength=620,
+        ).grid(row=1, column=0, sticky='w', padx=5, pady=(5, 0))
+
+        self.work_codes_text = ctk.CTkTextbox(work_codes_tab, wrap=tkinter.WORD)
+        self.work_codes_text.grid(row=2, column=0, sticky='nsew', padx=5, pady=5)
 
         # ================== RESULTS TAB ==================
         results_tab.grid_columnconfigure(0, weight=1)
@@ -130,11 +303,16 @@ class WagelistGenTab(BaseAutomationTab):
         self.save_pdf_checkbox.configure(state=state) 
         self.send_to_sender_checkbox.configure(state=state)
         self.export_button.configure(state=state)
+        self.work_codes_text.configure(state=state)
+        self.wc_clear_button.configure(state=state)
+        self.wc_extract_button.configure(state=state)
     def reset_ui(self) -> None:
         if messagebox.askokcancel(tr("dialogs.reset_form"), tr("confirm.are_you_sure")):
             self.agency_var.set("")
-            self.save_pdf_var.set("off") 
+            self.save_pdf_var.set("off")
             self.send_to_sender_var.set("on")
+            self.work_codes_text.delete("1.0", tkinter.END)
+            self._save_inputs()
             for item in self.results_tree.get_children(): self.results_tree.delete(item)
             self.app.clear_log(self.log_display)
             self.update_status("Ready", 0.0)
@@ -150,9 +328,15 @@ class WagelistGenTab(BaseAutomationTab):
         if not self._is_panchayat_label(agency):
             self.app.update_history("location_panchayat", agency)
         
+        # Work Codes textbox khaali ho to `[]` jata hai — matlab "sab generate
+        # karo" (purana behaviour). Macro / workflow runner sirf
+        # start_automation() call karta hai, uske liye bhi textbox khaali rahega.
+        work_codes = _parse_workcode_input(self.work_codes_text.get("1.0", tkinter.END))
+
         # We pass it as a list [agency] so the looping logic in run_automation_logic handles it correctly
         # This keeps it compatible with both manual run and macro run.
-        self.app.start_automation_thread(self.automation_key, self.run_automation_logic, args=([agency],))
+        self.app.start_automation_thread(self.automation_key, self.run_automation_logic,
+                                         args=([agency], work_codes))
     def retry_logic_handler(self) -> None:
         """
         Retry Logic for Wagelist Gen.
@@ -162,21 +346,39 @@ class WagelistGenTab(BaseAutomationTab):
         if messagebox.askyesno(tr("base.error_tab.retry_btn"), tr("dialogs.retry_remaining")):
             self.start_automation()
 
-    def run_automation_logic(self, agency_input):
+    def run_automation_logic(self, agency_input, work_codes=None):
         """
         Logic: Processes the provided agency/panchayat.
         agency_input: Can be a single string or a list of strings.
+        work_codes:   User ke diye workcodes. Khaali/None → pending list ka SAB
+                      kuch generate hota hai (purana behaviour). Kuch diya ho to
+                      sirf wahi workcodes uthaye jate hain.
         """
         self.app.after(0, self.set_ui_state, True)
         self.app.clear_log(self.log_display)
         # Clear tree only at start
         self.safe_tree_clear()
-        
+
         # Normalize input to a list to support the loop
         agency_list = agency_input if isinstance(agency_input, list) else [agency_input]
-        
+
         total_panchayats = len(agency_list)
-        all_generated_wagelists = [] 
+        all_generated_wagelists = []
+
+        # --- WORKCODE FILTER ---
+        # Har wanted code ka key-set, taaki poora / partial / last-6 paste
+        # teeno match ho jaye (dekho _wc_match_keys). Junk lines (jinka key-set
+        # khaali hai) yahin gir jati hain.
+        wanted_pairs = [(c, _wc_match_keys(c)) for c in (work_codes or [])]
+        wanted_pairs = [(c, k) for c, k in wanted_pairs if k]
+        wanted_codes = [c for c, _ in wanted_pairs]
+        wanted_keysets = [k for _, k in wanted_pairs]
+        # Jo codes portal par mil gaye (success ya fail) — baaki 'Not Found'.
+        handled_codes = set()
+        if wanted_keysets:
+            self.log_info(f"🎯 Work Code filter ON: only {len(wanted_keysets)} requested work code(s) will be generated.")
+        else:
+            self.log_info("📋 No work codes given — every pending wagelist will be generated.")
 
         try:
             driver = self.app.get_driver()
@@ -210,6 +412,12 @@ class WagelistGenTab(BaseAutomationTab):
             for p_index, agency_name_part in enumerate(agency_list):
                 if self.is_stopped(): break
 
+                # Filtered mode: jab saare maange gaye workcodes nipat gaye to
+                # bachi hui panchayats scan karne ka koi matlab nahi.
+                if wanted_keysets and len(handled_codes) >= len(wanted_codes):
+                    self.log_success("   All requested work codes are done — skipping the remaining panchayats.")
+                    break
+
                 # UI Update for current item
                 self.log_info(f"=== Processing '{agency_name_part}' ({p_index+1}/{total_panchayats}) ===")
                 self.app.after(0, self.app.set_status, f"Processing: {agency_name_part}")
@@ -228,13 +436,20 @@ class WagelistGenTab(BaseAutomationTab):
                     except Exception:
                         output_dir = None
 
-                total_errors_to_skip = 0
+                # Jo rows fail ho chuki hain unke match-keys — inhe dobara nahi
+                # uthana. (Success par row portal se khud hat jati hai.)
+                failed_keys = set()
+                processed_count = 0
+                consecutive_blind_errors = 0
                 panchayat_wagelists = []
 
                 # --- INNER LOOP (Existing Logic for one Panchayat) ---
                 while not self.is_stopped():
-                    self.app.after(0, self.app.set_status, f"[{agency_name_part}] Processing item {total_errors_to_skip + 1}...")
-                    
+                    self.app.after(0, self.app.set_status, f"[{agency_name_part}] Processing item {processed_count + 1}...")
+                    # Is iteration me kaunsi row uthi — outer except ko pata ho
+                    # ki kise 'failed' mark karna hai.
+                    work_code_keys = frozenset()
+
                     try:
                         # A. Load Page
                         loaded = False
@@ -277,21 +492,50 @@ class WagelistGenTab(BaseAutomationTab):
                             self.log_info(f"   No wagelist table found for {agency_name_part}.")
                             break
 
-                        if not rows or total_errors_to_skip >= len(rows): 
+                        if not rows:
                             self.log_success(f"   Done with {agency_name_part}.")
                             break
-                            
-                        row_to_process = rows[total_errors_to_skip]
-                        
-                        # E. Extract Data
-                        try: 
-                            checkbox = row_to_process.find_element(By.XPATH, ".//input[@type='checkbox']")
-                            tds = row_to_process.find_elements(By.TAG_NAME, "td")
-                            work_code = tds[2].get_attribute("innerText").strip()
-                        except NoSuchElementException: 
-                            break 
 
-                        self.log_info(f"   Generating: {work_code}")                        
+                        # Har row ka Work Code column (tds[2]) — ek hi round trip
+                        # me, taaki 50-row list par har iteration slow na ho.
+                        row_codes = self._extract_row_work_codes(driver, wagelist_table, rows)
+
+                        # E. Pick the next row to process (filter-aware)
+                        row_index = _pick_next_row_index(row_codes, wanted_keysets, failed_keys)
+                        if row_index is None:
+                            if wanted_keysets:
+                                self.log_info(f"   No more requested work codes pending in {agency_name_part}.")
+                                # Diagnostic: bina iske "kuch match nahi hua" ka
+                                # matlab log se pata hi nahi chalta tha ki page
+                                # par tha kya. (13 Sep 2026 ki report dekho.)
+                                if len(handled_codes) < len(wanted_codes):
+                                    pending = [c for c in row_codes if c.strip()]
+                                    if pending:
+                                        shown = ", ".join(pending[:15])
+                                        more = f" (+{len(pending) - 15} more)" if len(pending) > 15 else ""
+                                        self.log_info(f"   Pending here ({len(pending)}): {shown}{more}")
+                                    else:
+                                        self.log_info(f"   Nothing pending here.")
+                            else:
+                                self.log_success(f"   Done with {agency_name_part}.")
+                            break
+
+                        row_to_process = rows[row_index]
+                        work_code = row_codes[row_index]
+                        # identity keys — failed-row tracking ke liye
+                        work_code_keys = _wc_match_keys(work_code)
+                        handled_codes |= _wanted_codes_satisfied_by(work_code, wanted_pairs)
+
+                        try:
+                            checkbox = row_to_process.find_element(By.XPATH, ".//input[@type='checkbox']")
+                        except NoSuchElementException:
+                            self.log_warning(f"   No checkbox on the row for {truncate_workcode(work_code)}; skipping it.")
+                            failed_keys |= work_code_keys
+                            continue
+
+                        processed_count += 1
+                        consecutive_blind_errors = 0
+                        self.log_info(f"   Generating: {work_code}")
                         # F. Click Checkbox & Generate
                         if not checkbox.is_selected():
                             driver.execute_script("arguments[0].click();", checkbox)
@@ -311,7 +555,7 @@ class WagelistGenTab(BaseAutomationTab):
                             WebDriverWait(driver, 45).until(check_outcome)
                         except TimeoutException:
                             self.log_error("   Timeout: Page slow.")
-                            total_errors_to_skip += 1
+                            failed_keys |= work_code_keys
                             continue
 
                         # H. Handle Result
@@ -331,8 +575,8 @@ class WagelistGenTab(BaseAutomationTab):
 
                             self.log_success(f"   SUCCESS: {wagelist_no}{pdf_info}")
                             self._log_result(agency_name_part, work_code, "Success", wagelist_no, "", "")
-                            # Stay at index 0 because processed item is gone
-                            pass 
+                            # Row portal se hat chuki hai, isliye kuch skip nahi
+                            # karna — agli iteration khud agli row utha legi.
 
                         else:
                             try:
@@ -342,11 +586,21 @@ class WagelistGenTab(BaseAutomationTab):
                             
                             self.log_error(f"   Failed: {err_text}")
                             self._log_result(agency_name_part, work_code, f"Failed ({err_text[:20]})", "N/A", "", "")
-                            total_errors_to_skip += 1 # Skip this failed item
+                            failed_keys |= work_code_keys  # Skip this failed item
 
                     except Exception as e:
                         self.log_error(f"   Row Error: {e}")
-                        total_errors_to_skip += 1
+                        if work_code_keys:
+                            failed_keys |= work_code_keys
+                            consecutive_blind_errors = 0
+                        else:
+                            # Row uthane se PEHLE hi phat gaya (page load /
+                            # agency select). Kuch skip karne ko nahi hai, to
+                            # bina guard ke ye loop hamesha chalta rahega.
+                            consecutive_blind_errors += 1
+                            if consecutive_blind_errors >= 3:
+                                self.log_error(f"   Giving up on {agency_name_part} after 3 failed attempts.")
+                                break
                 
                 # End of While Loop (One Panchayat done)
                 time.sleep(1) # Breathe before next panchayat
@@ -354,6 +608,8 @@ class WagelistGenTab(BaseAutomationTab):
             # End of For Loop (Batch done)
 
             if not self.is_stopped():
+                if wanted_codes:
+                    self._report_missing_work_codes(wanted_codes, handled_codes)
                 if all_generated_wagelists:
                     self.log_info(f"📊 Wagelist Gen Complete: Processed {total_panchayats} Panchayat(s), Generated {len(all_generated_wagelists)} Wagelists.")
                 else:
@@ -377,6 +633,82 @@ class WagelistGenTab(BaseAutomationTab):
                 ))
             else:
                 self.app.after(3000, lambda: self.app.set_status("Ready"))
+
+    # ── Tab settings persistence (baaki tabs jaisa hi pattern) ──────────
+    def _save_inputs(self) -> None:
+        """Dono checkbox states DB me — Work Codes textbox JAAN-BOOJH KAR nahi.
+
+        Work codes per-run data hai; agli baar chupchaap filter lag jaata to
+        user ko lagta automation kuch generate hi nahi kar raha.
+        """
+        try:
+            self.app.history_manager.save_tab_inputs_batch("wagelist_gen", {
+                "save_pdf": self.save_pdf_var.get(),
+                "send_to_sender": self.send_to_sender_var.get(),
+            })
+        except Exception as e:
+            logger.debug("WagelistGen: could not save tab inputs: %s", e)
+
+    def _load_inputs(self) -> None:
+        """Pichhli baar ke checkbox states wapas lagao (widgets banne ke baad)."""
+        try:
+            data = self.app.history_manager.get_tab_inputs("wagelist_gen") or {}
+        except Exception as e:
+            logger.debug("WagelistGen: could not load tab inputs: %s", e)
+            return
+        self.save_pdf_var.set(_checkbox_state(data.get("save_pdf"), "off"))
+        self.send_to_sender_var.set(_checkbox_state(data.get("send_to_sender"), "on"))
+
+    def _extract_row_work_codes(self, driver, wagelist_table, rows):
+        """Pending table ki har row ka Work Code column, `rows` ke same order me.
+
+        Markup (tests/fixtures/wagelist_pending.html):
+            Sno. | Panchayat | Work Code | Work Name | Select
+
+        yaani workcode `tds[2]` me hai. Fast path ek hi JS call me saari rows
+        nikaal leta hai (50-row list par per-row round trip mehnga padta hai).
+        JS fail ho ya uska count `rows` se na mile to per-row Selenium fallback
+        — misalignment ka matlab hota GALAT row generate ho jana. Jis row me 3
+        se kam `<td>` ho (blank spacer row) uske liye "" aata hai, jise
+        `_pick_next_row_index` chhod deta hai.
+        """
+        try:
+            codes = driver.execute_script(
+                "return Array.from(arguments[0].querySelectorAll('tr'))"
+                ".filter(function(r){ return r.querySelector('td'); })"
+                ".map(function(r){ var c = r.querySelectorAll('td');"
+                " return c.length > 2 ? (c[2].innerText || '').trim() : ''; });",
+                wagelist_table)
+            if isinstance(codes, list) and len(codes) == len(rows):
+                return [str(c or "").strip() for c in codes]
+            logger.debug("WagelistGen: JS row-code extraction misaligned (%s vs %s rows); using fallback.",
+                         len(codes) if isinstance(codes, list) else codes, len(rows))
+        except Exception as e:
+            logger.debug("WagelistGen: JS row-code extraction failed (%s); using fallback.", e)
+
+        codes = []
+        for row in rows:
+            try:
+                tds = row.find_elements(By.TAG_NAME, "td")
+                codes.append(tds[2].get_attribute("innerText").strip() if len(tds) > 2 else "")
+            except Exception:
+                codes.append("")
+        return codes
+
+    def _report_missing_work_codes(self, wanted_codes, handled_codes):
+        """Jo maange gaye codes portal ki kisi bhi pending list me mile hi nahi.
+
+        Filtered mode me ye sabse kaam ka feedback hai — "5 diye, 3 bane, baaki
+        2 ka kya hua?". Har missing code ki ek 'Not Found' row banti hai taaki
+        Excel export me bhi dikhe.
+        """
+        missing = [c for c in wanted_codes if c not in handled_codes]
+        if not missing:
+            return
+        self.log_warning(f"⚠️ {len(missing)} requested work code(s) were not in any pending wagelist list:")
+        for code in missing:
+            self.log_warning(f"   • {code}")
+            self._log_result("", code, "Not Found", "N/A", "", "")
 
     def _log_result(self, panchayat, work_code, status, wagelist_no, job_card, applicant_name):
         timestamp = datetime.now().strftime("%H:%M:%S")

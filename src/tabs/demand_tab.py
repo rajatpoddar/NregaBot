@@ -16,6 +16,55 @@ from ._imports import By, Keys, Select, WebDriverWait, EC, NoSuchElementExceptio
 
 logger = get_logger()
 
+
+# ── Day-limit helpers (MGNREGA guarantee: pehle 100, ab 125 din) ─────────
+# Ye teeno pure hain — pehle inka logic bade Selenium methods ke andar dafan
+# tha, isliye limit badalne par kuch test nahi kar sakta tha.
+
+def _days_available(worked: int) -> int:
+    """Is household ko is financial year me aur kitne din mil sakte hain.
+
+    Negative bhi aa sakta hai (portal par entitlement se zyada dikh raha ho) —
+    caller `<= 0` par job card skip kar deta hai.
+    """
+    return config.MGNREGA_GUARANTEED_DAYS - int(worked or 0)
+
+
+def _allocate_days(user_days: int, avail: int, applicant_count: int) -> int:
+    """Ek job card ke labourers me per-head kitne din bharne hain.
+
+    User ne jo maanga wahi milta hai agar card me itni gunjaish ho; warna bache
+    hue din barabar baant diye jaate hain. 0 lautna valid hai (har ek ke liye
+    ek din bhi nahi bacha) — us soorat me caller pehle applicant ko poora
+    `avail` de deta hai.
+    """
+    adj_days = user_days
+    total_needed = user_days * applicant_count
+    if total_needed > avail:
+        adj_days = avail // applicant_count if applicant_count else avail
+    elif user_days > avail:
+        adj_days = avail
+    return adj_days
+
+
+def _status_tags(status: Any) -> tuple:
+    """Result row ka colour tag — failed (red) / warning (yellow) / success.
+
+    Kisi bhi number par match NAHI karta. Pehle yahan literal '100 days' padi
+    thi; limit badalte hi skipped rows chup-chaap rang kho deti ('skip' ne
+    waise bhi use redundant bana rakha tha).
+    """
+    status_low = str(status).lower()
+    if any(e in status_low for e in ['fail', 'error', 'crash', 'not found',
+                                     'invalid', 'aadhaar', 'not saved', 'not issued']):
+        return ('failed',)
+    if any(w in status_low for w in ['already', 'skip', 'adjust', 'limit']):
+        return ('warning',)
+    if any(s in status_low for s in ['success', 'saved', 'done']):
+        return ('success',)
+    return ()
+
+
 # --- Cloud File Picker Toplevel Window ---
 class CloudFilePicker(ctk.CTkToplevel):
     """
@@ -2171,20 +2220,16 @@ class DemandTab(BaseAutomationTab):
             except TimeoutException:
                 pass
 
-            # ── 3. Days availability (100-day rule) ──
+            # ── 3. Days availability (MGNREGA guarantee: config.MGNREGA_GUARANTEED_DAYS) ──
             worked = self._get_worked_days(driver, days_worked_ids)
-            avail = 100 - worked
+            avail = _days_available(worked)
             if avail <= 0:
                 for a in apps_in_jc:
-                    mark(jc, a.get('Name of Applicant'), "Skipped (100 days)")
+                    mark(jc, a.get('Name of Applicant'),
+                         f"Skipped ({config.MGNREGA_GUARANTEED_DAYS} days)")
                 return
 
-            adj_days = user_days
-            total_needed = user_days * len(apps_in_jc)
-            if total_needed > avail:
-                adj_days = avail // len(apps_in_jc) if len(apps_in_jc) else avail
-            elif user_days > avail:
-                adj_days = avail
+            adj_days = _allocate_days(user_days, avail, len(apps_in_jc))
 
             today = datetime.now().strftime('%d/%m/%Y')
 
@@ -2672,20 +2717,7 @@ class DemandTab(BaseAutomationTab):
         row_id = len(self.results_tree.get_children()) + 1
         
         status_str = str(status)
-        status_low = status_str.lower()
-        tags = () # Default: No Color (White/Black)
-
-        # 1. Failed Logic (Red)
-        if any(e in status_low for e in ['fail', 'error', 'crash', 'not found', 'invalid', 'aadhaar', 'not saved', 'not issued']):
-            tags = ('failed',)
-            
-        # 2. Warning Logic (Yellow) - 'already' (demand pehle se hai) + 'skipped' etc.
-        elif any(w in status_low for w in ['already', 'skip', 'adjust', 'limit', '100 days']):
-            tags = ('warning',)
-            
-        # 3. Success Logic (Green)
-        elif any(s in status_low for s in ['success', 'saved', 'done']):
-            tags = ('success',)
+        tags = _status_tags(status_str)
 
         # Display Text Truncation
         disp_status = (status_str[:100] + '...') if len(status_str) > 100 else status_str
