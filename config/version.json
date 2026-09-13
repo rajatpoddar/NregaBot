@@ -1,19 +1,25 @@
 {
-  "latest_version": "3.2.9",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.9-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.9-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.9-Linux.tar.gz",
+  "latest_version": "3.2.11",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.11-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.11-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.11-Linux.tar.gz",
   "core_update": {
-    "version": "3.2.9",
-    "url": "https://nregabot.com/updates/core_v3.2.9.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.2.9.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.9.zip",
+    "version": "3.2.11",
+    "url": "https://nregabot.com/updates/core_v3.2.11.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.11.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.11.zip",
     "force_full_reinstall": false,
     "hash": "",
-    "hash_windows": "90914d482d945e34b34c7ec5f710489288b604c87c54a6de7cb43d74951f2ac7",
-    "hash_macos": "27fb59f29fd592cfb43d9bc6bea6acecbc699d686e436d856eefb3af20202a61"
+    "hash_windows": "",
+    "hash_macos": ""
   },
   "changelog": {
+    "3.2.11": [
+      "🎯 **Generate Wagelist — Ab Sirf Jo Workcode Chaho:** Naya **Work Codes** tab aaya hai. Jin works ka wagelist chahiye unke code daal do, bas wahi generate honge. Khaali chhod diya to pehle jaisa hi saara pending wagelist ban jayega. Poora code, ya sirf aakhri kuch digits (jaise `18672`) — dono chalte hain. Jo code pending list me mila hi nahi, wo Results me **Not Found** dikhega.",
+      "💾 **Generate Wagelist — Tick Ab Yaad Rehta Hai:** 'Save PDF' aur 'Auto-start Send Wagelist' ke checkbox ab app band karke kholne par bhi wahi rehte hain. Pehle har baar dobara lagane padte the.",
+      "📅 **Demand — 100 Din Ki Jagah Ab 125 Din:** Rozgaar guarantee 125 din ki ho gayi hai. Jo labour 100 se 124 din kaam kar chuke the, unhe pehle galat **Skipped (100 days)** bata diya jata tha — ab unke bache hue din sahi se mil jaate hain.",
+      "🐞 **eKYC Report — Gayab Ho Rahe Members Ka Fix:** Ek job card par kai members hon to report me se kuch members chupchaap chhoot jaate the, aur aisa lagta tha ki filter member-wise ke bajaye jobcard-wise chal raha hai. Ab har member alag se aata hai — ek hi card ka ek member 'Yes' aur doosra 'No' ho to dono apne-apne filter me theek dikhte hain."
+    ],
     "3.2.9": [
       "⚡ **eMB Entry Bahot Tez:** Panchayat select hone ke baad har panchayat par ~25 second ka stall lagta tha (galat element par postback ka wait) — ab wo turant aage badhta hai. Block/PO/JE login par sabse zyada farq dikhega.",
       "🐞 **eMB Entry — Multi-Period Run Ka Crash Fix:** Ek work ke doosre measurement period par jaate hi 'stale element reference' aata tha aur poora work Failed ho jata tha. Ab saare period aaram se process hote hain.",
