@@ -196,4 +196,9 @@ BN5 = {
     "base.queue_added_msg": "{name} সারিতে যোগ হয়েছে — বর্তমান অটোমেশন শেষ হলে স্বয়ংক্রিয়ভাবে চলবে।",
     "base.queue_pending": "সারি: {count}টি অপেক্ষমাণ",
     "base.queue_auto_start": "সারি: পরবর্তী অটোমেশন শুরু হচ্ছে...",
+
+    # ── Push Notifications ──
+    "push.automation_success": "✅ {name} সম্পন্ন হয়েছে",
+    "push.automation_failed": "⚠️ {name} কিছু সমস্যা সহ সম্পন্ন হয়েছে",
+    "push.automation_duration": "{duration} লেগেছে",
 }

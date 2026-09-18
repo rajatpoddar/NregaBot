@@ -196,4 +196,9 @@ KN5 = {
     "base.queue_added_msg": "{name} ಕ್ಯೂಗೆ ಸೇರಿಸಲಾಗಿದೆ — ಪ್ರಸ್ತುತ ಆಟೊಮೇಷನ್ ಮುಗಿದ ನಂತರ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಚಲಿಸುತ್ತದೆ.",
     "base.queue_pending": "ಕ್ಯೂ: {count} ಬಾಕಿ ಇವೆ",
     "base.queue_auto_start": "ಕ್ಯೂ: ಮುಂದಿನ ಆಟೊಮೇಷನ್ ಪ್ರಾರಂಭವಾಗುತ್ತಿದೆ...",
+
+    # ── Push Notifications ──
+    "push.automation_success": "✅ {name} ಪೂರ್ಣಗೊಂಡಿದೆ",
+    "push.automation_failed": "⚠️ {name} ಸಮಸ್ಯೆಗಳೊಂದಿಗೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
+    "push.automation_duration": "{duration} ತೆಗೆದುಕೊಂಡಿದೆ",
 }

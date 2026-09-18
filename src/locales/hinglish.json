@@ -1105,7 +1105,7 @@
   "form.mb_entry.info_card_text": "• Is eMB automation ko sirf single activity works ke liye use karein.\n• Workcode box khali chhodkar 'Start Automation' par click karein — saare available works ek-ek karke auto-fill ho jayenge!",
   "file_manager.download_complete": "Download Complete",
   "file_manager.downloaded_ok": "'{file}' safalta se download ho gayi",
-  "push.automation_success": "✅ {name} poora hua",
-  "push.automation_failed": "⚠️ {name} me kuch dikkat rahi",
+  "push.automation_success": "✅ {name} poora ho gaya",
+  "push.automation_failed": "⚠️ {name} kuch issues ke saath khatam hua",
   "push.automation_duration": "{duration} laga"
 }

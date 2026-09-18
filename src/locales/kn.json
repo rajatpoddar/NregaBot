@@ -1106,6 +1106,6 @@
   "file_manager.download_complete": "ಡೌನ್‌ಲೋಡ್ ಪೂರ್ಣಗೊಂಡಿದೆ",
   "file_manager.downloaded_ok": "'{file}' ಯಶಸ್ವಿಯಾಗಿ ಡೌನ್‌ಲೋಡ್ ಆಗಿದೆ",
   "push.automation_success": "✅ {name} ಪೂರ್ಣಗೊಂಡಿದೆ",
-  "push.automation_failed": "⚠️ {name} ಸಮಸ್ಯೆಗಳೋಂದಿಗೆ ಮುಗಿದೆ",
-  "push.automation_duration": "{duration} ತೆಗೆದುಕೊಂಡಿತು"
+  "push.automation_failed": "⚠️ {name} ಸಮಸ್ಯೆಗಳೊಂದಿಗೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
+  "push.automation_duration": "{duration} ತೆಗೆದುಕೊಂಡಿದೆ"
 }

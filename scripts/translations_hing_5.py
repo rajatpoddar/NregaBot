@@ -283,4 +283,9 @@ HING5 = {
     "base.queue_added_msg": "{name} queue mein add ho gaya — abhi chal rahi automation khatam hote hi khud chalega.",
     "base.queue_pending": "Queue: {count} pending",
     "base.queue_auto_start": "Queue: agli automation shuru ho rahi hai...",
+
+    # ── Push Notifications ──
+    "push.automation_success": "✅ {name} poora ho gaya",
+    "push.automation_failed": "⚠️ {name} kuch issues ke saath khatam hua",
+    "push.automation_duration": "{duration} laga",
 }
