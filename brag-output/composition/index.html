@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NREGA Bot — Brag Video</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      width: 1920px;
+      height: 1080px;
+      background-color: #0F172A;
+      color: #F8FAFC;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    /* Global Animations & Positioning */
+    .scene {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1920px;
+      height: 1080px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out;
+      padding: 80px;
+    }
+
+    /* Scene 1: Hook (0s - 3s) */
+    #scene1 {
+      animation: scene1Anim 3s forwards;
+    }
+    @keyframes scene1Anim {
+      0% { opacity: 0; transform: scale(0.95); }
+      15% { opacity: 1; transform: scale(1); }
+      85% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.05); }
+    }
+
+    .hook-sub {
+      font-size: 48px;
+      color: #94A3B8;
+      font-weight: 500;
+      margin-bottom: 24px;
+      letter-spacing: -0.5px;
+    }
+    .hook-title {
+      font-size: 92px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -2px;
+      margin-bottom: 40px;
+    }
+    .hook-badge {
+      background: rgba(59, 130, 246, 0.15);
+      border: 2px solid #3B82F6;
+      color: #60A5FA;
+      padding: 16px 40px;
+      border-radius: 9999px;
+      font-size: 32px;
+      font-weight: 700;
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Scene 2: Feature Grid (3s - 8s) */
+    #scene2 {
+      animation: scene2Anim 5s forwards;
+      animation-delay: 3s;
+    }
+    @keyframes scene2Anim {
+      0% { opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    .section-title {
+      font-size: 64px;
+      font-weight: 800;
+      margin-bottom: 60px;
+      letter-spacing: -1px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 32px;
+      width: 1400px;
+    }
+    .card {
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      padding: 40px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      transform: translateY(20px);
+      opacity: 0;
+      animation: cardPop 0.5s forwards;
+    }
+    #card1 { animation-delay: 3.2s; }
+    #card2 { animation-delay: 3.5s; }
+    #card3 { animation-delay: 3.8s; }
+    #card4 { animation-delay: 4.1s; }
+
+    @keyframes cardPop {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-icon {
+      font-size: 56px;
+      background: rgba(59, 130, 246, 0.1);
+      width: 90px;
+      height: 90px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card-title {
+      font-size: 32px;
+      font-weight: 700;
+      color: #F8FAFC;
+      margin-bottom: 8px;
+    }
+    .card-desc {
+      font-size: 20px;
+      color: #94A3B8;
+    }
+
+    /* Scene 3: Demo Flow (8s - 14s) */
+    #scene3 {
+      animation: scene3Anim 6s forwards;
+      animation-delay: 8s;
+    }
+    @keyframes scene3Anim {
+      0% { opacity: 0; transform: translateY(20px); }
+      8% { opacity: 1; transform: translateY(0); }
+      92% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-20px); }
+    }
+
+    .demo-window {
+      width: 1400px;
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .window-header {
+      background: #0F172A;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #334155;
+    }
+    .window-dots {
+      display: flex;
+      gap: 10px;
+    }
+    .dot { width: 14px; height: 14px; border-radius: 50%; }
+    .dot-red { background: #EF4444; }
+    .dot-yellow { background: #F59E0B; }
+    .dot-green { background: #10B981; }
+    .window-title { font-size: 20px; font-weight: 600; color: #94A3B8; }
+
+    .window-body {
+      padding: 48px;
+    }
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 40px;
+    }
+    .select-box {
+      background: #0F172A;
+      border: 1px solid #3B82F6;
+      color: #F8FAFC;
+      padding: 18px 28px;
+      border-radius: 12px;
+      font-size: 24px;
+      font-weight: 500;
+      width: 600px;
+    }
+    .btn-start {
+      background: #3B82F6;
+      color: #FFFFFF;
+      padding: 18px 40px;
+      border-radius: 12px;
+      font-size: 24px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+    }
+
+    .progress-container {
+      background: #0F172A;
+      border-radius: 12px;
+      height: 24px;
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #3B82F6, #10B981);
+      width: 0%;
+      animation: loadProgress 3.5s forwards;
+      animation-delay: 9s;
+    }
+    @keyframes loadProgress {
+      to { width: 100%; }
+    }
+
+    .status-badge {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid #10B981;
+      color: #34D399;
+      padding: 20px;
+      border-radius: 12px;
+      font-size: 24px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      opacity: 0;
+      animation: statusPop 0.5s forwards;
+      animation-delay: 12.2s;
+    }
+    @keyframes statusPop {
+      to { opacity: 1; }
+    }
+
+    /* Scene 4: Outro (14s - 20s) */
+    #scene4 {
+      animation: scene4Anim 6s forwards;
+      animation-delay: 14s;
+    }
+    @keyframes scene4Anim {
+      0% { opacity: 0; transform: scale(0.95); }
+      10% { opacity: 1; transform: scale(1); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    .logo-icon {
+      font-size: 100px;
+    }
+    .brand-name {
+      font-size: 84px;
+      font-weight: 900;
+      letter-spacing: -2px;
+    }
+    .version-tag {
+      background: #3B82F6;
+      color: #FFFFFF;
+      font-size: 24px;
+      font-weight: 700;
+      padding: 8px 20px;
+      border-radius: 9999px;
+      margin-left: 16px;
+    }
+
+    .outro-tagline {
+      font-size: 44px;
+      font-weight: 600;
+      color: #94A3B8;
+      margin-bottom: 48px;
+    }
+    .cta-button {
+      background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+      color: #FFFFFF;
+      padding: 24px 64px;
+      border-radius: 16px;
+      font-size: 36px;
+      font-weight: 800;
+      box-shadow: 0 10px 30px rgba(37, 99, 235, 0.4);
+      letter-spacing: -0.5px;
+    }
+  </style>
+</head>
+<body data-composition-id="nregabot-brag" data-width="1920" data-height="1080" data-duration="20" data-fps="30">
+
+  <!-- Audio Track -->
+  <audio id="bg-music" src="assets/music/happy-beats-business-moves-vol-1-by-ende-dot-app.mp3" data-start="0" data-volume="0.8"></audio>
+
+  <!-- Scene 1: Hook -->
+  <div class="scene" id="scene1">
+    <div class="hook-sub">Manual MGNREGA Data Entry?</div>
+    <div class="hook-title">Automate 48+ Portal Tasks</div>
+    <div class="hook-badge">⚡ Done in Seconds</div>
+  </div>
+
+  <!-- Scene 2: Features -->
+  <div class="scene" id="scene2">
+    <div class="section-title">Built for Panchayats & Block Offices</div>
+    <div class="grid">
+      <div class="card" id="card1">
+        <div class="card-icon">📋</div>
+        <div>
+          <div class="card-title">Muster Roll Generator</div>
+          <div class="card-desc">Auto-generate & download MR PDFs in bulk</div>
+        </div>
+      </div>
+      <div class="card" id="card2">
+        <div class="card-icon">📝</div>
+        <div>
+          <div class="card-title">Demand Automation</div>
+          <div class="card-desc">Bulk CSV demand entry with 100-day limit check</div>
+        </div>
+      </div>
+      <div class="card" id="card3">
+        <div class="card-icon">📐</div>
+        <div>
+          <div class="card-title">eMB Entry & Verify</div>
+          <div class="card-desc">Bulk MB entry with smart retry logic</div>
+        </div>
+      </div>
+      <div class="card" id="card4">
+        <div class="card-icon">💳</div>
+        <div>
+          <div class="card-title">FTO & ABPS Verification</div>
+          <div class="card-desc">Verify NPCI Aadhaar status & generate FTOs</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene 3: Demo Flow -->
+  <div class="scene" id="scene3">
+    <div class="demo-window">
+      <div class="window-header">
+        <div class="window-dots">
+          <div class="dot dot-red"></div>
+          <div class="dot dot-yellow"></div>
+          <div class="dot dot-green"></div>
+        </div>
+        <div class="window-title">NREGA Bot Desktop Engine — True Background Mode</div>
+        <div></div>
+      </div>
+      <div class="window-body">
+        <div class="control-row">
+          <div class="select-box">📍 Panchayat: Gram Panchayat Rampur</div>
+          <div class="btn-start">▶ Start Automation</div>
+        </div>
+        <div class="progress-container">
+          <div class="progress-bar"></div>
+        </div>
+        <div class="status-badge">
+          ✅ Automation Complete! 45 Muster Rolls generated & exported to Excel + WhatsApp.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene 4: Outro -->
+  <div class="scene" id="scene4">
+    <div class="logo-container">
+      <div class="logo-icon">🚜</div>
+      <div class="brand-name">NREGA Bot <span class="version-tag">v3.2.9</span></div>
+    </div>
+    <div class="outro-tagline">Stop typing. Start automating.</div>
+    <div class="cta-button">Download at nregabot.com</div>
+  </div>
+
+  <script>
+    window.__timelines = window.__timelines || {};
+    window.__timelines["nregabot-brag"] = {
+      duration: 20,
+      fps: 30,
+      width: 1920,
+      height: 1080
+    };
+  </script>
+</body>
+</html>
