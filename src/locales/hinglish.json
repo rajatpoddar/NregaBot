@@ -303,6 +303,8 @@
   "tab.duplicate_mr.subtitle": "Chune hue Panchayat ke duplicate Muster Rolls print ya save karein.",
   "tab.ekyc_report.title": "eKYC Report",
   "tab.ekyc_report.subtitle": "Jobcard holders ki eKYC & ABPS status scan karein — panchayat-wise summary.",
+  "tab.skilled_aadhaar_report.title": "Skilled & Semi-Skilled Report",
+  "tab.skilled_aadhaar_report.subtitle": "Skilled worker Aadhaar updation status scan karein aur summary report banayein.",
   "tab.emb_verify.title": "eMB Verify",
   "tab.emb_verify.subtitle": "Chune hue Panchayat ke sanctioned amount ke hisaab se eMB entries verify karein.",
   "tab.fto_generation.title": "FTO Generation",

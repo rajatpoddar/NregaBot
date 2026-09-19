@@ -303,6 +303,8 @@
   "tab.duplicate_mr.subtitle": "ಆಯ್ಕೆ ಮಾಡಿದ ಪಂಚಾಯತ್‌ಗಾಗಿ ನಕಲು ಮುಸ್ತರ್ ರೋಲ್‌ಗಳನ್ನು ಮುದ್ರಿಸಿ ಅಥವಾ ಉಳಿಸಿ.",
   "tab.ekyc_report.title": "eKYC ವರದಿ",
   "tab.ekyc_report.subtitle": "ಜಾಬ್ ಕಾರ್ಡ್ ಹೊಂದಿರುವವರಿಗೆ eKYC ಮತ್ತು ABPS ಸ್ಥಿತಿಯನ್ನು ಸ್ಕ್ಯಾನ್ ಮಾಡಿ — ಪಂಚಾಯತ್-ವಾರು ಸಾರಾಂಶ.",
+  "tab.skilled_aadhaar_report.title": "ಕುಶಲ ಮತ್ತು ಅರೆ ಕುಶಲ ವರದಿ",
+  "tab.skilled_aadhaar_report.subtitle": "ಕುಶಲ ಕಾರ್ಮಿಕರ ಆಧಾರ್ ಅಪ್‌ಡೇಟ್ ಸ್ಥಿತಿಯನ್ನು ಸ್ಕ್ಯಾನ್ ಮಾಡಿ ಮತ್ತು ಸಾರಾಂಶ ವರದಿಯನ್ನು ರಚಿಸಿ.",
   "tab.emb_verify.title": "eMB ಪರಿಶೀಲಿಸಿ",
   "tab.emb_verify.subtitle": "ಆಯ್ಕೆ ಮಾಡಿದ ಪಂಚಾಯತ್‌ಗಾಗಿ ಅನುಮೋದಿತ ಮೊತ್ತದ ವಿರುದ್ಧ eMB ನಮೂದುಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
   "tab.fto_generation.title": "FTO ರಚನೆ",

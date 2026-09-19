@@ -91,6 +91,7 @@ class TestAutomationDisplayNamesKnownKeys:
         ("macro", "Macro"),
         ("scheme_closing", "Scheme Closing"),
         ("ekyc_report", "eKYC Report"),
+        ("skilled_aadhaar_report", "Skilled Worker Report"),
     ])
     def test_lookup_for_known_key(self, key: str, expected: str) -> None:
         # These are the *real* values from the dict. If the dict entry is

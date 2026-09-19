@@ -1,0 +1,2556 @@
+[
+ {
+  "coverage_id": "Cloud%20file%20manager%20client%20%28upload%2Fdownload%20paths%2C%20whatsapp-send%29::src%2Ftabs%2Ffile_management_tab.py%23files%2Fapi%20client%20%28cloud%20storage%20boundary%29::src%2Ftabs%2Ffile_management_tab.py::ATTACK-CLASSES.md%23Feature%20abuse%20and%20data%20leakage",
+  "canonical_refs": {
+   "surface": "Cloud file manager client (upload/download paths, whatsapp-send)",
+   "boundary": "src/tabs/file_management_tab.py#files/api client (cloud storage boundary)",
+   "subsystem": "src/tabs/file_management_tab.py",
+   "attack_class": "ATTACK-CLASSES.md#Feature abuse and data leakage"
+  },
+  "surface": "Cloud file manager client (upload/download paths, whatsapp-send)",
+  "boundary": "src/tabs/file_management_tab.py#files/api client (cloud storage boundary)",
+  "subsystem": "Cloud file manager",
+  "attack_class": "ATTACK-CLASSES.md#Feature abuse and data leakage",
+  "starting_paths": [
+   "src/tabs/file_management_tab.py",
+   "src/tabs/demand_tab.py",
+   "src/tabs/musterroll_gen_tab.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Feature abuse and data leakage",
+  "selected_companion_blocks": [
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Derived-data and disclosure attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Export, backup, restore, and migration attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Deletion, revocation, and lifecycle attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Universal moves",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "candidate",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/tabs/file_management_tab.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/tabs/file_management_tab.py"
+    ],
+    "invariant": "Server-controlled filename must be sanitized before joining into local write paths",
+    "method": "source",
+    "result": "os.path.join(save_dir, item['filename']) with no separator/'..' rejection (686); client-writable relative_path namespace exists (544); decisive server-side sanitization not visible in this repo.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [
+   "cloud-download-filename-traversal"
+  ],
+  "unresolved": [
+   "decisive co-condition outside desktop repo; see findings.json blockers"
+  ]
+ },
+ {
+  "coverage_id": "Cloud%20file%20manager%20client%20%28upload%2Fdownload%20paths%2C%20whatsapp-send%29::src%2Ftabs%2Ffile_management_tab.py%23files%2Fapi%20client%20%28cloud%20storage%20boundary%29::src%2Ftabs%2Ffile_management_tab.py::ATTACK-CLASSES.md%23Resource%20and%20file%20handling",
+  "canonical_refs": {
+   "surface": "Cloud file manager client (upload/download paths, whatsapp-send)",
+   "boundary": "src/tabs/file_management_tab.py#files/api client (cloud storage boundary)",
+   "subsystem": "src/tabs/file_management_tab.py",
+   "attack_class": "ATTACK-CLASSES.md#Resource and file handling"
+  },
+  "surface": "Cloud file manager client (upload/download paths, whatsapp-send)",
+  "boundary": "src/tabs/file_management_tab.py#files/api client (cloud storage boundary)",
+  "subsystem": "Cloud file manager",
+  "attack_class": "ATTACK-CLASSES.md#Resource and file handling",
+  "starting_paths": [
+   "src/tabs/file_management_tab.py",
+   "src/tabs/demand_tab.py",
+   "src/tabs/musterroll_gen_tab.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Resource and file handling",
+  "selected_companion_blocks": [
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Derived-data and disclosure attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Export, backup, restore, and migration attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Deletion, revocation, and lifecycle attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Universal moves",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "candidate",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "lite_loader.py",
+   "loader.py",
+   "nrega-security-audit-output/harness_local_check_2.py",
+   "src/managers/services.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/managers/services.py",
+     "loader.py",
+     "lite_loader.py"
+    ],
+    "invariant": "Update payload must be hash-verified before any install action on every path",
+    "method": "local",
+    "result": "Unpatched target: with empty declared hash, transport guard passes and code reaches the install branch with no verification (loader.py refuses the same payload); negative control foreign-host URL refused pre-GET.",
+    "artifact": "agents/parent-hunter/artifacts/harness_local_check_2.py"
+   },
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "nrega-security-audit-output/harness_local_check_2.py"
+    ],
+    "invariant": "Sandboxed reproduction record",
+    "method": "source",
+    "result": "Network deny + scratch-only writes + read-only target + empty env enforced; observed: guard bypass on empty hash.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [
+   "cloud-download-filename-traversal"
+  ],
+  "unresolved": [
+   "decisive co-condition outside desktop repo; see findings.json blockers"
+  ]
+ },
+ {
+  "coverage_id": "Crash%20reporter%20upload%20payload%20%2B%20OTP%2FOAuth%20activation%20flows::src%2Fconfig.py%23LICENSE_SERVER_URL%20%2B%20requests%20sessions%20%28client-server%20TLS%20boundary%29::src%2Fapp%2Fapp_license.py::ATTACK-CLASSES.md%23Cryptography%20and%20secrets",
+  "canonical_refs": {
+   "surface": "Crash reporter upload payload + OTP/OAuth activation flows",
+   "boundary": "src/config.py#LICENSE_SERVER_URL + requests sessions (client-server TLS boundary)",
+   "subsystem": "src/app/app_license.py",
+   "attack_class": "ATTACK-CLASSES.md#Cryptography and secrets"
+  },
+  "surface": "Crash reporter upload payload + OTP/OAuth activation flows",
+  "boundary": "src/config.py#LICENSE_SERVER_URL + requests sessions (client-server TLS boundary)",
+  "subsystem": "Crash/OAuth flows",
+  "attack_class": "ATTACK-CLASSES.md#Cryptography and secrets",
+  "starting_paths": [
+   "src/utils.py",
+   "src/app/app_license.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Cryptography and secrets",
+  "selected_companion_blocks": [
+   "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+   "WEB-PROTOCOL-AND-AUTH.md#Browser-session attack classes",
+   "WEB-PROTOCOL-AND-AUTH.md#API-key and mTLS attack classes",
+   "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+   "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "candidate",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/utils.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/utils.py"
+    ],
+    "invariant": "Unauthenticated ingest endpoints must validate client-chosen identity fields before trust decisions",
+    "method": "source",
+    "result": "Crash POST sends client-chosen license_key + free-form fields with no auth header; all decisive validation is server-side (out of scope); client-side PII masking applied before send.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [
+   "crash-report-unauth-arbitrary-content"
+  ],
+  "unresolved": [
+   "decisive co-condition outside desktop repo; see findings.json blockers"
+  ]
+ },
+ {
+  "coverage_id": "Crash%20reporter%20upload%20payload%20%2B%20OTP%2FOAuth%20activation%20flows::src%2Fconfig.py%23LICENSE_SERVER_URL%20%2B%20requests%20sessions%20%28client-server%20TLS%20boundary%29::src%2Fapp%2Fapp_license.py::ATTACK-CLASSES.md%23Feature%20abuse%20and%20data%20leakage",
+  "canonical_refs": {
+   "surface": "Crash reporter upload payload + OTP/OAuth activation flows",
+   "boundary": "src/config.py#LICENSE_SERVER_URL + requests sessions (client-server TLS boundary)",
+   "subsystem": "src/app/app_license.py",
+   "attack_class": "ATTACK-CLASSES.md#Feature abuse and data leakage"
+  },
+  "surface": "Crash reporter upload payload + OTP/OAuth activation flows",
+  "boundary": "src/config.py#LICENSE_SERVER_URL + requests sessions (client-server TLS boundary)",
+  "subsystem": "Crash/OAuth flows",
+  "attack_class": "ATTACK-CLASSES.md#Feature abuse and data leakage",
+  "starting_paths": [
+   "src/utils.py",
+   "src/app/app_license.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Feature abuse and data leakage",
+  "selected_companion_blocks": [
+   "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+   "WEB-PROTOCOL-AND-AUTH.md#Browser-session attack classes",
+   "WEB-PROTOCOL-AND-AUTH.md#API-key and mTLS attack classes",
+   "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+   "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "candidate",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/utils.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/utils.py"
+    ],
+    "invariant": "Unauthenticated ingest endpoints must validate client-chosen identity fields before trust decisions",
+    "method": "source",
+    "result": "Crash POST sends client-chosen license_key + free-form fields with no auth header; all decisive validation is server-side (out of scope); client-side PII masking applied before send.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [
+   "crash-report-unauth-arbitrary-content"
+  ],
+  "unresolved": [
+   "decisive co-condition outside desktop repo; see findings.json blockers"
+  ]
+ },
+ {
+  "coverage_id": "GitHub%20Actions%20release%20workflow%20%28triggers%2C%20permissions%2C%20artifact%20trust%29::.github%2Fworkflows%2Frelease.yml%23on%20push%20main%20%28release%20authority%20boundary%29::.github%2Fworkflows%2Frelease.yml::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries",
+  "canonical_refs": {
+   "surface": "GitHub Actions release workflow (triggers, permissions, artifact trust)",
+   "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+   "subsystem": ".github/workflows/release.yml",
+   "attack_class": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries"
+  },
+  "surface": "GitHub Actions release workflow (triggers, permissions, artifact trust)",
+  "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+  "subsystem": "CI release pipeline",
+  "attack_class": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries",
+  "starting_paths": [
+   ".github/workflows/release.yml"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   ".github/workflows/release.yml"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     ".github/workflows/release.yml"
+    ],
+    "invariant": "CI release pipeline: Chained vulnerabilities and trust boundaries invariants hold for its boundary",
+    "method": "source",
+    "result": "release.yml: push-triggered on main only (no pull_request_target), pinned v4/v5 actions, GITHUB_TOKEN-scoped, version sourced from committed version.json via jq (no script injection); no secrets consumed; unsigned artifacts are a documented trade-off covered by client hash gates.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "GitHub%20Actions%20release%20workflow%20%28triggers%2C%20permissions%2C%20artifact%20trust%29::.github%2Fworkflows%2Frelease.yml%23on%20push%20main%20%28release%20authority%20boundary%29::.github%2Fworkflows%2Frelease.yml::ATTACK-CLASSES.md%23Injection",
+  "canonical_refs": {
+   "surface": "GitHub Actions release workflow (triggers, permissions, artifact trust)",
+   "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+   "subsystem": ".github/workflows/release.yml",
+   "attack_class": "ATTACK-CLASSES.md#Injection"
+  },
+  "surface": "GitHub Actions release workflow (triggers, permissions, artifact trust)",
+  "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+  "subsystem": "CI release pipeline",
+  "attack_class": "ATTACK-CLASSES.md#Injection",
+  "starting_paths": [
+   ".github/workflows/release.yml"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Injection",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   ".github/workflows/release.yml"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     ".github/workflows/release.yml"
+    ],
+    "invariant": "CI release pipeline: Injection invariants hold for its boundary",
+    "method": "source",
+    "result": "release.yml: push-triggered on main only (no pull_request_target), pinned v4/v5 actions, GITHUB_TOKEN-scoped, version sourced from committed version.json via jq (no script injection); no secrets consumed; unsigned artifacts are a documented trade-off covered by client hash gates.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "GitHub%20Actions%20release%20workflow%20%28triggers%2C%20permissions%2C%20artifact%20trust%29::.github%2Fworkflows%2Frelease.yml%23on%20push%20main%20%28release%20authority%20boundary%29::.github%2Fworkflows%2Frelease.yml::ATTACK-CLASSES.md%23Obvious%20things",
+  "canonical_refs": {
+   "surface": "GitHub Actions release workflow (triggers, permissions, artifact trust)",
+   "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+   "subsystem": ".github/workflows/release.yml",
+   "attack_class": "ATTACK-CLASSES.md#Obvious things"
+  },
+  "surface": "GitHub Actions release workflow (triggers, permissions, artifact trust)",
+  "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+  "subsystem": "CI release pipeline",
+  "attack_class": "ATTACK-CLASSES.md#Obvious things",
+  "starting_paths": [
+   ".github/workflows/release.yml"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Obvious things",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   ".github/workflows/release.yml"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     ".github/workflows/release.yml"
+    ],
+    "invariant": "CI release pipeline: Obvious things invariants hold for its boundary",
+    "method": "source",
+    "result": "release.yml: push-triggered on main only (no pull_request_target), pinned v4/v5 actions, GITHUB_TOKEN-scoped, version sourced from committed version.json via jq (no script injection); no secrets consumed; unsigned artifacts are a documented trade-off covered by client hash gates.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "In-app%20update%20%2B%20smart%20update%20%2B%20updater.bat::loader.py%23check_for_updates%2Fextract_zip%20%28update%20authority%20boundary%29::src%2Fmanagers%2Fservices.py::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries",
+  "canonical_refs": {
+   "surface": "In-app update + smart update + updater.bat",
+   "boundary": "loader.py#check_for_updates/extract_zip (update authority boundary)",
+   "subsystem": "src/managers/services.py",
+   "attack_class": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries"
+  },
+  "surface": "In-app update + smart update + updater.bat",
+  "boundary": "loader.py#check_for_updates/extract_zip (update authority boundary)",
+  "subsystem": "In-app update (services/main_app/lite_app)",
+  "attack_class": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries",
+  "starting_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/managers/services.py",
+   "main_app.py",
+   "lite_app.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "candidate",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "lite_loader.py",
+   "loader.py",
+   "nrega-security-audit-output/harness_local_check_2.py",
+   "src/managers/services.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/managers/services.py",
+     "loader.py",
+     "lite_loader.py"
+    ],
+    "invariant": "Update payload must be hash-verified before any install action on every path",
+    "method": "local",
+    "result": "Unpatched target: with empty declared hash, transport guard passes and code reaches the install branch with no verification (loader.py refuses the same payload); negative control foreign-host URL refused pre-GET.",
+    "artifact": "agents/parent-hunter/artifacts/harness_local_check_2.py"
+   },
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "nrega-security-audit-output/harness_local_check_2.py"
+    ],
+    "invariant": "Sandboxed reproduction record",
+    "method": "local",
+    "result": "Network deny + scratch-only writes + read-only target + empty env enforced; observed: guard bypass on empty hash.",
+    "artifact": "agents/parent-hunter/artifacts/local_check_2_output.txt"
+   }
+  ],
+  "result_fingerprints": [
+   "in-app-update-accepts-unverified-core-payload"
+  ],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "In-app%20update%20%2B%20smart%20update%20%2B%20updater.bat::loader.py%23check_for_updates%2Fextract_zip%20%28update%20authority%20boundary%29::src%2Fmanagers%2Fservices.py::ATTACK-CLASSES.md%23Resource%20and%20file%20handling",
+  "canonical_refs": {
+   "surface": "In-app update + smart update + updater.bat",
+   "boundary": "loader.py#check_for_updates/extract_zip (update authority boundary)",
+   "subsystem": "src/managers/services.py",
+   "attack_class": "ATTACK-CLASSES.md#Resource and file handling"
+  },
+  "surface": "In-app update + smart update + updater.bat",
+  "boundary": "loader.py#check_for_updates/extract_zip (update authority boundary)",
+  "subsystem": "In-app update (services/main_app/lite_app)",
+  "attack_class": "ATTACK-CLASSES.md#Resource and file handling",
+  "starting_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/managers/services.py",
+   "main_app.py",
+   "lite_app.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Resource and file handling",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "candidate",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "lite_loader.py",
+   "loader.py",
+   "nrega-security-audit-output/harness_local_check_2.py",
+   "src/managers/services.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/managers/services.py",
+     "loader.py",
+     "lite_loader.py"
+    ],
+    "invariant": "Update payload must be hash-verified before any install action on every path",
+    "method": "local",
+    "result": "Unpatched target: with empty declared hash, transport guard passes and code reaches the install branch with no verification (loader.py refuses the same payload); negative control foreign-host URL refused pre-GET.",
+    "artifact": "agents/parent-hunter/artifacts/harness_local_check_2.py"
+   },
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "nrega-security-audit-output/harness_local_check_2.py"
+    ],
+    "invariant": "Sandboxed reproduction record",
+    "method": "local",
+    "result": "Network deny + scratch-only writes + read-only target + empty env enforced; observed: guard bypass on empty hash.",
+    "artifact": "agents/parent-hunter/artifacts/local_check_2_output.txt"
+   }
+  ],
+  "result_fingerprints": [
+   "in-app-update-accepts-unverified-core-payload"
+  ],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "License%20key%20transport%20%28headers%2C%20heartbeat%20query%20param%2C%20auth-token%20flow%29::src%2Fconfig.py%23LICENSE_SERVER_URL%20%2B%20requests%20sessions%20%28client-server%20TLS%20boundary%29::src%2Fapp%2Fapp_license.py::ATTACK-CLASSES.md%23Cryptography%20and%20secrets",
+  "canonical_refs": {
+   "surface": "License key transport (headers, heartbeat query param, auth-token flow)",
+   "boundary": "src/config.py#LICENSE_SERVER_URL + requests sessions (client-server TLS boundary)",
+   "subsystem": "src/app/app_license.py",
+   "attack_class": "ATTACK-CLASSES.md#Cryptography and secrets"
+  },
+  "surface": "License key transport (headers, heartbeat query param, auth-token flow)",
+  "boundary": "src/config.py#LICENSE_SERVER_URL + requests sessions (client-server TLS boundary)",
+  "subsystem": "License/telemetry HTTP client",
+  "attack_class": "ATTACK-CLASSES.md#Cryptography and secrets",
+  "starting_paths": [
+   "src/app/app_license.py",
+   "src/managers/services.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Cryptography and secrets",
+  "selected_companion_blocks": [
+   "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+   "WEB-PROTOCOL-AND-AUTH.md#Browser-session attack classes",
+   "WEB-PROTOCOL-AND-AUTH.md#API-key and mTLS attack classes",
+   "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+   "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "candidate",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/app/app_license.py",
+   "src/managers/services.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/app/app_license.py",
+     "src/managers/services.py"
+    ],
+    "invariant": "Password-equivalent license key must travel only in header/body scope, never URL scope",
+    "method": "source",
+    "result": "app-config poll appends ?license_key=<raw key> to the GET URL (1806-1809), contradicting the header invariant documented at 1622-1631; leak impact depends on server-side URL log retention (out of scope).",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [
+   "heartbeat-license-key-query-param"
+  ],
+  "unresolved": [
+   "decisive co-condition outside desktop repo; see findings.json blockers"
+  ]
+ },
+ {
+  "coverage_id": "License%20key%20transport%20%28headers%2C%20heartbeat%20query%20param%2C%20auth-token%20flow%29::src%2Fconfig.py%23LICENSE_SERVER_URL%20%2B%20requests%20sessions%20%28client-server%20TLS%20boundary%29::src%2Fapp%2Fapp_license.py::ATTACK-CLASSES.md%23Feature%20abuse%20and%20data%20leakage",
+  "canonical_refs": {
+   "surface": "License key transport (headers, heartbeat query param, auth-token flow)",
+   "boundary": "src/config.py#LICENSE_SERVER_URL + requests sessions (client-server TLS boundary)",
+   "subsystem": "src/app/app_license.py",
+   "attack_class": "ATTACK-CLASSES.md#Feature abuse and data leakage"
+  },
+  "surface": "License key transport (headers, heartbeat query param, auth-token flow)",
+  "boundary": "src/config.py#LICENSE_SERVER_URL + requests sessions (client-server TLS boundary)",
+  "subsystem": "License/telemetry HTTP client",
+  "attack_class": "ATTACK-CLASSES.md#Feature abuse and data leakage",
+  "starting_paths": [
+   "src/app/app_license.py",
+   "src/managers/services.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Feature abuse and data leakage",
+  "selected_companion_blocks": [
+   "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+   "WEB-PROTOCOL-AND-AUTH.md#Browser-session attack classes",
+   "WEB-PROTOCOL-AND-AUTH.md#API-key and mTLS attack classes",
+   "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+   "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "candidate",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/app/app_license.py",
+   "src/managers/services.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/app/app_license.py",
+     "src/managers/services.py"
+    ],
+    "invariant": "Password-equivalent license key must travel only in header/body scope, never URL scope",
+    "method": "source",
+    "result": "app-config poll appends ?license_key=<raw key> to the GET URL (1806-1809), contradicting the header invariant documented at 1622-1631; leak impact depends on server-side URL log retention (out of scope).",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [
+   "heartbeat-license-key-query-param"
+  ],
+  "unresolved": [
+   "decisive co-condition outside desktop repo; see findings.json blockers"
+  ]
+ },
+ {
+  "coverage_id": "License%20key%20transport%20%28headers%2C%20heartbeat%20query%20param%2C%20auth-token%20flow%29::src%2Fconfig.py%23LICENSE_SERVER_URL%20%2B%20requests%20sessions%20%28client-server%20TLS%20boundary%29::src%2Fapp%2Fapp_license.py::ATTACK-CLASSES.md%23Obvious%20things",
+  "canonical_refs": {
+   "surface": "License key transport (headers, heartbeat query param, auth-token flow)",
+   "boundary": "src/config.py#LICENSE_SERVER_URL + requests sessions (client-server TLS boundary)",
+   "subsystem": "src/app/app_license.py",
+   "attack_class": "ATTACK-CLASSES.md#Obvious things"
+  },
+  "surface": "License key transport (headers, heartbeat query param, auth-token flow)",
+  "boundary": "src/config.py#LICENSE_SERVER_URL + requests sessions (client-server TLS boundary)",
+  "subsystem": "License/telemetry HTTP client",
+  "attack_class": "ATTACK-CLASSES.md#Obvious things",
+  "starting_paths": [
+   "src/app/app_license.py",
+   "src/managers/services.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Obvious things",
+  "selected_companion_blocks": [
+   "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+   "WEB-PROTOCOL-AND-AUTH.md#Browser-session attack classes",
+   "WEB-PROTOCOL-AND-AUTH.md#API-key and mTLS attack classes",
+   "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+   "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/app/app_license.py",
+   "src/managers/services.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/app/app_license.py",
+     "src/managers/services.py"
+    ],
+    "invariant": "License/telemetry HTTP client: Obvious things invariants hold for its boundary",
+    "method": "source",
+    "result": "Reviewed; no boundary violation found in source.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Local%20state%20files%20as%20control%20input%20%28core_version.json%2C%20force_rollback%2C%20blocked%2C%20maintenance%2C%20boot_state%29::src%2Futils.py%23get_data_path%20state%20files%20%2B%20main_app%20127.0.0.1%3A60123%20%28local-trust%20boundary%29::src%2Futils.py::ATTACK-CLASSES.md%23Business%20logic",
+  "canonical_refs": {
+   "surface": "Local state files as control input (core_version.json, force_rollback, blocked, maintenance, boot_state)",
+   "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+   "subsystem": "src/utils.py",
+   "attack_class": "ATTACK-CLASSES.md#Business logic"
+  },
+  "surface": "Local state files as control input (core_version.json, force_rollback, blocked, maintenance, boot_state)",
+  "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+  "subsystem": "Loader + app control files",
+  "attack_class": "ATTACK-CLASSES.md#Business logic",
+  "starting_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/utils.py",
+   "src/app/app_license.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Business logic",
+  "selected_companion_blocks": [
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Local IPC and exported-component attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Privileged-helper and local-file attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Application-state and device-lifecycle attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/utils.py",
+   "src/app/app_license.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "loader.py",
+     "lite_loader.py",
+     "src/utils.py",
+     "src/app/app_license.py"
+    ],
+    "invariant": "Loader + app control files: Business logic invariants hold for its boundary",
+    "method": "source",
+    "result": "State files (core_version.json, force_rollback, blocked_versions, maintenance, boot_state) written via _save_json_file and consumed as control input; world-default perms noted as hardening (same-user attacker model); heal logic re-extracts only hash-matched zips.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": [],
+  "hardening_notes": [
+   "Consider 0600 perms for state JSONs (consistent with save_license_dat); same-user attacker model limits impact.",
+   "Server-controlled portal-host re-hosting (state registry) requires an already-compromised trusted origin; no sibling control violated — not a finding (hardening: consider allow-listing hosts)."
+  ]
+ },
+ {
+  "coverage_id": "Local%20state%20files%20as%20control%20input%20%28core_version.json%2C%20force_rollback%2C%20blocked%2C%20maintenance%2C%20boot_state%29::src%2Futils.py%23get_data_path%20state%20files%20%2B%20main_app%20127.0.0.1%3A60123%20%28local-trust%20boundary%29::src%2Futils.py::ATTACK-CLASSES.md%23Resource%20and%20file%20handling",
+  "canonical_refs": {
+   "surface": "Local state files as control input (core_version.json, force_rollback, blocked, maintenance, boot_state)",
+   "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+   "subsystem": "src/utils.py",
+   "attack_class": "ATTACK-CLASSES.md#Resource and file handling"
+  },
+  "surface": "Local state files as control input (core_version.json, force_rollback, blocked, maintenance, boot_state)",
+  "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+  "subsystem": "Loader + app control files",
+  "attack_class": "ATTACK-CLASSES.md#Resource and file handling",
+  "starting_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/utils.py",
+   "src/app/app_license.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Resource and file handling",
+  "selected_companion_blocks": [
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Local IPC and exported-component attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Privileged-helper and local-file attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Application-state and device-lifecycle attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/utils.py",
+   "src/app/app_license.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "loader.py",
+     "lite_loader.py",
+     "src/utils.py",
+     "src/app/app_license.py"
+    ],
+    "invariant": "Loader + app control files: Resource and file handling invariants hold for its boundary",
+    "method": "source",
+    "result": "State files (core_version.json, force_rollback, blocked_versions, maintenance, boot_state) written via _save_json_file and consumed as control input; world-default perms noted as hardening (same-user attacker model); heal logic re-extracts only hash-matched zips.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": [],
+  "hardening_notes": [
+   "Consider 0600 perms for state JSONs (consistent with save_license_dat); same-user attacker model limits impact.",
+   "Server-controlled portal-host re-hosting (state registry) requires an already-compromised trusted origin; no sibling control violated — not a finding (hardening: consider allow-listing hosts)."
+  ]
+ },
+ {
+  "coverage_id": "Managed%20browser%20launch%20%28remote-debugging-port%2C%20profile%20dirs%2C%20URL%20args%29::src%2Futils.py%23get_data_path%20state%20files%20%2B%20main_app%20127.0.0.1%3A60123%20%28local-trust%20boundary%29::src%2Fmanagers%2Fbrowser_manager.py::ATTACK-CLASSES.md%23Injection",
+  "canonical_refs": {
+   "surface": "Managed browser launch (remote-debugging-port, profile dirs, URL args)",
+   "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+   "subsystem": "src/managers/browser_manager.py",
+   "attack_class": "ATTACK-CLASSES.md#Injection"
+  },
+  "surface": "Managed browser launch (remote-debugging-port, profile dirs, URL args)",
+  "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+  "subsystem": "Browser manager",
+  "attack_class": "ATTACK-CLASSES.md#Injection",
+  "starting_paths": [
+   "src/managers/browser_manager.py",
+   "src/tabs/login_automation_tab.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Injection",
+  "selected_companion_blocks": [
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Local IPC and exported-component attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Privileged-helper and local-file attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Application-state and device-lifecycle attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/managers/browser_manager.py",
+   "src/tabs/login_automation_tab.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/managers/browser_manager.py",
+     "src/tabs/login_automation_tab.py"
+    ],
+    "invariant": "Browser manager: Injection invariants hold for its boundary",
+    "method": "source",
+    "result": "All browser launches use argv-list subprocess (no shell); URLs are constants or user files; profile dirs under home; remote-debugging-port exposure is loopback-by-default Chromium behavior, whole-system attacker model out of scope (hardening: CDP risk for high-assurance hosts).",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": [],
+  "hardening_notes": [
+   "CDP remote-debugging ports (9222/9223) are a risk on high-assurance hosts; consider documenting or gating behind a flag."
+  ]
+ },
+ {
+  "coverage_id": "PII%20masking%20at%20cloud%20sync%20boundaries%20%28results%20sync%2C%20backup%2C%20logs%2C%20crash%29::src%2Futils.py%23mask_%2A%20%2B%20base_tab._extract_tree_columns_rows%20%28PII%20cloud%20boundary%29::src%2Futils.py::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries",
+  "canonical_refs": {
+   "surface": "PII masking at cloud sync boundaries (results sync, backup, logs, crash)",
+   "boundary": "src/utils.py#mask_* + base_tab._extract_tree_columns_rows (PII cloud boundary)",
+   "subsystem": "src/utils.py",
+   "attack_class": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries"
+  },
+  "surface": "PII masking at cloud sync boundaries (results sync, backup, logs, crash)",
+  "boundary": "src/utils.py#mask_* + base_tab._extract_tree_columns_rows (PII cloud boundary)",
+  "subsystem": "PII masking + telemetry sync",
+  "attack_class": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries",
+  "starting_paths": [
+   "src/tabs/base_tab.py",
+   "src/app/app_automation.py",
+   "src/app/app_license.py",
+   "src/tabs/history_manager.py",
+   "src/utils.py",
+   "src/error_context.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries",
+  "selected_companion_blocks": [
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Derived-data and disclosure attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Export, backup, restore, and migration attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Deletion, revocation, and lifecycle attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Universal moves",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/tabs/base_tab.py",
+   "src/app/app_automation.py",
+   "src/app/app_license.py",
+   "src/tabs/history_manager.py",
+   "src/utils.py",
+   "src/error_context.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/tabs/base_tab.py",
+     "src/app/app_automation.py",
+     "src/app/app_license.py",
+     "src/tabs/history_manager.py",
+     "src/utils.py",
+     "src/error_context.py"
+    ],
+    "invariant": "PII masking + telemetry sync: Chained vulnerabilities and trust boundaries invariants hold for its boundary",
+    "method": "source",
+    "result": "Masking choke points verified at every cloud boundary: base_tab.py:346 mask_columns_rows before results sync; app_automation.py:692 consumes masked rows; history_manager.py:898 masks before local SQLite + sync; utils.py crash payload masks before POST. No unmasked egress path found.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "PII%20masking%20at%20cloud%20sync%20boundaries%20%28results%20sync%2C%20backup%2C%20logs%2C%20crash%29::src%2Futils.py%23mask_%2A%20%2B%20base_tab._extract_tree_columns_rows%20%28PII%20cloud%20boundary%29::src%2Futils.py::ATTACK-CLASSES.md%23Feature%20abuse%20and%20data%20leakage",
+  "canonical_refs": {
+   "surface": "PII masking at cloud sync boundaries (results sync, backup, logs, crash)",
+   "boundary": "src/utils.py#mask_* + base_tab._extract_tree_columns_rows (PII cloud boundary)",
+   "subsystem": "src/utils.py",
+   "attack_class": "ATTACK-CLASSES.md#Feature abuse and data leakage"
+  },
+  "surface": "PII masking at cloud sync boundaries (results sync, backup, logs, crash)",
+  "boundary": "src/utils.py#mask_* + base_tab._extract_tree_columns_rows (PII cloud boundary)",
+  "subsystem": "PII masking + telemetry sync",
+  "attack_class": "ATTACK-CLASSES.md#Feature abuse and data leakage",
+  "starting_paths": [
+   "src/tabs/base_tab.py",
+   "src/app/app_automation.py",
+   "src/app/app_license.py",
+   "src/tabs/history_manager.py",
+   "src/utils.py",
+   "src/error_context.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Feature abuse and data leakage",
+  "selected_companion_blocks": [
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Derived-data and disclosure attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Export, backup, restore, and migration attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Deletion, revocation, and lifecycle attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Universal moves",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/tabs/base_tab.py",
+   "src/app/app_automation.py",
+   "src/app/app_license.py",
+   "src/tabs/history_manager.py",
+   "src/utils.py",
+   "src/error_context.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/tabs/base_tab.py",
+     "src/app/app_automation.py",
+     "src/app/app_license.py",
+     "src/tabs/history_manager.py",
+     "src/utils.py",
+     "src/error_context.py"
+    ],
+    "invariant": "PII masking + telemetry sync: Feature abuse and data leakage invariants hold for its boundary",
+    "method": "source",
+    "result": "Masking choke points verified at every cloud boundary: base_tab.py:346 mask_columns_rows before results sync; app_automation.py:692 consumes masked rows; history_manager.py:898 masks before local SQLite + sync; utils.py crash payload masks before POST. No unmasked egress path found.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Packaging%20whitelist%20%2B%20PyInstaller%20specs%20%2B%20build%20scripts::.github%2Fworkflows%2Frelease.yml%23on%20push%20main%20%28release%20authority%20boundary%29::scripts%2Fbuild_update.py::ATTACK-CLASSES.md%23Obvious%20things",
+  "canonical_refs": {
+   "surface": "Packaging whitelist + PyInstaller specs + build scripts",
+   "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+   "subsystem": "scripts/build_update.py",
+   "attack_class": "ATTACK-CLASSES.md#Obvious things"
+  },
+  "surface": "Packaging whitelist + PyInstaller specs + build scripts",
+  "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+  "subsystem": "Packaging",
+  "attack_class": "ATTACK-CLASSES.md#Obvious things",
+  "starting_paths": [
+   "scripts/build_update.py",
+   "scripts/build_windows.bat",
+   "scripts/build_macos.sh",
+   "scripts/build_locales.py",
+   ".gitignore"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Obvious things",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "scripts/build_update.py",
+   "scripts/build_windows.bat",
+   "scripts/build_macos.sh",
+   "scripts/build_locales.py",
+   ".gitignore"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "scripts/build_update.py",
+     "scripts/build_windows.bat",
+     "scripts/build_macos.sh",
+     "scripts/build_locales.py",
+     ".gitignore"
+    ],
+    "invariant": "Packaging: Obvious things invariants hold for its boundary",
+    "method": "source",
+    "result": "build_update.py and release.yml use identical whitelist + sensitive-file denylist; server code, .env, NAS docs excluded; allowed extensions bounded; no secret leakage path found.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Repo%20hygiene%20%28committed%20secrets%2C%20.env%2C%20.gitignore%20coverage%29::.github%2Fworkflows%2Frelease.yml%23on%20push%20main%20%28release%20authority%20boundary%29::.gitignore::ATTACK-CLASSES.md%23Obvious%20things",
+  "canonical_refs": {
+   "surface": "Repo hygiene (committed secrets, .env, .gitignore coverage)",
+   "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+   "subsystem": ".gitignore",
+   "attack_class": "ATTACK-CLASSES.md#Obvious things"
+  },
+  "surface": "Repo hygiene (committed secrets, .env, .gitignore coverage)",
+  "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+  "subsystem": "Repo hygiene",
+  "attack_class": "ATTACK-CLASSES.md#Obvious things",
+  "starting_paths": [
+   ".gitignore",
+   "run_server.py",
+   "requirements.txt"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Obvious things",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   ".gitignore",
+   "run_server.py",
+   "requirements.txt"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     ".gitignore",
+     "run_server.py",
+     "requirements.txt"
+    ],
+    "invariant": "Repo hygiene: Obvious things invariants hold for its boundary",
+    "method": "source",
+    "result": "No secrets tracked in git (git ls-files clean); .env ignored and empty; run_server.py is a trivial dev page not in the core-zip whitelist and not referenced by shipped code; .gitignore covers env/secret patterns.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Report%2Fexport%20file%20sinks%20%28downloads%20dir%2C%20startfile%2Fopen%2C%20zip%2Fcsv%20imports%29::src%2Futils.py%23get_data_path%20state%20files%20%2B%20main_app%20127.0.0.1%3A60123%20%28local-trust%20boundary%29::src%2Ftabs%2Fbase_tab.py::ATTACK-CLASSES.md%23Feature%20abuse%20and%20data%20leakage",
+  "canonical_refs": {
+   "surface": "Report/export file sinks (downloads dir, startfile/open, zip/csv imports)",
+   "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+   "subsystem": "src/tabs/base_tab.py",
+   "attack_class": "ATTACK-CLASSES.md#Feature abuse and data leakage"
+  },
+  "surface": "Report/export file sinks (downloads dir, startfile/open, zip/csv imports)",
+  "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+  "subsystem": "Tab file handling",
+  "attack_class": "ATTACK-CLASSES.md#Feature abuse and data leakage",
+  "starting_paths": [
+   "src/tabs/base_tab.py",
+   "src/tabs/musterroll_gen_tab.py",
+   "src/tabs/pdf_merger_tab.py",
+   "src/utils.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Feature abuse and data leakage",
+  "selected_companion_blocks": [
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Local IPC and exported-component attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Privileged-helper and local-file attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Application-state and device-lifecycle attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/tabs/base_tab.py",
+   "src/tabs/musterroll_gen_tab.py",
+   "src/tabs/pdf_merger_tab.py",
+   "src/utils.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/tabs/base_tab.py",
+     "src/tabs/musterroll_gen_tab.py",
+     "src/tabs/pdf_merger_tab.py",
+     "src/utils.py"
+    ],
+    "invariant": "Tab file handling: Feature abuse and data leakage invariants hold for its boundary",
+    "method": "source",
+    "result": "Report/export sinks constrained to get_report_path/get_nregabot_path under ~/Downloads/NregaBot; save dialogs user-directed; zip/csv imports are user-provided local files (self-impact); startfile/open targets are app-generated reports.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Report%2Fexport%20file%20sinks%20%28downloads%20dir%2C%20startfile%2Fopen%2C%20zip%2Fcsv%20imports%29::src%2Futils.py%23get_data_path%20state%20files%20%2B%20main_app%20127.0.0.1%3A60123%20%28local-trust%20boundary%29::src%2Ftabs%2Fbase_tab.py::ATTACK-CLASSES.md%23Resource%20and%20file%20handling",
+  "canonical_refs": {
+   "surface": "Report/export file sinks (downloads dir, startfile/open, zip/csv imports)",
+   "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+   "subsystem": "src/tabs/base_tab.py",
+   "attack_class": "ATTACK-CLASSES.md#Resource and file handling"
+  },
+  "surface": "Report/export file sinks (downloads dir, startfile/open, zip/csv imports)",
+  "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+  "subsystem": "Tab file handling",
+  "attack_class": "ATTACK-CLASSES.md#Resource and file handling",
+  "starting_paths": [
+   "src/tabs/base_tab.py",
+   "src/tabs/musterroll_gen_tab.py",
+   "src/tabs/pdf_merger_tab.py",
+   "src/utils.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Resource and file handling",
+  "selected_companion_blocks": [
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Local IPC and exported-component attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Privileged-helper and local-file attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Application-state and device-lifecycle attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/tabs/base_tab.py",
+   "src/tabs/musterroll_gen_tab.py",
+   "src/tabs/pdf_merger_tab.py",
+   "src/utils.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/tabs/base_tab.py",
+     "src/tabs/musterroll_gen_tab.py",
+     "src/tabs/pdf_merger_tab.py",
+     "src/utils.py"
+    ],
+    "invariant": "Tab file handling: Resource and file handling invariants hold for its boundary",
+    "method": "source",
+    "result": "Report/export sinks constrained to get_report_path/get_nregabot_path under ~/Downloads/NregaBot; save dialogs user-directed; zip/csv imports are user-provided local files (self-impact); startfile/open targets are app-generated reports.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Server-driven%20config%20consumption%20%28feature%20flags%2C%20states%20registry%2C%20maintenance%2Frollback%2Fblocked%29::src%2Fapp%2Fapp_license.py%23%2Fapi%2Fapp-config%20consumer%20%28server-control%20boundary%29::src%2Fapp%2Fapp_license.py::ATTACK-CLASSES.md%23Business%20logic",
+  "canonical_refs": {
+   "surface": "Server-driven config consumption (feature flags, states registry, maintenance/rollback/blocked)",
+   "boundary": "src/app/app_license.py#/api/app-config consumer (server-control boundary)",
+   "subsystem": "src/app/app_license.py",
+   "attack_class": "ATTACK-CLASSES.md#Business logic"
+  },
+  "surface": "Server-driven config consumption (feature flags, states registry, maintenance/rollback/blocked)",
+  "boundary": "src/app/app_license.py#/api/app-config consumer (server-control boundary)",
+  "subsystem": "Heartbeat/app-config consumer",
+  "attack_class": "ATTACK-CLASSES.md#Business logic",
+  "starting_paths": [
+   "src/app/app_license.py",
+   "src/config.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Business logic",
+  "selected_companion_blocks": [
+   "CLOUD-AND-DEPLOYMENT.md#Core discipline",
+   "CLOUD-AND-DEPLOYMENT.md#Workload identity and IAM attack classes",
+   "CLOUD-AND-DEPLOYMENT.md#Ingress, network, and control-plane attack classes",
+   "CLOUD-AND-DEPLOYMENT.md#Configuration and secret lifecycle attack classes",
+   "CLOUD-AND-DEPLOYMENT.md#Universal moves",
+   "CLOUD-AND-DEPLOYMENT.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/app/app_license.py",
+   "src/config.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/app/app_license.py",
+     "src/config.py"
+    ],
+    "invariant": "Heartbeat/app-config consumer: Business logic invariants hold for its boundary",
+    "method": "source",
+    "result": "app-config consumer sanitizes states registry (type/length caps), maintenance/rollback/blocked files always overwritten (stale enable cleared); feature flags only gate UI; license_key query param tracked as candidate in License/telemetry HTTP client units.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Server-driven%20config%20consumption%20%28feature%20flags%2C%20states%20registry%2C%20maintenance%2Frollback%2Fblocked%29::src%2Fapp%2Fapp_license.py%23%2Fapi%2Fapp-config%20consumer%20%28server-control%20boundary%29::src%2Fapp%2Fapp_license.py::ATTACK-CLASSES.md%23Obvious%20things",
+  "canonical_refs": {
+   "surface": "Server-driven config consumption (feature flags, states registry, maintenance/rollback/blocked)",
+   "boundary": "src/app/app_license.py#/api/app-config consumer (server-control boundary)",
+   "subsystem": "src/app/app_license.py",
+   "attack_class": "ATTACK-CLASSES.md#Obvious things"
+  },
+  "surface": "Server-driven config consumption (feature flags, states registry, maintenance/rollback/blocked)",
+  "boundary": "src/app/app_license.py#/api/app-config consumer (server-control boundary)",
+  "subsystem": "Heartbeat/app-config consumer",
+  "attack_class": "ATTACK-CLASSES.md#Obvious things",
+  "starting_paths": [
+   "src/app/app_license.py",
+   "src/config.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Obvious things",
+  "selected_companion_blocks": [
+   "CLOUD-AND-DEPLOYMENT.md#Core discipline",
+   "CLOUD-AND-DEPLOYMENT.md#Workload identity and IAM attack classes",
+   "CLOUD-AND-DEPLOYMENT.md#Ingress, network, and control-plane attack classes",
+   "CLOUD-AND-DEPLOYMENT.md#Configuration and secret lifecycle attack classes",
+   "CLOUD-AND-DEPLOYMENT.md#Universal moves",
+   "CLOUD-AND-DEPLOYMENT.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/app/app_license.py",
+   "src/config.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/app/app_license.py",
+     "src/config.py"
+    ],
+    "invariant": "Heartbeat/app-config consumer: Obvious things invariants hold for its boundary",
+    "method": "source",
+    "result": "app-config consumer sanitizes states registry (type/length caps), maintenance/rollback/blocked files always overwritten (stale enable cleared); feature flags only gate UI; license_key query param tracked as candidate in License/telemetry HTTP client units.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Single-instance%20loopback%20socket%2060123%2F60124::src%2Futils.py%23get_data_path%20state%20files%20%2B%20main_app%20127.0.0.1%3A60123%20%28local-trust%20boundary%29::main_app.py::ATTACK-CLASSES.md%23Access%20control",
+  "canonical_refs": {
+   "surface": "Single-instance loopback socket 60123/60124",
+   "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+   "subsystem": "main_app.py",
+   "attack_class": "ATTACK-CLASSES.md#Access control"
+  },
+  "surface": "Single-instance loopback socket 60123/60124",
+  "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+  "subsystem": "Local IPC",
+  "attack_class": "ATTACK-CLASSES.md#Access control",
+  "starting_paths": [
+   "main_app.py",
+   "lite_app.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Access control",
+  "selected_companion_blocks": [
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Local IPC and exported-component attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Privileged-helper and local-file attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Application-state and device-lifecycle attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "main_app.py",
+   "lite_app.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "main_app.py",
+     "lite_app.py"
+    ],
+    "invariant": "Local IPC: Access control invariants hold for its boundary",
+    "method": "source",
+    "result": "Full: 127.0.0.1:60123 accepts only b'focus' -> bring_to_front (main_app.py); Lite binds 60124 and never reads the socket (lite_app.py:1786-1791); minimal authority, no sensitive sink.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Third-party%20dependency%20floors%20%28requirements.txt%2C%20unclaimed%20deps%29::.github%2Fworkflows%2Frelease.yml%23on%20push%20main%20%28release%20authority%20boundary%29::requirements.txt::ATTACK-CLASSES.md%23Obvious%20things",
+  "canonical_refs": {
+   "surface": "Third-party dependency floors (requirements.txt, unclaimed deps)",
+   "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+   "subsystem": "requirements.txt",
+   "attack_class": "ATTACK-CLASSES.md#Obvious things"
+  },
+  "surface": "Third-party dependency floors (requirements.txt, unclaimed deps)",
+  "boundary": ".github/workflows/release.yml#on push main (release authority boundary)",
+  "subsystem": "Dependencies",
+  "attack_class": "ATTACK-CLASSES.md#Obvious things",
+  "starting_paths": [
+   "requirements.txt",
+   "requirements-dev.txt"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Obvious things",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "requirements.txt",
+   "requirements-dev.txt"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "requirements.txt",
+     "requirements-dev.txt"
+    ],
+    "invariant": "Dependencies: Obvious things invariants hold for its boundary",
+    "method": "source",
+    "result": "requirements.txt uses version floors (>=) with documented rationale; no known-vulnerable pinned versions observed; PyInstaller floors documented; supply-chain drift risk accepted as standard floors-vs-lock trade-off (hardening: lockfile/hash pinning for the loader build).",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Update%20metadata%20%2B%20payload%20download%20%28loader%29::loader.py%23check_for_updates%2Fextract_zip%20%28update%20authority%20boundary%29::loader.py::ATTACK-CLASSES.md%23Business%20logic",
+  "canonical_refs": {
+   "surface": "Update metadata + payload download (loader)",
+   "boundary": "loader.py#check_for_updates/extract_zip (update authority boundary)",
+   "subsystem": "loader.py",
+   "attack_class": "ATTACK-CLASSES.md#Business logic"
+  },
+  "surface": "Update metadata + payload download (loader)",
+  "boundary": "loader.py#check_for_updates/extract_zip (update authority boundary)",
+  "subsystem": "Update pipeline (loader/lite_loader)",
+  "attack_class": "ATTACK-CLASSES.md#Business logic",
+  "starting_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/managers/services.py",
+   "main_app.py",
+   "lite_app.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Business logic",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/managers/services.py",
+   "main_app.py",
+   "lite_app.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "loader.py",
+     "lite_loader.py",
+     "src/managers/services.py",
+     "main_app.py",
+     "lite_app.py"
+    ],
+    "invariant": "Update pipeline (loader/lite_loader): Business logic invariants hold for its boundary",
+    "method": "source",
+    "result": "Verified fail-closed: HTTPS host pin (loader.py:667), empty-hash refusal (645), downgrade refusal (637), hash mismatch discard (704), crash-loop rollback via core_prev.zip; zip extractall with CPython path handling on hash-verified archives.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Update%20metadata%20%2B%20payload%20download%20%28loader%29::loader.py%23check_for_updates%2Fextract_zip%20%28update%20authority%20boundary%29::loader.py::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries",
+  "canonical_refs": {
+   "surface": "Update metadata + payload download (loader)",
+   "boundary": "loader.py#check_for_updates/extract_zip (update authority boundary)",
+   "subsystem": "loader.py",
+   "attack_class": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries"
+  },
+  "surface": "Update metadata + payload download (loader)",
+  "boundary": "loader.py#check_for_updates/extract_zip (update authority boundary)",
+  "subsystem": "Update pipeline (loader/lite_loader)",
+  "attack_class": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries",
+  "starting_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/managers/services.py",
+   "main_app.py",
+   "lite_app.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/managers/services.py",
+   "main_app.py",
+   "lite_app.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "loader.py",
+     "lite_loader.py",
+     "src/managers/services.py",
+     "main_app.py",
+     "lite_app.py"
+    ],
+    "invariant": "Update pipeline (loader/lite_loader): Chained vulnerabilities and trust boundaries invariants hold for its boundary",
+    "method": "source",
+    "result": "Verified fail-closed: HTTPS host pin (loader.py:667), empty-hash refusal (645), downgrade refusal (637), hash mismatch discard (704), crash-loop rollback via core_prev.zip; zip extractall with CPython path handling on hash-verified archives.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Update%20metadata%20%2B%20payload%20download%20%28loader%29::loader.py%23check_for_updates%2Fextract_zip%20%28update%20authority%20boundary%29::loader.py::ATTACK-CLASSES.md%23Resource%20and%20file%20handling",
+  "canonical_refs": {
+   "surface": "Update metadata + payload download (loader)",
+   "boundary": "loader.py#check_for_updates/extract_zip (update authority boundary)",
+   "subsystem": "loader.py",
+   "attack_class": "ATTACK-CLASSES.md#Resource and file handling"
+  },
+  "surface": "Update metadata + payload download (loader)",
+  "boundary": "loader.py#check_for_updates/extract_zip (update authority boundary)",
+  "subsystem": "Update pipeline (loader/lite_loader)",
+  "attack_class": "ATTACK-CLASSES.md#Resource and file handling",
+  "starting_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/managers/services.py",
+   "main_app.py",
+   "lite_app.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Resource and file handling",
+  "selected_companion_blocks": [
+   "SUPPLY-CHAIN-AND-RELEASE.md#Core discipline",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Dependency and build-input attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#CI and automation attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Release and update attack classes",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Universal moves",
+   "SUPPLY-CHAIN-AND-RELEASE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "loader.py",
+   "lite_loader.py",
+   "src/managers/services.py",
+   "main_app.py",
+   "lite_app.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "loader.py",
+     "lite_loader.py",
+     "src/managers/services.py",
+     "main_app.py",
+     "lite_app.py"
+    ],
+    "invariant": "Update pipeline (loader/lite_loader): Resource and file handling invariants hold for its boundary",
+    "method": "source",
+    "result": "Verified fail-closed: HTTPS host pin (loader.py:667), empty-hash refusal (645), downgrade refusal (637), hash mismatch discard (704), crash-loop rollback via core_prev.zip; zip extractall with CPython path handling on hash-verified archives.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "User-data%20backup%20push%2Fpull%2Frestore%20%28config%2Bstaff%20maps%20write-back%29::src%2Futils.py%23mask_%2A%20%2B%20base_tab._extract_tree_columns_rows%20%28PII%20cloud%20boundary%29::src%2Fapp%2Fapp_license.py::ATTACK-CLASSES.md%23Business%20logic",
+  "canonical_refs": {
+   "surface": "User-data backup push/pull/restore (config+staff maps write-back)",
+   "boundary": "src/utils.py#mask_* + base_tab._extract_tree_columns_rows (PII cloud boundary)",
+   "subsystem": "src/app/app_license.py",
+   "attack_class": "ATTACK-CLASSES.md#Business logic"
+  },
+  "surface": "User-data backup push/pull/restore (config+staff maps write-back)",
+  "boundary": "src/utils.py#mask_* + base_tab._extract_tree_columns_rows (PII cloud boundary)",
+  "subsystem": "Cloud backup",
+  "attack_class": "ATTACK-CLASSES.md#Business logic",
+  "starting_paths": [
+   "src/app/app_license.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Business logic",
+  "selected_companion_blocks": [
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Derived-data and disclosure attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Export, backup, restore, and migration attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Deletion, revocation, and lifecycle attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Universal moves",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/app/app_license.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/app/app_license.py"
+    ],
+    "invariant": "Cloud backup: Business logic invariants hold for its boundary",
+    "method": "source",
+    "result": "Backup payload recursively mask_aadhaar_text'd (app_license.py:2120-2140); restore writes only to get_data_path files and whitelisted config keys; no code-object restore path.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "User-data%20backup%20push%2Fpull%2Frestore%20%28config%2Bstaff%20maps%20write-back%29::src%2Futils.py%23mask_%2A%20%2B%20base_tab._extract_tree_columns_rows%20%28PII%20cloud%20boundary%29::src%2Fapp%2Fapp_license.py::ATTACK-CLASSES.md%23Resource%20and%20file%20handling",
+  "canonical_refs": {
+   "surface": "User-data backup push/pull/restore (config+staff maps write-back)",
+   "boundary": "src/utils.py#mask_* + base_tab._extract_tree_columns_rows (PII cloud boundary)",
+   "subsystem": "src/app/app_license.py",
+   "attack_class": "ATTACK-CLASSES.md#Resource and file handling"
+  },
+  "surface": "User-data backup push/pull/restore (config+staff maps write-back)",
+  "boundary": "src/utils.py#mask_* + base_tab._extract_tree_columns_rows (PII cloud boundary)",
+  "subsystem": "Cloud backup",
+  "attack_class": "ATTACK-CLASSES.md#Resource and file handling",
+  "starting_paths": [
+   "src/app/app_license.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Resource and file handling",
+  "selected_companion_blocks": [
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Derived-data and disclosure attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Export, backup, restore, and migration attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Deletion, revocation, and lifecycle attack classes",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Universal moves",
+   "DATA-ISOLATION-AND-LIFECYCLE.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/app/app_license.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/app/app_license.py"
+    ],
+    "invariant": "Cloud backup: Resource and file handling invariants hold for its boundary",
+    "method": "source",
+    "result": "Backup payload recursively mask_aadhaar_text'd (app_license.py:2120-2140); restore writes only to get_data_path files and whitelisted config keys; no code-object restore path.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": []
+ },
+ {
+  "coverage_id": "Wildcard%20sweep%20%28sound%20manager%2C%20icon%20manager%2C%20ui_components%2C%20i18n%2C%20onboarding%29::src%2Futils.py%23get_data_path%20state%20files%20%2B%20main_app%20127.0.0.1%3A60123%20%28local-trust%20boundary%29::src%2Fui_components.py::ATTACK-CLASSES.md%23Wildcard",
+  "canonical_refs": {
+   "surface": "Wildcard sweep (sound manager, icon manager, ui_components, i18n, onboarding)",
+   "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+   "subsystem": "src/ui_components.py",
+   "attack_class": "ATTACK-CLASSES.md#Wildcard"
+  },
+  "surface": "Wildcard sweep (sound manager, icon manager, ui_components, i18n, onboarding)",
+  "boundary": "src/utils.py#get_data_path state files + main_app 127.0.0.1:60123 (local-trust boundary)",
+  "subsystem": "Misc subsystems",
+  "attack_class": "ATTACK-CLASSES.md#Wildcard",
+  "starting_paths": [
+   "src/managers/sound_manager.py",
+   "src/managers/icon_manager.py",
+   "src/ui_components.py",
+   "src/i18n.py",
+   "src/tabs/whatsapp_chat_tab.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Wildcard",
+  "selected_companion_blocks": [
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Local IPC and exported-component attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Privileged-helper and local-file attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Application-state and device-lifecycle attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "covered",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/managers/sound_manager.py",
+   "src/managers/icon_manager.py",
+   "src/ui_components.py",
+   "src/i18n.py",
+   "src/tabs/whatsapp_chat_tab.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/managers/sound_manager.py",
+     "src/managers/icon_manager.py",
+     "src/ui_components.py",
+     "src/i18n.py",
+     "src/tabs/whatsapp_chat_tab.py"
+    ],
+    "invariant": "Misc subsystems: Wildcard invariants hold for its boundary",
+    "method": "source",
+    "result": "sound_manager subprocess argv-list with resource_path assets only; icon/ui components event-driven; whatsapp_chat_tab sends only via Bearer-authenticated server relay; no dangerous sinks (grep for eval/exec/shell=True/verify=False: none in src/).",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [],
+  "unresolved": [],
+  "hardening_notes": [
+   "SoundManager kills previous afplay by PID without peer check (same-user model; acceptable)."
+  ]
+ },
+ {
+  "coverage_id": "license.dat%20storage%2C%20load%2C%20local%20expiry%20check::src%2Fmanagers%2Fservices.py%23check_license%20%2B%20save_license_dat%20%28license-trust%20boundary%29::src%2Fmanagers%2Fservices.py::ATTACK-CLASSES.md%23Business%20logic",
+  "canonical_refs": {
+   "surface": "license.dat storage, load, local expiry check",
+   "boundary": "src/managers/services.py#check_license + save_license_dat (license-trust boundary)",
+   "subsystem": "src/managers/services.py",
+   "attack_class": "ATTACK-CLASSES.md#Business logic"
+  },
+  "surface": "license.dat storage, load, local expiry check",
+  "boundary": "src/managers/services.py#check_license + save_license_dat (license-trust boundary)",
+  "subsystem": "License manager",
+  "attack_class": "ATTACK-CLASSES.md#Business logic",
+  "starting_paths": [
+   "src/managers/services.py",
+   "src/utils.py",
+   "src/app/app_license.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Business logic",
+  "selected_companion_blocks": [
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Local IPC and exported-component attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Privileged-helper and local-file attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Application-state and device-lifecycle attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "candidate",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "src/utils.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/utils.py"
+    ],
+    "invariant": "Unauthenticated ingest endpoints must validate client-chosen identity fields before trust decisions",
+    "method": "source",
+    "result": "Crash POST sends client-chosen license_key + free-form fields with no auth header; all decisive validation is server-side (out of scope); client-side PII masking applied before send.",
+    "artifact": null
+   }
+  ],
+  "result_fingerprints": [
+   "license-dat-unsigned-local-expiry-bypass"
+  ],
+  "unresolved": [
+   "decisive co-condition outside desktop repo; see findings.json blockers"
+  ]
+ },
+ {
+  "coverage_id": "license.dat%20storage%2C%20load%2C%20local%20expiry%20check::src%2Fmanagers%2Fservices.py%23check_license%20%2B%20save_license_dat%20%28license-trust%20boundary%29::src%2Fmanagers%2Fservices.py::ATTACK-CLASSES.md%23Cryptography%20and%20secrets",
+  "canonical_refs": {
+   "surface": "license.dat storage, load, local expiry check",
+   "boundary": "src/managers/services.py#check_license + save_license_dat (license-trust boundary)",
+   "subsystem": "src/managers/services.py",
+   "attack_class": "ATTACK-CLASSES.md#Cryptography and secrets"
+  },
+  "surface": "license.dat storage, load, local expiry check",
+  "boundary": "src/managers/services.py#check_license + save_license_dat (license-trust boundary)",
+  "subsystem": "License manager",
+  "attack_class": "ATTACK-CLASSES.md#Cryptography and secrets",
+  "starting_paths": [
+   "src/managers/services.py",
+   "src/utils.py",
+   "src/app/app_license.py"
+  ],
+  "ordinary_attack_class_block": "ATTACK-CLASSES.md#Cryptography and secrets",
+  "selected_companion_blocks": [
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Local IPC and exported-component attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Privileged-helper and local-file attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Application-state and device-lifecycle attack classes",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+   "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+  ],
+  "excluded_blocks": [
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#HTTP framing and cache attack classes",
+    "reason": "Client-side only; client does not terminate proxies/caches."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#Federated-identity attack classes",
+    "reason": "No JWT/OAuth-RP parsing in client; OAuth is server-mediated via /api/oauth/*."
+   },
+   {
+    "block": "WEB-PROTOCOL-AND-AUTH.md#MFA, passkey, and account-transition attack classes",
+    "reason": "No MFA/passkey flows in client; OTP is server-side."
+   },
+   {
+    "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Tenant and object-isolation attack classes",
+    "reason": "Single-user desktop client; server-side tenancy is out of scope."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Container and orchestration attack classes",
+    "reason": "No container/k8s manifests in desktop repo."
+   },
+   {
+    "block": "CLOUD-AND-DEPLOYMENT.md#Managed storage, events, and edge attack classes",
+    "reason": "No cloud resource manifests in desktop repo; NAS deployment is server-repo scope."
+   }
+  ],
+  "prior_status": "none",
+  "attempts": [],
+  "wave": 1,
+  "status": "candidate",
+  "agent_id": "parent-hunter",
+  "reviewed_paths": [
+   "nrega-security-audit-output/harness_local_check_1.py",
+   "src/managers/services.py",
+   "src/utils.py"
+  ],
+  "local_checks": [
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "src/managers/services.py",
+     "src/utils.py"
+    ],
+    "invariant": "license.dat validity must be cryptographically bound, not self-declared",
+    "method": "local",
+    "result": "No HMAC/signature anywhere in src/; local gate is wall-clock vs self-declared expires_at; forged EXPIRED file correctly rejected locally (negative control) — bypass requires future-dating plus server-availability defeat (validate_on_server offline-grace returns True). Decisive co-condition server-side.",
+    "artifact": "agents/parent-hunter/artifacts/harness_local_check_1.py"
+   },
+   {
+    "agent_id": "parent-hunter",
+    "reviewed_paths": [
+     "nrega-security-audit-output/harness_local_check_1.py"
+    ],
+    "invariant": "Sandboxed negative-control record",
+    "method": "local",
+    "result": "check_license() -> False on expired forged file with server unreachable; invariant holds for the local gate as designed.",
+    "artifact": "agents/parent-hunter/artifacts/local_check_1_output.txt"
+   }
+  ],
+  "result_fingerprints": [
+   "license-dat-unsigned-local-expiry-bypass"
+  ],
+  "unresolved": [
+   "decisive co-condition outside desktop repo; see findings.json blockers"
+  ]
+ }
+]

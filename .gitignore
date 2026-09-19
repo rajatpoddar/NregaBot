@@ -71,6 +71,7 @@ docs/data/
 
 # IDE configs
 .idea/
+.claude/
 *.swp
 *.swo
 *~

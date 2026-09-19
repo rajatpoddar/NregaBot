@@ -9,7 +9,7 @@ APP_TAGLINE: str = "Your NREGA Task Management Companion"
 APP_DESCRIPTION: str = "A comprehensive tool for managing NREGA tasks efficiently."
 APP_AUTHOR: str = "Rajat Poddar"
 APP_AUTHOR_EMAIL: str = "Rajatpoddar@outlook.com"
-APP_VERSION: str = "3.2.11"
+APP_VERSION: str = "3.2.12"
 import os
 LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://nregabot.com')
 
@@ -408,8 +408,8 @@ ICONS: Dict[str, object] = {
     "Resend Rejected WG": "🔁", "Sarkar Aapke Dwar": "⛺", "SAD Update Status": "📊",
     # Reports & Tracking
     "MR Tracking": "🕵️", "Dashboard Report": "📈", "MIS Reports": "📊",
-    "Issued MR Details": "📋", "eKYC Report": "🆔", "Social Audit Report": "📝",
-    "NMMS Attendance": "📋", "Pending Bills": "💸",
+    "Issued MR Details": "📋", "eKYC Report": "🆔", "Skilled Worker Report": "👷",
+    "Social Audit Report": "📝", "NMMS Attendance": "📋", "Pending Bills": "💸",
     # Smart Tools
     "Macro Manager": "⚙️", "Login Automation": "🤖", "PDF Merger": "📑",
     "Workcode Extractor": "✂️", "File Manager": "📁",
@@ -867,6 +867,11 @@ DEL_REG_CONFIG: Dict[str, str] = {
 # --- eKYC Report Configuration ---
 EKYC_REPORT_CONFIG: Dict[str, str] = {
     "url": "https://vbgramgde2.dord.gov.in/vbgramg/UID/AppABPSRpt.aspx"
+}
+
+# --- Skilled & Semi-Skilled Aadhaar Report Configuration ---
+SKILLED_AADHAAR_CONFIG: Dict[str, str] = {
+    "url": "https://vbgramgde2.dord.gov.in/vbgramg/states/SkilledBulkAadhaarUpdate.aspx"
 }
 
 # --- Physical Complete Configuration ---

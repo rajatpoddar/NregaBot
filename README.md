@@ -4,9 +4,9 @@
 
 # 🚜 NREGA Bot
 
-**v3.2.9** — Powerful NREGA Automation for Windows, macOS & Linux
+**v3.2.12** — Powerful NREGA Automation for Windows, macOS & Linux
 
-[![Version](https://img.shields.io/badge/version-3.2.9-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
+[![Version](https://img.shields.io/badge/version-3.2.12-1F4E79?style=flat-square)](https://nregabot.com/#downloads)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f?style=flat-square)](https://nregabot.com/#downloads)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)]()
 [![Updates](https://img.shields.io/badge/updates-Smart%20SHA--256%20Verified-4c1?style=flat-square)]()

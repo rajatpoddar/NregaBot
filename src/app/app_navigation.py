@@ -82,6 +82,7 @@ class NavMixin:
             "MIS Reports": "emoji_mis_reports",
             "Issued MR Details": "emoji_issued_mr_report",
             "eKYC Report": "emoji_ekyc_report",
+            "Skilled Worker Report": "emoji_skilled_worker_report",
             "Social Audit Report": "emoji_social_audit",
             "NMMS Attendance": "emoji_nmms_attendance",
             "Pending Bills": "emoji_pending_bills",

@@ -75,6 +75,7 @@ AUTOMATION_DISPLAY_NAMES = {
     "macro": "Macro",
     "scheme_closing": "Scheme Closing",
     "ekyc_report": "eKYC Report",
+    "skilled_aadhaar_report": "Skilled Worker Report",
 }
 
 

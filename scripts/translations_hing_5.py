@@ -288,4 +288,6 @@ HING5 = {
     "push.automation_success": "✅ {name} poora ho gaya",
     "push.automation_failed": "⚠️ {name} kuch issues ke saath khatam hua",
     "push.automation_duration": "{duration} laga",
+    "tab.skilled_aadhaar_report.title": "Skilled & Semi-Skilled Report",
+    "tab.skilled_aadhaar_report.subtitle": "Skilled worker Aadhaar updation status scan karein aur summary report banayein.",
 }

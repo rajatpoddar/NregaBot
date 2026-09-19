@@ -1,0 +1,4 @@
+[setup] forged expired license.dat at /private/tmp/nregabot-audit-scratch/license.dat
+[result] check_license() -> False
+[result] server_reachable_in_sandbox -> False
+INVARIANT HOLDS: expired forged license rejected offline (negative control as designed)

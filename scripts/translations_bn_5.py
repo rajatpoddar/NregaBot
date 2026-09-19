@@ -201,4 +201,6 @@ BN5 = {
     "push.automation_success": "✅ {name} সম্পন্ন হয়েছে",
     "push.automation_failed": "⚠️ {name} কিছু সমস্যা সহ সম্পন্ন হয়েছে",
     "push.automation_duration": "{duration} লেগেছে",
+    "tab.skilled_aadhaar_report.title": "দক্ষ ও আধা-দক্ষ রিপোর্ট",
+    "tab.skilled_aadhaar_report.subtitle": "দক্ষ শ্রমিকদের আধার আপডেটের অবস্থা স্ক্যান করুন এবং সারসংক্ষেপ রিপোর্ট তৈরি করুন।",
 }

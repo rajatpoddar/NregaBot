@@ -238,6 +238,16 @@ class ServiceManager:
                 # foreign host (requests follows https→http redirects).
                 if not isinstance(url, str) or not url.startswith("https://nregabot.com/"):
                     raise Exception(f"Refusing unsafe update URL: {str(url)[:80]}")
+                # AUDIT FIX (19 Sep 2026 / Confirmed-1) — integrity gate:
+                # Fail closed if the server did not declare an integrity hash.
+                # Never download or install an unverified payload (mirrors loader.py:688).
+                expected_hash = (self.app.update_info or {}).get("hash") or ""
+                if not expected_hash:
+                    raise Exception(
+                        "Update skipped: server did not provide an integrity hash — refusing unverified update. "
+                        "Please reinstall manually from nregabot.com."
+                    )
+
                 filename = url.split('/')[-1]
                 dl_path = os.path.join(get_user_downloads_path(), filename)
                 
@@ -256,25 +266,23 @@ class ServiceManager:
                 # truncated transfer through the Cloudflare tunnel) would be
                 # copied into the loader's core.zip and fail extraction on the
                 # next launch, leaving the app stuck on the old version.
-                expected_hash = (self.app.update_info or {}).get("hash") or ""
-                if expected_hash:
-                    actual_hash = hashlib.sha256()
-                    with open(dl_path, 'rb') as f:
-                        for chunk in iter(lambda: f.read(8192), b""):
-                            actual_hash.update(chunk)
-                    if actual_hash.hexdigest() != expected_hash:
-                        try:
-                            os.remove(dl_path)
-                        except Exception:
-                            pass
-                        self.app.after(0, lambda: [
-                            messagebox.showerror(
-                                "Update Failed",
-                                "Download is corrupt — it will be retried automatically next time."
-                            ),
-                            about.update_button.configure(state="normal", text="Retry Update")
-                        ])
-                        return
+                actual_hash = hashlib.sha256()
+                with open(dl_path, 'rb') as f:
+                    for chunk in iter(lambda: f.read(8192), b""):
+                        actual_hash.update(chunk)
+                if actual_hash.hexdigest().lower() != expected_hash.lower():
+                    try:
+                        os.remove(dl_path)
+                    except Exception:
+                        pass
+                    self.app.after(0, lambda: [
+                        messagebox.showerror(
+                            "Update Failed",
+                            "Download is corrupt or hash mismatch — it will be retried automatically next time."
+                        ),
+                        about.update_button.configure(state="normal", text="Retry Update")
+                    ])
+                    return
 
                 self.app.after(0, lambda: self.app.set_status("Installing update..."))
 

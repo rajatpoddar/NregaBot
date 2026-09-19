@@ -256,6 +256,11 @@ def get_tabs_definition(app: Any) -> Dict[str, Dict[str, Any]]:
                 "icon": app.icon_images.get("emoji_ekyc_report"),
                 "key": "ekyc_report"
             },
+            "Skilled Worker Report": {
+                "creation_func": _lazy_import("SkilledAadhaarReportTab", "src.tabs.skilled_aadhaar_report_tab"),
+                "icon": app.icon_images.get("emoji_skilled_worker_report"),
+                "key": "skilled_aadhaar_report"
+            },
             "Social Audit Report": {
                 "creation_func": _lazy_import("SAReportTab", "src.tabs.SA_report_tab"),
                 "icon": app.icon_images.get("emoji_social_audit"),

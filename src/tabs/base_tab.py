@@ -1403,6 +1403,7 @@ class BaseAutomationTab(ctk.CTkFrame):
         "macro": "Macro",
         "scheme_closing": "Scheme Closing",
         "ekyc_report": "eKYC Report",
+        "skilled_aadhaar_report": "Skilled Worker Report",
     }
 
     def _report_category(self) -> str:
@@ -1565,7 +1566,11 @@ class BaseAutomationTab(ctk.CTkFrame):
             # ═══════════════════════════════════════════════
             # ROW 1: Main Title (merged across all columns)
             # ═══════════════════════════════════════════════
-            title_text = title_prefix.strip() if title_prefix.strip() else "Automation Report"
+            if title_prefix.strip():
+                title_text = title_prefix.strip()
+            else:
+                cat_name = self._report_category()
+                title_text = f"{cat_name} Report" if not cat_name.lower().endswith("report") else cat_name
             ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
             c = ws.cell(row=1, column=1, value=title_text)
             c.font = Font(size=14, bold=True, color="FFFFFF")
@@ -2600,6 +2605,19 @@ class BaseAutomationTab(ctk.CTkFrame):
     def log_info(self, msg: str) -> None:
         """Log an info message with ℹ️ prefix."""
         self.app.log_message(self.log_display, f"ℹ️ {msg}", "info")
+
+    def log(self, message: str, level: str = "INFO") -> None:
+        """Unified log helper routing to log_display."""
+        lvl = str(level).upper()
+        log_disp = getattr(self, "log_display", None)
+        if lvl in ("ERROR", "FAILED"):
+            self.app.log_message(log_disp, message, "error")
+        elif lvl in ("WARNING", "WARN"):
+            self.app.log_message(log_disp, message, "warning")
+        elif lvl in ("SUCCESS", "DONE"):
+            self.app.log_message(log_disp, message, "success")
+        else:
+            self.app.log_message(log_disp, message, "info")
 
     # ────────────────────────────────────────────────────────────────
     # STOP EVENT HELPER (P6.1)

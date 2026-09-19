@@ -1,0 +1,360 @@
+[
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "cloud-download-filename-traversal",
+    "title": "Cloud file-manager download writes use server-controlled 'filename' joined into the local save path without sanitization",
+    "description": "File-management download flows build the local write path by joining the server-supplied item['filename'] directly into a user-selected directory (file_management_tab.py:686 _download_multiple_files, and the recursive folder downloader's get_all_files path construction) before writing streamed bytes. If a malicious/compromised server (or an attacker who can influence stored filenames — e.g., another tenant in a shared folder tree, if the server permits) returns a filename containing '..' separators or an absolute path, the write escapes the chosen directory. Python's open() will not follow a '..' escape on its own — the join must contain it — so the impact is entirely gated on what the server may legally return in 'filename'.",
+    "claimed_root_cause": "The client treats server-controlled 'filename' as a safe path component (os.path.join(save_dir, item['filename'])) with no validation, relying on an unstated server-side sanitization guarantee that is not visible in this repository.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/tabs/file_management_tab.py",
+        "line": 683,
+        "scope": "GET /files/api/download/{item['id']}",
+        "description": "Server response supplies both the bytes and the metadata item['filename'] used to name the local file."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/tabs/file_management_tab.py",
+        "line": 686,
+        "scope": "local_path = os.path.join(save_dir, item['filename'])",
+        "description": "Server-controlled filename is joined into the user-chosen directory with no rejection of separators, '..' components, or absolute paths; on Windows a leading drive letter or UNC path in 'filename' would also redirect the write."
+      },
+      {
+        "kind": "sink",
+        "file": "src/tabs/file_management_tab.py",
+        "line": 688,
+        "scope": "open(local_path, 'wb') streamed write",
+        "description": "Bytes are written to the unsanitized path — the boundary effect (write outside the chosen directory) occurs here if and only if the server returns a traversal-shaped filename."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/tabs/file_management_tab.py",
+        "line": 686,
+        "description": "Direct join of server-controlled 'filename' into save_dir, no sanitization."
+      },
+      {
+        "file": "src/tabs/file_management_tab.py",
+        "line": 544,
+        "description": "Upload side sends client-controlled 'relative_path' to the same server, so the filename namespace is client-writable data stored server-side and returned verbatim to downloaders — the traversal precondition is realistic if the server does not sanitize at store time (server code is out of scope)."
+      }
+    ],
+    "blockers": [
+      "Whether nrega-server sanitizes 'filename'/'relative_path' at upload/store/list time (rejecting separators, '..' components, absolute paths) is not observable in the desktop repository; the server code (nrega-server/) is out of scope for this run.",
+      "Whether a licensed user can plant a filename into another user's download listing (cross-tenant filename influence) depends on server-side tenancy/isolation of the /files namespace."
+    ],
+    "validation_plan": {
+      "local": "Bounded fixture against a loopback stub of /files/api/download that returns header 'Content-Disposition'/'filename' of '../../pwned.txt' with dummy bytes; drive the unmodified _download_multiple_files worker with a scratch save_dir and observe the write landing outside it (client-side path proof, no vendor server contacted).",
+      "deployment": "Owner observes nrega-server: (1) the upload handler's filename/relative_path validation, (2) the list endpoint's filename serialization, (3) whether two licensed users can ever appear in one another's file namespace. If sanitization exists at store time and tenancy is enforced, close this record as rejected with that evidence."
+    }
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "crash-report-unauth-arbitrary-content",
+    "title": "Unauthenticated /api/crash-report accepts client-chosen license_key and free-form text fields (server-side trust decision out of scope)",
+    "description": "The crash reporter POSTs to /api/crash-report with no Authorization header: payload fields include license_key read from the local file (src/utils.py:573), error_message and error_traceback (PII-masked client-side), and last_log_lines. Any process or script on any machine can POST the same shape with arbitrary license_key and content. Whether this yields log poisoning, a stored-XSS path into the admin panel, PII-cross-attribution, or nothing at all is decided entirely by the server handler — which lives in nrega-server/ (out of scope). The client-side contribution is limited and by design (crash reports are fire-and-forget, and PII masking is applied before send).",
+    "claimed_root_cause": "src/utils.py::_upload_crash_report sends the report without client-side authentication, relying on the server to validate license_key ownership and sanitize free-form fields before any administrative rendering or storage decision.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/utils.py",
+        "line": 573,
+        "scope": "payload construction: license_key=_read_license_key(), error fields",
+        "description": "Client-chosen license_key plus free-form error_message/error_traceback/last_log_lines are assembled on every crash."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/utils.py",
+        "line": 503,
+        "scope": "requests.post(f\"{server_url}/api/crash-report\", json=payload, timeout=8)",
+        "description": "POST with no Authorization header and no session binding; the endpoint's trust model is whatever the server implements."
+      },
+      {
+        "kind": "sink",
+        "file": "src/utils.py",
+        "line": 503,
+        "scope": "server-side /api/crash-report handler (out of scope)",
+        "description": "All decisive validation (key ownership, field sanitization, admin-rendering context, rate limiting) happens server-side and is not observable from this repository."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/utils.py",
+        "line": 492,
+        "description": "Comment asserts server-side PII masking + rate limiting exist ('defense-in-depth') — an owner assertion, not a client-verifiable control."
+      },
+      {
+        "file": "src/utils.py",
+        "line": 573,
+        "description": "license_key is client-supplied data, enabling attribution spoofing if the server trusts it."
+      }
+    ],
+    "blockers": [
+      "The /api/crash-report handler (validation of license_key, sanitization of free-form fields, storage and admin-rendering context) is in nrega-server/, out of scope for this scoped run.",
+      "Whether the admin UI renders crash reports with HTML escaping, and whether log entries become readable by other principals, are deployment/server facts."
+    ],
+    "validation_plan": {
+      "deployment": "Owner observes nrega-server: (1) does /api/crash-report verify that the posted license_key belongs to a real license before storing? (2) are error_message/traceback/last_log_lines sanitized/length-capped at store time? (3) does the admin crash-report view render with auto-escaping and without HTML interpretation? If all three hold, close as rejected; if any fails, the server-side finding belongs to the nrega-server audit."
+    }
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "heartbeat-license-key-query-param",
+    "title": "License bearer key transmitted in URL query string on the periodic app-config poll",
+    "description": "The 20-second heartbeat loop sends the password-equivalent license key as a URL query parameter (?license_key=<key>) on the GET /api/app-config request, unlike every sibling request in the codebase which carries the key in the Authorization header over TLS (by explicit design, see app_license.py:1622-1631). URLs — including their query strings — are routinely recorded by intermediaries and recipients: TLS-terminating proxies/CDNs, server access logs, referer headers on any subsequent navigation, and browser/history surfaces if the URL is ever reconstructed outside the HTTP client. The client codebase's own comment acknowledges keys must never appear in URLs.",
+    "claimed_root_cause": "app_license.py:1806-1809 appends the raw license key to the request URL as a query parameter instead of using the Authorization header pattern used by all sibling endpoints, so the secret leaves the header-scoped trust boundary and enters URL-scoped logging/propagation surfaces.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/app/app_license.py",
+        "line": 1785,
+        "scope": "heartbeat loop, hb_key = (lic.get('key') or '').strip()",
+        "description": "The bearer key is read from local license state for the recurring poll (every ~20s while the app runs)."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/app/app_license.py",
+        "line": 1808,
+        "scope": "url += f\"?license_key={hb_key}\"",
+        "description": "The key is embedded in the URL query string — no URL-encoding is applied, and the value now travels wherever the URL travels (proxy/CDN/access logs), not just inside the TLS-protected header block."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/app/app_license.py",
+        "line": 1810,
+        "scope": "self.app_state.http_session.get(url, timeout=10)",
+        "description": "GET request issued with the key-bearing URL; TLS protects the wire but not downstream URL logging at the TLS termination point."
+      },
+      {
+        "kind": "sink",
+        "file": "src/app/app_license.py",
+        "line": 1810,
+        "scope": "server-side access logging / intermediary retention (deployment side)",
+        "description": "Destination of the leak: access logs and any intermediary records at/after TLS termination. Whether key-bearing URLs are actually retained there is a server/infrastructure fact outside this repository."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/app/app_license.py",
+        "line": 1808,
+        "description": "Key concatenated into the URL query string."
+      },
+      {
+        "file": "src/app/app_license.py",
+        "line": 1625,
+        "description": "Sibling comment states the codebase invariant: 'license key ... must never appear in a browser URL' — the header pattern used at 1606, 1646, 2149 etc. is the intended control."
+      },
+      {
+        "file": "src/managers/services.py",
+        "line": 85,
+        "description": "License key transmitted in POST body/header-style payloads elsewhere, confirming the query-parameter usage is the outlier."
+      }
+    ],
+    "blockers": [
+      "Whether the key-bearing URL is actually persisted (server access logs, CDN/proxy logs, WAF records) at nregabot.com's TLS termination is a deployment fact; the Flask server code (nrega-server/) is out of scope for this run and log-retention configuration is not observable from the client repo.",
+      "Whether any intermediary on the serving path (Cloudflare tunnel per loader comments) records full query strings requires owner observation of the deployed log pipeline."
+    ],
+    "validation_plan": {
+      "deployment": "Owner inspects the nregabot.com serving path: (1) grep recent nginx/Flask/uvicorn access logs for 'license_key=' occurrences and count distinct keys; (2) review CDN/proxy/WAF log settings for full-URL query retention; (3) confirm whether access logs are shipped to any third-party analytics or long-term storage. If key-bearing URLs are (or can be) logged, treat the key as exposed to log readers and rotate keys, then switch the endpoint to the Authorization header.",
+      "local": "Bounded client-side check (no live traffic): in a sandbox with a loopback-only fixture server, issue the same GET the heartbeat issues and record the full request line to confirm the key is on the wire in the URL (already established from source at line 1808); the open question that remains is exclusively server-side retention, covered by the deployment step."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "in-app-update-accepts-unverified-core-payload",
+    "title": "In-app updater installs trusted-host payloads without integrity verification (weaker than loader.py's fail-closed gate)",
+    "description": "The PyInstaller loader (loader.py) refuses any core-zip update whose server-declared SHA-256 is empty, and the Lite loader's comment calls empty-hash refusal the loader fix. The sibling in-app update path (src/managers/services.py::download_and_install_update) enforces only the transport guard (HTTPS + nregabot.com host pin). When self.app.update_info['hash'] is empty, the SHA-256 verification block is skipped entirely and the payload proceeds to install: on Windows os.startfile(dl_path) executes the downloaded file and the process exits; on macOS/Linux the downloaded file is opened and for .zip payloads main_app._apply_smart_update copies it to core.zip as the next-boot code source. Services.py itself defines the empty local hash as 'no verification possible' (_get_local_applied_hash docstring), making the missing-server-hash skip a direct violation of the codebase's own update-integrity invariant.",
+    "root_cause": "src/managers/services.py treats an empty server-declared hash as 'skip verification' instead of 'refuse update', diverging from loader.py's fail-closed integrity gate for the same authority boundary.",
+    "intended_behavior": "Any payload that reaches the install branch must have its bytes cryptographically bound to the release decision: a non-empty, platform-correct SHA-256 declared by version.json, verified against the downloaded file, on every path that can lead to code execution (loader, lite_loader, in-app).",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/managers/services.py",
+        "line": 223,
+        "scope": "ServiceManager.download_and_install_update(url, version)",
+        "description": "In-app update download/apply entry; invoked from the About tab update flow with version.json-supplied url and update_info."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/managers/services.py",
+        "line": 239,
+        "scope": "transport guard",
+        "description": "Only precondition enforced: url must be a string starting with 'https://nregabot.com/'. No requirement that a declared hash exists."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/managers/services.py",
+        "line": 259,
+        "scope": "expected_hash = (self.app.update_info or {}).get('hash') or ''",
+        "description": "Server-declared hash read; empty string is accepted, which deactivates the verification block below (no else-branch refuses the payload)."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/managers/services.py",
+        "line": 260,
+        "scope": "if expected_hash: ... sha256 verification",
+        "description": "SHA-256 verification of the downloaded file runs only inside this conditional; with expected_hash == '' the downloaded bytes are used with no integrity check."
+      },
+      {
+        "kind": "sink",
+        "file": "src/managers/services.py",
+        "line": 285,
+        "scope": "os.startfile(dl_path) (Windows) / subprocess.call(['open', dl_path]) (288)",
+        "description": "The unverified downloaded payload is handed to the OS: on Windows os.startfile executes it; the process then calls os._exit(0), making the payload the new code source on next boot."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/managers/services.py",
+        "line": 259,
+        "description": "expected_hash falls back to '' — the exact value that skips verification."
+      },
+      {
+        "file": "src/managers/services.py",
+        "line": 260,
+        "description": "Verification strictly nested under `if expected_hash:`; no refusal path for an empty hash."
+      },
+      {
+        "file": "loader.py",
+        "line": 690,
+        "description": "Sibling control on the same authority boundary: loader refuses empty server hash ('Refusing unverified update'), demonstrating the vendor's intended invariant for identical payloads."
+      },
+      {
+        "file": "lite_loader.py",
+        "line": 436,
+        "description": "Lite loader's own comment states empty generic hash is accepted because 'verification still runs whenever a hash IS present' — documents that verification-vs-skip is version.json-controlled, not protocol-guaranteed."
+      },
+      {
+        "file": "config/version.json",
+        "line": 10,
+        "description": "Live feed currently publishes hash_windows/hash_macos but the generic 'hash' field is empty, so reachability depends only on the publisher's field choice (owner-controlled), not on any client control."
+      },
+      {
+        "file": "nrega-security-audit-output/harness_local_check_2.py",
+        "line": 1,
+        "description": "Sandboxed harness artifact: negative control (http://evil.example refused pre-GET), target case (https://nregabot.com/... with empty declared hash passes the guard and reaches the install branch), positive probe (hash-present case performs the verification lookup). All controls enforced: network deny, scratch-only writes, read-only target, empty environment."
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "environmental_dependency",
+        "description": "A version.json response consumed by the app must carry a payload URL on https://nregabot.com/ with an empty/missing hash for the platform field the in-app path reads (update_info['hash']). The feed is served over HTTPS from the vendor's origin; an on-path TLS attacker cannot alter it (cert validation is default-on), so the practical writer is the vendor/origin compromise — the same position from which the loader's hash gate can also be bypassed by publishing a matching hash. The client-side defect is the absent fail-closed invariant, which removes defense-in-depth exactly where the loader keeps it."
+      },
+      {
+        "kind": "user_interaction",
+        "description": "User accepts the in-app update prompt and clicks the update button (normal update UX)."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Auditor-as-publisher test (dummy fixture): act as the version.json writer choosing to publish a trusted-host payload without a hash field, then observe whether the client enforces the loader's fail-closed invariant. No external service was contacted; the download GET fails offline by sandbox design and is irrelevant to the finding, which is established at the guard/verification branch, before any bytes flow.",
+      "payloads": [
+        "url=https://nregabot.com/updates/core_win_v3.2.11.zip  update_info={'is_smart_update': True, 'hash': ''}",
+        "url=http://evil.example/payload.zip  update_info={'is_smart_update': True, 'hash': 'a'*64}  (negative control)"
+      ],
+      "instructions": [
+        "Run under macOS seatbelt: sandbox-exec -f /tmp/net-deny.sb python3 nrega-security-audit-output/harness_local_check_2.py (profile: deny default, deny network*, allow file-read*, allow file-write* only under /private/tmp/nregabot-audit-scratch).",
+        "The harness stubs requests.get offline (no socket opened, no live endpoint contacted), drives the unpatched ServiceManager.download_and_install_update with the two payload descriptors above, and records whether the download URL is attempted (guard passed) or refused (guard held).",
+        "Read the three case outputs; the target case's 'attempted download URL' line is the minimum observed result."
+      ],
+      "observed_result": "Negative control: foreign-host URL refused before any GET (guard invariant holds). Target case: trusted-host URL with EMPTY declared hash passes the transport guard and the code path reaches the install branch with zero integrity verification — no refusal exists at any point. Exit code 1 = guard bypass confirmed (harness logic, not a crash)."
+    },
+    "remediation": {
+      "strategy": "Make the in-app path enforce the same fail-closed invariant as loader.py: refuse any update whose platform-declared hash is empty, and verify the downloaded bytes against it before any install action. Reuse loader.py's gate rather than inventing a third policy.",
+      "code_changes": [
+        {
+          "file_name": "src/managers/services.py",
+          "fixed_code": "expected_hash = (self.app.update_info or {}).get(\"hash\") or \"\"\nif not expected_hash:\n    # Fail closed: no unverified payload may reach the install branch\n    # (mirrors loader.py 'Refusing unverified update').\n    self.app.after(0, messagebox.showerror, \"Update Failed\",\n                   \"Update payload has no integrity hash — refusing to install.\"\n                   \" Please reinstall from nregabot.com.\")\n    self.app.after(0, lambda: about.update_button.configure(state=\"normal\", text=\"Retry Update\"))\n    return\nactual_hash = hashlib.sha256()\nwith open(dl_path, 'rb') as f:\n    for chunk in iter(lambda: f.read(8192), b\"\"):\n        actual_hash.update(chunk)\nif actual_hash.hexdigest() != expected_hash:\n    ...  # existing corrupt-download handling"
+        },
+        {
+          "file_name": "scripts/build_update.py",
+          "fixed_code": "# Publish the platform hashes for every field the clients read\n# (generic hash included) so no client path can encounter an empty hash."
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Requires the version.json origin (vendor-side) to publish an unhashed payload — a publisher mistake or origin compromise — plus a user accepting the in-app update; TLS blocks on-path attackers from writing the feed."
+      },
+      "impact": {
+        "score": "high",
+        "reason": "If reached, the payload becomes executed code on the worker's machine (Windows auto-execute; macOS next-boot code via core.zip), fully defeating the update-integrity control with code-execution consequence."
+      },
+      "overall_severity": "medium"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Complete source-visible trace with the strongest preventing layer identified (transport guard, services.py:239) and a sandboxed local reproduction demonstrating the empty-hash skip; no preventing layer exists between the guard and the sink."
+    }
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "license-dat-unsigned-local-expiry-bypass",
+    "title": "license.dat carries no cryptographic binding; local expiry check is the only offline gate",
+    "description": "The license file is a plaintext JSON blob written from server responses (src/utils.py::save_license_dat) with no HMAC/signature binding, and its only local validity check is comparing the self-declared 'expires_at' field against the wall clock (src/managers/services.py::check_license lines 67-68). The key itself is never verified locally — the network validation (validate_on_server) runs in a daemon thread and, on connection error, returns True (offline grace). A user who edits the JSON can extend 'expires_at' and keep operating offline indefinitely; the server would reject the forged key on the next successful online validation, but that rejection is advisory to a thread whose failure path is the offline-grace branch.",
+    "claimed_root_cause": "The license artifact lacks an integrity/authenticity binding (HMAC over {key, expires_at, machine_id}), so local trust decisions rest on attacker-editable data; combined with the offline-grace return-True path in validate_on_server, the effective enforcement of license validity is server-availability-dependent.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/managers/services.py",
+        "line": 56,
+        "scope": "ServiceManager.check_license()",
+        "description": "Loads license.dat JSON directly from disk; no signature/HMAC verification exists (repo-wide search for hmac/rsa/signature verification in src/ returned none)."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/managers/services.py",
+        "line": 67,
+        "scope": "expires_dt = datetime.fromisoformat(self.app.license_info['expires_at']...)",
+        "description": "Parses the file's self-declared expiry; the value originates from an attacker-editable plaintext file (chmod 600 protects confidentiality from other users, not integrity from the owner)."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/managers/services.py",
+        "line": 68,
+        "scope": "if datetime.now() > expires_dt: return False",
+        "description": "The only local gate: a wall-clock comparison. Pushing expires_at into the future passes it unconditionally."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/managers/services.py",
+        "line": 73,
+        "scope": "threading.Thread(target=self.validate_on_server, ..., daemon=True).start(); return True",
+        "description": "App access is granted before/independent of server validation; the online check is advisory to the startup flow."
+      },
+      {
+        "kind": "sink",
+        "file": "src/managers/services.py",
+        "line": 133,
+        "scope": "validate_on_server exception path returns True (offline grace)",
+        "description": "When the server is unreachable (firewall block of nregabot.com is trivially achievable by the license holder), validation 'passes' and the app continues with the forged file."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/managers/services.py",
+        "line": 67,
+        "description": "Expiry parsed from the file's own field."
+      },
+      {
+        "file": "src/utils.py",
+        "line": 690,
+        "description": "save_license_dat writes plaintext JSON (no MAC/signature) — the write-side confirms no binding exists anywhere."
+      },
+      {
+        "file": "nrega-security-audit-output/harness_local_check_1.py",
+        "line": 1,
+        "description": "Sandboxed negative-control artifact: forged EXPIRED license.dat under network-deny sandbox yields check_license() -> False (the local expiry gate behaves as designed), confirming the bypass requires the future-dated edit (co-condition), which is trivial for the file owner."
+      }
+    ],
+    "blockers": [
+      "The decisive co-condition is server-side: whether validate_on_server's rejection (when online) deactivates the app (deletes license.dat and revokes UI state) or merely shows an error dialog while the session continues. That behavior spans services.py and the server's response contract; the effective enforcement strength cannot be established from the client repo alone.",
+      "Vendor's accepted abuse model is unknown: a local license bypass by the machine owner is a revenue-control question; severity/impact framing as a security finding requires the owner to confirm the intended boundary (anti-tamper vs. hard security control)."
+    ],
+    "validation_plan": {
+      "local": "Bounded fixture (no live vendor traffic): in the network-deny sandbox, forge license.dat with a FUTURE expires_at and a syntactically valid key, run the app's startup license flow, and record that the app enters the licensed state offline (demonstrates the bypass end-to-end on the client side). This is the client-half proof; it needs the owner's confirmation of the abuse model to become a finding.",
+      "deployment": "Owner observes the online re-validation behavior: with a deliberately expired/forged key and the server reachable, record whether the app (a) deletes license.dat and locks all automations, or (b) shows a transient error while automation remains usable. Also state whether offline grace is an intended business tolerance and for how long."
+    }
+  }
+]

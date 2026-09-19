@@ -130,6 +130,11 @@ def get_tabs_definition_lite(app: Any) -> Dict[str, Dict[str, Any]]:
                 "icon": "📇",
                 "key": "ekyc_report"
             },
+            "Skilled Worker Report": {
+                "creation_func": _lazy_import("SkilledAadhaarReportTab", "src.tabs.skilled_aadhaar_report_tab"),
+                "icon": "👷‍♂️",
+                "key": "skilled_aadhaar_report"
+            },
         },
 
         # 5. Settings & About

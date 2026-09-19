@@ -303,6 +303,7 @@ class HistoryManager:
     # ── Import legacy JSON files into tab_inputs table ──
     _TAB_INPUT_JSON_FILES = {
         "ekyc_report": "ekyc_inputs.json",
+        "skilled_aadhaar_report": "skilled_aadhaar_inputs.json",
         "mr_tracking": "mr_tracking_inputs.json",
         "issued_mr_report": "issued_mr_report_inputs.json",
         "work_alloc": "work_alloc_inputs.json",

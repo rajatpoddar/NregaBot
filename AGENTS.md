@@ -7,7 +7,7 @@
 > 3. Non-negotiable safety rules (visible reminders)
 > 4. Workflow pointers (with links to canonical docs)
 >
-> **Status:** Content verified 30 Aug 2026; version table refreshed 9 Sep 2026 for **3.2.9** (see `config/version.json`).
+> **Status:** Content verified 30 Aug 2026; version table refreshed for **3.2.12** (see `config/version.json`).
 
 ---
 
@@ -121,7 +121,14 @@ Full rule: [`docs/RULES.md`](docs/RULES.md) RULE-SRC-007 / RULE-TST-003.
 1. **Read context first** - this file + the relevant section of [`docs/RULES.md`](docs/RULES.md) + the relevant `MEM-*` / `DEC-*` entries.
 2. **Verify version** - `config/version.json::latest_version` + `src/config.py::APP_VERSION` are the source of truth.
 3. **For non-trivial changes** - query Codebase Memory first (see section 5 below).
-4. **For new tabs** - subclass `BaseAutomationTab`; use function-level imports; register via `_lazy_import` in `src/tab_config.py`; add key to `AUTOMATION_DISPLAY_NAMES`.
+4. **For new tabs / automations** - Follow skill [`.agents/skills/nregabot-tab-builder/SKILL.md`](.agents/skills/nregabot-tab-builder/SKILL.md):
+   - Subclass `BaseAutomationTab` & lazy imports only inside methods (`RULE-SRC-001`).
+   - Register icon in all 4 registries (`assets/icons/emojis/`, `icon_manager.py`, `tab_config.py`, `app_navigation.py::_ICON_KEYS`, `config.py::TAB_ICONS`).
+   - Add key to `AUTOMATION_DISPLAY_NAMES` and test in `tests/test_automation_display_names.py`.
+   - Handle Panchayat dropdowns using `_clean_panchayat_value()`, `_is_panchayat_label()`, and ASP.NET postback staleness with GP login fallback.
+   - Use `self.show_automation_notification("success")` + `self.activity_details` for completion.
+   - Dedicated report directory via `self.app.get_report_path(self._report_category())`.
+   - Professional openpyxl multi-sheet Excel export with NregaBot branding, KPI cards, and auto-open.
 5. **For refactors** - write characterization test FIRST, then change, then verify.
 6. **Run pre-flight checks**:
    ```bash
@@ -221,10 +228,10 @@ venv/bin/python scripts/build_locales.py   # exit 0 required
 
 | File | Field | Current |
 |---|---|---|
-| `config/version.json` | `latest_version` | **3.2.9** |
-| `src/config.py` | `APP_VERSION` | **3.2.9** |
-| `README.md` | Version badge | **v3.2.9** |
-| `scripts/installer.iss` / `installer_lite.iss` | `AppVersion` | **3.2.9** |
+| `config/version.json` | `latest_version` | **3.2.12** |
+| `src/config.py` | `APP_VERSION` | **3.2.12** |
+| `README.md` | Version badge | **v3.2.12** |
+| `scripts/installer.iss` / `installer_lite.iss` | `AppVersion` | **3.2.12** |
 
 If any document disagrees with the first two, **the source-of-truth files win**. Always verify before publishing claims.
 

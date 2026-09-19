@@ -201,4 +201,6 @@ KN5 = {
     "push.automation_success": "✅ {name} ಪೂರ್ಣಗೊಂಡಿದೆ",
     "push.automation_failed": "⚠️ {name} ಸಮಸ್ಯೆಗಳೊಂದಿಗೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
     "push.automation_duration": "{duration} ತೆಗೆದುಕೊಂಡಿದೆ",
+    "tab.skilled_aadhaar_report.title": "ಕುಶಲ ಮತ್ತು ಅರೆ ಕುಶಲ ವರದಿ",
+    "tab.skilled_aadhaar_report.subtitle": "ಕುಶಲ ಕಾರ್ಮಿಕರ ಆಧಾರ್ ಅಪ್‌ಡೇಟ್ ಸ್ಥಿತಿಯನ್ನು ಸ್ಕ್ಯಾನ್ ಮಾಡಿ ಮತ್ತು ಸಾರಾಂಶ ವರದಿಯನ್ನು ರಚಿಸಿ.",
 }

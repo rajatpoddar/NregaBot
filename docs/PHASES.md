@@ -216,6 +216,9 @@ The following are explicitly listed as PLANNED in `docs/PRD.md` / `docs/SCALING_
 | Scheduled automations | SCALING_PLAN Phase 3 #18 | PLANNED |
 | State-registry integration for `PENDING_BILLS_CONFIG` | PHASES | PLANNED (currently manual edit) |
 | Adapter to expose per-key stop event in `_wait_for_automation_finish` (currently hardcoded to `stop_events["macro"]`) | PHASES | PLANNED (see deferred items) |
+| **Automation Reporting Standardization** | Tab Audit Sep 2026 | PLANNED (Add export buttons to `fto_generation`, `jobcard_verify`, `resend_rejected_wg`, `sad_update`; Polish `mr_tracking` & `mis_reports` Excel styling) |
+| **Security Audit Remediation** | `nrega-security-audit-output/` | PLANNED (Fix Confirmed-1 in `services.py` fail-closed hash gate; validate 4 leads: heartbeat query param, license.dat offline bypass, file traversal, crash report auth) |
+| **Release Workflow Simplification** | Release Audit Sep 2026 | PLANNED (Create `scripts/bump_version.py` single-command version bumper across all 8 files + changelog + dryrun check) |
 
 ---
 

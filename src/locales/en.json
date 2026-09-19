@@ -303,6 +303,8 @@
   "tab.duplicate_mr.subtitle": "Print or save duplicate Muster Rolls for the selected Panchayat.",
   "tab.ekyc_report.title": "eKYC Report",
   "tab.ekyc_report.subtitle": "Scan eKYC & ABPS status for jobcard holders — panchayat-wise summary.",
+  "tab.skilled_aadhaar_report.title": "Skilled & Semi-Skilled Report",
+  "tab.skilled_aadhaar_report.subtitle": "Scan skilled worker Aadhaar updation status & generate summary report.",
   "tab.emb_verify.title": "eMB Verify",
   "tab.emb_verify.subtitle": "Verify eMB entries against the sanctioned amount for the selected Panchayat.",
   "tab.fto_generation.title": "FTO Generation",

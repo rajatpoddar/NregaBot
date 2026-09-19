@@ -303,6 +303,8 @@
   "tab.duplicate_mr.subtitle": "चयनित पंचायत के डुप्लिकेट मस्टर रोल प्रिंट या सेव करें।",
   "tab.ekyc_report.title": "ई-केवाईसी रिपोर्ट",
   "tab.ekyc_report.subtitle": "जॉबकार्ड धारकों की ई-केवाईसी व एबीपीएस स्थिति स्कैन करें — पंचायत-वार सारांश।",
+  "tab.skilled_aadhaar_report.title": "कुशल व अर्धकुशल आधार रिपोर्ट",
+  "tab.skilled_aadhaar_report.subtitle": "कुशल श्रमिकों की आधार अपडेट स्थिति स्कैन करें एवं सारांश रिपोर्ट तैयार करें।",
   "tab.emb_verify.title": "ईएमबी सत्यापन",
   "tab.emb_verify.subtitle": "चयनित पंचायत के स्वीकृत राशि के अनुसार ईएमबी प्रविष्टियां सत्यापित करें।",
   "tab.fto_generation.title": "एफटीओ निर्माण",

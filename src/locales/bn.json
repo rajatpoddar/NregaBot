@@ -303,6 +303,8 @@
   "tab.duplicate_mr.subtitle": "নির্বাচিত পঞ্চায়েতের জন্য নকল মুস্তার রোল প্রিন্ট বা সংরক্ষণ করুন।",
   "tab.ekyc_report.title": "eKYC রিপোর্ট",
   "tab.ekyc_report.subtitle": "জব কার্ডধারীদের জন্য eKYC ও ABPS অবস্থা স্ক্যান করুন — পঞ্চায়েত-ভিত্তিক সারাংশ।",
+  "tab.skilled_aadhaar_report.title": "দক্ষ ও আধা-দক্ষ রিপোর্ট",
+  "tab.skilled_aadhaar_report.subtitle": "দক্ষ শ্রমিকদের আধার আপডেটের অবস্থা স্ক্যান করুন এবং সারসংক্ষেপ রিপোর্ট তৈরি করুন।",
   "tab.emb_verify.title": "eMB যাচাই",
   "tab.emb_verify.subtitle": "নির্বাচিত পঞ্চায়েতের অনুমোদিত পরিমাণের বিপরীতে eMB এন্ট্রি যাচাই করুন।",
   "tab.fto_generation.title": "FTO তৈরি",

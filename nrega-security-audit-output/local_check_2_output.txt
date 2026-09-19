@@ -1,0 +1,13 @@
+--- NEGATIVE CONTROL: http foreign host ---
+  attempted download URL: []
+  guard refused before any GET: True
+--- TARGET: https://nregabot.com/ with empty hash ---
+  attempted download URL: ['https://nregabot.com/updates/core_win_v3.2.11.zip']
+  guard refused before any GET: False
+--- POSITIVE PROBE: trusted URL with wrong hash ---
+  attempted download URL: ['https://nregabot.com/updates/core_win_v3.2.11.zip']
+  guard refused before any GET: False
+[result] negative-control refused: True
+[result] empty-hash accepted past guard (GET attempted): True
+[result] hash-present case attempted GET: True
+GUARD BYPASS CONFIRMED: empty declared hash passes transport guard and reaches the install branch without any integrity check
