@@ -10,10 +10,20 @@
 	// → NregaBot.code-workspace chuno. (Ya double-click file par)
 	"folders": [
 		{
+			"name": "NregaBot",
 			"path": "."
 		},
 		{
+			"name": "nrega-server",
 			"path": "nrega-server"
+		},
+		{
+			"name": "Android",
+			"path": "android-app"
+		},
+		{
+			"name": "marketing",
+			"path": "marketing"
 		}
 	],
 	"settings": {

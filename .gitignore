@@ -57,6 +57,7 @@ import_check_results.txt
 OPTIMIZATION_REPORT.md
 brag-output*/
 marketing-videos/
+marketing/
 
 # Generated docs (analysis/plan, not needed for app)
 docs/import_check_results.txt
