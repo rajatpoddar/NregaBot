@@ -1,7 +1,8 @@
 {
   "3.2.12": [
     "👷 **Skilled & Semi-Skilled Aadhaar Report:** Naya automation tab jisme Skilled aur Semi-Skilled labour ki Aadhaar seeding, bank, aur account status report scrape aur professional Excel me export hoti hai. Multi-Panchayat sequence ke sath ASP.NET postback page-index leak fix kiya gaya.",
-    "🔒 **In-App Update Integrity Gate:** In-app update pipeline me SHA-256 integrity gate lagaya gaya — empty ya missing server hash hone par update refuse hoti hai aur downloaded payload verify hone ke baad hi install hota hai."
+    "🔒 **In-App Update Integrity Gate:** In-app update pipeline me SHA-256 integrity gate lagaya gaya — empty ya missing server hash hone par update refuse hoti hai aur downloaded payload verify hone ke baad hi install hota hai.",
+    "📄 **Duplicate MR Print Reporting Fix:** Duplicate Muster Roll print automation me PDF save hone ke baad bhi column index mismatch ke karan '0 saved, 1 failed' reporting aane wala bug fix kiya gaya. Saath hi Edge aur Chromium browsers ke liye CDP & W3C print fallback jud gaya hai."
   ],
   "3.2.11": [
     "🎯 **Generate Wagelist — Ab Sirf Jo Workcode Chaho:** Naya **Work Codes** tab aaya hai. Jin works ka wagelist chahiye unke code daal do, bas wahi generate honge. Khaali chhod diya to pehle jaisa hi saara pending wagelist ban jayega. Poora code, ya sirf aakhri kuch digits (jaise `18672`) — dono chalte hain. Jo code pending list me mila hi nahi, wo Results me **Not Found** dikhega.",

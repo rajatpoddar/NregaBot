@@ -773,7 +773,7 @@ class SkilledAadhaarReportTab(BaseAutomationTab):
         _safe_ui(self._update_summary_cards)
 
     # --- Export Report ---
-    def export_professional_report(self, filepath: Optional[str] = None) -> Optional[str]:
+    def export_professional_report(self, filepath: Optional[str] = None, auto_open: bool = True) -> Optional[str]:
         """Exports scraped data and summary to an executive-grade Excel workbook or CSV."""
         if not self.all_scraped_data:
             messagebox.showinfo("Export", "No data to export.")
@@ -1156,14 +1156,15 @@ class SkilledAadhaarReportTab(BaseAutomationTab):
             self.log(f"📥 Report exported to {filepath}", "SUCCESS")
 
             # Auto-open file if desktop environment allows
-            try:
-                if sys.platform == "win32":
-                    os.startfile(filepath)
-                elif sys.platform == "darwin":
-                    import subprocess
-                    subprocess.call(['open', filepath])
-            except Exception:
-                pass
+            if auto_open:
+                try:
+                    if sys.platform == "win32":
+                        os.startfile(filepath)
+                    elif sys.platform == "darwin":
+                        import subprocess
+                        subprocess.call(['open', filepath])
+                except Exception:
+                    pass
 
             return filepath
         except Exception as ex:
