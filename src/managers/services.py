@@ -9,7 +9,11 @@ import subprocess
 import ctypes
 from datetime import datetime
 from typing import Any, Dict, Optional
-from getmac import get_mac_address
+try:
+    from getmac import get_mac_address
+except ImportError:
+    def get_mac_address() -> Optional[str]:
+        return None
 from tkinter import messagebox
 from src import config
 from src.utils import (get_data_path, get_user_downloads_path, parse_version,

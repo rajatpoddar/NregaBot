@@ -82,7 +82,7 @@ jobs:
         # selenium, fpdf2, openpyxl, requests, appdirs. Inme se koi bhi miss
         # hua to ModuleNotFoundError — is set ko kabhi chhota mat karo.
         # Version floors mirror requirements.txt (Pillow/selenium/fpdf2/openpyxl).
-        run: pip install pytest requests appdirs customtkinter Pillow>=12.3.0 selenium>=4.46.0 fpdf2>=2.8.7 openpyxl>=3.1.5
+        run: pip install pytest requests appdirs customtkinter Pillow>=12.3.0 selenium>=4.46.0 fpdf2>=2.8.7 openpyxl>=3.1.5 getmac>=0.9.5
 
       - name: Ruff — undefined-name & bare-except gate (F821,E722)
         # AUDIT FIX (25 Aug 2026): F821 ne real production bugs pakde the
