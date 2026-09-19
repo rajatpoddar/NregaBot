@@ -168,7 +168,14 @@ class EmbVerifyTab(BaseAutomationTab):
         """Show professional summary after eMB verification finishes."""
         if not self._is_alive():
             return
-        success = sum(1 for item in self.results_tree.get_children() if 'success' in str(self.results_tree.item(item)['values'][1]).lower() or 'verified' in str(self.results_tree.item(item)['values'][1]).lower())
+        def _is_success(item):
+            values = self.results_tree.item(item).get('values', [])
+            if not values or len(values) < 3:
+                return False
+            status = str(values[2]).lower()
+            return 'success' in status or 'verified' in status
+
+        success = sum(1 for item in self.results_tree.get_children() if _is_success(item))
         failed = total_work - success
         summary = f"✅ Verified: {success}\n❌ Failed/Rejected: {failed}\n📊 Total: {total_work}"
         self.update_status(f"✅ {success}/{total_work} verified", 1.0)

@@ -306,13 +306,30 @@ class DuplicateMrTab(BaseAutomationTab):
 
     def _show_completion_dialog(self):
         # Count success/fail from results_tree
+        # Columns: ("Timestamp", "Panchayat", "Work Code", "MSR No", "Status")
         # Status values: "Saved as PDF" (success), "PDF Save Failed", "Timeout", "No MSRs found", etc.
-        success_count = sum(1 for item in self.results_tree.get_children() if 'saved' in str(self.results_tree.item(item)['values'][3]).lower())
-        fail_count = sum(1 for item in self.results_tree.get_children() if 'saved' not in str(self.results_tree.item(item)['values'][3]).lower())
+        def _is_success(item):
+            values = self.results_tree.item(item).get('values', [])
+            if not values:
+                return False
+            status = str(values[4] if len(values) > 4 else values[-1]).lower()
+            return 'saved' in status or 'success' in status
+
+        children = self.results_tree.get_children()
+        success_count = sum(1 for item in children if _is_success(item))
+        fail_count = sum(1 for item in children if not _is_success(item))
         total_count = success_count + fail_count
         
         # Log structured summary first
         self.log_info(f"📊 Duplicate MR Complete: ✅ {success_count} saved, ❌ {fail_count} failed (of {total_count} total)")
+
+        self.activity_details = f"Duplicate MR: {success_count} saved, {fail_count} failed of {total_count} total"
+        if success_count > 0 and fail_count == 0:
+            self.show_automation_notification("success")
+        elif success_count > 0:
+            self.show_automation_notification("info")
+        elif total_count > 0:
+            self.show_automation_notification("error")
         
         final_message = f"Duplicate MR process has finished.\n✅ {success_count} saved, ❌ {fail_count} failed"
         # --- UPDATED PATH CHECK ---
@@ -485,7 +502,8 @@ class DuplicateMrTab(BaseAutomationTab):
                 });
             """)
 
-            if self.app.active_browser == 'firefox':
+            active_b = (getattr(self.app, 'active_browser', None) or getattr(driver, 'name', '') or '').lower()
+            if active_b in ('firefox', 'firefox_old'):
                 # Firefox: Inject a fixed div using JavaScript
                 footer_js = """
                 var footer = document.createElement('div');
@@ -505,7 +523,8 @@ class DuplicateMrTab(BaseAutomationTab):
                 self.log_warning("   - Note: PDF Scale setting is not supported for Firefox and will be ignored.")
                 pdf_data_base64 = driver.print_page()
             
-            elif self.app.active_browser == 'chrome':
+            else:
+                # Chrome, Edge, and other Chromium browsers
                 # Inject footer as a fixed-position element (avoids CDP footer causing extra blank page)
                 driver.execute_script("""
                     var existing = document.getElementById('nregabot-footer');
@@ -533,8 +552,15 @@ class DuplicateMrTab(BaseAutomationTab):
                     "marginBottom": 0.4,
                     "marginLeft": 0.4, "marginRight": 0.4
                 }
-                result = driver.execute_cdp_cmd('Page.printToPDF', print_options)
-                pdf_data_base64 = result['data']
+                try:
+                    result = driver.execute_cdp_cmd('Page.printToPDF', print_options)
+                    pdf_data_base64 = result.get('data') if isinstance(result, dict) else None
+                except Exception:
+                    try:
+                        pdf_data_base64 = driver.print_page()
+                    except Exception as e_print:
+                        self.log_error(f"Failed to print page to PDF: {e_print}")
+                        pdf_data_base64 = None
 
             if pdf_data_base64:
                 pdf_data = base64.b64decode(pdf_data_base64)
