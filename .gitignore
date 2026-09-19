@@ -52,9 +52,10 @@ backups/
 # Screenshots (heavy PNGs, not needed in release)
 assets/screenshots/
 
-# Generated report files
+# Generated report files / marketing video outputs
 import_check_results.txt
 OPTIMIZATION_REPORT.md
+brag-output*/
 
 # Generated docs (analysis/plan, not needed for app)
 docs/import_check_results.txt
