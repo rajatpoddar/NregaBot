@@ -9,7 +9,7 @@ APP_TAGLINE: str = "Your NREGA Task Management Companion"
 APP_DESCRIPTION: str = "A comprehensive tool for managing NREGA tasks efficiently."
 APP_AUTHOR: str = "Rajat Poddar"
 APP_AUTHOR_EMAIL: str = "Rajatpoddar@outlook.com"
-APP_VERSION: str = "3.2.12"
+APP_VERSION: str = "3.2.13"
 import os
 LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://nregabot.com')
 
@@ -717,11 +717,14 @@ def get_state_portal_url(url: str, state: str = "") -> str:
         from urllib.parse import urlsplit, urlunsplit
         parts = urlsplit(url)
         hostname = (parts.hostname or "").lower()
+        path = parts.path or ""
+        # Netnrega paths live on nregadeX servers, not vbgramgdeX servers
+        if path.lower().startswith("/netnrega") and host.lower().startswith("vbgramg"):
+            return url
         # Sirf transaction servers (vbgramgde2/3/4, nregadeX) re-host hote
         # hain — report/MIS (vbgramgrep) aur public (mnregaweb) untouched.
         if not _re.match(r"^(vbgramgde\d+|nregade\d+)\.dord\.gov\.in$", hostname):
             return url
-        path = parts.path or ""
         page = path.rsplit("/", 1)[-1] if path else ""
         override = (STATE_PAGE_OVERRIDES.get(state_key) or {}).get(page)
         if override:

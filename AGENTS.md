@@ -7,7 +7,7 @@
 > 3. Non-negotiable safety rules (visible reminders)
 > 4. Workflow pointers (with links to canonical docs)
 >
-> **Status:** Content verified 30 Aug 2026; version table refreshed for **3.2.12** (see `config/version.json`).
+> **Status:** Content verified 30 Aug 2026; version table refreshed for **3.2.13** (see `config/version.json`).
 
 ---
 
@@ -228,10 +228,10 @@ venv/bin/python scripts/build_locales.py   # exit 0 required
 
 | File | Field | Current |
 |---|---|---|
-| `config/version.json` | `latest_version` | **3.2.12** |
-| `src/config.py` | `APP_VERSION` | **3.2.12** |
-| `README.md` | Version badge | **v3.2.12** |
-| `scripts/installer.iss` / `installer_lite.iss` | `AppVersion` | **3.2.12** |
+| `config/version.json` | `latest_version` | **3.2.13** |
+| `src/config.py` | `APP_VERSION` | **3.2.13** |
+| `README.md` | Version badge | **v3.2.13** |
+| `scripts/installer.iss` / `installer_lite.iss` | `AppVersion` | **3.2.13** |
 
 If any document disagrees with the first two, **the source-of-truth files win**. Always verify before publishing claims.
 

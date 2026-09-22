@@ -1,19 +1,22 @@
 {
-  "latest_version": "3.2.12",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.12-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.12-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.12-Linux.tar.gz",
+  "latest_version": "3.2.13",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.13-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.13-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.13-Linux.tar.gz",
   "core_update": {
-    "version": "3.2.12",
-    "url": "https://nregabot.com/updates/core_v3.2.12.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.2.12.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.12.zip",
+    "version": "3.2.13",
+    "url": "https://nregabot.com/updates/core_v3.2.13.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.13.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.13.zip",
     "force_full_reinstall": false,
     "hash": "",
     "hash_windows": "",
     "hash_macos": ""
   },
   "changelog": {
+    "3.2.13": [
+      "🖨️ **Print Wagelist — Purana NREGA Support & Single Textbox:** Print Wagelist automation me Purana NREGA portal (nregade4/Netnrega) support aur portal switch [VB-G-RAM-G | NREGA (Old)] add kiya gaya. Extraction UI ko single clean full-width text box me streamline kiya gaya."
+    ],
     "3.2.12": [
       "👷 **Skilled & Semi-Skilled Aadhaar Report:** Naya automation tab jisme Skilled aur Semi-Skilled labour ki Aadhaar seeding, bank, aur account status report scrape aur professional Excel me export hoti hai. Multi-Panchayat sequence ke sath ASP.NET postback page-index leak fix kiya gaya.",
       "🔒 **In-App Update Integrity Gate:** In-app update pipeline me SHA-256 integrity gate lagaya gaya — empty ya missing server hash hone par update refuse hoti hai aur downloaded payload verify hone ke baad hi install hota hai."

@@ -34,8 +34,10 @@ from src.utils import get_logger
 
 logger = get_logger()
 
-# view_wagelist.aspx base URL (flag=UNSK for PO login)
-VIEW_WAGELIST_URL = "https://vbgramgde2.dord.gov.in/vbgramg/view_wagelist.aspx?flag=UNSK"
+# view_wagelist.aspx base URLs (flag=UNSK for PO login)
+VB_WAGELIST_URL = "https://vbgramgde2.dord.gov.in/vbgramg/view_wagelist.aspx?flag=UNSK"
+NREGA_WAGELIST_URL = "https://nregade4.dord.gov.in/Netnrega/view_wagelist.aspx?flag=UNSK"
+VIEW_WAGELIST_URL = VB_WAGELIST_URL  # Backward compatibility alias
 
 # Regex: matches wagelist IDs like 3422003WL000023, 3422003WL031552
 _WAGELIST_PATTERN = re.compile(r'\b\d+WL\d+\b', re.IGNORECASE)
@@ -73,17 +75,27 @@ class PrintWagelistTab(BaseAutomationTab):
             icon_key="emoji_send_wagelist"
         )
 
-        # --- Top Controls: FY + Save PDF option ---
+        # --- Top Controls: Portal + FY + Save PDF option ---
         controls_frame = ctk.CTkFrame(
             settings_tab, corner_radius=12, border_width=1,
             border_color=("gray85", "gray30")
         )
         controls_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
-        controls_frame.grid_columnconfigure(1, weight=1)
+
+        # Portal Selection (VB-G-RAM-G vs NREGA)
+        ctk.CTkLabel(controls_frame, text="Portal:").grid(
+            row=0, column=0, sticky="w", padx=(15, 5), pady=10
+        )
+        self.portal_var = ctk.StringVar(value="VB-G-RAM-G")
+        self.portal_segmented_button = ctk.CTkSegmentedButton(
+            controls_frame, variable=self.portal_var,
+            values=["VB-G-RAM-G", "NREGA (Old)"]
+        )
+        self.portal_segmented_button.grid(row=0, column=1, sticky="w", padx=(0, 15), pady=10)
 
         # Financial Year
         ctk.CTkLabel(controls_frame, text="Financial Year:").grid(
-            row=0, column=0, sticky="w", padx=15, pady=10
+            row=0, column=2, sticky="w", padx=(15, 5), pady=10
         )
         current_year = datetime.now().year
         year_options = [
@@ -98,7 +110,8 @@ class PrintWagelistTab(BaseAutomationTab):
         self.fin_year_menu = ctk.CTkOptionMenu(
             controls_frame, variable=self.fin_year_var, values=year_options
         )
-        self.fin_year_menu.grid(row=0, column=1, sticky="ew", padx=15, pady=10)
+        self.fin_year_menu.grid(row=0, column=3, sticky="ew", padx=(0, 15), pady=10)
+        controls_frame.grid_columnconfigure(3, weight=1)
 
         # Save PDF checkbox
         self.save_pdf_var = ctk.StringVar(value="on")
@@ -106,21 +119,20 @@ class PrintWagelistTab(BaseAutomationTab):
             controls_frame, text="Save as PDF",
             variable=self.save_pdf_var, onvalue="on", offvalue="off"
         )
-        self.save_pdf_checkbox.grid(row=0, column=2, padx=15, pady=10)
+        self.save_pdf_checkbox.grid(row=0, column=4, padx=15, pady=10)
 
-        # --- Extract Section (Workcode Extractor style) ---
+        # --- Extract Section (Single clean input text box) ---
         extract_frame = ctk.CTkFrame(
             settings_tab, corner_radius=12, border_width=1,
             border_color=("gray85", "gray30")
         )
         extract_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 8))
         extract_frame.grid_columnconfigure(0, weight=1)
-        extract_frame.grid_columnconfigure(1, weight=1)
-        extract_frame.grid_rowconfigure(3, weight=1)
+        extract_frame.grid_rowconfigure(2, weight=1)
 
-        # Row 0: Label + Extract button + options
+        # Row 0: Header controls
         top_row = ctk.CTkFrame(extract_frame, fg_color="transparent")
-        top_row.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 0))
+        top_row.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
         top_row.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
@@ -143,52 +155,39 @@ class PrintWagelistTab(BaseAutomationTab):
         )
         self.remove_dups_checkbox.grid(row=0, column=2, padx=10, pady=5)
 
+        self.copy_btn = ctk.CTkButton(
+            top_row, text="Copy", width=60,
+            command=self._copy_results
+        )
+        self.copy_btn.grid(row=0, column=3, padx=5, pady=5)
+
         self.clear_btn = ctk.CTkButton(
             top_row, text="Clear", width=70,
             command=self._clear_extract, fg_color="transparent",
             border_width=2, text_color=("gray10", "#DCE4EE")
         )
-        self.clear_btn.grid(row=0, column=3, padx=(5, 0), pady=5)
+        self.clear_btn.grid(row=0, column=4, padx=(5, 0), pady=5)
 
-        # Row 1: Hint
+        # Row 1: Hint + Count status
+        sub_row = ctk.CTkFrame(extract_frame, fg_color="transparent")
+        sub_row.grid(row=1, column=0, sticky="ew", padx=15, pady=(2, 5))
+        sub_row.grid_columnconfigure(0, weight=1)
+
         ctk.CTkLabel(
-            extract_frame,
+            sub_row,
             text="Paste wagelist numbers, reports, messages — anything containing patterns like 3422003WL000023",
             text_color="gray60", font=ctk.CTkFont(size=11)
-        ).grid(row=1, column=0, columnspan=2, sticky="w", padx=15, pady=(2, 5))
-
-        # Row 2: Input / Output side by side
-        # Left: Input textbox
-        self.input_text = ctk.CTkTextbox(extract_frame, wrap=tkinter.WORD, font=("Consolas", 12))
-        self.input_text.grid(row=2, column=0, sticky="nsew", padx=(10, 5), pady=(0, 5))
-
-        # Right: Output textbox (extracted wagelists)
-        output_frame = ctk.CTkFrame(extract_frame, fg_color="transparent")
-        output_frame.grid(row=2, column=1, sticky="nsew", padx=(5, 10), pady=(0, 5))
-        output_frame.grid_columnconfigure(0, weight=1)
-        output_frame.grid_rowconfigure(1, weight=1)
-
-        output_header = ctk.CTkFrame(output_frame, fg_color="transparent")
-        output_header.grid(row=0, column=0, sticky="ew")
-        output_header.grid_columnconfigure(1, weight=1)
+        ).grid(row=0, column=0, sticky="w")
 
         self.output_label = ctk.CTkLabel(
-            output_header, text="Extracted (0):",
-            font=ctk.CTkFont(weight="bold")
+            sub_row, text="Extracted (0):",
+            font=ctk.CTkFont(weight="bold", size=12), text_color=("gray20", "gray80")
         )
-        self.output_label.grid(row=0, column=0, sticky="w")
+        self.output_label.grid(row=0, column=1, sticky="e")
 
-        self.copy_btn = ctk.CTkButton(
-            output_header, text="Copy", width=60,
-            command=self._copy_results
-        )
-        self.copy_btn.grid(row=0, column=1, sticky="e", padx=(5, 0))
-
-        self.output_text = ctk.CTkTextbox(
-            output_frame, wrap=tkinter.NONE, state="disabled",
-            font=("Consolas", 12)
-        )
-        self.output_text.grid(row=1, column=0, sticky="nsew", pady=(3, 0))
+        # Row 2: Single Full-Width Input / Extracted Textbox
+        self.input_text = ctk.CTkTextbox(extract_frame, wrap=tkinter.WORD, font=("Consolas", 12))
+        self.input_text.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 5))
 
         # Row 3: Output folder hint
         self.output_folder_label = ctk.CTkLabel(
@@ -196,7 +195,7 @@ class PrintWagelistTab(BaseAutomationTab):
             font=ctk.CTkFont(size=11), wraplength=600, justify="left"
         )
         self.output_folder_label.grid(
-            row=3, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 8)
+            row=3, column=0, sticky="w", padx=15, pady=(0, 8)
         )
 
         # Action Buttons (Start / Stop / Retry / Reset)
@@ -232,20 +231,19 @@ class PrintWagelistTab(BaseAutomationTab):
         self.style_treeview(self.results_tree)
 
     # ------------------------------------------------------------------
-    # Extract Logic (like Workcode Extractor)
+    # Extract Logic
     # ------------------------------------------------------------------
-    def _extract_wagelists(self):
-        """Extract wagelist numbers from the input textbox using regex."""
-        input_content = self.input_text.get("1.0", tkinter.END)
-        if not input_content.strip():
-            messagebox.showinfo("No Input", "Please paste some text containing wagelist numbers first.")
-            return
+    def _extract_wagelists(self) -> list:
+        """Extract wagelist numbers from input text using regex and replace text box content."""
+        input_content = self.input_text.get("1.0", tkinter.END).strip()
+        if not input_content:
+            self.output_label.configure(text="Extracted (0):")
+            self._extracted_wagelists = []
+            return []
 
         matches = _WAGELIST_PATTERN.findall(input_content)
-        # Normalize to uppercase
         found = [m.upper() for m in matches]
 
-        # Deduplicate while preserving order
         if self.remove_dups_var.get() == "on":
             seen = set()
             unique = []
@@ -257,38 +255,30 @@ class PrintWagelistTab(BaseAutomationTab):
 
         self._extracted_wagelists = found
 
-        # Update output display
-        self.output_text.configure(state="normal")
-        self.output_text.delete("1.0", tkinter.END)
         if found:
-            self.output_text.insert("1.0", "\n".join(found))
-        else:
-            self.output_text.insert("1.0", "No wagelist numbers found (pattern: digits+WL+digits)")
-        self.output_text.configure(state="disabled")
-
-        self.output_label.configure(text=f"Extracted ({len(found)}):")
-
-        if found:
+            self.input_text.delete("1.0", tkinter.END)
+            self.input_text.insert("1.0", "\n".join(found))
+            self.output_label.configure(text=f"Extracted ({len(found)}):")
             self.log_info(f"🔍 Extracted {len(found)} unique wagelist(s): {', '.join(found[:5])}" +
-                         (f"... +{len(found)-5} more" if len(found) > 5 else ""))
+                          (f"... +{len(found)-5} more" if len(found) > 5 else ""))
         else:
-            self.log_info("🔍 No wagelist numbers found in the input text.")
+            self.output_label.configure(text="Extracted (0):")
+            self.log_info("🔍 No wagelist numbers found in the text.")
+
+        return found
 
     def _copy_results(self):
-        """Copy extracted wagelists to clipboard."""
-        results = self.output_text.get("1.0", tkinter.END).strip()
-        if results and "No wagelist" not in results:
+        """Copy text in textbox to clipboard."""
+        results = self.input_text.get("1.0", tkinter.END).strip()
+        if results:
             self.app.clipboard_clear()
             self.app.clipboard_append(results)
             self.copy_btn.configure(text="✓ Copied")
             self.app.after(2000, lambda: self.copy_btn.configure(text="Copy"))
 
     def _clear_extract(self):
-        """Clear input, output, and extracted list."""
+        """Clear text box and extracted list."""
         self.input_text.delete("1.0", tkinter.END)
-        self.output_text.configure(state="normal")
-        self.output_text.delete("1.0", tkinter.END)
-        self.output_text.configure(state="disabled")
         self.output_label.configure(text="Extracted (0):")
         self._extracted_wagelists = []
 
@@ -300,10 +290,12 @@ class PrintWagelistTab(BaseAutomationTab):
             return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
+        self.portal_segmented_button.configure(state=state)
         self.fin_year_menu.configure(state=state)
         self.save_pdf_checkbox.configure(state=state)
         self.extract_btn.configure(state=state)
         self.remove_dups_checkbox.configure(state=state)
+        self.copy_btn.configure(state=state)
         self.clear_btn.configure(state=state)
         self.input_text.configure(state=state)
         self.export_button.configure(state=state)
@@ -311,6 +303,7 @@ class PrintWagelistTab(BaseAutomationTab):
     def reset_ui(self) -> None:
         if messagebox.askokcancel(tr("dialogs.reset_form"), tr("confirm.are_you_sure")):
             self._clear_extract()
+            self.portal_var.set("VB-G-RAM-G")
             self.save_pdf_var.set("on")
             self.output_folder_label.configure(text="")
             self.safe_tree_clear()
@@ -320,31 +313,25 @@ class PrintWagelistTab(BaseAutomationTab):
             self.app.after(0, self.app.set_status, "Ready")
 
     def start_automation(self) -> None:
-        wagelist_list = self._extracted_wagelists
+        wagelist_list = self._extract_wagelists()
 
         if not wagelist_list:
-            # Try extracting first if input has text
-            input_content = self.input_text.get("1.0", tkinter.END).strip()
-            if input_content:
-                self._extract_wagelists()
-                wagelist_list = self._extracted_wagelists
-
-            if not wagelist_list:
-                messagebox.showwarning(
-                    "No Wagelists",
-                    "No wagelist numbers found.\n\n"
-                    "Paste text containing wagelist numbers (e.g. 3422003WL000023)\n"
-                    "and click 'Extract Wagelists' first."
-                )
-                return
+            messagebox.showwarning(
+                "No Wagelists",
+                "No wagelist numbers found.\n\n"
+                "Paste text containing wagelist numbers (e.g. 3422003WL000023)\n"
+                "and click 'Extract Wagelists' or 'Start Automation'."
+            )
+            return
 
         fin_year = self.fin_year_var.get()
         save_pdf = self.save_pdf_var.get() == "on"
+        portal_choice = self.portal_var.get()
 
         self.app.start_automation_thread(
             self.automation_key,
             self.run_automation_logic,
-            args=(fin_year, wagelist_list, save_pdf)
+            args=(fin_year, wagelist_list, save_pdf, portal_choice)
         )
 
     def retry_logic_handler(self) -> None:
@@ -354,12 +341,13 @@ class PrintWagelistTab(BaseAutomationTab):
     # ------------------------------------------------------------------
     # Automation Logic
     # ------------------------------------------------------------------
-    def run_automation_logic(self, fin_year: str, wagelist_list: list, save_pdf: bool):
+    def run_automation_logic(self, fin_year: str, wagelist_list: list, save_pdf: bool, portal_choice: str = "VB-G-RAM-G"):
         self.app.after(0, self.set_ui_state, True)
         self.safe_tree_clear()
         self.app.clear_log(self.log_display)
-        self.log_info("Starting Print Wagelist automation...")
-        self.app.after(0, self.app.set_status, "Running Print Wagelist...")
+        target_base_url = NREGA_WAGELIST_URL if "NREGA" in portal_choice else VB_WAGELIST_URL
+        self.log_info(f"Starting Print Wagelist automation ({portal_choice})...")
+        self.app.after(0, self.app.set_status, f"Running Print Wagelist ({portal_choice})...")
         self.app.after(0, self.update_status, "Initializing...", 0.0)
 
         # Prepare output directory
@@ -401,7 +389,7 @@ class PrintWagelistTab(BaseAutomationTab):
 
                 try:
                     result = self._process_single_wagelist(
-                        driver, wait, wagelist_no, fin_year, save_pdf, output_dir
+                        driver, wait, wagelist_no, fin_year, save_pdf, output_dir, target_base_url
                     )
                     if result:
                         success_count += 1
@@ -433,7 +421,7 @@ class PrintWagelistTab(BaseAutomationTab):
 
     def _process_single_wagelist(
         self, driver, wait, wagelist_no: str, fin_year: str,
-        save_pdf: bool, output_dir: str
+        save_pdf: bool, output_dir: str, target_base_url: str = VB_WAGELIST_URL
     ) -> str:
         """
         Process a single wagelist:
@@ -450,11 +438,13 @@ class PrintWagelistTab(BaseAutomationTab):
                 return ""
             try:
                 # A. Load page
-                self.log_info(f"   Loading view_wagelist page...")
+                portal_label = "NREGA" if target_base_url == NREGA_WAGELIST_URL else "VB-G-RAM-G"
+                self.log_info(f"   Loading view_wagelist page ({portal_label})...")
                 loaded = False
+                target_url = self.resolve_portal_url(target_base_url)
                 for _ in range(3):
                     try:
-                        driver.get(self.resolve_portal_url(VIEW_WAGELIST_URL))
+                        driver.get(target_url)
                         loaded = True
                         break
                     except Exception:
