@@ -203,4 +203,10 @@ BN5 = {
     "push.automation_duration": "{duration} লেগেছে",
     "tab.skilled_aadhaar_report.title": "দক্ষ ও আধা-দক্ষ রিপোর্ট",
     "tab.skilled_aadhaar_report.subtitle": "দক্ষ শ্রমিকদের আধার আপডেটের অবস্থা স্ক্যান করুন এবং সারসংক্ষেপ রিপোর্ট তৈরি করুন।",
+    "settings.manual_add.card_title": "ম্যানুয়ালি পঞ্চায়েত যোগ করুন",
+    "settings.manual_add.info": "ব্রাউজার লঞ্চ, পোর্টাল লগইন বা স্ক্র্যাপ ছাড়াই সরাসরি পঞ্চায়েতের নাম যোগ করুন। নাম লিখে Add চাপুন — পঞ্চায়েত সব ট্যাবের ড্রপডাউনে চলে আসবে।",
+    "settings.manual_add.placeholder": "পঞ্চায়েতের নাম...",
+    "settings.manual_add.btn": "➕ যোগ করুন",
+    "settings.manual_add.restart_title": "রিস্টार्ट করবেন?",
+    "settings.manual_add.restart_msg": "সব ট্যাবের ড্রপডাউনে দেখানোর জন্য অ্যাপ রিস্টার্ট করতে হবে।\n\nএখনই রিস্টার্ট করবেন? (আরও পঞ্চায়েত যোগ করতে চাইলে 'No' চাপুন।)",
 }

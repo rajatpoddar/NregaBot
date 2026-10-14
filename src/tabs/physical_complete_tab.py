@@ -239,6 +239,7 @@ class PhysicalCompleteTab(BaseAutomationTab):
                     if status == "Success": 
                         success_count += 1
                         self.last_successful_codes.append(work_code)
+                        self.last_successful_panchayat = p_name
                         self.log_success(f"    ✅ {truncate_workcode(work_code)}: Marked complete")
                     else: 
                         fail_count += 1
@@ -302,12 +303,25 @@ class PhysicalCompleteTab(BaseAutomationTab):
             # Postback Handle
             checkbox = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_checkdisc")))
             if not checkbox.is_selected():
-                checkbox.click()
-                wait.until(EC.staleness_of(checkbox))
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", checkbox)
+                time.sleep(0.3)
+                try:
+                    checkbox.click()
+                except Exception:
+                    driver.execute_script("arguments[0].click();", checkbox)
+                try:
+                    wait.until(EC.staleness_of(checkbox))
+                except TimeoutException:
+                    pass
 
             self.log_info("   - Clicking NEXT and handling alert...")
             next_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_BtnNext")))
-            next_btn.click()
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", next_btn)
+            time.sleep(0.3)
+            try:
+                next_btn.click()
+            except Exception:
+                driver.execute_script("arguments[0].click();", next_btn)
 
             try:
                 alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
@@ -329,7 +343,13 @@ class PhysicalCompleteTab(BaseAutomationTab):
             asset_desc_input.send_keys("Completed")
             
             self.log_info("   - Saving Physical Completion...")
-            self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
+            save_btn = self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_btSave")
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", save_btn)
+            time.sleep(0.3)
+            try:
+                save_btn.click()
+            except Exception:
+                driver.execute_script("arguments[0].click();", save_btn)
             
             try:
                 alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
@@ -358,41 +378,35 @@ class PhysicalCompleteTab(BaseAutomationTab):
         self.forward_to_scheme_closing(self.last_successful_panchayat, self.last_successful_codes, auto_start=False)
 
     def forward_to_scheme_closing(self, panchayat, work_codes, auto_start=False):
-        scheme_tab = None
-        
-        # NregaBot stores tabs in the 'tab_instances' dict by display name
-        if hasattr(self.app, 'tab_instances') and "Scheme Closing" in self.app.tab_instances:
-            scheme_tab = self.app.tab_instances["Scheme Closing"]
-        elif hasattr(self.app, 'tabs') and "scheme_closing" in self.app.tabs:
-            scheme_tab = self.app.tabs["scheme_closing"]
-            
-        if not scheme_tab:
-            messagebox.showerror(tr("base.automation_error.title"), tr("physical.complete.scheme_not_loaded"))
+        if not work_codes:
             return
-            
-        try:
-            # Tab ko visually switch karne ke liye
-            if hasattr(self.app, 'notebook'):
-                for tab_id in self.app.notebook._name_list:
-                    if "Scheme Closing" in tab_id or "scheme" in tab_id.lower():
-                        self.app.notebook.set(tab_id)
-                        break
-        except Exception as e:
-            print(f"Switching tab failed: {e}")
-            
-        # Update the Panchayat Field
-        scheme_tab.panchayat_var.set(panchayat)
-        
-        # Update the Work Codes
-        scheme_tab.work_codes_textbox.configure(state="normal")
-        scheme_tab.work_codes_textbox.delete("1.0", "end")
-        scheme_tab.work_codes_textbox.insert("1.0", "\n".join(work_codes))
-        
-        if auto_start:
-            # Chhota sa delay taaki UI update ho sake aur uske baad Scheme Closing start ho jaye
-            self.app.after(500, scheme_tab.start_automation)
+
+        # Visually navigate to Scheme Closing tab (lazy-loads frame if not yet instantiated)
+        self.app.show_frame("Scheme Closing")
+
+        def _action():
+            scheme_tab = self.app.tab_instances.get("Scheme Closing")
+            if not scheme_tab:
+                return
+
+            # Update the Panchayat Field
+            if panchayat:
+                scheme_tab.panchayat_var.set(panchayat)
+
+            # Update the Work Codes
+            scheme_tab.work_codes_textbox.configure(state="normal")
+            scheme_tab.work_codes_textbox.delete("1.0", "end")
+            scheme_tab.work_codes_textbox.insert("1.0", "\n".join(work_codes))
+
+            if auto_start:
+                self.app.after(500, scheme_tab.start_automation)
+            else:
+                messagebox.showinfo(tr("status.success"), tr("physical.complete.forwarded", count=len(work_codes)))
+
+        if hasattr(self.app, 'workflows') and hasattr(self.app.workflows, '_wait_and_execute'):
+            self.app.workflows._wait_and_execute("Scheme Closing", _action)
         else:
-            messagebox.showinfo(tr("status.success"), tr("physical.complete.forwarded", count=len(work_codes)))
+            self.app.after(500, _action)
     def reset_ui(self) -> None:
         if messagebox.askokcancel(tr("dialogs.reset_form"), tr("dialogs.reset_confirm_inputs")):
             self.panchayat_var.set("")

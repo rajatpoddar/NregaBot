@@ -1,4 +1,9 @@
 {
+  "3.2.14": [
+    "🌐 **Scheme Closing — VB-G-RAM-G Portal Support & Multi-Page Automation:** Scheme Closing automation me VB-G-RAM-G portal (`compwork.aspx`) support add kiya gaya. Technical staff dropdown me case-insensitive match, Page 1 se Page 2 ('NEXT' button) transition aur asset completion details auto-fill fix kiya gaya.",
+    "⏩ **Physical Complete se Direct Auto-Forward:** Physical Complete automation khatam hone par Scheme Closing par automatic transition aur work codes forward karne ki suvidha jodi gayi.",
+    "🏘️ **Manual Panchayat Add for All Users:** Settings me manual panchayat add feature ko sabhi users ke liye release kiya gaya taaki bina PO/GP portal credentials wale users bhi naye panchayats manually register kar saken."
+  ],
   "3.2.13": [
     "🖨️ **Print Wagelist — Purana NREGA Support & Single Textbox:** Print Wagelist automation me Purana NREGA portal (nregade4/Netnrega) support aur portal switch [VB-G-RAM-G | NREGA (Old)] add kiya gaya. Extraction UI ko single clean full-width text box me streamline kiya gaya."
   ],

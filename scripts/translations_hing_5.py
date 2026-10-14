@@ -290,4 +290,10 @@ HING5 = {
     "push.automation_duration": "{duration} laga",
     "tab.skilled_aadhaar_report.title": "Skilled & Semi-Skilled Report",
     "tab.skilled_aadhaar_report.subtitle": "Skilled worker Aadhaar updation status scan karein aur summary report banayein.",
+    "settings.manual_add.card_title": "Panchayat Manually Add Karein",
+    "settings.manual_add.info": "Bina browser launch, portal login ya scrape ke seedhe panchayat naam jodein. Naam likhkar Add dabayein — panchayat sabhi tabs ke dropdown me aa jayegi.",
+    "settings.manual_add.placeholder": "Panchayat ka naam...",
+    "settings.manual_add.btn": "➕ Add",
+    "settings.manual_add.restart_title": "Restart Karein?",
+    "settings.manual_add.restart_msg": "Sabhi tabs ke dropdown me dikhne ke liye app restart karna hoga.\n\nAbhi restart karein? (Aur panchayat add karne hain to 'No' dabayein.)",
 }

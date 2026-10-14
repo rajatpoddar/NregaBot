@@ -142,3 +142,10 @@ def test_does_not_touch_server_location_pool(monkeypatch, hier):
                         lambda *a, **k: calls.append(a))
     add_panchayat_manual(make_app(FakeHistoryManager()), "DUMRI")
     assert calls == []
+
+
+def test_settings_tab_manual_add_method_alias():
+    assert hasattr(settings_tab.SettingsTab, "_manual_add_panchayat")
+    assert hasattr(settings_tab.SettingsTab, "_dev_add_panchayat")
+    assert settings_tab.SettingsTab._manual_add_panchayat == settings_tab.SettingsTab._dev_add_panchayat
+

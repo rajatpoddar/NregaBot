@@ -1,19 +1,24 @@
 {
-  "latest_version": "3.2.13",
-  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.13-Setup.exe",
-  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.13-macOS.dmg",
-  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.13-Linux.tar.gz",
+  "latest_version": "3.2.14",
+  "download_url_windows": "https://nregabot.com/updates/NREGABot-v3.2.14-Setup.exe",
+  "download_url_macos": "https://nregabot.com/updates/NREGABot-v3.2.14-macOS.dmg",
+  "download_url_linux": "https://nregabot.com/updates/NREGABot-v3.2.14-Linux.tar.gz",
   "core_update": {
-    "version": "3.2.13",
-    "url": "https://nregabot.com/updates/core_v3.2.13.zip",
-    "url_windows": "https://nregabot.com/updates/core_win_v3.2.13.zip",
-    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.13.zip",
+    "version": "3.2.14",
+    "url": "https://nregabot.com/updates/core_v3.2.14.zip",
+    "url_windows": "https://nregabot.com/updates/core_win_v3.2.14.zip",
+    "url_macos": "https://nregabot.com/updates/core_mac_v3.2.14.zip",
     "force_full_reinstall": false,
     "hash": "",
     "hash_windows": "",
     "hash_macos": ""
   },
   "changelog": {
+    "3.2.14": [
+      "🌐 **Scheme Closing — VB-G-RAM-G Portal Support & Multi-Page Automation:** Scheme Closing automation me VB-G-RAM-G portal (`compwork.aspx`) support add kiya gaya. Technical staff dropdown me case-insensitive match, Page 1 se Page 2 ('NEXT' button) transition aur asset completion details auto-fill fix kiya gaya.",
+      "⏩ **Physical Complete se Direct Auto-Forward:** Physical Complete automation khatam hone par Scheme Closing par automatic transition aur work codes forward karne ki suvidha jodi gayi.",
+      "🏘️ **Manual Panchayat Add for All Users:** Settings me manual panchayat add feature ko sabhi users ke liye release kiya gaya taaki bina PO/GP portal credentials wale users bhi naye panchayats manually register kar saken."
+    ],
     "3.2.13": [
       "🖨️ **Print Wagelist — Purana NREGA Support & Single Textbox:** Print Wagelist automation me Purana NREGA portal (nregade4/Netnrega) support aur portal switch [VB-G-RAM-G | NREGA (Old)] add kiya gaya. Extraction UI ko single clean full-width text box me streamline kiya gaya."
     ],

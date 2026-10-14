@@ -334,7 +334,11 @@ class SchemeClosingTab(BaseAutomationTab):
     def _process_single_work_code(self, driver, inputs, work_code, cert_no):
         wait = WebDriverWait(driver, 20)
         long_wait = WebDriverWait(driver, 35)
-        url = "https://nregade4.dord.gov.in/netnrega/compwork.aspx"
+        url = self.resolve_portal_url(
+            getattr(config, "SCHEME_CLOSING_CONFIG", {}).get(
+                "url", "https://vbgramgde2.dord.gov.in/vbgramg/compwork.aspx"
+            )
+        )
         
         try:
             driver.get(url)
@@ -361,12 +365,17 @@ class SchemeClosingTab(BaseAutomationTab):
             work_dropdown = Select(work_dropdown_element)
             option_found = False
             for option in work_dropdown.options:
-                if work_code in option.get_attribute("value"):
-                    work_dropdown.select_by_value(option.get_attribute("value"))
+                val = option.get_attribute("value") or ""
+                txt = option.text or ""
+                if work_code in val or work_code in txt:
+                    work_dropdown.select_by_value(val)
                     option_found = True
                     break
             if not option_found: return "Failed", f"Work code {work_code} not found."
-            wait.until(EC.staleness_of(work_dropdown_element))
+            try:
+                wait.until(EC.staleness_of(work_dropdown_element))
+            except TimeoutException:
+                pass
             
             self.log_info("   - Page 1: Filling completion details...")
             work_name_full = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_Pnl_lblworkcode"))).text
@@ -376,15 +385,66 @@ class SchemeClosingTab(BaseAutomationTab):
                 area_input.send_keys(inputs["area"])
             else:
                 self.log_info("   - Actual Benefited Area is already filled, skipping.")
-            Select(wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_Ddldesignation")))).select_by_visible_text(inputs["measured_by"])
+            # Designation selection
+            self.log_info(f"   - Selecting Designation: {inputs['measured_by']}...")
+            desig_elem = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_Ddldesignation")))
+            desig_select = Select(desig_elem)
+            curr_desig = desig_select.first_selected_option.text.strip() if desig_select.all_selected_options else ""
+            target_desig = inputs["measured_by"].strip()
             
-            long_wait.until(EC.presence_of_element_located((By.XPATH, f"//select[@id='ctl00_ContentPlaceHolder1_Ddlmeasured']/option[text()='{inputs['measured_name']}']")))
-            Select(driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_Ddlmeasured")).select_by_visible_text(inputs["measured_name"])
+            if curr_desig.lower() != target_desig.lower():
+                self._select_by_text_case_insensitive(desig_select, target_desig)
+                try:
+                    wait.until(EC.staleness_of(desig_elem))
+                except TimeoutException:
+                    pass
             
-            self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_txtccNo").send_keys(str(cert_no))
-            self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_txtcc_dt").send_keys(inputs["completion_date"])
+            # Staff Name selection (case-insensitive & whitespace normalized)
+            self.log_info(f"   - Selecting Staff: {inputs['measured_name']}...")
+            try:
+                long_wait.until(lambda d: len(Select(d.find_element(By.ID, "ctl00_ContentPlaceHolder1_Ddlmeasured")).options) > 1)
+            except TimeoutException:
+                pass
 
-            # --- NEW: Check for the optional 'Excavation(cum)' field and fill it if empty ---
+            measured_elem = wait.until(EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_Ddlmeasured")))
+            measured_select = Select(measured_elem)
+            
+            target_name = " ".join(inputs["measured_name"].strip().lower().split())
+            matched_option = None
+            
+            # Pass 1: exact normalized match
+            for opt in measured_select.options:
+                opt_norm = " ".join(opt.text.strip().lower().split())
+                if opt_norm and opt_norm != "--select--" and opt_norm == target_name:
+                    matched_option = opt
+                    break
+                    
+            # Pass 2: substring / word match
+            if not matched_option:
+                for opt in measured_select.options:
+                    opt_norm = " ".join(opt.text.strip().lower().split())
+                    if opt_norm and opt_norm != "--select--":
+                        if target_name in opt_norm or opt_norm in target_name:
+                            matched_option = opt
+                            break
+
+            if matched_option:
+                measured_select.select_by_visible_text(matched_option.text)
+                self.log_info(f"   - Staff selected: {matched_option.text.strip()}")
+            else:
+                available = [o.text.strip() for o in measured_select.options if o.text.strip() and o.text.strip() != "--Select--"]
+                avail_str = ", ".join(available) if available else "None"
+                return "Failed", f"Staff '{inputs['measured_name']}' not found in dropdown (Available: {avail_str})"
+
+            cc_no_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txtccNo")))
+            cc_no_input.clear()
+            cc_no_input.send_keys(str(cert_no))
+            
+            cc_dt_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_txtcc_dt")))
+            cc_dt_input.clear()
+            cc_dt_input.send_keys(inputs["completion_date"])
+
+            # --- Check for the optional 'Excavation(cum)' field and fill it if empty ---
             try:
                 excavation_input = WebDriverWait(driver, 3).until(
                     EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_txtcomp_add_unit"))
@@ -393,15 +453,34 @@ class SchemeClosingTab(BaseAutomationTab):
                     excavation_input.send_keys("1")
                     self.log_info("   - Excavation(cum) field found and filled with '1'.")
             except TimeoutException:
-                    self.log_info("   - Excavation(cum) field not found on this page, skipping.")
-            else:
-                    self.log_info("   - Excavation(cum) field found but already filled.")
+                pass
             
+            # Click NEXT button to proceed to Page 2
+            self.log_info("   - Clicking NEXT to proceed to Page 2...")
+            next_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_BtnNext")))
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", next_btn)
+            time.sleep(0.3)
+            try:
+                next_btn.click()
+            except Exception:
+                driver.execute_script("arguments[0].click();", next_btn)
+
+            try:
+                alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
+                alert_text = alert.text
+                alert.accept()
+                if "remaining to fill" in alert_text or "remaining to payment" in alert_text or "error" in alert_text.lower():
+                    return "Failed", alert_text
+            except TimeoutException:
+                pass
+
             self.log_info("   - Page 2: Waiting for page to load...")
             asset_name_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Name")))
             asset_desc_input = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_grdData_ctl02_txtAsset_Description")))
             
             self.log_info("   - Page 2: Filling Asset Name and Description...")
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", asset_name_input)
+            time.sleep(0.2)
             asset_name_input.clear()
             asset_name_input.send_keys("Completed")
             asset_desc_input.clear()
@@ -412,7 +491,13 @@ class SchemeClosingTab(BaseAutomationTab):
                 if not messagebox.askyesno(tr("dialogs.confirm_scheme_closing"), confirm_text):
                     return "Cancelled", "User cancelled the operation."
 
-            self._find(driver, By.ID, "ctl00_ContentPlaceHolder1_btSave").click()
+            save_btn = wait.until(EC.element_to_be_clickable((By.ID, "ctl00_ContentPlaceHolder1_btSave")))
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", save_btn)
+            time.sleep(0.3)
+            try:
+                save_btn.click()
+            except Exception:
+                driver.execute_script("arguments[0].click();", save_btn)
             
             try:
                 alert_wait = WebDriverWait(driver, 5)
@@ -420,15 +505,15 @@ class SchemeClosingTab(BaseAutomationTab):
                 alert_text = alert.text
                 alert.accept()
                 
-                if "Multiple Asset Detail Successfully Save" in alert_text:
-                    return "Success", "Scheme closed successfully (alert)."
+                if "successfully" in alert_text.lower() or "save" in alert_text.lower():
+                    return "Success", f"Scheme closed successfully: {alert_text}"
                 else:
                     return "Failed", f"Unexpected alert: {alert_text}"
 
             except TimeoutException:
                 self.log_info("   - No success alert detected, checking page for status...")
                 page_source = driver.page_source
-                if "Work has been Completed Successfully" in page_source:
+                if "Work has been Completed Successfully" in page_source or "Successfully" in page_source:
                     return "Success", "Work completed successfully (page)."
                 else:
                     try:
@@ -476,11 +561,10 @@ class SchemeClosingTab(BaseAutomationTab):
         self.cert_no_entry.configure(state=state)
         self.completion_date_entry.configure(state=state)
         self.work_codes_textbox.configure(state=state)
-        self.export_button.configure(state=state)
-        self.export_format_menu.configure(state=state)
-        self.export_filter_menu.configure(state=state)
-        self.skip_confirm_checkbox.configure(state=state)
-        if state == "normal": self._on_format_change(self.export_format_menu.get())
+        if hasattr(self, 'export_button'):
+            self.export_button.configure(state=state)
+        if hasattr(self, 'skip_confirm_checkbox'):
+            self.skip_confirm_checkbox.configure(state=state)
 
     def export_report(self):
         self.export_treeview_to_excel(

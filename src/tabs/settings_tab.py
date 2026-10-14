@@ -601,51 +601,50 @@ class SettingsTab(ctk.CTkFrame):
                                             text_color=("gray50", "gray60"))
         self._scrape_status.pack(side="left", padx=(8, 0))
 
-        # ── Dev-only Card: Manual Panchayat Add ──
-        # Sirf source tree se run karne par banta hai (packaged build me nahi).
-        # Kisi doosre block ka panchayat testing ke liye chahiye ho to portal
-        # scrape ki zaroorat nahi padti — naam type karo, bas.
-        if is_dev_mode():
-            self._dev_add_frame = ctk.CTkFrame(
-                scroll, fg_color=("#EEF2FF", "#1E1B4B"), corner_radius=8,
-                border_width=1, border_color=("#A5B4FC", "#4338CA"))
-            self._dev_add_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(3, 5))
-            self._dev_add_frame.grid_columnconfigure(0, weight=1)
+        # ── Card: Manual Panchayat Add (Global Release) ──
+        # Users without PO/GP login can manually add panchayats to dropdowns
+        # without running website scrape or needing credentials.
+        self._manual_add_frame = ctk.CTkFrame(
+            scroll, fg_color=("#EEF2FF", "#1E1B4B"), corner_radius=8,
+            border_width=1, border_color=("#A5B4FC", "#4338CA"))
+        self._manual_add_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(3, 5))
+        self._manual_add_frame.grid_columnconfigure(0, weight=1)
+        self._dev_add_frame = self._manual_add_frame  # backward-compatibility alias
 
-            dev_header = ctk.CTkFrame(self._dev_add_frame, fg_color="transparent")
-            dev_header.pack(fill="x", padx=12, pady=(8, 2))
-            ctk.CTkLabel(dev_header, text="🧪 Dev: Add Panchayat Manually",
-                         font=ctk.CTkFont(size=13, weight="bold"),
-                         text_color=("#4338CA", "#A5B4FC")).pack(side="left")
+        manual_header = ctk.CTkFrame(self._manual_add_frame, fg_color="transparent")
+        manual_header.pack(fill="x", padx=12, pady=(8, 2))
+        ctk.CTkLabel(manual_header, text=tr("settings.manual_add.card_title"),
+                     font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color=("#4338CA", "#A5B4FC")).pack(side="left")
 
-            ctk.CTkLabel(
-                self._dev_add_frame,
-                text=("Sirf dev build me dikhta hai. Naam type karke Add dabayein — "
-                      "panchayat sabhi tabs ke dropdown me aa jayega. Server location "
-                      "pool par kuch nahi bheja jata."),
-                font=ctk.CTkFont(size=11), text_color=("gray50", "gray60"),
-                wraplength=620, justify="left",
-            ).pack(anchor="w", padx=12, pady=(0, 4))
+        ctk.CTkLabel(
+            self._manual_add_frame,
+            text=tr("settings.manual_add.info"),
+            font=ctk.CTkFont(size=11), text_color=("gray50", "gray60"),
+            wraplength=620, justify="left",
+        ).pack(anchor="w", padx=12, pady=(0, 4))
 
-            dev_row = ctk.CTkFrame(self._dev_add_frame, fg_color="transparent")
-            dev_row.pack(fill="x", padx=12, pady=(0, 4))
+        manual_row = ctk.CTkFrame(self._manual_add_frame, fg_color="transparent")
+        manual_row.pack(fill="x", padx=12, pady=(0, 4))
 
-            self._dev_panch_entry = ctk.CTkEntry(
-                dev_row, height=30, font=ctk.CTkFont(size=12),
-                placeholder_text="Panchayat ka naam...")
-            self._dev_panch_entry.pack(side="left", expand=True, fill="x")
-            self._dev_panch_entry.bind("<Return>", lambda e: self._dev_add_panchayat())
+        self._manual_panch_entry = ctk.CTkEntry(
+            manual_row, height=30, font=ctk.CTkFont(size=12),
+            placeholder_text=tr("settings.manual_add.placeholder"))
+        self._manual_panch_entry.pack(side="left", expand=True, fill="x")
+        self._dev_panch_entry = self._manual_panch_entry  # backward-compatibility alias
+        self._manual_panch_entry.bind("<Return>", lambda e: self._manual_add_panchayat())
 
-            ctk.CTkButton(dev_row, text="➕ Add", width=90, height=30,
-                          font=ctk.CTkFont(size=12, weight="bold"),
-                          fg_color=("#4F46E5", "#4F46E5"), text_color="white",
-                          hover_color=("#4338CA", "#4338CA"),
-                          command=self._dev_add_panchayat).pack(side="left", padx=(8, 0))
+        ctk.CTkButton(manual_row, text=tr("settings.manual_add.btn"), width=90, height=30,
+                      font=ctk.CTkFont(size=12, weight="bold"),
+                      fg_color=("#4F46E5", "#4F46E5"), text_color="white",
+                      hover_color=("#4338CA", "#4338CA"),
+                      command=self._manual_add_panchayat).pack(side="left", padx=(8, 0))
 
-            self._dev_add_status = ctk.CTkLabel(
-                self._dev_add_frame, text="", font=ctk.CTkFont(size=10),
-                text_color=("gray50", "gray60"), wraplength=620, justify="left")
-            self._dev_add_status.pack(anchor="w", padx=12, pady=(0, 8))
+        self._manual_add_status = ctk.CTkLabel(
+            self._manual_add_frame, text="", font=ctk.CTkFont(size=10),
+            text_color=("gray50", "gray60"), wraplength=620, justify="left")
+        self._manual_add_status.pack(anchor="w", padx=12, pady=(0, 8))
+        self._dev_add_status = self._manual_add_status  # backward-compatibility alias
 
         # ── Toolbar ──
         toolbar = ctk.CTkFrame(scroll, fg_color="transparent")
@@ -1113,34 +1112,36 @@ class SettingsTab(ctk.CTkFrame):
             pass
         return sorted(blocks, key=str.lower)
 
-    def _dev_add_panchayat(self) -> None:
-        """Dev card ka Add button / Enter key — manual panchayat entry.
+    def _manual_add_panchayat(self) -> None:
+        """Manual panchayat entry — Add button / Enter key.
 
         Koi browser, koi scrape, koi server call nahi. Sirf local history +
-        hierarchy. Restart optional rakha hai (scrape ki tarah forced nahi)
-        kyunki dev me ek saath kai naam add karne padte hain.
+        hierarchy. Restart optional rakha hai taaki user ek saath kai naam
+        add kar sake.
         """
-        entry = getattr(self, "_dev_panch_entry", None)
+        entry = getattr(self, "_manual_panch_entry", None) or getattr(self, "_dev_panch_entry", None)
         if entry is None:
             return
         added, msg = add_panchayat_manual(self.app, entry.get())
-        self._dev_add_status.configure(
-            text=msg,
-            text_color=("#16A34A", "#4ADE80") if added else ("#DC2626", "#F87171"),
-        )
+        status_lbl = getattr(self, "_manual_add_status", None) or getattr(self, "_dev_add_status", None)
+        if status_lbl:
+            status_lbl.configure(
+                text=msg,
+                text_color=("#16A34A", "#4ADE80") if added else ("#DC2626", "#F87171"),
+            )
         if not added:
             return
 
         entry.delete(0, "end")
         self._refresh_loc_list()
         if messagebox.askyesno(
-            "Restart?",
-            f"{msg}\n\nSabhi tabs ke dropdown me dikhne ke liye app restart karna "
-            "hoga.\n\nAbhi restart karein? (Aur panchayat add karne hain to 'No' "
-            "dabayein.)",
+            tr("settings.manual_add.restart_title"),
+            f"{msg}\n\n" + tr("settings.manual_add.restart_msg"),
             parent=self.winfo_toplevel(),
         ):
             self._restart_application()
+
+    _dev_add_panchayat = _manual_add_panchayat
 
     def _scrape_from_website(self) -> None:
         """
