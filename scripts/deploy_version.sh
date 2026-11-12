@@ -33,7 +33,7 @@ set -e
 
 # ── Config (env vars se override kar sakte ho) ──────────────────────────────
 NAS_USER="${NAS_USER:-rajat}"
-NAS_HOST_LAN="${NAS_HOST_LAN:-192.168.29.101}"
+NAS_HOST_LAN="${NAS_HOST_LAN:-192.168.29.102}"
 NAS_HOST_TS="${NAS_HOST_TS:-100.98.94.128}"        # Tailscale (node: cabelwala)
 NAS_BASE="${NAS_BASE:-/volume1/docker/Projects/Nrega-Bot}"
 COMPOSE_DIR="${NAS_BASE}/license-server"
