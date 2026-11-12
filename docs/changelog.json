@@ -1,4 +1,7 @@
 {
+  "3.2.15": [
+    "💸 **Pending Bills Automation — Live Portal Support & Multi-Page Scraping:** Pending Bills automation ko report scraper se badal kar live MGNREGA portal (`Bill_Approval_NRG.aspx`) par shift kiya gaya. 'All Available Financial Years' aur Panchayat selection, ASP.NET postback staleness handling, DataTables multi-page automatic traversal, live results treeview aur executive-grade multi-sheet Excel export (Detailed + Panchayat Summary) joda gaya."
+  ],
   "3.2.14": [
     "🌐 **Scheme Closing — VB-G-RAM-G Portal Support & Multi-Page Automation:** Scheme Closing automation me VB-G-RAM-G portal (`compwork.aspx`) support add kiya gaya. Technical staff dropdown me case-insensitive match, Page 1 se Page 2 ('NEXT' button) transition aur asset completion details auto-fill fix kiya gaya.",
     "⏩ **Physical Complete se Direct Auto-Forward:** Physical Complete automation khatam hone par Scheme Closing par automatic transition aur work codes forward karne ki suvidha jodi gayi.",

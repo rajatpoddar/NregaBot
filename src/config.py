@@ -9,7 +9,7 @@ APP_TAGLINE: str = "Your NREGA Task Management Companion"
 APP_DESCRIPTION: str = "A comprehensive tool for managing NREGA tasks efficiently."
 APP_AUTHOR: str = "Rajat Poddar"
 APP_AUTHOR_EMAIL: str = "Rajatpoddar@outlook.com"
-APP_VERSION: str = "3.2.14"
+APP_VERSION: str = "3.2.15"
 import os
 LICENSE_SERVER_URL: str = os.environ.get('LICENSE_SERVER_URL', 'https://nregabot.com')
 
@@ -837,8 +837,9 @@ DEL_DEMAND_CONFIG: Dict[str, str] = {
 #              value by opening the liability report in a browser and copying the
 #              Digest from the address bar.
 #
-# To add another state: add an entry with its state_code, the liability report URL,
-# the state_out data base URL and a fresh seed digest.
+PENDING_BILLS_URL: str = "https://nregade4.dord.gov.in/Netnrega/Bill_Approval_NRG.aspx"
+
+# Legacy config retained for backward compatibility
 PENDING_BILLS_CONFIG: Dict[str, Dict[str, str]] = {
     "JHARKHAND": {
         "state_code": "34",

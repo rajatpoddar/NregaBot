@@ -1,0 +1,45 @@
+NREGA BOT — APPLICATION DESCRIPTION (v3.2.13)
+=============================================
+
+WHAT IT IS
+----------
+NREGA Bot is a subscription-licensed desktop automation app (Windows/macOS/Linux; Python + CustomTkinter + Selenium) that drives India's MGNREGA / VB-G-RAM-G government portal through the user's own browser. It eliminates repetitive data entry and report generation for Gram Rozgar Sevaks, Panchayat Secretaries and BDO operators. ~200+ active users across Jharkhand, Rajasthan, Karnataka.
+
+Important nuance: it is NOT a web SaaS. It is desktop software with SaaS-style subscription licensing plus a cloud backend. Automation always runs locally, in the user's own browser, with the user's own portal login; credentials never leave the user's machine.
+
+BUSINESS MODEL
+--------------
+- Funnel: register at nregabot.com/trial (email/mobile OTP) -> 30-day free trial (feature-restricted, one per person/device, 100 MB cloud storage) -> paid subscription.
+- Pricing (Razorpay; DB-overridable via admin panel): Monthly Rs 199, Quarterly Rs 549, Half-yearly Rs 999, Yearly Rs 1799.
+- Add-ons: extra devices Rs 99/device; cloud storage 1GB Rs 199/yr, 5GB Rs 499/yr, 10GB Rs 899/yr.
+- Licensing: key locked to device(s) up to purchased limit; validated server-side at /api/validate.
+- Retention: WhatsApp renewal reminders, referral program (+15 days to referrer when a trial user upgrades), welcome messages.
+- Admin panel: license management, revenue/MRR dashboard, trial-funnel analytics, state analytics, pricing editor, error-spike alerts.
+- Two SKUs: Full (48 automation tabs) and Lite (~17 tabs, low-end PCs, no animations).
+
+HOW IT WORKS (RUNTIME)
+----------------------
+1. User launches the app -> license activation/heartbeat against the Flask server.
+2. User picks browser: Chrome/Edge run detached with --remote-debugging-port=9222 (CDP-attached); Firefox uses a Selenium-managed Geckodriver.
+3. User logs into the government portal themselves (persistent browser profile).
+4. User opens one of 48 tabs (Demand, MR Fill, Wagelist, FTO, eMB, ABPS Verify, eKYC Report, Jobcard Verification, MIS Reports, ...).
+5. The tab reads/fills the portal DOM via Selenium in a worker thread; the browser stays minimized (true background mode).
+6. Results export to print-ready Excel/PDF/CSV and WhatsApp reports. Macro Manager chains multiple automations sequentially across panchayats.
+
+DELIVERY & UPDATES (TWO-STAGE)
+------------------------------
+- PyInstaller bundle ships only loader.py -> splash -> downloads a SHA-256-verified core zip from nregabot.com -> extracts to app_live/ -> spawns main_app.py (Full, port 60123) or lite_app.py (Lite, port 60124).
+- Core zip whitelist: only app code (src/, config/, assets/, changelog, license) — no tests, no server code, no secrets.
+- Hotfixes: same version + new core hash = KB-size re-download in seconds, no reinstall; failed boots auto-rollback to the last known-good core.
+- New states onboard server-side via the State Registry (/api/app-config on heartbeat) without an app release.
+
+BACKEND (nrega-server/, separate repo)
+--------------------------------------
+Self-hosted Flask + Postgres + Redis + Celery + WebDAV on a Synology NAS (docker-compose). Handles: license validation & device binding; state registry + maintenance/rollback flags; cloud sync (settings, files, block-wise location data pool shared between same-block operators); Razorpay payments; crash/error pipeline; usage telemetry; admin panel; WhatsApp automator (welcome + expiry reminders).
+
+COMPLIANCE & SAFETY
+-------------------
+- DPDP/PII: license keys are sha256-hashed client-side before any sync; Aadhaar/mobile/IFSC masked in logger + payload + server (3 layers).
+- Live government portal: the bot cannot undo a wrong submission (EULA disclaimer).
+- Own browser, own login: the app never stores or transmits portal credentials.
+- Single-instance app (port as mutex). i18n: English, Hindi, Kannada, Bengali, Hinglish. 306 tests passing.

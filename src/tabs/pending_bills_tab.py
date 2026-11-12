@@ -1,37 +1,18 @@
 # tabs/pending_bills_tab.py
 """
-Pending Bills Scraper Tab
+Pending Material Bills Automation Tab
 
-Scrapes the MGNREGA public "Liability & Expenditure Report" (pending bills)
-website and prepares an Excel sheet of unpaid Muster Rolls & Bills for the
-selected State → District → Block → Panchayat and Financial Year.
+Scrapes pending material bills awaiting approval from the MGNREGA / Netnrega portal:
+URL: https://nregade4.dord.gov.in/Netnrega/Bill_Approval_NRG.aspx
 
-Behaviour:
-- User selects State, District, Block (required), Panchayat & Financial Year.
-- If Panchayat is left empty → data is collected for ALL panchayats of the
-  selected Block.
-- If Financial Year is left empty → data is collected for the last 6 financial
-  years (current FY + previous 5).
-
-How the scraping works (public site, plain HTTP — no browser needed):
-    page=S  liability_exp_report.aspx  → lists districts (digests from links)
-    page=D  liability_exp_report.aspx  → lists blocks
-    page=B  liability_exp_report.aspx  → lists panchayats (name + panchayat_code)
-    Final   state_html/anticipated_exp.aspx (per panchayat link, carries its own digest)
-            → redirects to Netnrega/writereaddata/state_out/{fy2}anticipated_exp{panchayat_code}_{fy2}.html
-            → static HTML with 4 sections:
-                1) Unpaid Muster Rolls    2) Unpaid Bills
-                3) Unpaid MSR (Skilled)   4) Unpaid Voucher (Skilled)
-
-Following the panchayat link (instead of guessing the static file URL) is important:
-MGNREGA periodically refreshes its data files, so a hard-coded URL pattern may 404
-while the page link always carries a fresh digest + correct redirect target.
-
-Digest handling: every liability report page demands a per-query "Digest" value.
-Digests are embedded in the page links, so we only need ONE valid *seed* digest
-for page=S (config.PENDING_BILLS_CONFIG['seed_digest']) and then follow links.
-Other financial years are reached through the ASP.NET financial-year dropdown
-postback, which the server answers with fresh digests for that year.
+Features:
+- Browser-based Selenium automation (user logs into MGNREGA portal).
+- Supports iterating through:
+  • "All Available Financial Years" (or a specific financial year).
+  • "🌐 All Panchayats", "⭐ My Saved Panchayats", or a single Panchayat.
+- Captures live pending bills from table #gvbillpaid1 into the results treeview.
+- Executive-grade multi-sheet Excel export (Detailed Pending Bills + Panchayat Summary)
+  with KPI cards, styling, number formatting, and auto-launch.
 """
 import os
 import re
@@ -50,33 +31,22 @@ from src.i18n import tr
 
 logger = get_logger()
 
-# Labels used in the dropdowns for the "empty" (collect everything) options
+# Dropdown label constants
+ALL_FY_LABEL = "🗓 All Available Financial Years"
 ALL_PANCHAYATS_LABEL = "🌐 All Panchayats"
-ALL_FY_LABEL = "🗓 All (Last 6 Financial Years)"
-
-# Section names inside the final report html (order matters for parsing)
-SECTION_MR = "Muster Roll"
-SECTION_BILL = "Bill"
-SECTION_MSR_SKILLED = "Skilled MSR"
-SECTION_VOUCHER_SKILLED = "Skilled Voucher"
 
 
 class PendingBillsTab(BaseAutomationTab):
     def __init__(self, parent: Any, app_instance: Any) -> None:
         super().__init__(parent, app_instance, automation_key="pending_bills")
-        # Detailed scraped rows (used by Excel export). Each row is a dict.
         self.collected_rows: List[Dict[str, Any]] = []
-        # Location vars (also enables base-class activity/panchayat extraction)
-        self.state_var = ctk.StringVar(value="JHARKHAND")
-        self.district_var = ctk.StringVar(value="")
-        self.block_var = ctk.StringVar(value="")
-        self.panchayat_var = ctk.StringVar(value=ALL_PANCHAYATS_LABEL)
+
         self.fy_var = ctk.StringVar(value=ALL_FY_LABEL)
+        self.panchayat_var = ctk.StringVar(value=ALL_PANCHAYATS_LABEL)
+
         self.config_vars = {
-            "location_state": self.state_var,
-            "location_district": self.district_var,
-            "location_block": self.block_var,
-            "location_panchayat": self.panchayat_var,
+            "pending_bills_fy": self.fy_var,
+            "pending_bills_panchayat": self.panchayat_var,
         }
 
         self.grid_columnconfigure(0, weight=1)
@@ -89,12 +59,12 @@ class PendingBillsTab(BaseAutomationTab):
     # UI BUILDERS
     # ────────────────────────────────────────────────────────────────────────
     def _create_widgets(self) -> None:
-        notebook = ctk.CTkTabview(self)
-        notebook.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.notebook = ctk.CTkTabview(self)
+        self.notebook.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        settings_tab = notebook.add("Settings")
-        results_tab = notebook.add("Results")
-        self._create_log_and_status_area(notebook)  # adds "Logs & Status"
+        settings_tab = self.notebook.add("Settings")
+        results_tab = self.notebook.add("Results")
+        self._create_log_and_status_area(self.notebook)  # adds "Logs & Status"
 
         settings_tab.grid_columnconfigure(0, weight=1)
         settings_tab.grid_rowconfigure(2, weight=1)
@@ -109,9 +79,10 @@ class PendingBillsTab(BaseAutomationTab):
             header, text=tr("form.pending_bills.scraper_title"),
             font=ctk.CTkFont(size=17, weight="bold"),
             text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
-        ).pack(anchor="w", padx=14, pady=(10, 0))
+        ).pack(anchor="w", padx=14, pady=(10, 2))
         ctk.CTkLabel(
-            header, text="Scrapes unpaid Muster Rolls & Bills from the MGNREGA website and prepares an Excel sheet.",
+            header,
+            text="MGNREGA portal me pehle se login hona chahiye. Bot Bill Approval page se pending bills capture karega.",
             font=ctk.CTkFont(size=12),
             text_color=(config.COLORS["text_dark_alt"], config.COLORS["text_light"])
         ).pack(anchor="w", padx=14, pady=(0, 10))
@@ -122,51 +93,23 @@ class PendingBillsTab(BaseAutomationTab):
         inputs_card.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
         inputs_card.grid_columnconfigure(1, weight=1)
 
-        # State
-        ctk.CTkLabel(inputs_card, text=tr("form.pending_bills.state_required"), font=ctk.CTkFont(size=12, weight="bold")).grid(
-            row=0, column=0, sticky="w", padx=(16, 10), pady=(14, 5))
-        self.state_menu = ctk.CTkOptionMenu(inputs_card, variable=self.state_var,
-                                            values=self._state_values(), width=240)
-        self.state_menu.grid(row=0, column=1, sticky="ew", padx=(0, 16), pady=(14, 5))
-
-        # District
-        ctk.CTkLabel(inputs_card, text=tr("form.pending_bills.district_required"), font=ctk.CTkFont(size=12, weight="bold")).grid(
-            row=1, column=0, sticky="w", padx=(16, 10), pady=5)
-        self.district_menu = ctk.CTkOptionMenu(inputs_card, variable=self.district_var,
-                                               values=[], width=240)
-        self.district_menu.grid(row=1, column=1, sticky="ew", padx=(0, 16), pady=5)
-
-        # Block
-        ctk.CTkLabel(inputs_card, text=tr("form.pending_bills.block_required"), font=ctk.CTkFont(size=12, weight="bold")).grid(
-            row=2, column=0, sticky="w", padx=(16, 10), pady=5)
-        self.block_menu = ctk.CTkOptionMenu(inputs_card, variable=self.block_var,
-                                            values=[], width=240)
-        self.block_menu.grid(row=2, column=1, sticky="ew", padx=(0, 16), pady=5)
+        # Financial Year
+        ctk.CTkLabel(inputs_card, text=tr("form.pending_bills.financial_year"),
+                     font=ctk.CTkFont(size=12, weight="bold")).grid(
+            row=0, column=0, sticky="w", padx=(16, 10), pady=(14, 8))
+        self.fy_menu = ctk.CTkOptionMenu(inputs_card, variable=self.fy_var,
+                                         values=self._fy_values(), width=280)
+        self.fy_menu.grid(row=0, column=1, sticky="ew", padx=(0, 16), pady=(14, 8))
 
         # Panchayat
-        ctk.CTkLabel(inputs_card, text=tr("common.panchayat_col"), font=ctk.CTkFont(size=12, weight="bold")).grid(
-            row=3, column=0, sticky="w", padx=(16, 10), pady=5)
+        ctk.CTkLabel(inputs_card, text=tr("common.panchayat_col"),
+                     font=ctk.CTkFont(size=12, weight="bold")).grid(
+            row=1, column=0, sticky="w", padx=(16, 10), pady=(8, 14))
         self.panchayat_menu = ctk.CTkOptionMenu(inputs_card, variable=self.panchayat_var,
-                                                values=[ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL], width=240)
-        self.panchayat_menu.grid(row=3, column=1, sticky="ew", padx=(0, 16), pady=5)
+                                                values=self._panchayat_values(), width=280)
+        self.panchayat_menu.grid(row=1, column=1, sticky="ew", padx=(0, 16), pady=(8, 14))
 
-        # Financial Year
-        ctk.CTkLabel(inputs_card, text=tr("form.pending_bills.financial_year"), font=ctk.CTkFont(size=12, weight="bold")).grid(
-            row=4, column=0, sticky="w", padx=(16, 10), pady=(5, 14))
-        self.fy_menu = ctk.CTkOptionMenu(inputs_card, variable=self.fy_var,
-                                         values=self._fy_values(), width=240)
-        self.fy_menu.grid(row=4, column=1, sticky="ew", padx=(0, 16), pady=(5, 14))
-
-        # ── Wire up cascading dropdowns ──
-        self.state_var.trace_add("write", self._on_state_change)
-        self.district_var.trace_add("write", self._on_district_change)
-        self.block_var.trace_add("write", self._on_block_change)
-        # populate initial values
-        self._on_state_change()
-        self._on_district_change()
-        self._on_block_change()
-
-        # ── Info / rules card ──
+        # ── Info / instructions card ──
         info = ctk.CTkFrame(settings_tab, corner_radius=12, border_width=1,
                             border_color=("gray85", "gray30"), fg_color=("gray97", "gray18"))
         info.grid(row=2, column=0, sticky="nsew", padx=12, pady=6)
@@ -175,13 +118,14 @@ class PendingBillsTab(BaseAutomationTab):
             info, text=tr("common.how_it_works"),
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color=(config.COLORS["blue_dark"], config.COLORS["blue_light"])
-        ).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 2))
+        ).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 4))
         rules_text = (
-            "• Data is scraped live from the MGNREGA Liability & Expenditure report website.\n"
-            "• District & Block are required. Select them from your saved location data.\n"
-            "• Leave Panchayat empty  →  collects data for ALL panchayats of the selected Block.\n"
-            "• Leave Financial Year empty  →  collects data for the last 6 financial years.\n"
-            "• Each row in Results = one Panchayat. Click 'Export to Excel' for the full item-wise sheet."
+            "• Automation run karne ke liye browser me MGNREGA portal pehle se LOGIN hona chahiye.\n"
+            "• URL: https://nregade4.dord.gov.in/Netnrega/Bill_Approval_NRG.aspx\n"
+            "• Financial Year: 'All Available Financial Years' ya koi specific financial year select karein.\n"
+            "• Panchayat: '🌐 All Panchayats', '⭐ My Saved Panchayats', ya specific Panchayat chunein.\n"
+            "• Bot ek-ek karke selected financial years aur panchayats ke pending bills scrape karega.\n"
+            "• Task complete hone par executive-grade multi-sheet Excel report generate hogi."
         )
         ctk.CTkLabel(
             info, text=rules_text, justify="left", anchor="w",
@@ -197,23 +141,29 @@ class PendingBillsTab(BaseAutomationTab):
         res_btn_frame = ctk.CTkFrame(results_tab, fg_color="transparent")
         res_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=(5, 0))
         self.export_button = ctk.CTkButton(
-            res_btn_frame, text=tr("common.export_excel"), width=150, height=32,
+            res_btn_frame, text=tr("common.export_excel"), width=160, height=32,
             fg_color=config.COLORS["green_export"], hover_color="#0B5E0B",
             command=self.export_report, font=ctk.CTkFont(size=12, weight="bold"))
         self.export_button.pack(side="right")
-        ctk.CTkLabel(
-            res_btn_frame, text=tr("form.pending_bills.summary_hint"), font=ctk.CTkFont(size=11),
-            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"])
-        ).pack(side="left", padx=5)
+        self.res_count_label = ctk.CTkLabel(
+            res_btn_frame, text="0 bills captured", font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=(config.COLORS["text_medium"], config.COLORS["text_light"]))
+        self.res_count_label.pack(side="left", padx=5)
 
-        cols = ("Financial Year", "Panchayat", "MR Count", "Bill Count", "Amount (₹)", "Status")
+        cols = ("FY", "Panchayat", "Work Code", "Work Name", "Bill No.", "Bill Date",
+                "Vendor Name", "Bill Amount (₹)", "Balance (₹)")
         self.results_tree = ttk.Treeview(results_tab, columns=cols, show="headings")
-        widths = {"Financial Year": 130, "Panchayat": 160, "MR Count": 90,
-                  "Bill Count": 90, "Amount (₹)": 110, "Status": 100}
+        widths = {
+            "FY": 95, "Panchayat": 130, "Work Code": 170, "Work Name": 220,
+            "Bill No.": 80, "Bill Date": 90, "Vendor Name": 160,
+            "Bill Amount (₹)": 110, "Balance (₹)": 110
+        }
         for col in cols:
             self.results_tree.heading(col, text=col)
-            self.results_tree.column(col, width=widths[col], minwidth=70,
-                                     anchor="w" if col == "Panchayat" else "center")
+            align = "w" if col in ("Panchayat", "Work Name", "Vendor Name") else "center"
+            if "Amount" in col or "Balance" in col:
+                align = "e"
+            self.results_tree.column(col, width=widths[col], minwidth=70, anchor=align)
         self.results_tree.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         scrollbar = ctk.CTkScrollbar(results_tab, command=self.results_tree.yview)
         self.results_tree.configure(yscroll=scrollbar.set)
@@ -222,73 +172,66 @@ class PendingBillsTab(BaseAutomationTab):
         self._setup_treeview_sorting(self.results_tree)
 
     # ────────────────────────────────────────────────────────────────────────
-    # DROPDOWN VALUE HELPERS
+    # INPUT PERSISTENCE
     # ────────────────────────────────────────────────────────────────────────
-    def _state_values(self) -> List[str]:
-        return list(config.PENDING_BILLS_CONFIG.keys()) or ["JHARKHAND"]
-
-    def _district_values(self, state: str) -> List[str]:
-        vals: List[str] = []
+    def load_inputs(self) -> None:
         try:
-            vals = self.app.history_manager.get_filtered_suggestions(
-                "location_district", "location_state", state) or []
+            data = self.app.history_manager.get_tab_inputs("pending_bills")
+            if not data:
+                return
+            saved_fy = data.get("pending_bills_fy", "")
+            if saved_fy and hasattr(self, "fy_menu") and saved_fy in self.fy_menu.cget("values"):
+                self.fy_var.set(saved_fy)
+            saved_panch = data.get("pending_bills_panchayat", "")
+            if saved_panch and hasattr(self, "panchayat_var"):
+                self.panchayat_var.set(saved_panch)
         except Exception:
-            vals = []
-        if not vals:
-            try:
-                from src.location_data import STATE_DISTRICT_MAP
-                vals = STATE_DISTRICT_MAP.get(state.title(), [])
-            except Exception:
-                vals = []
-        return [v for v in vals if v] or [""]
+            pass
 
-    def _block_values(self, district: str) -> List[str]:
+    def save_inputs(self, inputs: Optional[Dict[str, Any]] = None) -> None:
         try:
-            vals = self.app.history_manager.get_filtered_suggestions(
-                "location_block", "location_district", district) or []
+            save_data = inputs or {
+                "pending_bills_fy": self.fy_var.get(),
+                "pending_bills_panchayat": self.panchayat_var.get(),
+            }
+            self.app.history_manager.save_tab_inputs_batch("pending_bills", save_data)
         except Exception:
-            vals = []
-        return [v for v in vals if v] or [""]
+            pass
 
-    def _panchayat_values(self, block: str) -> List[str]:
-        try:
-            vals = self.app.history_manager.get_filtered_suggestions(
-                "location_panchayat", "location_block", block) or []
-        except Exception:
-            vals = []
-        return [v for v in vals if v] or [""]
+    # ────────────────────────────────────────────────────────────────────────
+    # DROPDOWN VALUES
+    # ────────────────────────────────────────────────────────────────────────
+    @staticmethod
+    def _last_n_financial_years(n: int = 6) -> List[str]:
+        now = datetime.now()
+        cur_start = now.year if now.month >= 4 else now.year - 1
+        return [f"{cur_start - i}-{cur_start - i + 1}" for i in range(n)]
+
+    @staticmethod
+    def _current_financial_year() -> str:
+        now = datetime.now()
+        start = now.year if now.month >= 4 else now.year - 1
+        return f"{start}-{start + 1}"
 
     def _fy_values(self) -> List[str]:
         return [ALL_FY_LABEL] + self._last_n_financial_years(6)
 
-    def _on_state_change(self, *_):
-        self.district_var.set("")
-        self.block_var.set("")
-        self.panchayat_var.set(ALL_PANCHAYATS_LABEL)
-        self.district_menu.configure(values=self._district_values(self.state_var.get().strip()))
-
-    def _on_district_change(self, *_):
-        self.block_var.set("")
-        self.panchayat_var.set(ALL_PANCHAYATS_LABEL)
-        self.block_menu.configure(values=self._block_values(self.district_var.get().strip()))
-
-    def _on_block_change(self, *_):
-        self.panchayat_var.set(ALL_PANCHAYATS_LABEL)
-        self.panchayat_menu.configure(
-            # _all_panchayat_values history se labels filter karta hai — warna
-            # purana saved label prefix + history dono se aa kar 2 baar dikhta.
-            values=self._all_panchayat_values(self._panchayat_values(self.block_var.get().strip())))
+    def _panchayat_values(self) -> List[str]:
+        saved = self._get_saved_panchayats()
+        vals = [ALL_PANCHAYATS_LABEL, config.MY_PANCHAYATS_LABEL]
+        if saved:
+            vals.extend(saved)
+        return vals
 
     # ────────────────────────────────────────────────────────────────────────
-    # STATE / INPUT MANAGEMENT
+    # UI STATE
     # ────────────────────────────────────────────────────────────────────────
     def set_ui_state(self, running: bool) -> None:
         if not self._is_alive():
             return
         self.set_common_ui_state(running)
         state = "disabled" if running else "normal"
-        for w in (self.state_menu, self.district_menu, self.block_menu,
-                  self.panchayat_menu, self.fy_menu):
+        for w in (self.fy_menu, self.panchayat_menu):
             try:
                 w.configure(state=state)
             except Exception:
@@ -299,552 +242,458 @@ class PendingBillsTab(BaseAutomationTab):
             except Exception:
                 pass
 
-    def save_inputs(self, inputs: Dict[str, str]) -> None:
-        try:
-            self.app.history_manager.save_tab_inputs_batch("pending_bills", inputs)
-        except Exception as e:
-            logger.debug("Failed to save pending_bills inputs: %s", e)
-
-    def load_inputs(self) -> None:
-        try:
-            data = self.app.history_manager.get_tab_inputs("pending_bills") or {}
-        except Exception:
-            data = {}
-        if not data:
-            return
-        state = (data.get("state") or "JHARKHAND").strip()
-        if state not in self._state_values():
-            state = "JHARKHAND"
-        self.state_var.set(state)
-        self.district_var.set(data.get("district", ""))
-        self.block_var.set(data.get("block", ""))
-        self.panchayat_var.set(data.get("panchayat") or ALL_PANCHAYATS_LABEL)
-        fy = (data.get("fy") or "").strip()
-        self.fy_var.set(fy if fy in self._fy_values() else ALL_FY_LABEL)
-
-    def retry_logic_handler(self) -> None:
-        """Re-run the automation with the same inputs."""
-        self.start_automation()
-
-    def reset_ui(self) -> None:
-        super().reset_ui()
-        self.state_var.set("JHARKHAND")
-        self.district_var.set("")
-        self.block_var.set("")
-        self.panchayat_var.set(ALL_PANCHAYATS_LABEL)
-        self.fy_var.set(ALL_FY_LABEL)
-        self.safe_tree_clear()
-        self.collected_rows = []
+    def safe_tree_insert(self, row: Dict[str, Any]) -> None:
+        def _add():
+            if not self._is_alive() or not hasattr(self, "results_tree"):
+                return
+            vals = (
+                row.get("fy", ""),
+                row.get("panchayat", ""),
+                row.get("work_code", ""),
+                row.get("work_name", ""),
+                row.get("bill_no", ""),
+                row.get("bill_date", ""),
+                row.get("vendor_name", ""),
+                f"₹ {float(row.get('bill_amount', 0) or 0):,.2f}",
+                f"₹ {float(row.get('balance_to_paid', 0) or 0):,.2f}"
+            )
+            self.results_tree.insert("", "end", values=vals)
+            if hasattr(self, "res_count_label"):
+                self.res_count_label.configure(text=f"{len(self.collected_rows)} bills captured")
+        self.app.after(0, _add)
 
     # ────────────────────────────────────────────────────────────────────────
-    # START / AUTOMATION ENTRY
+    # PARSING ENGINE (Static, Testable)
+    # ────────────────────────────────────────────────────────────────────────
+    @staticmethod
+    def parse_bills_table(html_content: str, fy: str = "", panchayat: str = "") -> List[Dict[str, Any]]:
+        """Parses pending bills table #gvbillpaid1 from HTML string.
+        Extracts all columns cleanly into dictionary records.
+        """
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html_content, "html.parser")
+        table = soup.find("table", id="gvbillpaid1")
+        if not table:
+            return []
+
+        rows: List[Dict[str, Any]] = []
+        tbody = table.find("tbody")
+        tr_elements = tbody.find_all("tr") if tbody else table.find_all("tr")[1:]
+
+        for tr_elem in tr_elements:
+            tds = tr_elem.find_all("td")
+            if not tds:
+                continue
+
+            # Check for empty table indicator row
+            if len(tds) == 1 or "no data available" in tr_elem.get_text().lower():
+                continue
+
+            def _clean(val: Any) -> str:
+                return (val.get_text(strip=True) if val else "").strip()
+
+            s_no = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblsno")))
+            work_code = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblworkcode")))
+            work_name = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblworkname")))
+            total_sanction = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lbltfinsanction")))
+            mat_sanction = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblsancformat")))
+            total_mat_booked = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lbltmatbook")))
+            total_paid = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblTotalPaid")))
+            balance_to_paid = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblBalancedtoPaid")))
+            work_status = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblworkstatus")))
+            bill_no = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblbillNo")))
+            bill_date = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblbilldate")))
+            vendor_name = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblvendername")))
+            vendor_tin = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lbltinno")))
+            bill_amount = _clean(tr_elem.find(class_="billAmount") or tr_elem.find(id=lambda x: x and x.endswith("_amt")))
+            tax_amount = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lbltaxamount")))
+            material_list_no = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblmateriallstno")))
+            fto_no = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblftono")))
+            is_rejected = _clean(tr_elem.find(id=lambda x: x and x.endswith("_lblisrejected")))
+
+            # Positional fallback if specific ID spans are missing
+            if not work_code and len(tds) >= 17:
+                s_no = s_no or _clean(tds[0])
+                work_code = _clean(tds[1])
+                work_name = _clean(tds[2])
+                total_sanction = total_sanction or _clean(tds[3])
+                mat_sanction = mat_sanction or _clean(tds[4])
+                total_mat_booked = total_mat_booked or _clean(tds[5])
+                total_paid = total_paid or _clean(tds[6])
+                balance_to_paid = balance_to_paid or _clean(tds[7])
+                work_status = work_status or _clean(tds[8])
+                bill_no = bill_no or _clean(tds[9])
+                bill_date = bill_date or _clean(tds[10])
+                vendor_name = vendor_name or _clean(tds[11])
+                bill_amount = bill_amount or _clean(tds[12])
+                tax_amount = tax_amount or _clean(tds[13])
+                material_list_no = material_list_no or _clean(tds[14])
+                fto_no = fto_no or _clean(tds[15])
+                is_rejected = is_rejected or _clean(tds[16])
+
+            if not work_code and not bill_no:
+                continue
+
+            row_data: Dict[str, Any] = {
+                "s_no": s_no,
+                "fy": fy,
+                "panchayat": panchayat,
+                "work_code": work_code,
+                "work_name": work_name,
+                "total_sanction": total_sanction,
+                "mat_sanction": mat_sanction,
+                "total_mat_booked": total_mat_booked,
+                "total_paid": total_paid,
+                "balance_to_paid": balance_to_paid,
+                "work_status": work_status,
+                "bill_no": bill_no,
+                "bill_date": bill_date,
+                "vendor_name": vendor_name,
+                "vendor_tin": vendor_tin,
+                "bill_amount": bill_amount,
+                "tax_amount": tax_amount,
+                "material_list_no": material_list_no,
+                "fto_no": fto_no,
+                "is_rejected": is_rejected or "N",
+            }
+            rows.append(row_data)
+
+        return rows
+
+    def _scrape_table_all_pages(self, driver: Any, current_fy: str, cleaned_p: str) -> List[Dict[str, Any]]:
+        """Scrapes all rows from table #gvbillpaid1.
+        1. Attempts to select 'All' (-1) in DataTables length dropdown and trigger draw.
+        2. Scrapes the table.
+        3. If multiple pages remain, traverses them via the Next button (#gvbillpaid1_next).
+        """
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select
+
+        # Attempt to set DataTables page length to All (-1)
+        try:
+            len_dropdowns = driver.find_elements(By.NAME, "gvbillpaid1_length")
+            if len_dropdowns:
+                len_sel = Select(len_dropdowns[0])
+                for opt in len_sel.options:
+                    if opt.get_attribute("value") == "-1" or "all" in opt.text.lower():
+                        len_sel.select_by_value("-1")
+                        driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", len_dropdowns[0])
+                        time.sleep(1.0)
+                        break
+        except Exception:
+            pass
+
+        try:
+            driver.execute_script("""
+                if (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable('#gvbillpaid1')) {
+                    $('#gvbillpaid1').DataTable().page.len(-1).draw();
+                }
+            """)
+            time.sleep(0.8)
+        except Exception:
+            pass
+
+        collected_rows: List[Dict[str, Any]] = []
+        seen_keys = set()
+        max_pages = 50
+
+        for page in range(1, max_pages + 1):
+            tables = driver.find_elements(By.ID, "gvbillpaid1")
+            if not tables:
+                break
+
+            table_html = tables[0].get_attribute("outerHTML")
+            page_rows = self.parse_bills_table(table_html, fy=current_fy, panchayat=cleaned_p)
+            for r in page_rows:
+                key = (r.get("work_code"), r.get("bill_no"))
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    collected_rows.append(r)
+
+            # Check if there is an active (not disabled) Next button
+            next_btns = driver.find_elements(By.ID, "gvbillpaid1_next")
+            if not next_btns:
+                next_btns = driver.find_elements(By.CSS_SELECTOR, ".paginate_button.next")
+
+            if not next_btns:
+                break
+
+            classes = next_btns[0].get_attribute("class") or ""
+            if "disabled" in classes.lower():
+                break  # Reached the last page
+
+            # Click next page to fetch remaining 10 rows
+            try:
+                driver.execute_script("arguments[0].click();", next_btns[0])
+                time.sleep(1.0)
+            except Exception:
+                break
+
+        return collected_rows
+
+    # ────────────────────────────────────────────────────────────────────────
+    # START / AUTOMATION DISPATCH
     # ────────────────────────────────────────────────────────────────────────
     def start_automation(self) -> None:
         self.safe_tree_clear()
         self.collected_rows = []
+        if hasattr(self, "res_count_label"):
+            self.res_count_label.configure(text="0 bills captured")
 
-        state = self.state_var.get().strip().upper()
-        district = self.district_var.get().strip().upper()
-        block = self.block_var.get().strip().upper()
-        panchayat = self.panchayat_var.get().strip().upper()
-        if panchayat == ALL_PANCHAYATS_LABEL.upper():
-            panchayat = ""
-        elif panchayat == config.MY_PANCHAYATS_LABEL.upper():
-            panchayat = config.MY_PANCHAYATS_LABEL  # Keep marker → filtered in scraper
-        fy = self.fy_var.get().strip()
-        if fy == ALL_FY_LABEL:
-            fy = ""
+        target_fy = self.fy_var.get().strip()
+        target_panchayat = self.panchayat_var.get().strip()
 
-        if not state or not district or not block:
-            messagebox.showwarning(tr("errors.input_error"), tr("dialogs.select_state_district_block"),
-                                   parent=self)
-            return
-        if state not in config.PENDING_BILLS_CONFIG:
-            messagebox.showwarning(
-                "Unsupported State",
-                f"Pending Bills scraping is not configured for '{state}'.\n\n"
-                "Please add it to config.PENDING_BILLS_CONFIG.",
-                parent=self)
-            return
-
-        fys: List[str] = [fy] if fy else self._last_n_financial_years(6)
-
-        inputs = {"state": self.state_var.get().strip(), "district": self.district_var.get().strip(),
-                  "block": self.block_var.get().strip(), "panchayat": self.panchayat_var.get().strip(),
-                  "fy": fy}
+        inputs = {
+            "pending_bills_fy": target_fy,
+            "pending_bills_panchayat": target_panchayat,
+        }
         self.save_inputs(inputs)
-        for key, val in (("location_state", inputs["state"]),
-                         ("location_district", inputs["district"]),
-                         ("location_block", inputs["block"])):
-            if val:
-                try:
-                    self.app.update_history(key, val)
-                except Exception:
-                    pass
 
         self.app.start_automation_thread(
             self.automation_key, self.run_automation_logic,
-            args=(state, district, block, panchayat, fys))
+            args=(target_fy, target_panchayat))
 
     # ────────────────────────────────────────────────────────────────────────
-    # SCRAPING CORE (runs in background thread)
+    # AUTOMATION WORKER (Runs in background thread)
     # ────────────────────────────────────────────────────────────────────────
-    def run_automation_logic(self, state: str, district: str, block: str,
-                             panchayat: str, fys: List[str]) -> None:
+    def run_automation_logic(self, target_fy: str, target_panchayat: str) -> None:
         self.app.after(0, self.set_ui_state, True)
         self.app.after(0, lambda: self.app.clear_log(self.log_display))
-        self.log_info("🚀 Starting Pending Bills scraping...")
+        self.log_info("🚀 Starting Pending Material Bills extraction...")
 
-        try:
-            import requests
-        except ImportError:
-            self.log_error("'requests' is not installed. Run: pip install requests")
+        start_time = time.time()
+        driver = self.app.get_driver()
+        if not driver:
+            self.log_error("❌ Browser driver not available.")
             self.app.after(0, self.set_ui_state, False)
             return
 
-        cfg = config.PENDING_BILLS_CONFIG.get(state)
-        if not cfg:
-            self.log_error(f"No configuration for state '{state}'.")
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait, Select
+        from selenium.webdriver.support import expected_conditions as EC
+
+        wait = WebDriverWait(driver, 15)
+        raw_url = getattr(config, "PENDING_BILLS_URL", "https://nregade4.dord.gov.in/Netnrega/Bill_Approval_NRG.aspx")
+        target_url = self.resolve_portal_url(raw_url)
+
+        self.log_info(f"🌐 Navigating to Bill Approval page: {target_url}")
+        driver.get(target_url)
+
+        # ── Verify page presence (user must be logged in) ──
+        try:
+            wait.until(lambda d: d.find_elements(By.ID, "ctl00_ContentPlaceHolder1_DDLFY") or
+                                 d.find_elements(By.ID, "ctl00_ContentPlaceHolder1_ddlpnch"))
+        except Exception:
+            self.log_error("❌ Portal par Bill Approval page nahi mila.")
+            self.log_error("👉 Sunishchit karein ki aap browser me MGNREGA portal par LOGGED IN hain aur session active hai.")
             self.app.after(0, self.set_ui_state, False)
             return
 
-        session = requests.Session()
-        session.headers.update({
-            "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                           "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
-        })
-
-        seed_fy = cfg.get("seed_fin_year") or fys[0]
-        seed_digest = cfg.get("seed_digest") or ""
-
-        # ── Open the state page (page=S) once using the seed digest ──
-        seed_url = self._state_page_url(cfg, state, seed_fy, seed_digest)
-        seed_html = self._fetch(session, seed_url)
-        if not seed_html or self._is_error_page(seed_html):
-            self.log_error("✗ Could not open the Pending Bills report.")
-            if seed_digest:
-                self.log_error("The configured seed digest may have expired — please refresh "
-                               "'seed_digest' in config.PENDING_BILLS_CONFIG.")
-            else:
-                self.log_error("No seed digest configured in config.PENDING_BILLS_CONFIG.")
-            self.app.after(0, self.set_ui_state, False)
-            self.app.after(0, self.update_status, "Failed — seed digest expired", 0.0)
-            return
-
-        # current page=S state (url + html) — used to chain FY postbacks
-        cur = {"url": seed_url, "html": seed_html}
-
-        total_fys = len(fys)
-        grand_mr = grand_bill = 0
-        grand_total = 0.0
-
+        # ── Step 1: Determine Financial Years to process ──
+        fys_to_process: List[str] = []
         try:
-            for fi, fy in enumerate(fys, 1):
-                if self.is_stopped():
-                    self.log_warning("⏹ Stop signal received.")
-                    break
-                self.log_info(f"── 📅 Financial Year: {fy}  ({fi}/{total_fys}) ──")
-                self.app.after(0, self.update_status,
-                               f"FY {fy}: opening report...", (fi - 1) / total_fys)
-
-                # Switch to the target FY via the ASP.NET dropdown postback
-                if fy != seed_fy:
-                    new_html, new_url = self._switch_fy(session, cur["url"], cur["html"], fy)
-                    if not new_html or self._is_error_page(new_html):
-                        self.log_warning(f"  ⚠ Could not switch to FY {fy}; skipping it.")
-                        continue
-                    cur = {"url": new_url, "html": new_html}
-
-                s_html = cur["html"]
-                self.log_info(f"  ✅ Report opened for FY {fy}.")
-
-                try:
-                    # ── page=S → find district page=D link (with its digest) ──
-                    d_url = self._find_district_url(cfg, s_html, district)
-                    if not d_url:
-                        self.log_error(f"✗ District '{district}' not found for FY {fy}.")
-                        continue
-                    d_html = self._fetch(session, d_url)
-                    if not d_html or self._is_error_page(d_html):
-                        self.log_error(f"✗ Could not open district page for '{district}' (FY {fy}).")
-                        continue
-                    self.log_info(f"  ✅ District '{district}' found.")
-
-                    # ── page=D → find block page=B link (with its digest) ──
-                    b_url = self._find_block_url(cfg, d_html, block)
-                    if not b_url:
-                        self.log_error(f"✗ Block '{block}' not found for FY {fy}.")
-                        continue
-                    b_html = self._fetch(session, b_url)
-                    if not b_html or self._is_error_page(b_html):
-                        self.log_error(f"✗ Could not open block page for '{block}' (FY {fy}).")
-                        continue
-                    self.log_info(f"  ✅ Block '{block}' found.")
-
-                    # ── page=B → panchayat codes ──
-                    panchayats = self._get_panchayats(cfg, b_html)
-                    if self._is_my_saved_panchayat(panchayat):
-                        saved = {self._normalize_name(p) for p in self._get_saved_panchayats() if p and p.strip()}
-                        if not saved:
-                            self.log_warning("  ⚠ No saved panchayat found in Settings > Location Data.")
-                            self._reset_ui_state_safe()
-                            return
-                        panchayats = [p for p in panchayats
-                                      if self._normalize_name(p["name"]) in saved]
-                        self.log_info(f"  ⭐ My Saved Panchayats mode: {len(panchayats)} saved panchayat(s) will be processed.")
-                    elif panchayat:
-                        panchayats = [p for p in panchayats
-                                      if self._normalize_name(p["name"]) == panchayat]
-                    if not panchayats:
-                        self.log_warning(f"  ⚠ No panchayat found for FY {fy}.")
-                        continue
-
-                    self.log_info(f"  🗂 Scraping {len(panchayats)} panchayat(s)...")
-                    for pi, panch in enumerate(panchayats, 1):
-                        if self.is_stopped():
-                            self.log_warning("⏹ Stop signal received.")
-                            break
-                        progress = (fi - 1 + (pi - 1) / max(len(panchayats), 1)) / total_fys
-                        self.app.after(0, self.update_status,
-                                       f"{panch['name']} ({pi}/{len(panchayats)}) — FY {fy}", progress)
-
-                        try:
-                            rows, ok, msg = self._scrape_panchayat(
-                                session, cfg, fy, state, district, block, panch)
-                        except Exception as e:
-                            rows, ok, msg = [], False, f"Error: {str(e)[:120]}"
-
-                        mr_count = sum(1 for r in rows if r["section"] == SECTION_MR)
-                        bill_count = sum(1 for r in rows if r["section"] == SECTION_BILL)
-                        amt = sum(r["amount"] for r in rows)
-                        grand_mr += mr_count
-                        grand_bill += bill_count
-                        grand_total += amt
-                        self.collected_rows.extend(rows)
-
-                        status = "Success" if rows else "No Data"
-                        tags = ("success",) if rows else ("skipped",)
-                        self.app.after(0, self.safe_tree_insert,
-                                       (fy, panch["name"], mr_count, bill_count,
-                                        round(amt, 2), status), tags)
-
-                        if ok and rows:
-                            self.log_info(f"  ✓ {panch['name']}: {msg}  (₹{amt:,.2f})")
-                        elif ok:
-                            self.log_success(f"  ✓ {panch['name']}: {msg}")
-                        else:
-                            self.log_warning(f"  ⚠ {panch['name']}: {msg}")
-                except Exception as e:
-                    self.log_error(f"✗ Unexpected error for FY {fy}: {str(e)[:200]}")
-        finally:
-            self.app.after(0, self.set_ui_state, False)
-            self.app.after(0, self.update_status, "Finished", 1.0)
-            self.app.after(0, self.app.set_status, "Finished")
-
-        if self.is_stopped():
-            self.log_warning("⏹ Automation stopped by user.")
-        else:
-            self.log_info(f"📊 Summary: {grand_mr} unpaid MRs, {grand_bill} unpaid bills, "
-                          f"total ₹{grand_total:,.2f}")
-            self.log_success("✅ Pending Bills scraping completed. "
-                             "Click 'Export to Excel' to save the sheet.")
-            self.app.after(5000, lambda: self.app.set_status("Ready"))
-
-    # ── HTTP helpers ────────────────────────────────────────────────────────
-    def _fetch(self, session: Any, url: str, retries: int = 2) -> Optional[str]:
-        for attempt in range(retries + 1):
-            try:
-                r = session.get(url, timeout=30)
-                if r.status_code == 200:
-                    # Report pages are UTF-8 (Hindi text) — requests often
-                    # defaults to ISO-8859-1 when the header lacks a charset.
-                    if r.encoding is None or r.encoding.lower() in ("iso-8859-1", "windows-1252"):
-                        r.encoding = "utf-8"
-                    return r.text
-                return None
-            except Exception:
-                if attempt >= retries:
-                    return None
-                time.sleep(2)
-        return None
-
-    def _state_page_url(self, cfg: Dict[str, str], state: str, fy: str, digest: str) -> str:
-        from urllib.parse import urlencode
-        return cfg["report_url"] + "?" + urlencode({
-            "lflag": "eng", "state_code": cfg["state_code"], "state_name": state,
-            "fin_year": fy, "page": "S"}) + (f"&Digest={digest}" if digest else "")
-
-    def _abs_url(self, cfg: Dict[str, str], href: str) -> str:
-        """Resolve a (possibly relative) link against the report URL."""
-        from urllib.parse import urlsplit
-        host = urlsplit(cfg["report_url"]).netloc
-        if href.startswith("http://") or href.startswith("https://"):
-            return href
-        if href.startswith("//"):
-            return "https:" + href
-        if href.startswith("/"):
-            return f"https://{host}{href}"
-        base = cfg["report_url"].rsplit("/", 1)[0] + "/"
-        return base + href
-
-    def _is_error_page(self, html: str) -> bool:
-        if not html:
-            return True
-        low = html.lower()
-        if "url tempered" in low or "url tampered" in low or "fin year not found" in low:
-            return True
-        # Real report pages are large; error/empty pages are tiny
-        if len(html) < 2000:
-            return True
-        return False
-
-    def _iter_links(self, html: str):
-        """Yield dicts for liability/anticipated report links on a page."""
-        try:
-            from bs4 import BeautifulSoup
-            from urllib.parse import parse_qs, urlparse
-        except ImportError:
-            return
-        soup = BeautifulSoup(html, "html.parser")
-        for a in soup.find_all("a", href=True):
-            href = a.get("href", "")
-            if "liability_exp_report.aspx" not in href and "anticipated_exp.aspx" not in href:
-                continue
-            qs = parse_qs(urlparse(href).query)
-            item: Dict[str, str] = {"text": a.get_text(" ", strip=True), "href": href}
-            for k in ("page", "state_name", "state_code", "district_name", "district_code",
-                      "block_name", "block_code", "panchayat_name", "panchayat_code",
-                      "fin_year", "Digest"):
-                v = qs.get(k)
-                item[k] = v[0] if v else ""
-            yield item
-
-    # ── Page traversal (digests travel inside the links) ───────────────────
-    def _find_district_url(self, cfg: Dict[str, str], s_html: str, district: str) -> Optional[str]:
-        """Return the absolute page=D URL (including its Digest) for the district."""
-        target = self._normalize_name(district)
-        for a in self._iter_links(s_html):
-            if a.get("page") == "D":
-                name = a.get("district_name") or a.get("text")
-                if name and self._normalize_name(name) == target:
-                    return self._abs_url(cfg, a.get("href", ""))
-        return None
-
-    def _find_block_url(self, cfg: Dict[str, str], d_html: str, block: str) -> Optional[str]:
-        target = self._normalize_name(block)
-        for a in self._iter_links(d_html):
-            if a.get("page") == "B":
-                name = a.get("block_name") or a.get("text")
-                if name and self._normalize_name(name) == target:
-                    return self._abs_url(cfg, a.get("href", ""))
-        return None
-
-    def _get_panchayats(self, cfg: Dict[str, str], b_html: str) -> List[Dict[str, str]]:
-        seen = set()
-        out: List[Dict[str, str]] = []
-        for a in self._iter_links(b_html):
-            code = a.get("panchayat_code")
-            if not code or code in seen:
-                continue
-            seen.add(code)
-            out.append({
-                "name": a.get("panchayat_name") or a.get("text"),
-                "code": code,
-                "href": self._abs_url(cfg, a.get("href", "")),
-            })
-        out.sort(key=lambda p: self._normalize_name(p["name"]))
-        return out
-
-    def _switch_fy(self, session: Any, current_url: str, current_html: str,
-                   new_fy: str) -> Tuple[Optional[str], str]:
-        """ASP.NET postback: change the financial-year dropdown to get fresh digests.
-
-        Returns (html_of_new_page, url_to_use_for_next_postback). On failure the
-        html is None and the original url is returned unchanged.
-        """
-        try:
-            from bs4 import BeautifulSoup
-        except ImportError:
-            return None, current_url
-        try:
-            soup = BeautifulSoup(current_html, "html.parser")
-            form = soup.find("form", id="aspnetForm") or soup.find("form")
-            if not form:
-                return None, current_url
-
-            sel = None
-            for s in form.find_all("select"):
-                nm = (s.get("name") or "").lower()
-                if "finyr" in nm or "fin_year" in nm:
-                    sel = s
-                    break
-            if not sel:
-                return None, current_url
-            valid = {o.get("value") for o in sel.find_all("option")}
-            if new_fy not in valid:
-                return None, current_url
-
-            post: Dict[str, str] = {}
-            for inp in form.find_all("input"):
-                nm = inp.get("name")
-                if nm:
-                    post[nm] = inp.get("value", "")
-            sel_name = sel.get("name")
-            post[sel_name] = new_fy
-            post["__EVENTTARGET"] = sel_name
-            post["__EVENTARGUMENT"] = ""
-            post["__LASTFOCUS"] = ""
-
-            r = session.post(current_url, data=post, timeout=40, allow_redirects=True)
-            if r.status_code != 200:
-                return None, current_url
-            if r.encoding is None or r.encoding.lower() in ("iso-8859-1", "windows-1252"):
-                r.encoding = "utf-8"
-            return r.text, (r.url or current_url)
+            fy_elem = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_DDLFY")
+            fy_select = Select(fy_elem)
+            available_fys = [opt.text.strip() for opt in fy_select.options
+                             if opt.text.strip() and "--SELECT" not in opt.text.strip().upper()]
         except Exception as e:
-            logger.debug("FY switch postback failed: %s", e)
-            return None, current_url
+            self.log_warning(f"Could not read Financial Year options: {e}")
+            available_fys = []
 
-    def _scrape_panchayat(self, session: Any, cfg: Dict[str, str], fy: str, state: str,
-                          district: str, block: str, panch: Dict[str, str]
-                          ) -> Tuple[List[Dict[str, Any]], bool, str]:
-        """Fetch + parse the final per-panchayat report html. Returns (rows, ok, msg)."""
-        # Prefer the page link (fresh digest + current redirect target). Fall back
-        # to the guessed static URL only if the link is missing.
-        url = panch.get("href")
-        if not url:
-            fy2 = self._fy_short(fy)
-            url = f"{cfg['data_base_url']}{fy2}anticipated_exp{panch['code']}_{fy2}.html"
-        html = self._fetch(session, url)
-        if html is None:
-            return [], False, "Report page not available"
-        rows = self._parse_final_page(html, fy, state, district, block, panch["name"])
-        if not rows:
-            return [], True, "No pending bills/MRs"
-        return rows, True, f"{len(rows)} pending item(s)"
+        if not target_fy or target_fy == ALL_FY_LABEL:
+            fys_to_process = available_fys or [self._current_financial_year()]
+            self.log_info(f"🗓 Mode: All Available Financial Years ({len(fys_to_process)} years found: {', '.join(fys_to_process)})")
+        else:
+            fys_to_process = [target_fy]
+            self.log_info(f"🗓 Mode: Single Financial Year ({target_fy})")
 
-    # ── Final page parsing ──────────────────────────────────────────────────
-    def _parse_final_page(self, html: str, fy: str, state: str, district: str,
-                          block: str, panchayat_name: str) -> List[Dict[str, Any]]:
-        try:
-            from bs4 import BeautifulSoup
-        except ImportError:
-            return []
-        soup = BeautifulSoup(html, "html.parser")
+        total_fys = len(fys_to_process)
 
-        table = None
-        for t in soup.find_all("table"):
-            txt = t.get_text(" ", strip=True)
-            if "Work Name" in txt and "Amount" in txt:
-                table = t
+        # ── Loop over Financial Years ──
+        for fy_idx, current_fy in enumerate(fys_to_process):
+            if self.is_stopped():
+                self.log_warning("⏹️ Automation stopped by user.")
                 break
-        if table is None:
-            return []
 
-        rows: List[Dict[str, Any]] = []
-        section = ""
-        for tr in table.find_all("tr"):
-            cells = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
-            if not cells:
-                continue
-            joined = " ".join(cells).lower()
+            self.log_info(f"\n{'='*20} Financial Year [{fy_idx+1}/{total_fys}]: {current_fy} {'='*20}")
 
-            # ── Detect section header rows (order matters) ──
-            if "muster roll no." in joined:
-                section = SECTION_MR
-                continue
-            if "bill no." in joined:
-                section = SECTION_BILL
-                continue
-            if "msr no." in joined:
-                section = SECTION_MSR_SKILLED
-                continue
-            if "voucher no." in joined:
-                section = SECTION_VOUCHER_SKILLED
-                continue
+            # Select FY with postback wait
+            try:
+                fy_elem = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_DDLFY"))
+                )
+                curr_sel = Select(fy_elem).first_selected_option.text.strip()
+                if curr_sel != current_fy:
+                    self.log_info(f"Selecting FY: {current_fy}...")
+                    old_fy_ref = fy_elem
+                    Select(fy_elem).select_by_visible_text(current_fy)
+                    self._wait_for_postback(driver, old_fy_ref, timeout=12)
+                    time.sleep(1.5)
+            except Exception as e:
+                self.log_warning(f"Failed to select FY {current_fy}: {e}")
 
-            if len(cells) < 4:
-                continue
-            first = cells[0].strip().lower()
-            if first in ("s.no", "s no", "sno", "s.no.", "", "no data") or \
-               "state :" in joined or "district:" in joined or "work name" in joined:
-                continue
-            if "no data" in joined:
-                continue
+            # ── Step 2: Determine Panchayats for this FY ──
+            panch_elem = self._find_panchayat_dropdown(driver, wait, ["ctl00_ContentPlaceHolder1_ddlpnch"], timeout=6)
+            is_gp_login = panch_elem is None
 
-            work_name_raw = cells[1]
-            num = cells[2]
-            amount_raw = cells[3]
+            panchayats_to_process: List[str] = []
+            if not is_gp_login:
+                all_options: List[str] = []
+                for _ in range(3):
+                    try:
+                        p_elem_fresh = driver.find_element(By.ID, "ctl00_ContentPlaceHolder1_ddlpnch")
+                        p_select = Select(p_elem_fresh)
+                        all_options = [opt.text.strip() for opt in p_select.options
+                                       if opt.text.strip() and "--SELECT" not in opt.text.strip().upper()
+                                       and not (opt.get_attribute("value") or "").startswith("00")]
+                        if all_options:
+                            break
+                    except Exception:
+                        time.sleep(1.0)
 
-            # Extract work code from the trailing "(...)" of the work name
-            wc = ""
-            m = re.search(r"\(([^()]+)\)\s*$", work_name_raw)
-            if m:
-                wc = m.group(1).strip()
-                work_name = work_name_raw[:m.start()].strip()
+                if self._is_my_saved_panchayat(target_panchayat):
+                    panchayats_to_process = self._filter_panchayats_to_saved(all_options)
+                    self.log_info(f"⭐ My Saved Panchayats mode: {len(panchayats_to_process)} panchayat(s) will be processed.")
+                elif self._is_panchayat_label(target_panchayat):
+                    panchayats_to_process = all_options
+                    self.log_info(f"🌐 All Panchayats mode: {len(panchayats_to_process)} panchayats found.")
+                else:
+                    # Single target panchayat
+                    panchayats_to_process = [target_panchayat]
             else:
-                work_name = work_name_raw.strip()
+                gp_name = self._read_gp_panchayat(driver, ["ctl00_ContentPlaceHolder1_lblBlocktxt", "ctl00_ContentPlaceHolder1_lblStatetxt"]) or "Panchayat"
+                panchayats_to_process = [gp_name]
+                self.log_info(f"Panchayat dropdown not found — GP Login mode detected for {gp_name}.")
 
-            rows.append({
-                "fy": fy, "state": state, "district": district, "block": block,
-                "panchayat": panchayat_name, "section": section,
-                "work_name": work_name, "work_code": wc,
-                "number": num, "amount": self._parse_amount(amount_raw),
-            })
-        return rows
+            if not panchayats_to_process:
+                self.log_warning(f"No panchayats to process for FY {current_fy}.")
+                continue
 
-    @staticmethod
-    def _parse_amount(raw: str) -> float:
-        s = re.sub(r"[^0-9.]", "", raw)
-        try:
-            return float(s) if s else 0.0
-        except ValueError:
-            return 0.0
+            # ── Loop over Panchayats ──
+            tot_p = len(panchayats_to_process)
+            for p_idx, p_name in enumerate(panchayats_to_process):
+                if self.is_stopped():
+                    self.log_warning("⏹️ Automation stopped by user.")
+                    break
 
-    # ── Misc helpers ────────────────────────────────────────────────────────
-    @staticmethod
-    def _normalize_name(s: str) -> str:
-        return re.sub(r"\s+", " ", str(s or "")).strip().upper()
+                cleaned_p = self._clean_panchayat_value(p_name)
+                self.log_info(f"--- [{fy_idx+1}/{total_fys}] Panchayat [{p_idx+1}/{tot_p}]: {cleaned_p} ({current_fy}) ---")
+                self.app.after(0, self.update_status, f"{cleaned_p} ({current_fy})...", (p_idx + 1) / tot_p)
 
-    @staticmethod
-    def _fy_short(fy: str) -> str:
-        parts = fy.split("-")
-        if len(parts) == 2:
-            return parts[0][-2:] + parts[1][-2:]
-        return fy.replace("-", "")
+                if not is_gp_login:
+                    selected_ok = False
+                    for attempt in range(3):
+                        try:
+                            p_elem_live = WebDriverWait(driver, 10).until(
+                                EC.presence_of_element_located((By.ID, "ctl00_ContentPlaceHolder1_ddlpnch"))
+                            )
+                            p_sel = Select(p_elem_live)
+                            matched_text = None
+                            target_lower = cleaned_p.lower()
+                            for opt in p_sel.options:
+                                opt_txt = opt.text.strip()
+                                if target_lower == opt_txt.lower() or target_lower in opt_txt.lower():
+                                    matched_text = opt_txt
+                                    break
 
-    @staticmethod
-    def _last_n_financial_years(n: int = 6) -> List[str]:
-        """Indian FYs ending on the current year (April → March)."""
-        now = datetime.now()
-        start_year = now.year if now.month >= 4 else now.year - 1
-        return [f"{start_year - i}-{start_year - i + 1}" for i in range(n)]
+                            if not matched_text:
+                                self.log_warning(f"Panchayat '{cleaned_p}' not found in dropdown. Skipping.")
+                                break
+
+                            curr_sel_text = p_sel.first_selected_option.text.strip()
+                            if curr_sel_text == matched_text:
+                                selected_ok = True
+                                break
+
+                            self.log_info(f"Selecting Panchayat: '{matched_text}'...")
+                            old_p_ref = p_elem_live
+                            p_sel.select_by_visible_text(matched_text)
+                            self._wait_for_postback(driver, old_p_ref, timeout=12)
+                            time.sleep(1.5)
+                            selected_ok = True
+                            break
+                        except Exception as e:
+                            time.sleep(1.0)
+
+                    if not selected_ok and not is_gp_login:
+                        continue
+
+                # ── Step 3: Wait for table #gvbillpaid1 or message ──
+                try:
+                    WebDriverWait(driver, 8).until(
+                        lambda d: d.find_elements(By.ID, "gvbillpaid1") or
+                                 d.find_elements(By.ID, "ctl00_ContentPlaceHolder1_lblmsg")
+                    )
+                except Exception:
+                    pass
+                time.sleep(0.5)
+
+                # Scrape table (with All length select and Next page traversal)
+                try:
+                    parsed_rows = self._scrape_table_all_pages(driver, current_fy, cleaned_p)
+                    if parsed_rows:
+                        self.collected_rows.extend(parsed_rows)
+                        for r in parsed_rows:
+                            self.safe_tree_insert(r)
+                        self.log_info(f"✅ Found {len(parsed_rows)} pending bill(s) for {cleaned_p}.")
+                    else:
+                        self.log_info(f"ℹ️ 0 pending bills for {cleaned_p}.")
+                except Exception as e:
+                    self.log_warning(f"Error scraping table for {cleaned_p}: {e}")
+
+        elapsed_time = round(time.time() - start_time, 1)
+        mins, secs = divmod(int(elapsed_time), 60)
+        time_str = f"{mins}m {secs}s" if mins else f"{secs}s"
+
+        self.log_info(f"\n🎉 Extraction Complete! Captured {len(self.collected_rows)} bills in {time_str}.")
+
+        # Thread-safe notification per Point 5 of nregabot-tab-builder
+        self.activity_details = {
+            "total": len(self.collected_rows),
+            "success": len(self.collected_rows),
+            "failed": 0,
+            "time_taken": time_str
+        }
+        self.app.after(0, self.set_ui_state, False)
+        self.show_automation_notification("success")
+
+        # Switch to Results tab
+        self.app.after(0, lambda: self.notebook.set("Results"))
+
+        # Prompt export if rows were captured
+        if self.collected_rows:
+            self.app.after(500, self.export_report)
 
     # ────────────────────────────────────────────────────────────────────────
-    # EXCEL EXPORT
+    # EXECUTIVE-GRADE EXCEL EXPORT (OpenPyXL)
     # ────────────────────────────────────────────────────────────────────────
     def export_report(self) -> None:
         if not self.collected_rows:
             messagebox.showinfo(tr("dialogs.no_data"),
-                                tr("dialogs.no_scraped_data_export"),
+                                "No pending bills captured to export.",
                                 parent=self)
             return
-        # Save under ~/Downloads/NregaBot/Report {fin_year}/Pending Bills/
+
         sel_fy = self.fy_var.get().strip()
         fin_year = sel_fy if (sel_fy and sel_fy != ALL_FY_LABEL) else ""
-        reports_dir = self.app.get_report_path("Pending Bills", fin_year)
+        reports_dir = self.app.get_report_path(self._report_category(), fin_year)
+        os.makedirs(reports_dir, exist_ok=True)
+
         file_path = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel Workbook", "*.xlsx")],
             initialdir=reports_dir,
-            initialfile=f"Pending_Bills_{datetime.now().strftime('%d-%m-%Y')}.xlsx",
+            initialfile=f"Pending_Bills_{datetime.now().strftime('%d-%m-%Y_%H%M')}.xlsx",
             title=tr("form.pending_bills.save_report"))
         if not file_path:
             return
+
         try:
-            self._write_excel(file_path)
+            self.write_excel_report(self.collected_rows, file_path)
             messagebox.showinfo(tr("dialogs.success"),
                                 tr("dialogs.report_saved_success", path=file_path), parent=self)
+            # Auto-open per Point 7
             try:
                 if sys.platform == "win32":
                     os.startfile(file_path)
@@ -854,311 +703,309 @@ class PendingBillsTab(BaseAutomationTab):
             except Exception:
                 pass
         except Exception as e:
-            messagebox.showerror(tr("dialogs.export_error"), tr("dialogs.failed_export_excel", error=e), parent=self)
+            messagebox.showerror(tr("dialogs.export_error"), f"Failed to export Excel report: {e}", parent=self)
 
-    def _write_excel(self, file_path: str) -> None:
+    @staticmethod
+    def write_excel_report(rows: List[Dict[str, Any]], file_path: str) -> None:
+        """Writes executive-grade multi-sheet Excel report per Point 7 of
+        nregabot-tab-builder skill.
+        Sheet 1: Pending Bills Details with KPI Cards & Navy headers
+        Sheet 2: Panchayat Summary with Grand Total double border
+        """
         import openpyxl
         from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
         from openpyxl.utils import get_column_letter
 
-        header_font = Font(bold=True, color="FFFFFF", size=11)
-        header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
-        title_font = Font(size=14, bold=True, color="FFFFFF")
-        white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
-        gray_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-        total_fill = PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
-        center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        left_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
-        thin_border = Border(
-            left=Side(style="thin", color="B0B0B0"), right=Side(style="thin", color="B0B0B0"),
-            top=Side(style="thin", color="B0B0B0"), bottom=Side(style="thin", color="B0B0B0"))
-
         wb = openpyxl.Workbook()
 
-        # ── Color-coded analytics styles ──
-        red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-        orange_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
-        green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-        red_font = Font(bold=True, color="9C0006")
-        green_font = Font(bold=True, color="006100")
-        section_fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
+        # Styles
+        navy_header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+        subtitle_fill = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+        zebra_gray_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+        white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+        grand_total_fill = PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
 
-        # ── Sheet 1: Summary (per FY × panchayat) — color-coded extremes + grand total ──
-        ws = wb.active
-        ws.title = tr("form.pending_bills.summary_title")
-        sum_headers = ["Financial Year", "Panchayat", "Muster Rolls", "Bills",
-                       "Skilled MSR", "Skilled Voucher", "Total Amount (Rs)", "Share %"]
-        ncols2 = len(sum_headers)
-        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols2)
-        c = ws.cell(row=1, column=1, value="Pending Bills Summary (per Panchayat)")
-        c.font = title_font
-        c.fill = header_fill
-        c.alignment = center_align
-        for i, h in enumerate(sum_headers, 1):
-            cell = ws.cell(row=2, column=i, value=h)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = center_align
-            cell.border = thin_border
+        # KPI Fills & Fonts
+        kpi_total_fill = PatternFill(start_color="DCE6F1", end_color="DCE6F1", fill_type="solid")
+        kpi_amount_fill = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
+        kpi_amount_font = Font(name="Calibri", size=15, bold=True, color="166534")
+        kpi_balance_fill = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
+        kpi_balance_font = Font(name="Calibri", size=15, bold=True, color="991B1B")
+        kpi_panch_fill = PatternFill(start_color="CFFAFE", end_color="CFFAFE", fill_type="solid")
+        kpi_panch_font = Font(name="Calibri", size=15, bold=True, color="155E75")
 
-        # Aggregate per (FY, panchayat) — only rows that belong to a known
-        # section are counted, so the Summary totals always match the detail sheets.
-        summary: Dict[Tuple[str, str], Dict[str, Any]] = {}
-        for r in self.collected_rows:
-            if r["section"] not in (SECTION_MR, SECTION_BILL,
-                                     SECTION_MSR_SKILLED, SECTION_VOUCHER_SKILLED):
-                continue
-            key = (r["fy"], r["panchayat"])
-            s = summary.setdefault(key, {"mr": 0, "bill": 0, "msr": 0, "voucher": 0, "amt": 0.0})
-            if r["section"] == SECTION_MR:
-                s["mr"] += 1
-            elif r["section"] == SECTION_BILL:
-                s["bill"] += 1
-            elif r["section"] == SECTION_MSR_SKILLED:
-                s["msr"] += 1
-            elif r["section"] == SECTION_VOUCHER_SKILLED:
-                s["voucher"] += 1
-            s["amt"] += r["amount"]
+        title_font = Font(name="Calibri", size=14, bold=True, color="FFFFFF")
+        subtitle_font = Font(name="Calibri", size=9, italic=True, color="475569")
+        kpi_label_font = Font(name="Calibri", size=9, bold=True, color="475569")
+        header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+        regular_font = Font(name="Calibri", size=10)
+        bold_font = Font(name="Calibri", size=10, bold=True)
 
-        tot_amt = sum(s["amt"] for s in summary.values())
-        max_key = max(summary, key=lambda k: summary[k]["amt"]) if summary else None
-        min_key = min(summary, key=lambda k: summary[k]["amt"]) if summary else None
+        center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        left_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        right_align = Alignment(horizontal="right", vertical="center", wrap_text=False)
 
-        # Sort by amount (highest first) so the biggest pending row is on top
-        for idx, ((fy, panch), s) in enumerate(
-                sorted(summary.items(), key=lambda kv: kv[1]["amt"], reverse=True), 1):
-            row_num = 2 + idx
-            share = (s["amt"] / tot_amt * 100) if tot_amt else 0.0
-            vals = [fy, panch, s["mr"], s["bill"], s["msr"], s["voucher"],
-                    round(s["amt"], 2), round(share, 1)]
-            is_max = len(summary) > 1 and (fy, panch) == max_key
-            is_min = len(summary) > 1 and (fy, panch) == min_key
-            for j, v in enumerate(vals, 1):
-                cell = ws.cell(row=row_num, column=j, value=v)
-                cell.border = thin_border
-                cell.alignment = center_align if j != 2 else left_align
-                if is_max:
-                    cell.fill = red_fill
-                    cell.font = red_font
-                elif is_min:
-                    cell.fill = green_fill
-                    cell.font = green_font
-                elif idx % 2 == 0:
-                    cell.fill = gray_fill
+        thin_side = Side(style="thin", color="CBD5E1")
+        thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+        double_bottom = Border(left=thin_side, right=thin_side, top=thin_side,
+                               bottom=Side(style="double", color="1F4E79"))
 
-        # ── GRAND TOTAL row (bottom) ──
-        tot_mr = sum(s["mr"] for s in summary.values())
-        tot_bill = sum(s["bill"] for s in summary.values())
-        tot_msr = sum(s["msr"] for s in summary.values())
-        tot_voucher = sum(s["voucher"] for s in summary.values())
-        total_row = 2 + len(summary) + 1
-        ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=2)
-        cell = ws.cell(row=total_row, column=1, value="GRAND TOTAL")
-        cell.font = Font(bold=True, size=12)
-        cell.alignment = Alignment(horizontal="right", vertical="center")
-        cell.fill = total_fill
-        cell.border = thin_border
-        for j, v in enumerate([tot_mr, tot_bill, tot_msr, tot_voucher,
-                               round(tot_amt, 2), 100.0], 3):
-            cell = ws.cell(row=total_row, column=j, value=v)
-            cell.font = Font(bold=True, size=12)
-            cell.alignment = center_align
-            cell.fill = total_fill
-            cell.border = thin_border
+        # Calculations for KPIs
+        total_bills = len(rows)
+        total_amount = sum(float(r.get("bill_amount", 0) or 0) for r in rows)
+        total_balance = sum(float(r.get("balance_to_paid", 0) or 0) for r in rows)
+        unique_panchayats = len(set(r.get("panchayat", "") for r in rows if r.get("panchayat")))
 
-        for i, w in enumerate([16, 20, 12, 10, 12, 14, 16, 10], 1):
-            ws.column_dimensions[get_column_letter(i)].width = w
-        ws.freeze_panes = "A3"
-        ws.sheet_properties.tabColor = "1F4E79"
+        # ════════════════════ SHEET 1: DETAILS ════════════════════
+        ws1 = wb.active
+        ws1.title = "Pending Bills Details"
+        ws1.views.sheetView[0].showGridLines = True
 
-        # ── Sheet 2: Analytics — color-coded rankings ──
-        wa = wb.create_sheet("Analytics")
-        a_headers = ["Rank", "Panchayat / Financial Year", "Muster Rolls", "Bills",
-                     "Skilled MSR", "Skilled Voucher", "Total Amount (Rs)", "Share %"]
-        na = len(a_headers)
-        wa.merge_cells(start_row=1, start_column=1, end_row=1, end_column=na)
-        c = wa.cell(row=1, column=1, value="📊 Pending Bills Analytics")
-        c.font = title_font
-        c.fill = header_fill
-        c.alignment = center_align
-        wa.merge_cells(start_row=2, start_column=1, end_row=2, end_column=na)
-        c = wa.cell(row=2, column=1,
-                    value=f"Generated by NregaBot.com | {datetime.now().strftime('%d-%b-%Y %I:%M %p')}")
-        c.font = Font(italic=True, size=9, color="555555")
-        c.alignment = center_align
-
-        def _rank_block(start_row: int, title: str,
-                        ranked: List[Tuple[str, int, int, int, int, float]]) -> int:
-            """Write a color-coded ranking table (ranked = (label, mr, bill, msr,
-            voucher, amt), sorted descending by amount). Returns the next row."""
-            n = len(ranked)
-            total = sum(item[5] for item in ranked)
-            wa.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=na)
-            c = wa.cell(row=start_row, column=1, value=title)
-            c.font = Font(bold=True, size=12, color="FFFFFF")
-            c.fill = section_fill
-            c.alignment = Alignment(horizontal="left", vertical="center")
-            start_row += 1
-            for i, h in enumerate(a_headers, 1):
-                cell = wa.cell(row=start_row, column=i, value=h)
-                cell.font = header_font
-                cell.fill = header_fill
-                cell.alignment = center_align
-                cell.border = thin_border
-            start_row += 1
-            for pos, (label, mr, bill, msr, vouch, amt) in enumerate(ranked, 1):
-                share = (amt / total * 100) if total else 0.0
-                fill, font = white_fill, None
-                if n > 1:
-                    if pos == 1:
-                        fill, font = red_fill, red_font
-                    elif pos == n:
-                        fill, font = green_fill, green_font
-                    elif pos <= 3:
-                        fill = orange_fill
-                row_vals = [pos, label, mr, bill, msr, vouch, round(amt, 2), round(share, 1)]
-                for j, v in enumerate(row_vals, 1):
-                    cell = wa.cell(row=start_row, column=j, value=v)
-                    cell.border = thin_border
-                    cell.alignment = center_align if j != 2 else left_align
-                    cell.fill = fill
-                    if font:
-                        cell.font = font
-                    elif j in (7, 8):
-                        cell.font = Font(bold=True)
-                start_row += 1
-            # Block total (merge 1-6 so the amount sits outside the merge at col 7)
-            wa.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=6)
-            c = wa.cell(row=start_row, column=1, value=f"TOTAL ({n})")
-            c.font = Font(bold=True)
-            c.alignment = Alignment(horizontal="right", vertical="center")
-            c.fill = total_fill
-            c.border = thin_border
-            c = wa.cell(row=start_row, column=7, value=round(total, 2))
-            c.font = Font(bold=True)
-            c.alignment = center_align
-            c.fill = total_fill
-            c.border = thin_border
-            return start_row + 2  # blank spacer row
-
-        # Panchayat totals across all FYs
-        panch_agg: Dict[str, List[float]] = {}
-        for (fy, panch), s in summary.items():
-            agg = panch_agg.setdefault(panch, [0, 0, 0, 0, 0.0])
-            agg[0] += s["mr"]; agg[1] += s["bill"]; agg[2] += s["msr"]
-            agg[3] += s["voucher"]; agg[4] += s["amt"]
-        ranked_panch = sorted(
-            ((p, int(a[0]), int(a[1]), int(a[2]), int(a[3]), a[4]) for p, a in panch_agg.items()),
-            key=lambda t: t[5], reverse=True)
-
-        # FY totals across all panchayats
-        fy_agg: Dict[str, List[float]] = {}
-        for (fy, panch), s in summary.items():
-            agg = fy_agg.setdefault(fy, [0, 0, 0, 0, 0.0])
-            agg[0] += s["mr"]; agg[1] += s["bill"]; agg[2] += s["msr"]
-            agg[3] += s["voucher"]; agg[4] += s["amt"]
-        ranked_fy = sorted(
-            ((fy, int(a[0]), int(a[1]), int(a[2]), int(a[3]), a[4]) for fy, a in fy_agg.items()),
-            key=lambda t: t[5], reverse=True)
-
-        row = 4
-        row = _rank_block(row, "🏆 PANCHAYAT RANKING — Highest Pending First", ranked_panch)
-        row = _rank_block(row, "📅 FINANCIAL YEAR ANALYSIS — Highest Pending First", ranked_fy)
-
-        # Quick insights
-        wa.merge_cells(start_row=row, start_column=1, end_row=row, end_column=na)
-        c = wa.cell(row=row, column=1, value="💡 Quick Insights")
-        c.font = Font(bold=True, size=12, color="FFFFFF")
-        c.fill = section_fill
-        c.alignment = Alignment(horizontal="left", vertical="center")
-        row += 1
-        insights: List[str] = []
-        if ranked_panch:
-            insights.append(f"• Highest pending panchayat: {ranked_panch[0][0]} — "
-                            f"₹{ranked_panch[0][5]:,.2f}")
-            insights.append(f"• Lowest pending panchayat: {ranked_panch[-1][0]} — "
-                            f"₹{ranked_panch[-1][5]:,.2f}")
-        if ranked_fy:
-            insights.append(f"• Highest pending financial year: {ranked_fy[0][0]} — "
-                            f"₹{ranked_fy[0][5]:,.2f}")
-        insights.append(f"• Total pending amount: ₹{tot_amt:,.2f}")
-        for line in insights:
-            wa.merge_cells(start_row=row, start_column=1, end_row=row, end_column=na)
-            c = wa.cell(row=row, column=1, value=line)
-            c.font = Font(size=11)
-            c.alignment = Alignment(horizontal="left", vertical="center")
-            row += 1
-
-        for i, w in enumerate([6, 22, 12, 10, 12, 14, 16, 10], 1):
-            wa.column_dimensions[get_column_letter(i)].width = w
-        wa.freeze_panes = "A4"
-        wa.sheet_properties.tabColor = "2E75B6"
-
-        # ── Section-wise sheets: Muster Roll / Bills / Skilled MSR / Skilled Voucher ──
-        detail_headers = ["S.No", "Financial Year", "State", "District", "Block", "Panchayat",
-                          "Work Name", "Work Code", "MR/Bill/Voucher No.", "Amount (Rs)"]
-        ncols = len(detail_headers)
-        sections = [
-            (SECTION_MR, "Muster Roll", "1F4E79"),
-            (SECTION_BILL, "Bills", "C00000"),
-            (SECTION_MSR_SKILLED, "Skilled MSR", "375623"),
-            (SECTION_VOUCHER_SKILLED, "Skilled Voucher", "7F6000"),
+        headers1 = [
+            "S.No", "Financial Year", "Panchayat", "Work Code", "Work Name",
+            "Bill No.", "Bill Date", "Vendor Name", "Vendor TIN/GSTIN",
+            "Bill Amount (₹)", "Tax Amount (₹)", "Balance to be Paid (₹)",
+            "Total Financial Sanction (₹)", "Sanction for Material (₹)",
+            "Total Material Booked (₹)", "Total Paid (₹)", "Work Status",
+            "Material List No.", "FTO No.", "Rejected"
         ]
-        for section_key, sheet_name, tab_color in sections:
-            rows = [r for r in self.collected_rows if r["section"] == section_key]
-            ws = wb.create_sheet(sheet_name)
-            ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
-            c = ws.cell(row=1, column=1, value=f"{sheet_name} — Pending Items")
-            c.font = title_font
-            c.fill = header_fill
-            c.alignment = center_align
-            ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncols)
-            c = ws.cell(row=2, column=1,
-                        value=f"Generated by NregaBot.com | {datetime.now().strftime('%d-%b-%Y %I:%M %p')}")
-            c.font = Font(italic=True, size=9, color="555555")
-            c.alignment = center_align
+        num_cols1 = len(headers1)
 
-            for i, h in enumerate(detail_headers, 1):
-                cell = ws.cell(row=3, column=i, value=h)
-                cell.font = header_font
-                cell.fill = header_fill
-                cell.alignment = center_align
+        # Row 1: Header Banner
+        ws1.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_cols1)
+        ws1.row_dimensions[1].height = 36
+        banner1 = ws1.cell(row=1, column=1, value="MGNREGA - PENDING MATERIAL BILLS REPORT")
+        banner1.font = title_font
+        banner1.fill = navy_header_fill
+        banner1.alignment = center_align
+
+        # Row 2: Subtitle Branding Bar
+        ws1.merge_cells(start_row=2, start_column=1, end_row=2, end_column=num_cols1)
+        ws1.row_dimensions[2].height = 18
+        sub1 = ws1.cell(row=2, column=1,
+                        value=f"Generated via NregaBot (https://nregabot.com) | Date: {datetime.now().strftime('%d-%b-%Y %I:%M %p')}")
+        sub1.font = subtitle_font
+        sub1.fill = subtitle_fill
+        sub1.alignment = center_align
+
+        # Row 4-5: KPI Summary Cards
+        ws1.row_dimensions[4].height = 18
+        ws1.row_dimensions[5].height = 28
+
+        # Card 1: Total Bills (Cols A:C)
+        ws1.merge_cells("A4:C4")
+        ws1.merge_cells("A5:C5")
+        ws1["A4"] = "TOTAL PENDING BILLS"
+        ws1["A4"].font = kpi_label_font
+        ws1["A4"].fill = kpi_total_fill
+        ws1["A4"].alignment = center_align
+        ws1["A5"] = total_bills
+        ws1["A5"].font = Font(name="Calibri", size=15, bold=True, color="1F4E79")
+        ws1["A5"].fill = kpi_total_fill
+        ws1["A5"].alignment = center_align
+
+        # Card 2: Total Amount (Cols D:F)
+        ws1.merge_cells("D4:F4")
+        ws1.merge_cells("D5:F5")
+        ws1["D4"] = "TOTAL BILL AMOUNT (₹)"
+        ws1["D4"].font = kpi_label_font
+        ws1["D4"].fill = kpi_amount_fill
+        ws1["D4"].alignment = center_align
+        ws1["D5"] = total_amount
+        ws1["D5"].font = kpi_amount_font
+        ws1["D5"].fill = kpi_amount_fill
+        ws1["D5"].alignment = center_align
+        ws1["D5"].number_format = "₹ #,##0.00"
+
+        # Card 3: Total Balance to be Paid (Cols G:I)
+        ws1.merge_cells("G4:I4")
+        ws1.merge_cells("G5:I5")
+        ws1["G4"] = "TOTAL BALANCE TO BE PAID (₹)"
+        ws1["G4"].font = kpi_label_font
+        ws1["G4"].fill = kpi_balance_fill
+        ws1["G4"].alignment = center_align
+        ws1["G5"] = total_balance
+        ws1["G5"].font = kpi_balance_font
+        ws1["G5"].fill = kpi_balance_fill
+        ws1["G5"].alignment = center_align
+        ws1["G5"].number_format = "₹ #,##0.00"
+
+        # Card 4: Panchayats (Cols J:L)
+        ws1.merge_cells("J4:L4")
+        ws1.merge_cells("J5:L5")
+        ws1["J4"] = "PANCHAYATS COVERED"
+        ws1["J4"].font = kpi_label_font
+        ws1["J4"].fill = kpi_panch_fill
+        ws1["J4"].alignment = center_align
+        ws1["J5"] = unique_panchayats
+        ws1["J5"].font = kpi_panch_font
+        ws1["J5"].fill = kpi_panch_fill
+        ws1["J5"].alignment = center_align
+
+        # Apply borders to KPI blocks
+        for r_kpi in (4, 5):
+            for col_idx in range(1, 13):
+                ws1.cell(row=r_kpi, column=col_idx).border = thin_border
+
+        # Row 7: Table Headers
+        ws1.row_dimensions[7].height = 26
+        for col_idx, h in enumerate(headers1, 1):
+            c = ws1.cell(row=7, column=col_idx, value=h)
+            c.font = header_font
+            c.fill = navy_header_fill
+            c.alignment = center_align
+            c.border = thin_border
+
+        # Data Rows
+        numeric_cols1 = {10, 11, 12, 13, 14, 15, 16}
+        for r_idx, row in enumerate(rows, start=1):
+            row_num = 7 + r_idx
+            ws1.row_dimensions[row_num].height = 20
+            fill = zebra_gray_fill if (r_idx % 2 == 0) else white_fill
+
+            vals = [
+                r_idx,
+                row.get("fy", ""),
+                row.get("panchayat", ""),
+                row.get("work_code", ""),
+                row.get("work_name", ""),
+                row.get("bill_no", ""),
+                row.get("bill_date", ""),
+                row.get("vendor_name", ""),
+                row.get("vendor_tin", ""),
+                float(row.get("bill_amount", 0) or 0),
+                float(row.get("tax_amount", 0) or 0),
+                float(row.get("balance_to_paid", 0) or 0),
+                float(row.get("total_sanction", 0) or 0),
+                float(row.get("mat_sanction", 0) or 0),
+                float(row.get("total_mat_booked", 0) or 0),
+                float(row.get("total_paid", 0) or 0),
+                row.get("work_status", ""),
+                row.get("material_list_no", ""),
+                row.get("fto_no", ""),
+                row.get("is_rejected", "N")
+            ]
+
+            for c_idx, val in enumerate(vals, 1):
+                cell = ws1.cell(row=row_num, column=c_idx, value=val)
+                cell.font = regular_font
+                cell.fill = fill
                 cell.border = thin_border
 
-            total_amt = 0.0
-            for idx, r in enumerate(rows, 1):
-                row_num = 3 + idx
-                is_even = idx % 2 == 0
-                fill = white_fill if is_even else gray_fill
-                vals = [idx, r["fy"], r["state"], r["district"], r["block"], r["panchayat"],
-                        r["work_name"], r["work_code"], r["number"], round(r["amount"], 2)]
-                total_amt += r["amount"]
-                for j, v in enumerate(vals, 1):
-                    cell = ws.cell(row=row_num, column=j, value=v)
-                    cell.fill = fill
-                    cell.border = thin_border
-                    cell.alignment = center_align if j in (1, 2, 9, 10) else left_align
+                if c_idx in numeric_cols1:
+                    cell.alignment = right_align
+                    cell.number_format = "#,##0.00"
+                elif c_idx in (3, 5, 8):  # Panchayat, Work Name, Vendor Name
+                    cell.alignment = left_align
+                else:
+                    cell.alignment = center_align
 
-            # Per-sheet total row
-            total_row = 3 + len(rows) + 1
-            ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=9)
-            cell = ws.cell(row=total_row, column=1, value=f"TOTAL ({len(rows)} items)")
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal="right", vertical="center")
-            cell.fill = total_fill
-            cell.border = thin_border
-            cell = ws.cell(row=total_row, column=10, value=round(total_amt, 2))
-            cell.font = Font(bold=True)
-            cell.alignment = center_align
-            cell.fill = total_fill
-            cell.border = thin_border
+        ws1.freeze_panes = "A8"
 
-            widths = [6, 14, 14, 14, 16, 16, 45, 24, 18, 13]
-            for i, w in enumerate(widths, 1):
-                ws.column_dimensions[get_column_letter(i)].width = w
-            ws.freeze_panes = "A4"
-            if rows:
-                ws.auto_filter.ref = f"A3:{get_column_letter(ncols)}{3 + len(rows)}"
-            ws.sheet_properties.tabColor = tab_color
+        # Auto-fit column widths for Sheet 1
+        for col in ws1.columns:
+            max_len = 0
+            col_letter = get_column_letter(col[0].column)
+            for cell in col[6:]:  # Start measuring from header row
+                val_str = str(cell.value or "")
+                if len(val_str) > max_len:
+                    max_len = len(val_str)
+            ws1.column_dimensions[col_letter].width = min(max(max_len + 3, 11), 50)
+
+        # ════════════════════ SHEET 2: SUMMARY ════════════════════
+        ws2 = wb.create_sheet(title="Panchayat Summary")
+        ws2.views.sheetView[0].showGridLines = True
+
+        headers2 = [
+            "S.No", "Financial Year", "Panchayat", "Pending Bills Count",
+            "Total Bill Amount (₹)", "Total Balance to be Paid (₹)"
+        ]
+        num_cols2 = len(headers2)
+
+        # Row 1: Header Banner
+        ws2.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_cols2)
+        ws2.row_dimensions[1].height = 36
+        banner2 = ws2.cell(row=1, column=1, value="PENDING MATERIAL BILLS - PANCHAYAT SUMMARY")
+        banner2.font = title_font
+        banner2.fill = navy_header_fill
+        banner2.alignment = center_align
+
+        # Row 2: Subtitle
+        ws2.merge_cells(start_row=2, start_column=1, end_row=2, end_column=num_cols2)
+        ws2.row_dimensions[2].height = 18
+        sub2 = ws2.cell(row=2, column=1,
+                        value=f"Generated via NregaBot (https://nregabot.com) | Date: {datetime.now().strftime('%d-%b-%Y %I:%M %p')}")
+        sub2.font = subtitle_font
+        sub2.fill = subtitle_fill
+        sub2.alignment = center_align
+
+        # Row 4: Headers
+        ws2.row_dimensions[4].height = 26
+        for col_idx, h in enumerate(headers2, 1):
+            c = ws2.cell(row=4, column=col_idx, value=h)
+            c.font = header_font
+            c.fill = navy_header_fill
+            c.alignment = center_align
+            c.border = thin_border
+
+        # Aggregate summary by (FY, Panchayat)
+        summary_dict: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for r in rows:
+            key = (r.get("fy", ""), r.get("panchayat", ""))
+            s = summary_dict.setdefault(key, {"count": 0, "amount": 0.0, "balance": 0.0})
+            s["count"] += 1
+            s["amount"] += float(r.get("bill_amount", 0) or 0)
+            s["balance"] += float(r.get("balance_to_paid", 0) or 0)
+
+        # Sort summary by amount descending
+        sorted_summary = sorted(summary_dict.items(), key=lambda kv: kv[1]["amount"], reverse=True)
+
+        for s_idx, ((fy_val, p_val), stats) in enumerate(sorted_summary, start=1):
+            s_row = 4 + s_idx
+            ws2.row_dimensions[s_row].height = 20
+            fill = zebra_gray_fill if (s_idx % 2 == 0) else white_fill
+
+            vals2 = [
+                s_idx, fy_val, p_val, stats["count"], stats["amount"], stats["balance"]
+            ]
+            for c_idx, val in enumerate(vals2, 1):
+                cell = ws2.cell(row=s_row, column=c_idx, value=val)
+                cell.font = regular_font
+                cell.fill = fill
+                cell.border = thin_border
+                if c_idx in (5, 6):
+                    cell.alignment = right_align
+                    cell.number_format = "₹ #,##0.00"
+                elif c_idx == 3:
+                    cell.alignment = left_align
+                else:
+                    cell.alignment = center_align
+
+        # Grand Total Row
+        gt_row = 5 + len(sorted_summary)
+        ws2.row_dimensions[gt_row].height = 22
+        gt_vals = ["", "GRAND TOTAL", "", total_bills, total_amount, total_balance]
+        for c_idx, val in enumerate(gt_vals, 1):
+            cell = ws2.cell(row=gt_row, column=c_idx, value=val)
+            cell.font = bold_font
+            cell.fill = grand_total_fill
+            cell.border = double_bottom
+            if c_idx in (5, 6):
+                cell.alignment = right_align
+                cell.number_format = "₹ #,##0.00"
+            else:
+                cell.alignment = center_align
+
+        ws2.freeze_panes = "A5"
+
+        # Auto-fit column widths for Sheet 2
+        for col in ws2.columns:
+            max_len = 0
+            col_letter = get_column_letter(col[0].column)
+            for cell in col[3:]:
+                val_str = str(cell.value or "")
+                if len(val_str) > max_len:
+                    max_len = len(val_str)
+            ws2.column_dimensions[col_letter].width = min(max(max_len + 4, 12), 40)
 
         wb.save(file_path)
