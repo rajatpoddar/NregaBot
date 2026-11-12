@@ -6,9 +6,12 @@ from src.tabs.pending_bills_tab import PendingBillsTab
 
 def test_parse_pending_bills_table_from_html():
     htm_path = os.path.join(os.path.dirname(__file__), "..", "docs", "htm", "pending Bills.htm")
-    assert os.path.exists(htm_path), f"Sample HTM file not found at {htm_path}"
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "pending_bills_sample.html")
 
-    with open(htm_path, "r", encoding="utf-8", errors="ignore") as f:
+    target_path = htm_path if os.path.exists(htm_path) else fixture_path
+    assert os.path.exists(target_path), f"Fixture not found at {target_path}"
+
+    with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
         html = f.read()
 
     rows = PendingBillsTab.parse_bills_table(html, fy="2024-2025", panchayat="Burkundi")
